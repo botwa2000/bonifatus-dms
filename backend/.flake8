@@ -1,0 +1,97 @@
+# backend/.flake8
+# Bonifatus DMS - Flake8 Configuration
+# Python linting configuration for code quality
+
+[flake8]
+# Maximum line length
+max-line-length = 88
+
+# Exclude patterns
+exclude = 
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .venv,
+    venv,
+    env,
+    migrations/versions,
+    build,
+    dist,
+    *.egg-info
+
+# Ignore specific errors
+ignore = 
+    # Line break before binary operator (conflicts with black)
+    W503,
+    # Line break after binary operator
+    W504,
+    # Line too long (handled by black)
+    E501,
+    # Whitespace before ':' (handled by black)
+    E203,
+    # Multiple statements on one line (black handles this)
+    E701,
+    # Blank line contains whitespace
+    W293,
+    # Missing docstring in public module
+    D100,
+    # Missing docstring in public class
+    D101,
+    # Missing docstring in public method
+    D102,
+    # Missing docstring in public function
+    D103,
+    # Missing docstring in public package
+    D104,
+    # Missing docstring in magic method
+    D105,
+    # Missing docstring in public nested class
+    D106,
+    # Missing docstring in __init__
+    D107
+
+# Enable specific checks
+select = 
+    # Pyflakes errors
+    F,
+    # PEP 8 errors
+    E,
+    # PEP 8 warnings
+    W,
+    # Complexity
+    C90
+
+# McCabe complexity
+max-complexity = 12
+
+# Import order checks
+import-order-style = google
+application-import-names = src
+
+# Docstring checks
+docstring-convention = google
+
+# Per-file ignores
+per-file-ignores =
+    # Tests can have longer lines and missing docstrings
+    tests/*:D,E501,F401,F811
+    # Migration files can have longer lines
+    migrations/*:E501
+    # Configuration files can have longer lines
+    src/core/config.py:E501
+    # __init__.py files can have unused imports
+    __init__.py:F401
+    # Test conftest can have redefined fixtures
+    conftest.py:F811
+
+# Count errors
+count = True
+
+# Show source code for each error
+show-source = True
+
+# Statistics
+statistics = True
+
+# Benchmark
+benchmark = True

@@ -1,22 +1,23 @@
 # database/migrations/001_initial_schema.py
 """
 Bonifatus DMS - Initial Database Schema Migration
-Alembic migration for creating initial database structure
+Alembic migration for creating initial database structure with default data
 """
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from datetime import datetime
 
 # revision identifiers
-revision = '001'
+revision = '001_initial_schema'
 down_revision = None
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    """Create initial database schema"""
+    """Create initial database schema with all tables and default data"""
     
     # Create custom types
     user_tier = postgresql.ENUM('free', 'premium_trial', 'premium', 'admin', name='user_tier')
@@ -194,7 +195,7 @@ def upgrade():
         sa.PrimaryKeyConstraint('id')
     )
     
-    # Create indexes
+    # Create indexes for performance
     op.create_index('idx_user_email', 'users', ['email'], unique=True)
     op.create_index('idx_user_google_id', 'users', ['google_id'], unique=True)
     op.create_index('idx_user_tier', 'users', ['tier'])
@@ -227,38 +228,87 @@ def upgrade():
     op.execute('CREATE INDEX idx_document_user_keywords ON documents USING gin(user_keywords)')
     op.execute("CREATE INDEX idx_document_text_search ON documents USING gin(to_tsvector('english', extracted_text))")
     op.execute("CREATE INDEX idx_document_title_search ON documents USING gin(to_tsvector('english', title))")
+    
+    # Insert default system settings
+    op.execute("""
+        INSERT INTO system_settings (
+            free_tier_document_limit,
+            premium_trial_document_limit, 
+            premium_document_limit,
+            free_tier_monthly_uploads,
+            premium_monthly_uploads,
+            max_file_size_mb,
+            ocr_enabled,
+            ai_categorization_enabled,
+            default_language,
+            supported_languages
+        ) VALUES (
+            100, 500, 0, 50, 0, 50,
+            true, true, 'en', '["en", "de"]'
+        )
+    """)
+    
+    # Insert default system categories
+    categories_data = [
+        ("Finance", "Finanzen", "Financial documents, invoices, receipts", 
+         "Finanzielle Dokumente, Rechnungen, Quittungen", "#10B981", 
+         "invoice,receipt,bank,financial,money,payment,tax,accounting"),
+        ("Personal", "Persönlich", "Personal documents, certificates, ID", 
+         "Persönliche Dokumente, Zertifikate, Ausweis", "#3B82F6", 
+         "personal,certificate,passport,id,identification,birth,marriage,medical"),
+        ("Business", "Geschäft", "Business documents, contracts, reports", 
+         "Geschäftsdokumente, Verträge, Berichte", "#8B5CF6", 
+         "business,contract,report,presentation,meeting,proposal,strategy"),
+        ("Legal", "Rechtlich", "Legal documents, contracts, insurance", 
+         "Rechtsdokumente, Verträge, Versicherung", "#EF4444", 
+         "legal,contract,insurance,law,court,agreement,terms,policy"),
+        ("Archive", "Archiv", "Archived documents, old files", 
+         "Archivierte Dokumente, alte Dateien", "#6B7280", 
+         "archive,old,historical,reference,backup")
+    ]
+    
+    for i, (name_en, name_de, desc_en, desc_de, color, keywords) in enumerate(categories_data):
+        op.execute(f"""
+            INSERT INTO categories (
+                user_id, name_en, name_de, description_en, description_de,
+                color, is_system_category, keywords, sort_order
+            ) VALUES (
+                NULL, '{name_en}', '{name_de}', '{desc_en}', '{desc_de}',
+                '{color}', true, '{keywords}', {i}
+            )
+        """)
 
 
 def downgrade():
     """Drop all tables and types"""
     
     # Drop indexes
-    op.drop_index('idx_document_title_search')
-    op.drop_index('idx_document_text_search') 
-    op.drop_index('idx_document_user_keywords')
-    op.drop_index('idx_document_keywords')
-    op.drop_index('idx_audit_success')
-    op.drop_index('idx_audit_created')
-    op.drop_index('idx_audit_action')
-    op.drop_index('idx_audit_user')
-    op.drop_index('idx_user_settings_user')
-    op.drop_index('idx_document_favorite')
-    op.drop_index('idx_document_updated')
-    op.drop_index('idx_document_created')
-    op.drop_index('idx_document_filename')
-    op.drop_index('idx_document_google_id')
-    op.drop_index('idx_document_status')
-    op.drop_index('idx_document_category')
-    op.drop_index('idx_document_user')
-    op.drop_index('idx_category_sort')
-    op.drop_index('idx_category_active')
-    op.drop_index('idx_category_system')
-    op.drop_index('idx_category_user')
-    op.drop_index('idx_user_created')
-    op.drop_index('idx_user_active')
-    op.drop_index('idx_user_tier')
-    op.drop_index('idx_user_google_id')
-    op.drop_index('idx_user_email')
+    op.execute('DROP INDEX IF EXISTS idx_document_title_search')
+    op.execute('DROP INDEX IF EXISTS idx_document_text_search') 
+    op.execute('DROP INDEX IF EXISTS idx_document_user_keywords')
+    op.execute('DROP INDEX IF EXISTS idx_document_keywords')
+    op.drop_index('idx_audit_success', table_name='audit_logs')
+    op.drop_index('idx_audit_created', table_name='audit_logs')
+    op.drop_index('idx_audit_action', table_name='audit_logs')
+    op.drop_index('idx_audit_user', table_name='audit_logs')
+    op.drop_index('idx_user_settings_user', table_name='user_settings')
+    op.drop_index('idx_document_favorite', table_name='documents')
+    op.drop_index('idx_document_updated', table_name='documents')
+    op.drop_index('idx_document_created', table_name='documents')
+    op.drop_index('idx_document_filename', table_name='documents')
+    op.drop_index('idx_document_google_id', table_name='documents')
+    op.drop_index('idx_document_status', table_name='documents')
+    op.drop_index('idx_document_category', table_name='documents')
+    op.drop_index('idx_document_user', table_name='documents')
+    op.drop_index('idx_category_sort', table_name='categories')
+    op.drop_index('idx_category_active', table_name='categories')
+    op.drop_index('idx_category_system', table_name='categories')
+    op.drop_index('idx_category_user', table_name='categories')
+    op.drop_index('idx_user_created', table_name='users')
+    op.drop_index('idx_user_active', table_name='users')
+    op.drop_index('idx_user_tier', table_name='users')
+    op.drop_index('idx_user_google_id', table_name='users')
+    op.drop_index('idx_user_email', table_name='users')
     
     # Drop tables
     op.drop_table('audit_logs')

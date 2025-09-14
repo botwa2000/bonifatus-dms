@@ -1,7 +1,7 @@
 # backend/migrations/env.py
 """
 Bonifatus DMS - Alembic Environment Configuration
-Database migration environment setup for PostgreSQL
+Database migration environment setup for Supabase PostgreSQL
 """
 
 from logging.config import fileConfig
