@@ -1,0 +1,197 @@
+# backend/src/core/config.py
+"""
+Bonifatus DMS - Configuration Management System
+All settings loaded from environment variables and database
+Zero hardcoded configuration values
+"""
+from pydantic_settings import BaseSettings
+from pydantic import Field, validator
+from typing import List, Dict, Any, Optional
+from functools import lru_cache
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseSettings(BaseSettings):
+    """Database configuration from environment variables"""
+    
+    # Supabase PostgreSQL connection
+    database_url: str = Field(..., description="Supabase PostgreSQL connection URL")
+    database_pool_size: int = Field(default=5, description="Database connection pool size")
+    database_pool_recycle: int = Field(default=3600, description="Pool recycle time in seconds")
+    database_echo: bool = Field(default=False, description="Enable SQL query logging")
+    
+    # Connection health checks
+    database_pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
+    database_connect_timeout: int = Field(default=30, description="Database connection timeout")
+    
+    class Config:
+        env_prefix = "DATABASE_"
+        case_sensitive = False
+
+
+class GoogleSettings(BaseSettings):
+    """Google services configuration"""
+    
+    # OAuth 2.0 configuration
+    google_client_id: str = Field(..., description="Google OAuth client ID")
+    google_client_secret: str = Field(..., description="Google OAuth client secret")
+    google_redirect_uri: str = Field(default="", description="OAuth redirect URI")
+    
+    # Google Drive API settings
+    google_drive_scopes: List[str] = Field(
+        default=["https://www.googleapis.com/auth/drive.file"],
+        description="Google Drive API scopes"
+    )
+    
+    # Google Cloud Vision API (for OCR)
+    google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
+    google_vision_monthly_limit: int = Field(default=950, description="Monthly Vision API request limit")
+    google_application_credentials: Optional[str] = Field(default=None, description="Service account key path")
+    
+    # API rate limiting
+    google_api_requests_per_minute: int = Field(default=100, description="API requests per minute limit")
+    google_api_requests_per_day: int = Field(default=10000, description="API requests per day limit")
+    
+    class Config:
+        env_prefix = "GOOGLE_"
+        case_sensitive = False
+
+
+class SecuritySettings(BaseSettings):
+    """Security and authentication configuration"""
+    
+    # JWT configuration
+    secret_key: str = Field(..., description="JWT secret key")
+    algorithm: str = Field(default="HS256", description="JWT algorithm")
+    access_token_expire_minutes: int = Field(default=30, description="Access token expiration in minutes")
+    refresh_token_expire_days: int = Field(default=7, description="Refresh token expiration in days")
+    
+    # Password requirements
+    password_min_length: int = Field(default=12, description="Minimum password length")
+    password_require_uppercase: bool = Field(default=True, description="Require uppercase in password")
+    password_require_lowercase: bool = Field(default=True, description="Require lowercase in password")
+    password_require_numbers: bool = Field(default=True, description="Require numbers in password")
+    password_require_symbols: bool = Field(default=True, description="Require symbols in password")
+    
+    # Session security
+    session_cookie_secure: bool = Field(default=True, description="Secure cookie flag")
+    session_cookie_httponly: bool = Field(default=True, description="HTTP only cookie flag")
+    session_cookie_samesite: str = Field(default="lax", description="SameSite cookie attribute")
+    
+    # Rate limiting
+    rate_limit_requests_per_minute: int = Field(default=60, description="API rate limit per minute")
+    rate_limit_burst_size: int = Field(default=10, description="Rate limit burst allowance")
+    
+    # CAPTCHA settings
+    recaptcha_enabled: bool = Field(default=True, description="Enable reCAPTCHA")
+    recaptcha_site_key: Optional[str] = Field(default=None, description="reCAPTCHA site key")
+    recaptcha_secret_key: Optional[str] = Field(default=None, description="reCAPTCHA secret key")
+    
+    class Config:
+        env_prefix = "SECURITY_"
+        case_sensitive = False
+
+
+class ApplicationSettings(BaseSettings):
+    """General application configuration"""
+    
+    # Application identification
+    app_name: str = Field(default="Bonifatus DMS", description="Application name")
+    app_version: str = Field(default="1.0.0", description="Application version")
+    app_description: str = Field(default="Professional Document Management System", description="App description")
+    
+    # Environment
+    environment: str = Field(default="development", description="Deployment environment")
+    debug: bool = Field(default=False, description="Enable debug mode")
+    testing: bool = Field(default=False, description="Testing mode")
+    
+    # API configuration
+    api_prefix: str = Field(default="/api/v1", description="API URL prefix")
+    docs_url: Optional[str] = Field(default="/api/docs", description="API documentation URL")
+    redoc_url: Optional[str] = Field(default="/api/redoc", description="ReDoc documentation URL")
+    
+    # CORS settings
+    cors_origins: List[str] = Field(
+        default=["http://localhost:3000"],
+        description="Allowed CORS origins"
+    )
+    cors_allow_credentials: bool = Field(default=True, description="Allow CORS credentials")
+    cors_allow_methods: List[str] = Field(
+        default=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        description="Allowed CORS methods"
+    )
+    cors_allow_headers: List[str] = Field(
+        default=["*"],
+        description="Allowed CORS headers"
+    )
+    
+    # File processing
+    max_file_size_mb: int = Field(default=50, description="Maximum file size in MB")
+    allowed_file_types: List[str] = Field(
+        default=[".pdf", ".doc", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".tiff", ".bmp"],
+        description="Allowed file extensions"
+    )
+    
+    # Logging
+    log_level: str = Field(default="INFO", description="Logging level")
+    log_format: str = Field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        description="Log format string"
+    )
+    
+    @validator("environment")
+    def validate_environment(cls, v):
+        allowed_environments = ["development", "staging", "production", "testing"]
+        if v not in allowed_environments:
+            raise ValueError(f"Environment must be one of: {allowed_environments}")
+        return v
+    
+    @validator("docs_url", "redoc_url")
+    def disable_docs_in_production(cls, v, values):
+        if values.get("environment") == "production":
+            return None
+        return v
+    
+    class Config:
+        env_prefix = "APP_"
+        case_sensitive = False
+
+
+class Settings:
+    """Main settings container combining all configuration sources"""
+    
+    def __init__(self):
+        self.database = DatabaseSettings()
+        self.google = GoogleSettings()
+        self.security = SecuritySettings()
+        self.app = ApplicationSettings()
+        
+        logger.info(f"Configuration loaded for environment: {self.app.environment}")
+    
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production environment"""
+        return self.app.environment == "production"
+    
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development environment"""
+        return self.app.environment == "development"
+    
+    @property
+    def is_testing(self) -> bool:
+        """Check if running in testing environment"""
+        return self.app.environment == "testing" or self.app.testing
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """Get cached settings instance"""
+    return Settings()
+
+
+# Global settings instance
+settings = get_settings()
