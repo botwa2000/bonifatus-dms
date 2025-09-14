@@ -28,8 +28,10 @@ class DatabaseSettings(BaseSettings):
     database_connect_timeout: int = Field(default=30, description="Database connection timeout")
     
     class Config:
-        env_prefix = "DATABASE_"
+        env_file = "../.env"
+        env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
 
 class GoogleSettings(BaseSettings):
@@ -56,15 +58,17 @@ class GoogleSettings(BaseSettings):
     google_api_requests_per_day: int = Field(default=10000, description="API requests per day limit")
     
     class Config:
-        env_prefix = "GOOGLE_"
+        env_file = "../.env"
+        env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
 
 class SecuritySettings(BaseSettings):
     """Security and authentication configuration"""
     
     # JWT configuration
-    secret_key: str = Field(..., description="JWT secret key")
+    security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=30, description="Access token expiration in minutes")
     refresh_token_expire_days: int = Field(default=7, description="Refresh token expiration in days")
@@ -91,8 +95,10 @@ class SecuritySettings(BaseSettings):
     recaptcha_secret_key: Optional[str] = Field(default=None, description="reCAPTCHA secret key")
     
     class Config:
-        env_prefix = "SECURITY_"
+        env_file = "../.env"
+        env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
 
 class ApplicationSettings(BaseSettings):
@@ -104,7 +110,7 @@ class ApplicationSettings(BaseSettings):
     app_description: str = Field(default="Professional Document Management System", description="App description")
     
     # Environment
-    environment: str = Field(default="development", description="Deployment environment")
+    app_environment: str = Field(default="development", description="Deployment environment")
     debug: bool = Field(default=False, description="Enable debug mode")
     testing: bool = Field(default=False, description="Testing mode")
     
@@ -113,10 +119,10 @@ class ApplicationSettings(BaseSettings):
     docs_url: Optional[str] = Field(default="/api/docs", description="API documentation URL")
     redoc_url: Optional[str] = Field(default="/api/redoc", description="ReDoc documentation URL")
     
-    # CORS settings
-    cors_origins: List[str] = Field(
-        default=["http://localhost:3000"],
-        description="Allowed CORS origins"
+    # CORS settings - using string that gets parsed to list
+    cors_origins: str = Field(
+        default="http://localhost:3000",
+        description="Comma-separated CORS origins"
     )
     cors_allow_credentials: bool = Field(default=True, description="Allow CORS credentials")
     cors_allow_methods: List[str] = Field(
@@ -142,22 +148,31 @@ class ApplicationSettings(BaseSettings):
         description="Log format string"
     )
     
-    @validator("environment")
+    @validator("app_environment")
     def validate_environment(cls, v):
         allowed_environments = ["development", "staging", "production", "testing"]
         if v not in allowed_environments:
             raise ValueError(f"Environment must be one of: {allowed_environments}")
         return v
     
+    @validator("cors_origins")
+    def parse_cors_origins(cls, v):
+        """Parse comma-separated CORS origins string into list"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+    
     @validator("docs_url", "redoc_url")
     def disable_docs_in_production(cls, v, values):
-        if values.get("environment") == "production":
+        if values.get("app_environment") == "production":
             return None
         return v
     
     class Config:
-        env_prefix = "APP_"
+        env_file = "../.env"
+        env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
 
 class Settings:
@@ -169,22 +184,22 @@ class Settings:
         self.security = SecuritySettings()
         self.app = ApplicationSettings()
         
-        logger.info(f"Configuration loaded for environment: {self.app.environment}")
+        logger.info(f"Configuration loaded for environment: {self.app.app_environment}")
     
     @property
     def is_production(self) -> bool:
         """Check if running in production environment"""
-        return self.app.environment == "production"
+        return self.app.app_environment == "production"
     
     @property
     def is_development(self) -> bool:
         """Check if running in development environment"""
-        return self.app.environment == "development"
+        return self.app.app_environment == "development"
     
     @property
     def is_testing(self) -> bool:
         """Check if running in testing environment"""
-        return self.app.environment == "testing" or self.app.testing
+        return self.app.app_environment == "testing" or self.app.testing
 
 
 @lru_cache()
