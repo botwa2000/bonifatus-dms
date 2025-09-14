@@ -6,7 +6,7 @@ Data export, account deletion, and usage analytics
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, func, text
+from sqlalchemy import and_, or_, desc, func, text
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime, timedelta, timezone
