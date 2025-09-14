@@ -20,12 +20,12 @@ settings = get_settings()
 
 class DatabaseManager:
     """Manages Supabase PostgreSQL database connections and operations"""
-    
+
     def __init__(self):
         self._engine = None
         self._session_local = None
         self._initialized = False
-    
+
     @property
     def engine(self):
         """Get or create database engine"""
@@ -38,34 +38,32 @@ class DatabaseManager:
                 echo=settings.database.database_echo,
                 connect_args={
                     "connect_timeout": settings.database.database_connect_timeout,
-                    "options": "-c timezone=UTC"
-                }
+                    "options": "-c timezone=UTC",
+                },
             )
             logger.info("Database engine created successfully")
         return self._engine
-    
-    @property 
+
+    @property
     def session_local(self):
         """Get or create session factory"""
         if self._session_local is None:
             self._session_local = sessionmaker(
-                autocommit=False,
-                autoflush=False, 
-                bind=self.engine
+                autocommit=False, autoflush=False, bind=self.engine
             )
             logger.info("Database session factory created")
         return self._session_local
-    
+
     async def init_database(self) -> bool:
         """Initialize database tables and default data"""
         try:
             # Create all tables
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables created successfully")
-            
+
             # Initialize default data if needed
             await self._create_default_data()
-            
+
             # Verify database connection
             if await self.health_check():
                 self._initialized = True
@@ -74,14 +72,14 @@ class DatabaseManager:
             else:
                 logger.error("Database health check failed after initialization")
                 return False
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Database initialization failed: {e}")
             return False
         except Exception as e:
             logger.error(f"Unexpected error during database initialization: {e}")
             return False
-    
+
     async def health_check(self) -> bool:
         """Check database connection health"""
         try:
@@ -93,18 +91,20 @@ class DatabaseManager:
         except Exception as e:
             logger.warning(f"Database health check failed: {e}")
             return False
-    
+
     async def _create_default_data(self):
         """Create default system data (categories, settings, etc.)"""
         try:
             from src.database.models import Category, SystemSettings
-            
+
             with self.session_local() as session:
                 # Check if default categories exist
-                existing_categories = session.query(Category).filter(
-                    Category.is_system_category == True
-                ).count()
-                
+                existing_categories = (
+                    session.query(Category)
+                    .filter(Category.is_system_category == True)
+                    .count()
+                )
+
                 if existing_categories == 0:
                     # Create default categories
                     default_categories = [
@@ -115,34 +115,34 @@ class DatabaseManager:
                             "description_de": "Finanzielle Dokumente, Rechnungen, Quittungen",
                             "color": "#10B981",
                             "is_system_category": True,
-                            "keywords": "invoice,receipt,bank,financial,money,payment"
+                            "keywords": "invoice,receipt,bank,financial,money,payment",
                         },
                         {
-                            "name_en": "Personal", 
+                            "name_en": "Personal",
                             "name_de": "Persönlich",
                             "description_en": "Personal documents, certificates, ID",
                             "description_de": "Persönliche Dokumente, Zertifikate, Ausweis",
                             "color": "#3B82F6",
                             "is_system_category": True,
-                            "keywords": "personal,certificate,passport,id,identification"
+                            "keywords": "personal,certificate,passport,id,identification",
                         },
                         {
                             "name_en": "Business",
-                            "name_de": "Geschäft", 
+                            "name_de": "Geschäft",
                             "description_en": "Business documents, contracts, reports",
                             "description_de": "Geschäftsdokumente, Verträge, Berichte",
                             "color": "#8B5CF6",
                             "is_system_category": True,
-                            "keywords": "business,contract,report,presentation,meeting"
+                            "keywords": "business,contract,report,presentation,meeting",
                         },
                         {
                             "name_en": "Legal",
                             "name_de": "Rechtlich",
                             "description_en": "Legal documents, contracts, insurance",
-                            "description_de": "Rechtsdokumente, Verträge, Versicherung", 
+                            "description_de": "Rechtsdokumente, Verträge, Versicherung",
                             "color": "#EF4444",
                             "is_system_category": True,
-                            "keywords": "legal,contract,insurance,law,court,agreement"
+                            "keywords": "legal,contract,insurance,law,court,agreement",
                         },
                         {
                             "name_en": "Archive",
@@ -151,17 +151,17 @@ class DatabaseManager:
                             "description_de": "Archivierte Dokumente, alte Dateien",
                             "color": "#6B7280",
                             "is_system_category": True,
-                            "keywords": "archive,old,historical,reference"
-                        }
+                            "keywords": "archive,old,historical,reference",
+                        },
                     ]
-                    
+
                     for cat_data in default_categories:
                         category = Category(**cat_data)
                         session.add(category)
-                    
+
                     session.commit()
                     logger.info(f"Created {len(default_categories)} default categories")
-                
+
                 # Check if system settings exist
                 existing_settings = session.query(SystemSettings).count()
                 if existing_settings == 0:
@@ -177,15 +177,15 @@ class DatabaseManager:
                         ai_categorization_enabled=True,
                         default_language="en",
                         supported_languages=["en", "de"],
-                        maintenance_mode=False
+                        maintenance_mode=False,
                     )
                     session.add(default_settings)
                     session.commit()
                     logger.info("Created default system settings")
-                    
+
         except Exception as e:
             logger.error(f"Failed to create default data: {e}")
-    
+
     def get_db_session(self) -> Generator[Session, None, None]:
         """Database dependency for FastAPI"""
         session = self.session_local()
@@ -193,7 +193,7 @@ class DatabaseManager:
             yield session
         finally:
             session.close()
-    
+
     async def close(self):
         """Close database connections"""
         if self._engine:

@@ -14,9 +14,9 @@ from .google_oauth_service import GoogleOAuthService
 
 __all__ = [
     "AuthService",
-    "DocumentService", 
+    "DocumentService",
     "CategoryService",
     "SearchService",
     "UserService",
-    "GoogleOAuthService"
+    "GoogleOAuthService",
 ]

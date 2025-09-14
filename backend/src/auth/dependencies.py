@@ -20,7 +20,7 @@ security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> User:
     """
     Get current authenticated user from JWT token
@@ -28,22 +28,21 @@ async def get_current_user(
     try:
         auth_service = AuthService(db)
         user = await auth_service.get_current_user(credentials.credentials)
-        
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         if not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Inactive user account"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user account"
             )
-        
+
         return user
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -55,18 +54,15 @@ async def get_current_user(
         )
 
 
-async def get_admin_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
+async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
     """
     Require admin user privileges
     """
     if current_user.tier != UserTier.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required"
         )
-    
+
     return current_user
 
 
@@ -74,34 +70,33 @@ def require_tier(required_tier: UserTier):
     """
     Dependency factory to require specific user tier or higher
     """
-    async def tier_dependency(
-        current_user: User = Depends(get_current_user)
-    ) -> User:
+
+    async def tier_dependency(current_user: User = Depends(get_current_user)) -> User:
         # Define tier hierarchy
         tier_hierarchy = {
             UserTier.FREE: 0,
             UserTier.PREMIUM_TRIAL: 1,
             UserTier.PREMIUM: 2,
-            UserTier.ADMIN: 3
+            UserTier.ADMIN: 3,
         }
-        
+
         user_level = tier_hierarchy.get(current_user.tier, 0)
         required_level = tier_hierarchy.get(required_tier, 0)
-        
+
         if user_level < required_level:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires {required_tier.value} tier or higher"
+                detail=f"Requires {required_tier.value} tier or higher",
             )
-        
+
         return current_user
-    
+
     return tier_dependency
 
 
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> Optional[User]:
     """
     Get current user if authenticated, None if not
@@ -109,7 +104,7 @@ async def get_optional_user(
     """
     if not credentials:
         return None
-    
+
     try:
         auth_service = AuthService(db)
         user = await auth_service.get_current_user(credentials.credentials)
@@ -118,23 +113,21 @@ async def get_optional_user(
         return None
 
 
-async def require_verified_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
+async def require_verified_user(current_user: User = Depends(get_current_user)) -> User:
     """
     Require verified user account
     """
     if not current_user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account verification required"
+            detail="Account verification required",
         )
-    
+
     return current_user
 
 
 async def require_google_drive_connected(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> User:
     """
     Require Google Drive connection
@@ -142,7 +135,7 @@ async def require_google_drive_connected(
     if not current_user.google_drive_connected:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google Drive connection required"
+            detail="Google Drive connection required",
         )
-    
+
     return current_user

@@ -10,13 +10,13 @@ from .models import Base, User, Document, Category, UserSettings, SystemSettings
 
 __all__ = [
     "engine",
-    "SessionLocal", 
+    "SessionLocal",
     "get_db",
     "init_database",
     "Base",
     "User",
-    "Document", 
+    "Document",
     "Category",
     "UserSettings",
-    "SystemSettings"
+    "SystemSettings",
 ]

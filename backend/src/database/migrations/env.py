@@ -11,7 +11,7 @@ import os
 import sys
 
 # Add the src directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from src.database.models import Base
 from src.core.config import get_settings
@@ -33,8 +33,7 @@ try:
 except Exception:
     # Fallback for cases where settings can't be loaded
     database_url = os.getenv(
-        "DATABASE_URL", 
-        "postgresql://bonifatus:password@localhost:5432/bonifatus_dms"
+        "DATABASE_URL", "postgresql://bonifatus:password@localhost:5432/bonifatus_dms"
     )
 
 # Override sqlalchemy.url from configuration
@@ -44,12 +43,12 @@ config.set_main_option("sqlalchemy.url", database_url)
 def run_migrations_offline() -> None:
     """
     Run migrations in 'offline' mode.
-    
+
     This configures the context with just a URL
     and not an Engine, though an Engine is acceptable
     here as well. By skipping the Engine creation
     we don't even need a DBAPI to be available.
-    
+
     Calls to context.execute() here emit the given string to the
     script output.
     """
@@ -71,13 +70,13 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
-    
+
     In this scenario we need to create an Engine
     and associate a connection with the context.
     """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = database_url
-    
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -106,14 +105,14 @@ def render_item(type_, obj, autogen_context):
         # Handle custom PostgreSQL types
         if obj.name in ["user_tier", "document_status"]:
             return f"postgresql.ENUM{obj.enums!r}, name='{obj.name}'"
-    
+
     return False
 
 
 def process_revision_directives(context, revision, directives):
     """Process revision directives to add custom logic."""
     # Skip empty migrations
-    if getattr(config.cmd_opts, 'autogenerate', False):
+    if getattr(config.cmd_opts, "autogenerate", False):
         script = directives[0]
         if script.upgrade_ops.is_empty():
             directives[:] = []

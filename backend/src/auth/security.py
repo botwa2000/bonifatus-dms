@@ -43,35 +43,39 @@ def hash_password(password: str) -> str:
         raise
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
     """
     Create JWT access token
     """
     try:
         to_encode = data.copy()
-        
+
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(
                 minutes=settings.security.access_token_expire_minutes
             )
-        
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.utcnow(),
-            "type": "access",
-            "jti": secrets.token_urlsafe(32)  # JWT ID for tracking
-        })
-        
+
+        to_encode.update(
+            {
+                "exp": expire,
+                "iat": datetime.utcnow(),
+                "type": "access",
+                "jti": secrets.token_urlsafe(32),  # JWT ID for tracking
+            }
+        )
+
         encoded_jwt = jwt.encode(
             to_encode,
             settings.security.secret_key,
-            algorithm=settings.security.algorithm
+            algorithm=settings.security.algorithm,
         )
-        
+
         return encoded_jwt
-        
+
     except Exception as e:
         logger.error(f"Token creation failed: {e}")
         raise
@@ -86,22 +90,24 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
         expire = datetime.utcnow() + timedelta(
             days=settings.security.refresh_token_expire_days
         )
-        
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.utcnow(),
-            "type": "refresh",
-            "jti": secrets.token_urlsafe(32)
-        })
-        
+
+        to_encode.update(
+            {
+                "exp": expire,
+                "iat": datetime.utcnow(),
+                "type": "refresh",
+                "jti": secrets.token_urlsafe(32),
+            }
+        )
+
         encoded_jwt = jwt.encode(
             to_encode,
             settings.security.secret_key,
-            algorithm=settings.security.algorithm
+            algorithm=settings.security.algorithm,
         )
-        
+
         return encoded_jwt
-        
+
     except Exception as e:
         logger.error(f"Refresh token creation failed: {e}")
         raise
@@ -115,10 +121,10 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         payload = jwt.decode(
             token,
             settings.security.secret_key,
-            algorithms=[settings.security.algorithm]
+            algorithms=[settings.security.algorithm],
         )
         return payload
-        
+
     except JWTError as e:
         logger.warning(f"JWT decode failed: {e}")
         return None
@@ -136,38 +142,36 @@ def validate_password_strength(password: str) -> Dict[str, Any]:
         "require_uppercase": settings.security.password_require_uppercase,
         "require_lowercase": settings.security.password_require_lowercase,
         "require_numbers": settings.security.password_require_numbers,
-        "require_symbols": settings.security.password_require_symbols
+        "require_symbols": settings.security.password_require_symbols,
     }
-    
+
     errors = []
-    
+
     # Check length
     if len(password) < requirements["min_length"]:
-        errors.append(f"Password must be at least {requirements['min_length']} characters long")
-    
+        errors.append(
+            f"Password must be at least {requirements['min_length']} characters long"
+        )
+
     # Check uppercase
     if requirements["require_uppercase"] and not any(c.isupper() for c in password):
         errors.append("Password must contain at least one uppercase letter")
-    
+
     # Check lowercase
     if requirements["require_lowercase"] and not any(c.islower() for c in password):
         errors.append("Password must contain at least one lowercase letter")
-    
+
     # Check numbers
     if requirements["require_numbers"] and not any(c.isdigit() for c in password):
         errors.append("Password must contain at least one number")
-    
+
     # Check symbols
     if requirements["require_symbols"]:
         symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
         if not any(c in symbols for c in password):
             errors.append("Password must contain at least one special character")
-    
-    return {
-        "valid": len(errors) == 0,
-        "errors": errors,
-        "requirements": requirements
-    }
+
+    return {"valid": len(errors) == 0, "errors": errors, "requirements": requirements}
 
 
 def generate_secure_token(length: int = 32) -> str:
@@ -188,4 +192,4 @@ def constant_time_compare(a: str, b: str) -> bool:
     """
     Compare two strings in constant time to prevent timing attacks
     """
-    return secrets.compare_digest(a.encode('utf-8'), b.encode('utf-8'))
+    return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
