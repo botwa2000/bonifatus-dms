@@ -1,0 +1,158 @@
+# docker-compose.yml
+# Bonifatus DMS - Docker Compose for Local Development
+# Complete development environment with PostgreSQL database
+
+version: '3.8'
+
+services:
+  # PostgreSQL database (alternative to Supabase for local development)
+  postgres:
+    image: postgres:15-alpine
+    container_name: bonifatus-postgres
+    environment:
+      POSTGRES_DB: bonifatus_dms
+      POSTGRES_USER: bonifatus
+      POSTGRES_PASSWORD: bonifatus_dev_password_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bonifatus -d bonifatus_dms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bonifatus-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: bonifatus-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bonifatus-network
+
+  # FastAPI backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bonifatus-backend
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://bonifatus:bonifatus_dev_password_2024@postgres:5432/bonifatus_dms
+      
+      # Google OAuth (add your credentials)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-google-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
+      
+      # Security
+      SECURITY_SECRET_KEY: ${SECRET_KEY:-bonifatus-dev-secret-key-change-in-production-2024}
+      
+      # Application settings
+      APP_ENVIRONMENT: development
+      APP_DEBUG: "true"
+      
+      # CORS settings
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8080
+      
+      # Google Vision API (optional)
+      GOOGLE_VISION_ENABLED: "false"
+      
+      # Development settings
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bonifatus-network
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional, for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: bonifatus-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - bonifatus-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Database administration tool
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bonifatus-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@bonifatus.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - bonifatus-network
+    profiles:
+      - tools
+
+  # Redis admin interface
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: bonifatus-redis-commander
+    environment:
+      REDIS_HOSTS: redis:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - bonifatus-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  bonifatus-network:
+    driver: bridge
+    name: bonifatus-network
