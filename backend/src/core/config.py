@@ -136,6 +136,11 @@ class SecuritySettings(BaseSettings):
         default=None, description="reCAPTCHA secret key"
     )
 
+    @property
+    def secret_key(self) -> str:
+        """Backward compatibility property for secret_key access"""
+        return self.security_secret_key
+
     class Config:
         env_file = "../.env"
         env_file_encoding = "utf-8"

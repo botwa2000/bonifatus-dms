@@ -176,6 +176,31 @@ def test_category(test_db_session, test_user):
     
     return category
 
+@pytest.fixture(scope="function")
+def test_document(test_db_session, test_user, test_category):
+    """Create a test document"""
+    from src.database.models import Document, DocumentStatus
+    
+    document = Document(
+        user_id=test_user.id,
+        category_id=test_category.id,
+        filename="test_document.pdf",
+        original_filename="Original Test Document.pdf",
+        file_path="/Test Category/test_document.pdf",
+        google_drive_file_id="test_file_id_123",
+        file_size_bytes=1024000,
+        mime_type="application/pdf",
+        file_extension=".pdf",
+        status=DocumentStatus.READY,
+        title="Test Document",
+        description="Test document description"
+    )
+    
+    test_db_session.add(document)
+    test_db_session.commit()
+    test_db_session.refresh(document)
+    
+    return document
 
 @pytest.fixture(scope="function")
 def mock_google_drive():

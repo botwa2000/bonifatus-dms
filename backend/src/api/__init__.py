@@ -16,11 +16,8 @@ api_router = APIRouter(prefix="/api/v1")
 
 # Include all sub-routers
 api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
-
 api_router.include_router(documents_router, prefix="/documents", tags=["documents"])
-
 api_router.include_router(categories_router, prefix="/categories", tags=["categories"])
-
 api_router.include_router(users_router, prefix="/users", tags=["users"])
 
 __all__ = ["api_router"]
