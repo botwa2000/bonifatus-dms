@@ -17,7 +17,24 @@ from typing import Generator
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+import socket
+from urllib.parse import urlparse
 
+def resolve_ipv4_address(hostname: str) -> str:
+    """Resolve hostname to IPv4 address for Codespaces compatibility"""
+    try:
+        addresses = socket.getaddrinfo(hostname, None, socket.AF_INET, socket.SOCK_STREAM)
+        if addresses:
+            ipv4_addr = addresses[0][4][0]
+            logger.info(f"Resolved {hostname} to IPv4: {ipv4_addr}")
+            return ipv4_addr
+        else:
+            logger.warning(f"No IPv4 address found for {hostname}, using hostname")
+            return hostname
+    except Exception as e:
+        logger.warning(f"IPv4 resolution failed for {hostname}: {e}, using hostname")
+        return hostname
+    
 class DatabaseManager:
     """Manages Supabase PostgreSQL database connections and operations"""
 
@@ -39,6 +56,9 @@ class DatabaseManager:
                 connect_args={
                     "connect_timeout": settings.database.database_connect_timeout,
                     "options": "-c timezone=UTC",
+                    "hostaddr": resolve_ipv4_address(urlparse(settings.database.database_url).hostname),
+                    "sslmode": "require",
+                    "application_name": "bonifatus-dms",
                 },
             )
             logger.info("Database engine created successfully")
