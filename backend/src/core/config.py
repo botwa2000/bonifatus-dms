@@ -136,60 +136,6 @@ class SecuritySettings(BaseSettings):
         default=None, description="reCAPTCHA secret key"
     )
 
-    @property
-    def secret_key(self) -> str:
-        """Backward compatibility property for secret_key access"""
-        return self.security_secret_key
-
-    @property
-    def environment(self) -> str:
-        """Backward compatibility property for environment access"""
-        return self.app.app_environment
-
-    @property
-    def cors_origins(self) -> List[str]:
-        """Helper property to get CORS origins as a list"""
-        if isinstance(self.app.cors_origins, str):
-            return [
-                origin.strip()
-                for origin in self.app.cors_origins.split(",")
-                if origin.strip()
-            ]
-        return self.app.cors_origins
-
-        @property
-        def environment(self) -> str:
-            """Convenience property for environment access"""
-            return self.app.app_environment
-
-        @property
-        def cors_origins(self) -> List[str]:
-            """Convenience property for CORS origins as a list"""
-            if isinstance(self.app.cors_origins, str):
-                return [
-                    origin.strip()
-                    for origin in self.app.cors_origins.split(",")
-                    if origin.strip()
-                ]
-            return (
-                self.app.cors_origins if isinstance(self.app.cors_origins, list) else []
-            )
-
-        @property
-        def secret_key(self) -> str:
-            """Convenience property for JWT secret key"""
-            return self.security.security_secret_key
-
-        @property
-        def docs_url(self) -> Optional[str]:
-            """Convenience property for API docs URL"""
-            return self.app.docs_url if not self.is_production else None
-
-        @property
-        def redoc_url(self) -> Optional[str]:
-            """Convenience property for ReDoc URL"""
-            return self.app.redoc_url if not self.is_production else None
-
     class Config:
         env_file = "../.env"
         env_file_encoding = "utf-8"
@@ -314,6 +260,43 @@ class Settings:
     def is_testing(self) -> bool:
         """Check if running in testing environment"""
         return self.app.app_environment == "testing" or self.app.testing
+
+    # Convenience properties for clean API access
+    @property
+    def environment(self) -> str:
+        """Convenience property for environment access"""
+        return self.app.app_environment
+
+    @property
+    def cors_origins(self) -> List[str]:
+        """Convenience property for CORS origins as a list"""
+        if isinstance(self.app.cors_origins, str):
+            return [
+                origin.strip()
+                for origin in self.app.cors_origins.split(",")
+                if origin.strip()
+            ]
+        return self.app.cors_origins if isinstance(self.app.cors_origins, list) else []
+
+    @property
+    def secret_key(self) -> str:
+        """Convenience property for JWT secret key"""
+        return self.security.security_secret_key
+
+    @property
+    def database_url(self) -> str:
+        """Convenience property for database URL"""
+        return self.database.database_url
+
+    @property
+    def docs_url(self) -> Optional[str]:
+        """Convenience property for API docs URL"""
+        return self.app.docs_url if not self.is_production else None
+
+    @property
+    def redoc_url(self) -> Optional[str]:
+        """Convenience property for ReDoc URL"""
+        return self.app.redoc_url if not self.is_production else None
 
 
 @lru_cache()
