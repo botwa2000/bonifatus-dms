@@ -22,8 +22,8 @@ app = FastAPI(
     title="Bonifatus DMS",
     description="Professional Document Management System",
     version="1.0.0",
-    docs_url="/api/docs" if settings.environment != "production" else None,
-    redoc_url="/api/redoc" if settings.environment != "production" else None,
+    docs_url=settings.docs_url,
+    redoc_url=settings.redoc_url,
 )
 
 # CORS configuration
