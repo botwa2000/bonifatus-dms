@@ -13,6 +13,7 @@ from .models import (
     Category,
     UserSettings,
     SystemSettings,
+    AuditLog,
     UserTier,
     DocumentStatus,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "Category",
     "UserSettings",
     "SystemSettings",
+    "AuditLog",
     "UserTier",
     "DocumentStatus",
 ]

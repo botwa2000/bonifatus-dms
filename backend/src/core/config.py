@@ -141,6 +141,22 @@ class SecuritySettings(BaseSettings):
         """Backward compatibility property for secret_key access"""
         return self.security_secret_key
 
+    @property
+    def environment(self) -> str:
+        """Backward compatibility property for environment access"""
+        return self.app.app_environment
+
+    @property
+    def cors_origins(self) -> List[str]:
+        """Helper property to get CORS origins as a list"""
+        if isinstance(self.app.cors_origins, str):
+            return [
+                origin.strip()
+                for origin in self.app.cors_origins.split(",")
+                if origin.strip()
+            ]
+        return self.app.cors_origins
+
     class Config:
         env_file = "../.env"
         env_file_encoding = "utf-8"
