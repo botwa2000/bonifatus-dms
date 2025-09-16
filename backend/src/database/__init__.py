@@ -6,7 +6,16 @@ All database models and connection management
 """
 
 from .connection import engine, SessionLocal, get_db, init_database
-from .models import Base, User, Document, Category, UserSettings, SystemSettings
+from .models import (
+    Base,
+    User,
+    Document,
+    Category,
+    UserSettings,
+    SystemSettings,
+    UserTier,
+    DocumentStatus,
+)
 
 __all__ = [
     "engine",
@@ -19,4 +28,6 @@ __all__ = [
     "Category",
     "UserSettings",
     "SystemSettings",
+    "UserTier",
+    "DocumentStatus",
 ]
