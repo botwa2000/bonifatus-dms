@@ -138,13 +138,13 @@ class AuthService:
             # Generate tokens
             access_token = jwt.encode(
                 access_payload,
-                settings.security.secret_key,
+                settings.secret_key,
                 algorithm=settings.security.algorithm,
             )
 
             refresh_token = jwt.encode(
                 refresh_payload,
-                settings.security.secret_key,
+                settings.secret_key,
                 algorithm=settings.security.algorithm,
             )
 
@@ -163,7 +163,7 @@ class AuthService:
             # Decode JWT token
             payload = jwt.decode(
                 token,
-                settings.security.secret_key,
+                settings.secret_key,
                 algorithms=[settings.security.algorithm],
             )
 
@@ -206,7 +206,7 @@ class AuthService:
             # Decode refresh token
             payload = jwt.decode(
                 refresh_token,
-                settings.security.secret_key,
+                settings.secret_key,
                 algorithms=[settings.security.algorithm],
             )
 
