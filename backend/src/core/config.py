@@ -298,6 +298,11 @@ class Settings:
         """Convenience property for ReDoc URL"""
         return self.app.redoc_url if not self.is_production else None
 
+    @property
+    def secret_key(self) -> str:
+        """Convenience property for secret_key access"""
+        return self.security_secret_key
+
 
 @lru_cache()
 def get_settings() -> Settings:
