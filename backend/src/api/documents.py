@@ -75,13 +75,15 @@ async def upload_document(
 
         # Create initial document record
         document = await document_service.create_document_record(
-                user_id=user.id,  # ✅ CORRECT - pass user_id instead of user object
-                file=file,
-                category_id=category_id,
-                title=title,
-                description=description,
-                keywords=keywords.split(",") if keywords else None,  # ✅ Convert string to list
-            )
+            user_id=user.id,  # ✅ CORRECT - pass user_id instead of user object
+            file=file,
+            category_id=category_id,
+            title=title,
+            description=description,
+            keywords=(
+                keywords.split(",") if keywords else None
+            ),  # ✅ Convert string to list
+        )
 
         # Schedule background processing
         background_tasks.add_task(
