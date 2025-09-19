@@ -129,7 +129,8 @@ class TestJWTTokens:
         with patch('src.api.auth.AuthService') as mock_auth_class:
             mock_auth_service = Mock()
             mock_auth_class.return_value = mock_auth_service
-            mock_auth_service.refresh_user_tokens.return_value = None
+            # FIX: Mock the correct method that's actually called
+            mock_auth_service.validate_refresh_token.return_value = None
             
             response = client.post("/api/v1/auth/refresh", json={
                 "refresh_token": "invalid_refresh_token"

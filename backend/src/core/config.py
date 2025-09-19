@@ -220,6 +220,21 @@ class Settings(BaseSettings):
         """Convenience property for ReDoc URL"""
         return self.app.redoc_url if not self.is_production else None
 
+    @property
+    def google_client_id(self) -> str:
+        """Convenience property for Google OAuth client ID"""
+        return self.google.google_client_id
+
+    @property
+    def google_client_secret(self) -> str:
+        """Convenience property for Google OAuth client secret"""
+        return self.google.google_client_secret
+
+    @property
+    def google_redirect_uri(self) -> str:
+        """Convenience property for Google OAuth redirect URI"""
+        return self.google.google_redirect_uri
+
     class Config:
         env_file = "../.env"
         env_file_encoding = "utf-8"
