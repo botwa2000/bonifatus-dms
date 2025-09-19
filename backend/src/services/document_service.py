@@ -180,7 +180,7 @@ class DocumentService:
                 document.language_detected = self._detect_language(extracted_text)
 
                 # Extract keywords
-                keywords = await self._extract_keywords(
+                keywords = self._extract_keywords(
                     extracted_text, document.language_detected or "en"
                 )
                 document.extracted_keywords = keywords
@@ -377,7 +377,7 @@ class DocumentService:
             logger.error(f"PDF text extraction failed: {e}")
             return None
 
-    async def _extract_keywords(self, text: str, language: str = "en") -> List[str]:
+    def _extract_keywords(self, text: str, language: str = "en") -> List[str]:
         """
         Extract relevant keywords from text using NLP
         """
