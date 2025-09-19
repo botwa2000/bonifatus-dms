@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 router = APIRouter()
 
+
 class CategoryCreate(BaseModel):
     name_en: str
     name_de: str
@@ -23,6 +24,7 @@ class CategoryCreate(BaseModel):
     color: Optional[str] = "#808080"
     icon: Optional[str] = "📁"
     keywords: Optional[str] = ""
+
 
 class CategoryUpdate(BaseModel):
     name_en: Optional[str] = None
@@ -33,11 +35,14 @@ class CategoryUpdate(BaseModel):
     icon: Optional[str] = None
     keywords: Optional[str] = None
 
+
 @router.get("/")
 async def list_categories(
     include_system: bool = Query(True, description="Include system categories"),
     include_user: bool = Query(True, description="Include user categories"),
-    language: str = Query("en", pattern="^(en|de)$", description="Language for category names"),
+    language: str = Query(
+        "en", pattern="^(en|de)$", description="Language for category names"
+    ),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
@@ -52,7 +57,7 @@ async def list_categories(
             )
 
         category_service = CategoryService(db)
-        
+
         # Simply retrieve categories from database (no initialization)
         categories = await category_service.get_user_categories(
             user_id=user.id,
@@ -64,7 +69,7 @@ async def list_categories(
         return {
             "categories": categories,
             "total": len(categories),
-            "language": language
+            "language": language,
         }
 
     except HTTPException:
@@ -75,6 +80,7 @@ async def list_categories(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve categories",
         )
+
 
 @router.post("/")
 async def create_category(
@@ -94,10 +100,9 @@ async def create_category(
 
         category_service = CategoryService(db)
         category = await category_service.create_user_category(
-            user_id=user.id,
-            category_data=category_data.dict()
+            user_id=user.id, category_data=category_data.dict()
         )
-        
+
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -110,7 +115,7 @@ async def create_category(
             "name_de": category.name_de,
             "color": category.color,
             "icon": category.icon,
-            "message": "Category created successfully"
+            "message": "Category created successfully",
         }
 
     except HTTPException:
@@ -121,6 +126,7 @@ async def create_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create category",
         )
+
 
 @router.get("/{category_id}")
 async def get_category(
@@ -140,8 +146,9 @@ async def get_category(
             )
 
         from src.database.models import Category
+
         category = db.query(Category).filter(Category.id == category_id).first()
-        
+
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -160,7 +167,9 @@ async def get_category(
             "name": category.name_de if language == "de" else category.name_en,
             "name_en": category.name_en,
             "name_de": category.name_de,
-            "description": category.description_de if language == "de" else category.description_en,
+            "description": (
+                category.description_de if language == "de" else category.description_en
+            ),
             "description_en": category.description_en,
             "description_de": category.description_de,
             "color": category.color,
@@ -168,7 +177,9 @@ async def get_category(
             "keywords": category.keywords.split(",") if category.keywords else [],
             "is_system_category": category.is_system_category,
             "created_at": category.created_at.isoformat(),
-            "last_used_at": category.last_used_at.isoformat() if category.last_used_at else None
+            "last_used_at": (
+                category.last_used_at.isoformat() if category.last_used_at else None
+            ),
         }
 
     except HTTPException:
@@ -179,6 +190,7 @@ async def get_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve category",
         )
+
 
 @router.put("/{category_id}")
 async def update_category(
@@ -201,7 +213,7 @@ async def update_category(
         category = await category_service.update_category(
             category_id, user.id, updates.dict(exclude_unset=True)
         )
-        
+
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -211,7 +223,7 @@ async def update_category(
         return {
             "id": category.id,
             "message": "Category updated successfully",
-            "updated_at": category.updated_at.isoformat()
+            "updated_at": category.updated_at.isoformat(),
         }
 
     except HTTPException:
@@ -222,6 +234,7 @@ async def update_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update category",
         )
+
 
 @router.delete("/{category_id}")
 async def delete_category(
@@ -241,14 +254,16 @@ async def delete_category(
 
         category_service = CategoryService(db)
         success = await category_service.delete_category(category_id, user.id)
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Category not found or cannot be deleted",
             )
 
-        return {"message": "Category deleted successfully. Documents have been reassigned."}
+        return {
+            "message": "Category deleted successfully. Documents have been reassigned."
+        }
 
     except HTTPException:
         raise
@@ -258,6 +273,7 @@ async def delete_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete category",
         )
+
 
 @router.post("/suggest")
 async def suggest_category(
@@ -282,7 +298,7 @@ async def suggest_category(
         return {
             "suggestions": suggestions,
             "text_length": len(text),
-            "total_suggestions": len(suggestions)
+            "total_suggestions": len(suggestions),
         }
 
     except HTTPException:
@@ -293,6 +309,7 @@ async def suggest_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate suggestions",
         )
+
 
 @router.get("/statistics/usage")
 async def get_category_statistics(
