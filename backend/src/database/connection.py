@@ -235,3 +235,4 @@ engine = db_manager.engine
 SessionLocal = db_manager.session_local
 get_db = db_manager.get_db_session
 init_database = db_manager.init_database
+close_database = db_manager.close
