@@ -26,7 +26,11 @@ class AuthService:
         self.db = db
 
     def create_or_update_user_from_google(
-        self, google_id: str, email: str, full_name: str, avatar_url: Optional[str] = None
+        self,
+        google_id: str,
+        email: str,
+        full_name: str,
+        avatar_url: Optional[str] = None,
     ) -> User:
         """
         Create new user or update existing user from Google OAuth data
@@ -42,7 +46,7 @@ class AuthService:
                 user.full_name = full_name
                 user.avatar_url = avatar_url
                 user.last_login_at = datetime.utcnow()
-                
+
                 logger.info(f"Updated existing user: {user.id}")
             else:
                 # Create new user
@@ -205,23 +209,20 @@ class AuthService:
             # Get document count
             doc_count = self.db.execute(
                 text("SELECT COUNT(*) FROM documents WHERE user_id = :user_id"),
-                {"user_id": user_id}
+                {"user_id": user_id},
             ).scalar()
 
             # Get category count
             category_count = self.db.execute(
                 text("SELECT COUNT(*) FROM categories WHERE user_id = :user_id"),
-                {"user_id": user_id}
+                {"user_id": user_id},
             ).scalar()
 
             return {
                 "documents": {"total": doc_count or 0},
-                "categories": {"custom_categories": category_count or 0}
+                "categories": {"custom_categories": category_count or 0},
             }
 
         except Exception as e:
             logger.error(f"Failed to get user statistics: {e}")
-            return {
-                "documents": {"total": 0},
-                "categories": {"custom_categories": 0}
-            }
+            return {"documents": {"total": 0}, "categories": {"custom_categories": 0}}

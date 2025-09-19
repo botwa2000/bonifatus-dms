@@ -24,6 +24,7 @@ router = APIRouter()
 
 class SearchRequest(BaseModel):
     """Search request model"""
+
     query: str
     category_ids: Optional[List[int]] = None
     file_types: Optional[List[str]] = None
@@ -35,6 +36,7 @@ class SearchRequest(BaseModel):
 
 class GlobalSearchRequest(BaseModel):
     """Global search across all entities"""
+
     query: str
     entities: Optional[List[str]] = ["documents", "categories"]
     limit: Optional[int] = 20
@@ -78,7 +80,9 @@ async def search_documents(
         }
 
         # Perform search
-        results = await search_service.advanced_search(search_request.query, search_filters)
+        results = await search_service.advanced_search(
+            search_request.query, search_filters
+        )
 
         return {
             "results": results["documents"],
@@ -96,9 +100,9 @@ async def search_documents(
                 "file_types": search_request.file_types,
                 "date_range": {
                     "from": search_request.date_from,
-                    "to": search_request.date_to
-                }
-            }
+                    "to": search_request.date_to,
+                },
+            },
         }
 
     except HTTPException:
@@ -106,8 +110,7 @@ async def search_documents(
     except Exception as e:
         logger.error(f"Document search failed: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Search failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Search failed"
         )
 
 
@@ -140,7 +143,7 @@ async def search_categories(
             user_id=user.id,
             query=query,
             include_system=include_system,
-            language=language
+            language=language,
         )
 
         return {
@@ -148,7 +151,7 @@ async def search_categories(
             "total": results["total"],
             "query": query,
             "language": language,
-            "search_time_ms": results["search_time_ms"]
+            "search_time_ms": results["search_time_ms"],
         }
 
     except HTTPException:
@@ -157,7 +160,7 @@ async def search_categories(
         logger.error(f"Category search failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Category search failed"
+            detail="Category search failed",
         )
 
 
@@ -188,7 +191,7 @@ async def global_search(
             user_id=user.id,
             query=search_request.query,
             entities=search_request.entities,
-            limit=search_request.limit
+            limit=search_request.limit,
         )
 
         return {
@@ -197,7 +200,7 @@ async def global_search(
             "results": results["results"],
             "total_results": results["total_results"],
             "search_time_ms": results["search_time_ms"],
-            "results_by_entity": results["results_by_entity"]
+            "results_by_entity": results["results_by_entity"],
         }
 
     except HTTPException:
@@ -206,7 +209,7 @@ async def global_search(
         logger.error(f"Global search failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Global search failed"
+            detail="Global search failed",
         )
 
 
@@ -236,17 +239,10 @@ async def get_search_suggestions(
 
         # Get suggestions
         suggestions = await search_service.get_search_suggestions(
-            user_id=user.id,
-            query=query,
-            entity=entity,
-            limit=limit
+            user_id=user.id, query=query, entity=entity, limit=limit
         )
 
-        return {
-            "query": query,
-            "suggestions": suggestions,
-            "entity": entity
-        }
+        return {"query": query, "suggestions": suggestions, "entity": entity}
 
     except HTTPException:
         raise
@@ -254,7 +250,7 @@ async def get_search_suggestions(
         logger.error(f"Search suggestions failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get suggestions"
+            detail="Failed to get suggestions",
         )
 
 
@@ -282,14 +278,10 @@ async def get_recent_searches(
 
         # Get recent searches
         recent_searches = await search_service.get_recent_searches(
-            user_id=user.id,
-            limit=limit
+            user_id=user.id, limit=limit
         )
 
-        return {
-            "recent_searches": recent_searches,
-            "total": len(recent_searches)
-        }
+        return {"recent_searches": recent_searches, "total": len(recent_searches)}
 
     except HTTPException:
         raise
@@ -297,5 +289,5 @@ async def get_recent_searches(
         logger.error(f"Recent searches failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get recent searches"
+            detail="Failed to get recent searches",
         )

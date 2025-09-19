@@ -85,9 +85,7 @@ async def upload_document(
 
         # Schedule background processing
         background_tasks.add_task(
-            process_document_background,
-            document.id,
-            settings.database_url
+            process_document_background, document.id, settings.database_url
         )
 
         return {
@@ -113,12 +111,12 @@ async def process_document_background(document_id: int, database_url: str):
     """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    
+
     # Create new database session for background task
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
@@ -138,7 +136,7 @@ async def process_document_background(document_id: int, database_url: str):
             file_content=document.file_content,
             filename=document.filename,
             mime_type=document.mime_type,
-            user_id=document.user_id
+            user_id=document.user_id,
         )
 
         if drive_file:
@@ -294,14 +292,22 @@ async def get_document(
                 else None
             ),
             "extracted_text": document.extracted_text,
-            "extracted_keywords": document.extracted_keywords.split(",") if document.extracted_keywords else [],
-            "user_keywords": document.user_keywords.split(",") if document.user_keywords else [],
+            "extracted_keywords": (
+                document.extracted_keywords.split(",")
+                if document.extracted_keywords
+                else []
+            ),
+            "user_keywords": (
+                document.user_keywords.split(",") if document.user_keywords else []
+            ),
             "is_favorite": document.is_favorite,
             "view_count": document.view_count,
             "google_drive_url": document.google_drive_url,
             "created_at": document.created_at.isoformat(),
             "updated_at": document.updated_at.isoformat(),
-            "last_viewed_at": document.last_viewed_at.isoformat() if document.last_viewed_at else None,
+            "last_viewed_at": (
+                document.last_viewed_at.isoformat() if document.last_viewed_at else None
+            ),
         }
 
     except HTTPException:
@@ -356,14 +362,20 @@ async def update_document(
             update_data["description"] = description
         if category_id is not None:
             # Validate category belongs to user
-            category = db.query(Category).filter(
-                Category.id == category_id,
-                ((Category.user_id == user.id) | (Category.is_system_category == True))
-            ).first()
+            category = (
+                db.query(Category)
+                .filter(
+                    Category.id == category_id,
+                    (
+                        (Category.user_id == user.id)
+                        | (Category.is_system_category == True)
+                    ),
+                )
+                .first()
+            )
             if not category:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid category"
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category"
                 )
             update_data["category_id"] = category_id
         if keywords is not None:
@@ -374,14 +386,14 @@ async def update_document(
         # Apply updates
         for field, value in update_data.items():
             setattr(document, field, value)
-        
+
         document.updated_at = datetime.utcnow()
         db.commit()
 
         return {
             "id": document.id,
             "message": "Document updated successfully",
-            "updated_fields": list(update_data.keys())
+            "updated_fields": list(update_data.keys()),
         }
 
     except HTTPException:
@@ -428,8 +440,7 @@ async def delete_document(
             try:
                 google_drive = GoogleDriveClient()
                 await google_drive.delete_file(
-                    file_id=document.google_drive_file_id,
-                    user_id=user.id
+                    file_id=document.google_drive_file_id, user_id=user.id
                 )
             except Exception as e:
                 logger.warning(f"Failed to delete from Google Drive: {e}")
@@ -440,7 +451,7 @@ async def delete_document(
 
         return {
             "message": "Document deleted successfully",
-            "deleted_document_id": document_id
+            "deleted_document_id": document_id,
         }
 
     except HTTPException:
@@ -485,14 +496,13 @@ async def download_document(
         if not document.google_drive_file_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Document not available for download"
+                detail="Document not available for download",
             )
 
         # Generate download URL
         google_drive = GoogleDriveClient()
         download_url = await google_drive.get_download_url(
-            file_id=document.google_drive_file_id,
-            user_id=user.id
+            file_id=document.google_drive_file_id, user_id=user.id
         )
 
         return {

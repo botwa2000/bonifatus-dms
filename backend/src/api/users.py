@@ -53,16 +53,18 @@ def get_user_profile(
                 "theme": user.theme,
                 "google_drive_connected": user.google_drive_connected,
                 "created_at": user.created_at.isoformat(),
-                "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                "last_login_at": (
+                    user.last_login_at.isoformat() if user.last_login_at else None
+                ),
             },
             "usage": profile_data.get("tier_limits", {}),
             "trial_info": profile_data.get("trial_info", {}),
             "statistics": profile_data.get("statistics", {}),
             "google_drive": {
                 "connected": user.google_drive_connected,
-                "folder_id": getattr(user, 'google_drive_folder_id', None),
-                "last_sync": getattr(user, 'last_sync_at', None)
-            }
+                "folder_id": getattr(user, "google_drive_folder_id", None),
+                "last_sync": getattr(user, "last_sync_at", None),
+            },
         }
 
     except HTTPException:
@@ -116,7 +118,7 @@ def update_user_profile(
 
         return {
             "message": "Profile updated successfully",
-            "updated_fields": list(update_data.keys())
+            "updated_fields": list(update_data.keys()),
         }
 
     except HTTPException:
@@ -148,7 +150,9 @@ def get_user_settings(
             )
 
         # Get user settings
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+        settings = (
+            db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+        )
 
         if not settings:
             # Create default settings
@@ -159,7 +163,7 @@ def get_user_settings(
                 documents_per_page=20,
                 default_view_mode="grid",
                 notification_enabled=True,
-                privacy_level="standard"
+                privacy_level="standard",
             )
             db.add(settings)
             db.commit()
@@ -167,18 +171,14 @@ def get_user_settings(
         return {
             "document_processing": {
                 "auto_categorization_enabled": settings.auto_categorization_enabled,
-                "ocr_enabled": settings.ocr_enabled
+                "ocr_enabled": settings.ocr_enabled,
             },
             "ui_preferences": {
                 "documents_per_page": settings.documents_per_page,
-                "default_view_mode": settings.default_view_mode
+                "default_view_mode": settings.default_view_mode,
             },
-            "notifications": {
-                "enabled": settings.notification_enabled
-            },
-            "privacy": {
-                "level": settings.privacy_level
-            }
+            "notifications": {"enabled": settings.notification_enabled},
+            "privacy": {"level": settings.privacy_level},
         }
 
     except HTTPException:
@@ -211,7 +211,9 @@ def update_user_settings(
             )
 
         # Get or create settings
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+        settings = (
+            db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+        )
         if not settings:
             settings = UserSettings(user_id=user.id)
             db.add(settings)
@@ -220,7 +222,9 @@ def update_user_settings(
         if "document_processing" in settings_data:
             proc_settings = settings_data["document_processing"]
             if "auto_categorization_enabled" in proc_settings:
-                settings.auto_categorization_enabled = proc_settings["auto_categorization_enabled"]
+                settings.auto_categorization_enabled = proc_settings[
+                    "auto_categorization_enabled"
+                ]
             if "ocr_enabled" in proc_settings:
                 settings.ocr_enabled = proc_settings["ocr_enabled"]
 
@@ -267,11 +271,7 @@ def get_user_statistics(
         user_service = UserService(db)
         statistics = user_service.get_usage_statistics(user.id, period)  # REMOVED await
 
-        return {
-            "period": period,
-            "user_id": user.id,
-            "statistics": statistics
-        }
+        return {"period": period, "user_id": user.id, "statistics": statistics}
 
     except HTTPException:
         raise
@@ -358,11 +358,7 @@ def export_user_data(
         user_service = UserService(db)
         export_data = user_service.export_user_data(user.id, format)  # REMOVED await
 
-        return {
-            "user_id": user.id,
-            "format": format,
-            "data": export_data
-        }
+        return {"user_id": user.id, "format": format, "data": export_data}
 
     except HTTPException:
         raise
@@ -407,7 +403,7 @@ def delete_user_account(
         return {
             "message": "Account deleted successfully",
             "user_id": user.id,
-            "deletion_summary": deletion_result
+            "deletion_summary": deletion_result,
         }
 
     except HTTPException:

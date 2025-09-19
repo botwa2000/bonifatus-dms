@@ -20,13 +20,21 @@ class DatabaseSettings(BaseSettings):
 
     # Supabase PostgreSQL connection
     database_url: str = Field(..., description="Supabase PostgreSQL connection URL")
-    database_pool_size: int = Field(default=5, description="Database connection pool size")
-    database_pool_recycle: int = Field(default=3600, description="Pool recycle time in seconds")
+    database_pool_size: int = Field(
+        default=5, description="Database connection pool size"
+    )
+    database_pool_recycle: int = Field(
+        default=3600, description="Pool recycle time in seconds"
+    )
     database_echo: bool = Field(default=False, description="Enable SQL query logging")
 
     # Connection health checks
-    database_pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
-    database_connect_timeout: int = Field(default=30, description="Database connection timeout")
+    database_pool_pre_ping: bool = Field(
+        default=True, description="Enable connection health checks"
+    )
+    database_connect_timeout: int = Field(
+        default=30, description="Database connection timeout"
+    )
 
     class Config:
         env_file = "../.env"
@@ -50,7 +58,9 @@ class GoogleSettings(BaseSettings):
     )
 
     # Google Cloud Vision API (for OCR)
-    google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
+    google_vision_enabled: bool = Field(
+        default=True, description="Enable Google Vision OCR"
+    )
 
     class Config:
         env_file = "../.env"
@@ -65,15 +75,23 @@ class SecuritySettings(BaseSettings):
     # JWT Configuration
     security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
-    access_token_expire_minutes: int = Field(default=30, description="JWT access token expiration time")
-    refresh_token_expire_days: int = Field(default=7, description="JWT refresh token expiration time")
+    access_token_expire_minutes: int = Field(
+        default=30, description="JWT access token expiration time"
+    )
+    refresh_token_expire_days: int = Field(
+        default=7, description="JWT refresh token expiration time"
+    )
 
     # Password Configuration
     password_min_length: int = Field(default=8, description="Minimum password length")
-    password_require_special: bool = Field(default=True, description="Require special characters in passwords")
+    password_require_special: bool = Field(
+        default=True, description="Require special characters in passwords"
+    )
 
     # Rate Limiting
-    rate_limit_requests: int = Field(default=100, description="Rate limit requests per minute")
+    rate_limit_requests: int = Field(
+        default=100, description="Rate limit requests per minute"
+    )
     rate_limit_burst: int = Field(default=200, description="Rate limit burst size")
 
     @property
@@ -187,7 +205,7 @@ class Settings(BaseSettings):
 
     # ====== CONVENIENCE PROPERTIES - THE CRITICAL FIX ======
     # These provide clean API access while maintaining modular structure
-    
+
     @property
     def environment(self) -> str:
         """Convenience property for environment access"""
@@ -197,7 +215,11 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Convenience property for CORS origins as a list"""
         if isinstance(self.app.cors_origins, str):
-            return [origin.strip() for origin in self.app.cors_origins.split(",") if origin.strip()]
+            return [
+                origin.strip()
+                for origin in self.app.cors_origins.split(",")
+                if origin.strip()
+            ]
         return self.app.cors_origins if isinstance(self.app.cors_origins, list) else []
 
     @property

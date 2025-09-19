@@ -26,12 +26,15 @@ security = HTTPBearer()
 
 router = APIRouter()
 
+
 class GoogleCallbackRequest(BaseModel):
     code: str
     state: str
 
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
 
 @router.post("/google/login")
 async def google_login_initiate():
@@ -53,7 +56,9 @@ async def google_login_initiate():
 
 
 @router.post("/google/callback")
-async def google_login_callback(request: GoogleCallbackRequest, db: Session = Depends(get_db)):
+async def google_login_callback(
+    request: GoogleCallbackRequest, db: Session = Depends(get_db)
+):
     """
     Handle Google OAuth 2.0 callback
     Exchange authorization code for tokens and create/update user
@@ -136,13 +141,15 @@ async def google_login_callback(request: GoogleCallbackRequest, db: Session = De
 
 
 @router.post("/refresh")
-async def refresh_access_token(request: RefreshTokenRequest, db: Session = Depends(get_db)):
+async def refresh_access_token(
+    request: RefreshTokenRequest, db: Session = Depends(get_db)
+):
     """
     Refresh access token using refresh token
     """
     try:
         auth_service = AuthService(db)
-        
+
         # Validate refresh token and get user
         user = auth_service.validate_refresh_token(request.refresh_token)
         if not user:
@@ -197,8 +204,7 @@ def logout(
     except Exception as e:
         logger.error(f"Logout failed: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail="Logout failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout failed"
         )
 
 
@@ -271,9 +277,13 @@ def get_google_drive_status(
         # Basic connection status
         return {
             "connected": user.google_drive_connected,
-            "folder_id": getattr(user, 'google_drive_folder_id', None),
-            "last_sync": user.last_sync_at.isoformat() if getattr(user, 'last_sync_at', None) else None,
-            "storage_used": getattr(user, 'storage_used_bytes', 0),
+            "folder_id": getattr(user, "google_drive_folder_id", None),
+            "last_sync": (
+                user.last_sync_at.isoformat()
+                if getattr(user, "last_sync_at", None)
+                else None
+            ),
+            "storage_used": getattr(user, "storage_used_bytes", 0),
         }
 
     except HTTPException:
