@@ -53,8 +53,7 @@ class TestDocumentProcessing:
             file_size_bytes=1024,
             mime_type="application/pdf",
             file_extension=".pdf",
-            status=DocumentStatus.PROCESSING,
-            file_content=b"Mock PDF content for testing"
+            status=DocumentStatus.PROCESSING
         )
         
         test_db_session.add(document)

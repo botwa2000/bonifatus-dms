@@ -379,36 +379,97 @@ class DocumentService:
 
     def _extract_keywords(self, text: str, language: str = "en") -> List[str]:
         """
-        Extract relevant keywords from text using NLP
+        Extract keywords using database-driven configuration and NLTK
         """
         try:
             if not text or len(text.strip()) < 10:
                 return []
 
-            # Clean and tokenize text
-            cleaned_text = re.sub(r"[^\w\s]", " ", text.lower())
-            tokens = word_tokenize(cleaned_text)
+            # Get supported languages from database settings
+            from src.database.models import SystemSettings
 
-            # Remove stopwords based on language
-            stopwords = self.stopwords_de if language == "de" else self.stopwords_en
-            filtered_tokens = [
-                token for token in tokens if token not in stopwords and len(token) > 2
+            system_settings = self.db.query(SystemSettings).first()
+            supported_languages = (
+                system_settings.supported_languages if system_settings else ["en", "de"]
+            )
+
+            # Validate language is supported
+            if language not in supported_languages:
+                language = system_settings.default_language if system_settings else "en"
+
+            # Clean text and tokenize
+            import re
+
+            clean_text = re.sub(r"[^\w\s]", " ", text.lower())
+            words = clean_text.split()
+
+            # Use NLTK stopwords (not hardcoded)
+            stop_words = set()
+            try:
+                if language == "en":
+                    stop_words = self.stopwords_en
+                elif language == "de":
+                    stop_words = self.stopwords_de
+            except Exception:
+                # Fallback if NLTK not available
+                pass
+
+            # Filter meaningful words
+            meaningful_words = [
+                word
+                for word in words
+                if len(word) >= 3 and word not in stop_words and word.isalpha()
             ]
 
-            # Lemmatize tokens
-            lemmatized = [self.lemmatizer.lemmatize(token) for token in filtered_tokens]
+            # Get domain keywords from existing categories in database
+            domain_keywords = self._get_domain_keywords_from_db()
 
-            # Count frequency and select top keywords
-            word_freq = Counter(lemmatized)
-            top_keywords = [
-                word for word, freq in word_freq.most_common(20) if freq > 1
+            # Extract frequent words
+            from collections import Counter
+
+            word_counts = Counter(meaningful_words)
+            frequent_keywords = [word for word, count in word_counts.most_common(10)]
+
+            # Find domain-specific keywords from database
+            found_domain_keywords = [
+                word for word in meaningful_words if word in domain_keywords
             ]
 
-            return top_keywords
+            # Combine and deduplicate
+            all_keywords = list(set(frequent_keywords + found_domain_keywords))
+
+            return all_keywords[:15]  # Return up to 15 keywords
 
         except Exception as e:
             logger.error(f"Keyword extraction failed: {e}")
-            return []
+            return []  # Return empty list on error
+
+    def _get_domain_keywords_from_db(self) -> set:
+        """
+        Get domain-specific keywords from category keywords stored in database
+        """
+        try:
+            from src.database.models import Category
+
+            # Get all category keywords from database
+            categories = (
+                self.db.query(Category).filter(Category.keywords.isnot(None)).all()
+            )
+
+            domain_keywords = set()
+            for category in categories:
+                if category.keywords:
+                    # Split comma-separated keywords and add to set
+                    keywords = [
+                        kw.strip().lower() for kw in category.keywords.split(",")
+                    ]
+                    domain_keywords.update(keywords)
+
+            return domain_keywords
+
+        except Exception as e:
+            logger.error(f"Failed to get domain keywords from database: {e}")
+            return set()
 
     def _detect_language(self, text: str) -> str:
         """

@@ -34,7 +34,6 @@ security = HTTPBearer()
 
 router = APIRouter()
 
-
 @router.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -49,6 +48,8 @@ async def upload_document(
     """
     Upload document to Google Drive with automatic processing
     """
+    document = None  # Initialize document variable to avoid UnboundLocalError
+    
     try:
         # Authenticate user
         auth_service = AuthService(db)
@@ -75,19 +76,17 @@ async def upload_document(
 
         # Create initial document record
         document = await document_service.create_document_record(
-            user_id=user.id,  # ✅ CORRECT - pass user_id instead of user object
+            user_id=user.id,
             file=file,
             category_id=category_id,
             title=title,
             description=description,
-            keywords=(
-                keywords.split(",") if keywords else None
-            ),  # ✅ Convert string to list
+            keywords=keywords.split(",") if keywords else None,
         )
 
         # Schedule background processing
         background_tasks.add_task(
-            process_document_background, document.id, settings.database_url
+            process_document_background, document.id, settings.database.database_url
         )
 
         return {
@@ -101,6 +100,14 @@ async def upload_document(
         raise
     except Exception as e:
         logger.error(f"Document upload failed: {e}")
+        # Clean up document if it was created but processing failed
+        if document and document.id:
+            try:
+                db.delete(document)
+                db.commit()
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup document after error: {cleanup_error}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Upload failed",
