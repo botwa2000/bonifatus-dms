@@ -527,6 +527,24 @@ class SearchService:
 
         return text("1=1")  # Return all if no valid search terms
 
+    def _parse_search_query(self, query: str) -> List[str]:
+        """
+        Parse search query into terms (simple implementation for test compatibility)
+        """
+        import re
+
+        # Extract quoted phrases
+        phrases = re.findall(r'"([^"]*)"', query)
+
+        # Remove quotes and split remaining words
+        query_without_quotes = re.sub(r'"[^"]*"', "", query)
+        words = query_without_quotes.split()
+
+        # Combine phrases and words
+        search_terms = phrases + [word for word in words if word.strip()]
+
+        return search_terms
+
     def _parse_advanced_query(self, query: str) -> Dict[str, Any]:
         """
         Parse advanced search query with operators

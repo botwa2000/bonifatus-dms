@@ -14,16 +14,16 @@ from src.database.models import User, UserTier
 @pytest.mark.integration
 class TestUserAPI:
     """Test user management API endpoints"""
-    
+
     def test_get_user_profile_success(self, client, auth_headers, test_user):
         """Test getting user profile information"""
-        with patch('src.api.users.AuthService') as mock_auth_class:
+        with patch("src.api.users.AuthService") as mock_auth_class:
             mock_auth_service = Mock()
             mock_auth_class.return_value = mock_auth_service
             mock_auth_service.get_current_user.return_value = test_user
-            
+
             response = client.get("/api/v1/users/profile", headers=auth_headers)
-            
+
             assert response.status_code == status.HTTP_200_OK
             data = response.json()
             assert data["id"] == test_user.id
