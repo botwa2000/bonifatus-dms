@@ -136,11 +136,163 @@ class SearchService:
             logger.error(f"Advanced search failed: {e}")
             return {"documents": [], "total": 0, "search_time_ms": 0, "suggestions": []}
 
+    async def search_categories(
+        self, user_id: int, query: str, include_system: bool = True, language: str = "en"
+    ) -> Dict[str, Any]:
+        """
+        Search categories with multilingual support
+        """
+        try:
+            start_time = time.time()
+            
+            # Build category search query
+            base_query = self.db.query(Category)
+            
+            # Filter by user access
+            if include_system:
+                base_query = base_query.filter(
+                    or_(
+                        Category.user_id == user_id,
+                        Category.is_system_category == True
+                    )
+                )
+            else:
+                base_query = base_query.filter(Category.user_id == user_id)
+            
+            # Apply search
+            if query and query.strip():
+                search_term = f"%{query.strip()}%"
+                if language == "de":
+                    base_query = base_query.filter(
+                        or_(
+                            Category.name_de.ilike(search_term),
+                            Category.description_de.ilike(search_term)
+                        )
+                    )
+                else:
+                    base_query = base_query.filter(
+                        or_(
+                            Category.name_en.ilike(search_term),
+                            Category.description_en.ilike(search_term)
+                        )
+                    )
+            
+            categories = base_query.all()
+            search_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Format results
+            formatted_categories = []
+            for category in categories:
+                formatted_categories.append({
+                    "id": category.id,
+                    "name": category.name_de if language == "de" else category.name_en,
+                    "name_en": category.name_en,
+                    "name_de": category.name_de,
+                    "description": category.description_de if language == "de" else category.description_en,
+                    "color": category.color,
+                    "icon": category.icon,
+                    "is_system": category.is_system_category,
+                    "document_count": self._get_category_document_count(category.id, user_id)
+                })
+            
+            return {
+                "categories": formatted_categories,
+                "total": len(formatted_categories),
+                "search_time_ms": search_time_ms
+            }
+            
+        except Exception as e:
+            logger.error(f"Category search failed: {e}")
+            return {"categories": [], "total": 0, "search_time_ms": 0}
+
+    async def global_search(
+        self, user_id: int, query: str, entities: List[str], limit: int = 20
+    ) -> Dict[str, Any]:
+        """
+        Global search across multiple entities
+        """
+        try:
+            start_time = time.time()
+            results = {
+                "results": [],
+                "total_results": 0,
+                "results_by_entity": {},
+                "search_time_ms": 0
+            }
+            
+            # Search documents
+            if "documents" in entities:
+                doc_results = await self.search_documents(
+                    user_id=user_id,
+                    query=query,
+                    filters={"per_page": limit // len(entities)}
+                )
+                
+                formatted_docs = []
+                for doc in doc_results["documents"]:
+                    formatted_docs.append({
+                        "type": "document",
+                        "id": doc["id"],
+                        "title": doc.get("title", doc["filename"]),
+                        "subtitle": f"Document • {doc['mime_type']}",
+                        "url": f"/documents/{doc['id']}",
+                        "icon": "file",
+                        "relevance_score": doc.get("relevance_score", 0.5)
+                    })
+                
+                results["results"].extend(formatted_docs)
+                results["results_by_entity"]["documents"] = {
+                    "count": len(formatted_docs),
+                    "total_available": doc_results["total"]
+                }
+            
+            # Search categories
+            if "categories" in entities:
+                cat_results = await self.search_categories(
+                    user_id=user_id,
+                    query=query
+                )
+                
+                formatted_cats = []
+                for cat in cat_results["categories"][:limit // len(entities)]:
+                    formatted_cats.append({
+                        "type": "category",
+                        "id": cat["id"],
+                        "title": cat["name"],
+                        "subtitle": f"Category • {cat['document_count']} documents",
+                        "url": f"/categories/{cat['id']}",
+                        "icon": cat.get("icon", "folder"),
+                        "color": cat.get("color"),
+                        "relevance_score": 0.7  # Categories get higher base relevance
+                    })
+                
+                results["results"].extend(formatted_cats)
+                results["results_by_entity"]["categories"] = {
+                    "count": len(formatted_cats),
+                    "total_available": cat_results["total"]
+                }
+            
+            # Sort by relevance
+            results["results"].sort(key=lambda x: x["relevance_score"], reverse=True)
+            results["total_results"] = len(results["results"])
+            results["search_time_ms"] = int((time.time() - start_time) * 1000)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Global search failed: {e}")
+            return {
+                "results": [],
+                "total_results": 0,
+                "results_by_entity": {},
+                "search_time_ms": 0
+            }
+
     async def get_search_suggestions(
-        self, user_id: int, query: str, limit: int = 5
+        self, user_id: int, query: str, entity: str = "documents", limit: int = 5
     ) -> List[str]:
         """
-        Get search query suggestions based on user's documents
+        Get search suggestions as user types (enhanced with entity support)
         """
         try:
             if not query or len(query.strip()) < 2:
@@ -149,64 +301,66 @@ class SearchService:
             query_lower = query.lower().strip()
             suggestions = []
 
-            # Get suggestions from document titles
-            title_matches = (
-                self.db.query(Document.title)
-                .filter(
-                    and_(
-                        Document.user_id == user_id,
-                        Document.title.ilike(f"%{query_lower}%"),
-                        Document.title.isnot(None),
+            if entity in ["documents", "all"]:
+                # Get suggestions from document titles
+                title_matches = (
+                    self.db.query(Document.title)
+                    .filter(
+                        and_(
+                            Document.user_id == user_id,
+                            Document.title.ilike(f"%{query_lower}%"),
+                            Document.title.isnot(None),
+                        )
                     )
+                    .distinct()
+                    .limit(limit)
+                    .all()
                 )
-                .distinct()
-                .limit(limit)
-                .all()
-            )
 
-            suggestions.extend([match.title for match in title_matches if match.title])
+                suggestions.extend([match.title for match in title_matches if match.title])
 
-            # Get suggestions from extracted keywords
-            keyword_matches = self.db.execute(
-                text(
+                # Get suggestions from extracted keywords
+                keyword_matches = self.db.execute(
+                    text(
+                        """
+                        SELECT DISTINCT unnest(extracted_keywords) as keyword
+                        FROM documents 
+                        WHERE user_id = :user_id 
+                        AND extracted_keywords IS NOT NULL
+                        AND LOWER(unnest(extracted_keywords)) LIKE LOWER(:query)
+                        LIMIT :limit
                     """
-                    SELECT DISTINCT unnest(extracted_keywords) as keyword
-                    FROM documents 
-                    WHERE user_id = :user_id 
-                    AND extracted_keywords IS NOT NULL
-                    AND LOWER(unnest(extracted_keywords)) LIKE LOWER(:query)
-                    LIMIT :limit
-                """
-                ),
-                {"user_id": user_id, "query": f"%{query_lower}%", "limit": limit},
-            ).fetchall()
+                    ),
+                    {"user_id": user_id, "query": f"%{query_lower}%", "limit": limit},
+                ).fetchall()
 
-            suggestions.extend([match.keyword for match in keyword_matches])
+                suggestions.extend([match.keyword for match in keyword_matches])
 
-            # Get suggestions from category names
-            category_matches = (
-                self.db.query(Category)
-                .filter(
-                    and_(
-                        or_(
-                            Category.user_id == user_id,
-                            Category.is_system_category == True,
-                        ),
-                        or_(
-                            Category.name_en.ilike(f"%{query_lower}%"),
-                            Category.name_de.ilike(f"%{query_lower}%"),
-                        ),
+            if entity in ["categories", "all"]:
+                # Get suggestions from category names
+                category_matches = (
+                    self.db.query(Category)
+                    .filter(
+                        and_(
+                            or_(
+                                Category.user_id == user_id,
+                                Category.is_system_category == True,
+                            ),
+                            or_(
+                                Category.name_en.ilike(f"%{query_lower}%"),
+                                Category.name_de.ilike(f"%{query_lower}%"),
+                            ),
+                        )
                     )
+                    .limit(limit)
+                    .all()
                 )
-                .limit(limit)
-                .all()
-            )
 
-            for category in category_matches:
-                if query_lower in category.name_en.lower():
-                    suggestions.append(category.name_en)
-                if query_lower in category.name_de.lower():
-                    suggestions.append(category.name_de)
+                for category in category_matches:
+                    if query_lower in category.name_en.lower():
+                        suggestions.append(category.name_en)
+                    if query_lower in category.name_de.lower():
+                        suggestions.append(category.name_de)
 
             # Remove duplicates and limit results
             unique_suggestions = list(dict.fromkeys(suggestions))[:limit]
@@ -215,6 +369,47 @@ class SearchService:
 
         except Exception as e:
             logger.error(f"Search suggestions failed for user {user_id}: {e}")
+            return []
+
+    async def get_recent_searches(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get user's recent search queries
+        Note: This would require a search_history table in production
+        For now, return popular keywords from user's documents
+        """
+        try:
+            # Get most recent/common keywords from user's documents
+            popular_keywords = self.db.execute(
+                text("""
+                    SELECT keyword, COUNT(*) as frequency,
+                           MAX(created_at) as last_used
+                    FROM (
+                        SELECT unnest(extracted_keywords) as keyword, created_at
+                        FROM documents 
+                        WHERE user_id = :user_id 
+                        AND extracted_keywords IS NOT NULL
+                        AND created_at >= NOW() - INTERVAL '30 days'
+                    ) keywords
+                    GROUP BY keyword
+                    ORDER BY last_used DESC, frequency DESC
+                    LIMIT :limit
+                """),
+                {"user_id": user_id, "limit": limit},
+            ).fetchall()
+
+            recent_searches = []
+            for keyword in popular_keywords:
+                recent_searches.append({
+                    "query": keyword.keyword,
+                    "frequency": keyword.frequency,
+                    "last_used": keyword.last_used.isoformat() if keyword.last_used else None,
+                    "type": "keyword"
+                })
+
+            return recent_searches
+
+        except Exception as e:
+            logger.error(f"Recent searches failed: {e}")
             return []
 
     async def get_popular_searches(
@@ -260,6 +455,22 @@ class SearchService:
         except Exception as e:
             logger.error(f"Popular searches failed for user {user_id}: {e}")
             return []
+
+    def _get_category_document_count(self, category_id: int, user_id: int) -> int:
+        """
+        Get document count for a category
+        """
+        try:
+            return (
+                self.db.query(Document)
+                .filter(
+                    Document.category_id == category_id,
+                    Document.user_id == user_id
+                )
+                .count()
+            )
+        except Exception:
+            return 0
 
     def _build_search_conditions(self, query: str):
         """
@@ -633,7 +844,7 @@ class SearchService:
         Generate intelligent search suggestions
         """
         try:
-            suggestions = await self.get_search_suggestions(user_id, query, limit=5)
+            suggestions = await self.get_search_suggestions(user_id, query, entity="all", limit=5)
             return suggestions
         except Exception as e:
             logger.error(f"Search suggestions generation failed: {e}")

@@ -39,7 +39,7 @@ async def list_categories(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -105,7 +105,7 @@ async def create_category(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -196,7 +196,7 @@ async def get_category(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -285,7 +285,7 @@ async def update_category(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -392,7 +392,7 @@ async def delete_category(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -495,7 +495,7 @@ async def list_category_documents(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -589,7 +589,7 @@ async def suggest_category(
     """
     try:
         auth_service = AuthService(db)
-        user = await auth_service.get_current_user(credentials.credentials)
+        user = auth_service.get_current_user(credentials.credentials)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

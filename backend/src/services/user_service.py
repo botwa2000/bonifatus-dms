@@ -34,7 +34,7 @@ class UserService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def get_complete_profile(self, user_id: int) -> Dict[str, Any]:
+    def get_complete_profile(self, user_id: int) -> Dict[str, Any]:
         """
         Get comprehensive user profile with statistics and tier info
         """
@@ -50,7 +50,7 @@ class UserService:
             trial_info = self._get_trial_info(user)
 
             # Get usage statistics
-            statistics = await self.get_usage_statistics(user_id, "month")
+            statistics = self.get_usage_statistics(user_id, "month")
 
             return {
                 "tier_limits": tier_limits,
