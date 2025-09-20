@@ -1,258 +1,248 @@
 # backend/src/services/user_service.py
-"""
-Bonifatus DMS - User Service
-User profile management, statistics, and tier operations
-Data export, account deletion, and usage analytics
-"""
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func, text
-from typing import Dict, Any, List, Optional
+from sqlalchemy import func, desc
+from typing import List, Optional, Dict, Any
 import logging
-from datetime import datetime, timedelta, timezone
-import json
-import csv
-import io
+from datetime import datetime, timedelta
 
-from src.database.models import (
-    User,
-    UserSettings,
-    Document,
-    Category,
-    AuditLog,
-    UserTier,
-)
-from src.core.config import get_settings
+from src.database.models import User, Document, Category, UserSettings, UserActivity
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class UserService:
-    """Service for user profile and account management operations"""
-
     def __init__(self, db: Session):
         self.db = db
 
-    def get_complete_profile(self, user_id: int) -> Dict[str, Any]:
-        """
-        Get comprehensive user profile with statistics and tier info
-        """
-        try:
-            user = self.db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return {}
-
-            # Get tier limits
-            tier_limits = self._get_tier_limits(user.tier)
-
-            # Get trial information
-            trial_info = self._get_trial_info(user)
-
-            # Get usage statistics
-            statistics = self.get_usage_statistics(user_id, "month")
-
-            return {
-                "tier_limits": tier_limits,
-                "trial_info": trial_info,
-                "statistics": statistics,
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to get complete profile for user {user_id}: {e}")
-            return {}
-
-    def get_usage_statistics(
-        self, user_id: int, period: str = "month"
-    ) -> Dict[str, Any]:
-        """
-        Get detailed usage statistics for specified period
-        FIXED: Removed async - this method doesn't need to be async
-        """
-        try:
-            # Calculate date range
-            now = datetime.utcnow()
-            if period == "week":
-                start_date = now - timedelta(days=7)
-            elif period == "month":
-                start_date = now - timedelta(days=30)
-            elif period == "year":
-                start_date = now - timedelta(days=365)
-            else:  # all
-                start_date = datetime.min
-
-            # Document statistics
-            total_documents = (
-                self.db.query(Document).filter(Document.user_id == user_id).count()
-            )
-
-            period_documents = (
-                self.db.query(Document)
-                .filter(
-                    and_(Document.user_id == user_id, Document.created_at >= start_date)
-                )
-                .count()
-            )
-
-            # Storage statistics
-            storage_query = self.db.query(
-                func.coalesce(func.sum(Document.file_size_bytes), 0).label(
-                    "total_storage"
-                )
-            ).filter(Document.user_id == user_id)
-
-            total_storage = storage_query.scalar() or 0
-
-            # Category usage
-            category_stats = (
-                self.db.query(
-                    Category.name_en,
-                    Category.color,
-                    func.count(Document.id).label("document_count"),
-                )
-                .outerjoin(
-                    Document,
-                    and_(
-                        Document.category_id == Category.id, Document.user_id == user_id
-                    ),
-                )
-                .filter(
-                    or_(
-                        Category.user_id == user_id, Category.is_system_category == True
-                    )
-                )
-                .group_by(Category.id, Category.name_en, Category.color)
-                .all()
-            )
-
-            # Recent activity
-            recent_uploads = (
-                self.db.query(Document)
-                .filter(
-                    and_(
-                        Document.user_id == user_id,
-                        Document.created_at >= now - timedelta(days=7),
-                    )
-                )
-                .order_by(desc(Document.created_at))
-                .limit(10)
-                .all()
-            )
-
-            # Most viewed documents
-            popular_docs = (
-                self.db.query(Document)
-                .filter(Document.user_id == user_id)
-                .order_by(desc(Document.view_count))
-                .limit(5)
-                .all()
-            )
-
-            return {
-                "period": period,
-                "documents": {
-                    "total": total_documents,
-                    "period_uploads": period_documents,
-                    "storage_bytes": total_storage,
-                    "storage_mb": round(total_storage / (1024 * 1024), 2),
-                },
-                "categories": [
-                    {
-                        "name": cat.name_en,
-                        "color": cat.color,
-                        "document_count": cat.document_count,
-                    }
-                    for cat in category_stats
-                ],
-                "recent_activity": [
-                    {
-                        "id": doc.id,
-                        "filename": doc.filename,
-                        "title": doc.title,
-                        "uploaded_at": doc.created_at.isoformat(),
-                    }
-                    for doc in recent_uploads
-                ],
-                "popular_documents": [
-                    {
-                        "id": doc.id,
-                        "filename": doc.filename,
-                        "title": doc.title,
-                        "view_count": doc.view_count,
-                    }
-                    for doc in popular_docs
-                ],
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to get usage statistics for user {user_id}: {e}")
-            return {}
-
-    def start_premium_trial(self, user_id: int) -> Dict[str, Any]:
-        """
-        Start premium trial for eligible user
-        FIXED: Removed async - doesn't need to be async
-        """
+    def get_user_profile(self, user_id: int) -> Dict[str, Any]:
+        """Get complete user profile information"""
         try:
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 return {"success": False, "error": "User not found"}
 
-            if user.tier != UserTier.FREE:
-                return {
-                    "success": False,
-                    "error": "Trial only available for free users",
-                }
-
-            if user.trial_started_at:
-                return {"success": False, "error": "Trial already used"}
-
-            # Start trial
-            trial_start = datetime.utcnow()
-            trial_end = trial_start + timedelta(days=30)
-
-            user.tier = UserTier.PREMIUM_TRIAL
-            user.trial_started_at = trial_start
-            user.trial_ended_at = trial_end
-
-            self.db.commit()
-
-            logger.info(f"Started premium trial for user {user_id}")
-            return {"success": True, "trial_ends_at": trial_end.isoformat()}
-
-        except Exception as e:
-            logger.error(f"Failed to start premium trial for user {user_id}: {e}")
-            self.db.rollback()
-            return {"success": False, "error": str(e)}
-
-    def export_user_data(self, user_id: int, format: str = "json") -> Dict[str, Any]:
-        """
-        Export all user data for GDPR compliance
-        FIXED: Removed async - doesn't need to be async
-        """
-        try:
-            user = self.db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return {"success": False, "error": "User not found"}
-
-            # Get all user documents
-            documents = (
-                self.db.query(Document).filter(Document.user_id == user_id).all()
-            )
-
-            # Get user categories
-            categories = (
-                self.db.query(Category).filter(Category.user_id == user_id).all()
-            )
-
-            # Get user settings
             settings = (
                 self.db.query(UserSettings)
                 .filter(UserSettings.user_id == user_id)
                 .first()
             )
 
-            # Prepare export data
+            profile_data = {
+                "timezone": settings.timezone if settings else "UTC",
+                "language": settings.language if settings else "en",
+                "notification_preferences": (
+                    settings.notification_preferences if settings else {}
+                ),
+                "created_at": user.created_at.isoformat(),
+                "last_login_at": (
+                    user.last_login_at.isoformat() if user.last_login_at else None
+                ),
+            }
+
+            storage_usage = self._calculate_storage_usage(user_id)
+            subscription_status = self._get_subscription_status(user)
+
+            return {
+                "success": True,
+                "profile": profile_data,
+                "storage_usage": storage_usage,
+                "subscription_status": subscription_status,
+            }
+
+        except Exception as e:
+            logger.error(f"Get user profile failed: {e}")
+            return {"success": False, "error": "Failed to retrieve profile"}
+
+    def update_user_profile(
+        self, user_id: int, updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update user profile information"""
+        try:
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return {"success": False, "error": "User not found"}
+
+            if "full_name" in updates:
+                user.full_name = updates["full_name"]
+
+            settings = (
+                self.db.query(UserSettings)
+                .filter(UserSettings.user_id == user_id)
+                .first()
+            )
+
+            if not settings:
+                settings = UserSettings(user_id=user_id)
+                self.db.add(settings)
+
+            if "timezone" in updates:
+                settings.timezone = updates["timezone"]
+            if "language" in updates:
+                settings.language = updates["language"]
+            if "notification_preferences" in updates:
+                settings.notification_preferences = updates["notification_preferences"]
+
+            user.updated_at = datetime.utcnow()
+            self.db.commit()
+
+            self._log_user_activity(user_id, "profile_updated", {"updates": list(updates.keys())})
+
+            return {"success": True}
+
+        except Exception as e:
+            logger.error(f"Update user profile failed: {e}")
+            self.db.rollback()
+            return {"success": False, "error": "Failed to update profile"}
+
+    def get_user_settings(self, user_id: int) -> Dict[str, Any]:
+        """Get user settings and preferences"""
+        try:
+            settings = (
+                self.db.query(UserSettings)
+                .filter(UserSettings.user_id == user_id)
+                .first()
+            )
+
+            if not settings:
+                return {
+                    "auto_categorization_enabled": True,
+                    "ocr_enabled": True,
+                    "documents_per_page": 20,
+                    "default_view": "grid",
+                    "theme": "light",
+                    "timezone": "UTC",
+                    "language": "en",
+                    "notification_preferences": {},
+                }
+
+            return {
+                "auto_categorization_enabled": settings.auto_categorization_enabled,
+                "ocr_enabled": settings.ocr_enabled,
+                "documents_per_page": settings.documents_per_page,
+                "default_view": settings.default_view,
+                "theme": settings.theme,
+                "timezone": settings.timezone,
+                "language": settings.language,
+                "notification_preferences": settings.notification_preferences or {},
+            }
+
+        except Exception as e:
+            logger.error(f"Get user settings failed: {e}")
+            return {}
+
+    def update_user_settings(
+        self, user_id: int, updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update user settings and preferences"""
+        try:
+            settings = (
+                self.db.query(UserSettings)
+                .filter(UserSettings.user_id == user_id)
+                .first()
+            )
+
+            if not settings:
+                settings = UserSettings(user_id=user_id)
+                self.db.add(settings)
+
+            for field, value in updates.items():
+                if hasattr(settings, field):
+                    setattr(settings, field, value)
+
+            settings.updated_at = datetime.utcnow()
+            self.db.commit()
+
+            self._log_user_activity(user_id, "settings_updated", {"updates": list(updates.keys())})
+
+            return {"success": True}
+
+        except Exception as e:
+            logger.error(f"Update user settings failed: {e}")
+            self.db.rollback()
+            return {"success": False, "error": "Failed to update settings"}
+
+    def get_user_statistics(self, user_id: int) -> Dict[str, Any]:
+        """Get user usage statistics"""
+        try:
+            total_documents = (
+                self.db.query(Document)
+                .filter(Document.user_id == user_id)
+                .count()
+            )
+
+            total_storage = (
+                self.db.query(func.sum(Document.file_size_bytes))
+                .filter(Document.user_id == user_id)
+                .scalar() or 0
+            )
+
+            documents_by_status = (
+                self.db.query(Document.status, func.count())
+                .filter(Document.user_id == user_id)
+                .group_by(Document.status)
+                .all()
+            )
+
+            recent_uploads = (
+                self.db.query(func.count())
+                .filter(
+                    Document.user_id == user_id,
+                    Document.created_at >= datetime.utcnow() - timedelta(days=30)
+                )
+                .scalar() or 0
+            )
+
+            most_used_categories = (
+                self.db.query(Category.name_en, func.count(Document.id))
+                .join(Document, Category.id == Document.category_id)
+                .filter(Document.user_id == user_id)
+                .group_by(Category.id, Category.name_en)
+                .order_by(desc(func.count(Document.id)))
+                .limit(5)
+                .all()
+            )
+
+            return {
+                "total_documents": total_documents,
+                "total_storage_bytes": total_storage,
+                "storage_formatted": self._format_file_size(total_storage),
+                "documents_by_status": {
+                    str(status): count for status, count in documents_by_status
+                },
+                "recent_uploads_30_days": recent_uploads,
+                "most_used_categories": [
+                    {"name": name, "count": count}
+                    for name, count in most_used_categories
+                ],
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"Get user statistics failed: {e}")
+            return {}
+
+    def export_user_data(self, user_id: int) -> Dict[str, Any]:
+        """Export user data for GDPR compliance"""
+        try:
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return {"success": False, "error": "User not found"}
+
+            documents = (
+                self.db.query(Document).filter(Document.user_id == user_id).all()
+            )
+
+            categories = (
+                self.db.query(Category).filter(Category.user_id == user_id).all()
+            )
+
+            settings = (
+                self.db.query(UserSettings)
+                .filter(UserSettings.user_id == user_id)
+                .first()
+            )
+
             export_data = {
                 "user_profile": {
                     "email": user.email,
@@ -270,6 +260,10 @@ class UserService:
                         "description": doc.description,
                         "created_at": doc.created_at.isoformat(),
                         "file_size_bytes": doc.file_size_bytes,
+                        "mime_type": doc.mime_type,
+                        "status": doc.status.value,
+                        "extracted_keywords": doc.extracted_keywords,
+                        "language_detected": doc.language_detected,
                     }
                     for doc in documents
                 ],
@@ -280,234 +274,230 @@ class UserService:
                         "description_en": cat.description_en,
                         "description_de": cat.description_de,
                         "color": cat.color,
+                        "keywords": cat.keywords,
                     }
                     for cat in categories
                 ],
                 "settings": (
                     {
-                        "auto_categorization_enabled": (
-                            settings.auto_categorization_enabled if settings else True
-                        ),
-                        "ocr_enabled": settings.ocr_enabled if settings else True,
-                        "documents_per_page": (
-                            settings.documents_per_page if settings else 20
-                        ),
+                        "auto_categorization_enabled": settings.auto_categorization_enabled,
+                        "ocr_enabled": settings.ocr_enabled,
+                        "documents_per_page": settings.documents_per_page,
+                        "default_view": settings.default_view,
+                        "theme": settings.theme,
+                        "timezone": settings.timezone,
+                        "language": settings.language,
+                        "notification_preferences": settings.notification_preferences,
                     }
                     if settings
                     else {}
                 ),
             }
 
-            if format == "csv":
-                # Convert to CSV format
-                output = io.StringIO()
-                writer = csv.writer(output)
+            self._log_user_activity(user_id, "data_exported", {})
 
-                # Write documents CSV
-                writer.writerow(["Type", "Filename", "Title", "Created At", "Size"])
-                for doc in documents:
-                    writer.writerow(
-                        [
-                            "Document",
-                            doc.filename,
-                            doc.title,
-                            doc.created_at.isoformat(),
-                            doc.file_size_bytes,
-                        ]
-                    )
-
-                return {
-                    "success": True,
-                    "format": "csv",
-                    "data": output.getvalue(),
-                    "filename": f"user_data_{user_id}.csv",
-                }
-            else:
-                return {
-                    "success": True,
-                    "format": "json",
-                    "data": export_data,
-                    "filename": f"user_data_{user_id}.json",
-                }
+            return {
+                "success": True,
+                "export_data": export_data,
+                "exported_at": datetime.utcnow().isoformat(),
+            }
 
         except Exception as e:
-            logger.error(f"Failed to export user data for user {user_id}: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"Export user data failed: {e}")
+            return {"success": False, "error": "Failed to export data"}
 
-    async def delete_user_account(
-        self, user_id: int, delete_google_drive_files: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Permanently delete user account and all associated data
-        """
+    def delete_user_account(self, user_id: int) -> Dict[str, Any]:
+        """Delete user account and all associated data"""
         try:
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
                 return {"success": False, "error": "User not found"}
 
-            # Count items to be deleted for reporting
-            document_count = (
-                self.db.query(Document).filter(Document.user_id == user_id).count()
-            )
+            self.db.query(Document).filter(Document.user_id == user_id).delete()
+            self.db.query(Category).filter(Category.user_id == user_id).delete()
+            self.db.query(UserSettings).filter(UserSettings.user_id == user_id).delete()
+            self.db.query(UserActivity).filter(UserActivity.user_id == user_id).delete()
 
-            category_count = (
-                self.db.query(Category).filter(Category.user_id == user_id).count()
-            )
-
-            drive_files_deleted = 0
-
-            # Delete from Google Drive if requested
-            if delete_google_drive_files:
-                try:
-                    from src.integrations.google_drive import GoogleDriveClient
-
-                    drive_client = GoogleDriveClient(user_id, self.db)
-
-                    # Get all user documents with Google Drive file IDs
-                    documents = (
-                        self.db.query(Document)
-                        .filter(
-                            and_(
-                                Document.user_id == user_id,
-                                Document.google_drive_file_id.isnot(None),
-                            )
-                        )
-                        .all()
-                    )
-
-                    for doc in documents:
-                        if await drive_client.delete_file(doc.google_drive_file_id):
-                            drive_files_deleted += 1
-
-                except Exception as drive_error:
-                    logger.warning(
-                        f"Google Drive deletion failed for user {user_id}: {drive_error}"
-                    )
-
-            # Delete database records (cascade will handle related data)
             self.db.delete(user)
             self.db.commit()
 
-            logger.info(
-                f"Deleted user account {user_id} with {document_count} documents"
-            )
+            logger.info(f"User account {user_id} deleted successfully")
 
             return {
                 "success": True,
-                "deleted_documents": document_count,
-                "deleted_categories": category_count,
-                "google_drive_files_deleted": drive_files_deleted,
+                "deleted_at": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
-            logger.error(f"Failed to delete user account {user_id}: {e}")
+            logger.error(f"Delete user account failed: {e}")
             self.db.rollback()
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Failed to delete account"}
 
-    def _get_tier_limits(self, tier: UserTier) -> Dict[str, int]:
-        """
-        Get tier-specific limits and quotas
-        """
-        limits = {
-            UserTier.FREE: {
-                "document_limit": 100,
-                "monthly_uploads": 50,
-                "max_file_size_mb": 50,
-                "custom_categories": 10,
-                "ai_processing": 10,
-            },
-            UserTier.PREMIUM_TRIAL: {
-                "document_limit": 500,
-                "monthly_uploads": 200,
-                "max_file_size_mb": 100,
-                "custom_categories": 25,
-                "ai_processing": 50,
-            },
-            UserTier.PREMIUM: {
-                "document_limit": 0,  # Unlimited
-                "monthly_uploads": 0,  # Unlimited
-                "max_file_size_mb": 200,
-                "custom_categories": 100,
-                "ai_processing": 0,  # Unlimited
-            },
-            UserTier.ADMIN: {
-                "document_limit": 0,  # Unlimited
-                "monthly_uploads": 0,  # Unlimited
-                "max_file_size_mb": 500,
-                "custom_categories": 0,  # Unlimited
-                "ai_processing": 0,  # Unlimited
-            },
-        }
-
-        return limits.get(tier, limits[UserTier.FREE])
-
-    def _get_trial_info(self, user: User) -> Dict[str, Any]:
-        """
-        Get trial status and information
-        """
-        if not user.trial_started_at:
-            return {
-                "has_used_trial": False,
-                "trial_available": user.tier == UserTier.FREE,
-            }
-
-        now = datetime.utcnow()
-        is_trial_active = (
-            user.tier == UserTier.PREMIUM_TRIAL
-            and user.trial_ended_at
-            and now < user.trial_ended_at
-        )
-
-        days_remaining = 0
-        if is_trial_active and user.trial_ended_at:
-            days_remaining = (user.trial_ended_at - now).days
-
-        return {
-            "has_used_trial": True,
-            "trial_available": False,
-            "trial_active": is_trial_active,
-            "trial_started": user.trial_started_at.isoformat(),
-            "trial_ends": (
-                user.trial_ended_at.isoformat() if user.trial_ended_at else None
-            ),
-            "days_remaining": max(0, days_remaining),
-        }
-
-    def _format_data_as_csv(self, data: Dict[str, Any]) -> str:
-        """
-        Format exported data as CSV string
-        """
+    def get_user_activity(
+        self, user_id: int, limit: int = 20, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get user activity log"""
         try:
-            output = io.StringIO()
+            activities = (
+                self.db.query(UserActivity)
+                .filter(UserActivity.user_id == user_id)
+                .order_by(desc(UserActivity.created_at))
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
 
-            # Write profile data
-            output.write("=== USER PROFILE ===\n")
-            profile_writer = csv.writer(output)
-            profile_writer.writerow(["Field", "Value"])
-
-            for key, value in data.get("profile", {}).items():
-                profile_writer.writerow([key, str(value)])
-
-            # Write documents data
-            output.write("\n=== DOCUMENTS ===\n")
-            if data.get("documents"):
-                doc_writer = csv.DictWriter(
-                    output, fieldnames=data["documents"][0].keys()
-                )
-                doc_writer.writeheader()
-                doc_writer.writerows(data["documents"])
-
-            # Write categories data
-            output.write("\n=== CATEGORIES ===\n")
-            if data.get("categories"):
-                cat_writer = csv.DictWriter(
-                    output, fieldnames=data["categories"][0].keys()
-                )
-                cat_writer.writeheader()
-                cat_writer.writerows(data["categories"])
-
-            return output.getvalue()
+            return [
+                {
+                    "id": activity.id,
+                    "action": activity.action,
+                    "details": activity.details,
+                    "ip_address": activity.ip_address,
+                    "user_agent": activity.user_agent,
+                    "created_at": activity.created_at.isoformat(),
+                }
+                for activity in activities
+            ]
 
         except Exception as e:
-            logger.error(f"Failed to format data as CSV: {e}")
-            return "Error formatting data as CSV"
+            logger.error(f"Get user activity failed: {e}")
+            return []
+
+    def submit_feedback(self, user_id: int, feedback: Dict[str, Any]) -> Dict[str, Any]:
+        """Submit user feedback"""
+        try:
+            feedback_data = {
+                "user_id": user_id,
+                "type": feedback.get("type", "general"),
+                "rating": feedback.get("rating"),
+                "message": feedback.get("message", ""),
+                "page": feedback.get("page"),
+                "feature": feedback.get("feature"),
+            }
+
+            self._log_user_activity(
+                user_id, "feedback_submitted", {"type": feedback_data["type"]}
+            )
+
+            logger.info(f"Feedback submitted by user {user_id}: {feedback_data['type']}")
+
+            return {
+                "success": True,
+                "feedback_id": f"feedback_{user_id}_{datetime.now().timestamp()}",
+            }
+
+        except Exception as e:
+            logger.error(f"Submit feedback failed: {e}")
+            return {"success": False, "error": "Failed to submit feedback"}
+
+    def _calculate_storage_usage(self, user_id: int) -> Dict[str, Any]:
+        """Calculate user's storage usage"""
+        try:
+            total_size = (
+                self.db.query(func.sum(Document.file_size_bytes))
+                .filter(Document.user_id == user_id)
+                .scalar() or 0
+            )
+
+            document_count = (
+                self.db.query(Document)
+                .filter(Document.user_id == user_id)
+                .count()
+            )
+
+            return {
+                "total_bytes": total_size,
+                "total_formatted": self._format_file_size(total_size),
+                "document_count": document_count,
+                "average_file_size": (
+                    total_size // document_count if document_count > 0 else 0
+                ),
+            }
+
+        except Exception as e:
+            logger.error(f"Calculate storage usage failed: {e}")
+            return {
+                "total_bytes": 0,
+                "total_formatted": "0 B",
+                "document_count": 0,
+                "average_file_size": 0,
+            }
+
+    def _get_subscription_status(self, user: User) -> Dict[str, Any]:
+        """Get user's subscription status"""
+        try:
+            return {
+                "tier": user.tier.value,
+                "is_active": True,
+                "expires_at": None,
+                "features": self._get_tier_features(user.tier.value),
+            }
+
+        except Exception as e:
+            logger.error(f"Get subscription status failed: {e}")
+            return {
+                "tier": "free",
+                "is_active": True,
+                "expires_at": None,
+                "features": [],
+            }
+
+    def _get_tier_features(self, tier: str) -> List[str]:
+        """Get features available for user tier"""
+        if tier == "premium":
+            return [
+                "unlimited_storage",
+                "advanced_search",
+                "ai_categorization",
+                "priority_support",
+                "api_access",
+            ]
+        elif tier == "pro":
+            return [
+                "extended_storage",
+                "advanced_search",
+                "ai_categorization",
+                "email_support",
+            ]
+        else:  # free
+            return [
+                "basic_storage",
+                "basic_search",
+                "manual_categorization",
+            ]
+
+    def _format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human readable format"""
+        try:
+            if size_bytes == 0:
+                return "0 B"
+
+            size_names = ["B", "KB", "MB", "GB", "TB"]
+            import math
+            i = int(math.floor(math.log(size_bytes, 1024)))
+            power = math.pow(1024, i)
+            size = round(size_bytes / power, 2)
+            return f"{size} {size_names[i]}"
+
+        except Exception:
+            return f"{size_bytes} B"
+
+    def _log_user_activity(
+        self, user_id: int, action: str, details: Dict[str, Any]
+    ):
+        """Log user activity"""
+        try:
+            activity = UserActivity(
+                user_id=user_id,
+                action=action,
+                details=details,
+                ip_address="127.0.0.1",  # Would be populated from request
+                user_agent="Unknown",     # Would be populated from request
+            )
+
+            self.db.add(activity)
+            self.db.commit()
+
+        except Exception as e:
+            logger.warning(f"Failed to log user activity: {e}")
+            self.db.rollback()

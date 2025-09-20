@@ -1,4 +1,4 @@
-# backend/src/api/categories.py - Fixed API (No Initialization Calls)
+# backend/src/api/categories.py
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import logging
 
 from src.database import get_db
+from src.database.models import Category
 from src.services.auth_service import AuthService
 from src.services.category_service import CategoryService
 
@@ -23,7 +24,7 @@ class CategoryCreate(BaseModel):
     description_de: Optional[str] = ""
     color: Optional[str] = "#808080"
     icon: Optional[str] = "📁"
-    keywords: Optional[str] = ""
+    keywords: Optional[List[str]] = []
 
 
 class CategoryUpdate(BaseModel):
@@ -33,7 +34,7 @@ class CategoryUpdate(BaseModel):
     description_de: Optional[str] = None
     color: Optional[str] = None
     icon: Optional[str] = None
-    keywords: Optional[str] = None
+    keywords: Optional[List[str]] = None
 
 
 @router.get("/")
@@ -57,8 +58,10 @@ def list_categories(
             )
 
         category_service = CategoryService(db)
+        
+        if not category_service.db.query(Category).filter(Category.user_id.is_(None)).first():
+            category_service.initialize_default_categories()
 
-        # Simply retrieve categories from database (no initialization)
         categories = category_service.get_user_categories(
             user_id=user.id,
             include_system=include_system,
@@ -70,6 +73,10 @@ def list_categories(
             "categories": categories,
             "total": len(categories),
             "language": language,
+            "filters": {
+                "include_system": include_system,
+                "include_user": include_user,
+            },
         }
 
     except HTTPException:
@@ -88,7 +95,7 @@ def create_category(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    """Create user-defined category"""
+    """Create new user category"""
     try:
         auth_service = AuthService(db)
         user = auth_service.get_current_user(credentials.credentials)
@@ -99,22 +106,13 @@ def create_category(
             )
 
         category_service = CategoryService(db)
+        
         category = category_service.create_user_category(
-            user_id=user.id, category_data=category_data.dict()
+            user_id=user.id, category_data=category_data.model_dump()
         )
 
-        if not category:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create category. You may have reached the limit of 50 user categories.",
-            )
-
         return {
-            "id": category.id,
-            "name_en": category.name_en,
-            "name_de": category.name_de,
-            "color": category.color,
-            "icon": category.icon,
+            "category": category,
             "message": "Category created successfully",
         }
 
@@ -131,11 +129,10 @@ def create_category(
 @router.get("/{category_id}")
 def get_category(
     category_id: int,
-    language: str = Query("en", pattern="^(en|de)$"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    """Get specific category by ID"""
+    """Get category details"""
     try:
         auth_service = AuthService(db)
         user = auth_service.get_current_user(credentials.credentials)
@@ -146,8 +143,14 @@ def get_category(
             )
 
         from src.database.models import Category
-
-        category = db.query(Category).filter(Category.id == category_id).first()
+        category = (
+            db.query(Category)
+            .filter(
+                Category.id == category_id,
+                (Category.user_id == user.id) | (Category.user_id.is_(None))
+            )
+            .first()
+        )
 
         if not category:
             raise HTTPException(
@@ -155,31 +158,22 @@ def get_category(
                 detail="Category not found",
             )
 
-        # Check access permissions
-        if not category.is_system_category and category.user_id != user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied",
-            )
+        category_service = CategoryService(db)
+        document_count = category_service._get_category_document_count(category_id, user.id)
 
         return {
             "id": category.id,
-            "name": category.name_de if language == "de" else category.name_en,
             "name_en": category.name_en,
             "name_de": category.name_de,
-            "description": (
-                category.description_de if language == "de" else category.description_en
-            ),
             "description_en": category.description_en,
             "description_de": category.description_de,
             "color": category.color,
             "icon": category.icon,
-            "keywords": category.keywords.split(",") if category.keywords else [],
-            "is_system_category": category.is_system_category,
+            "keywords": category.keywords,
+            "is_system": category.user_id is None,
+            "document_count": document_count,
             "created_at": category.created_at.isoformat(),
-            "last_used_at": (
-                category.last_used_at.isoformat() if category.last_used_at else None
-            ),
+            "updated_at": category.updated_at.isoformat() if category.updated_at else None,
         }
 
     except HTTPException:
@@ -199,7 +193,7 @@ def update_category(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    """Update user category (system categories cannot be updated)"""
+    """Update user category"""
     try:
         auth_service = AuthService(db)
         user = auth_service.get_current_user(credentials.credentials)
@@ -210,21 +204,18 @@ def update_category(
             )
 
         category_service = CategoryService(db)
-        category = category_service.update_category(
-            category_id, user.id, updates.dict(exclude_unset=True)
-        )
-
-        if not category:
+        
+        update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
+        
+        success = category_service.update_category(category_id, user.id, update_data)
+        
+        if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Category not found or cannot be updated",
+                detail="Category not found or not owned by user",
             )
 
-        return {
-            "id": category.id,
-            "message": "Category updated successfully",
-            "updated_at": category.updated_at.isoformat(),
-        }
+        return {"message": "Category updated successfully"}
 
     except HTTPException:
         raise
@@ -242,7 +233,7 @@ def delete_category(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    """Delete user category and reassign documents"""
+    """Delete user category"""
     try:
         auth_service = AuthService(db)
         user = auth_service.get_current_user(credentials.credentials)
@@ -253,16 +244,22 @@ def delete_category(
             )
 
         category_service = CategoryService(db)
-        success = category_service.delete_category(category_id, user.id)
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Category not found or cannot be deleted",
-            )
+        result = category_service.delete_category(category_id, user.id)
+        
+        if not result["success"]:
+            if "not found" in result["error"]:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=result["error"],
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=result["error"],
+                )
 
         return {
-            "message": "Category deleted successfully. Documents have been reassigned."
+            "message": result["message"]
         }
 
     except HTTPException:
@@ -275,11 +272,8 @@ def delete_category(
         )
 
 
-# backend/src/api/categories.py - Fix async endpoints
-
-
 @router.post("/suggest")
-def suggest_category(  # REMOVED async
+def suggest_category(
     text: str = Query(..., min_length=10, description="Text content to analyze"),
     limit: int = Query(5, ge=1, le=10, description="Maximum number of suggestions"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -296,9 +290,7 @@ def suggest_category(  # REMOVED async
             )
 
         category_service = CategoryService(db)
-        suggestions = category_service.suggest_categories(
-            text, user.id, limit
-        )  # REMOVED await
+        suggestions = category_service.suggest_categories(text, user.id, limit)
 
         return {
             "suggestions": suggestions,
@@ -317,7 +309,7 @@ def suggest_category(  # REMOVED async
 
 
 @router.get("/statistics/usage")
-def get_category_statistics(  # REMOVED async
+def get_category_statistics(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
@@ -332,7 +324,7 @@ def get_category_statistics(  # REMOVED async
             )
 
         category_service = CategoryService(db)
-        statistics = category_service.get_category_statistics(user.id)  # REMOVED await
+        statistics = category_service.get_category_statistics(user.id)
 
         return statistics
 
