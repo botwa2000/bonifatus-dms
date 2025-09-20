@@ -468,3 +468,37 @@ class SearchHistory(Base):
 
     def __repr__(self):
         return f"<SearchHistory(id={self.id}, user_id={self.user_id}, query='{self.query}')>"
+
+
+class UserActivity(Base):
+    """User activity tracking for audit and analytics"""
+
+    __tablename__ = "user_activity"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Activity details
+    action = Column(String(100), nullable=False)  # Action performed
+    details = Column(JSON, nullable=True)  # Additional action details
+    ip_address = Column(String(45), nullable=True)  # IPv4/IPv6 address
+    user_agent = Column(String(500), nullable=True)  # Browser/client info
+
+    # Timestamp
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_user_activity_user", "user_id"),
+        Index("idx_user_activity_action", "action"),
+        Index("idx_user_activity_created", "created_at"),
+        Index("idx_user_activity_user_action", "user_id", "action"),
+    )
+
+    def __repr__(self):
+        return f"<UserActivity(id={self.id}, user_id={self.user_id}, action='{self.action}')>"
