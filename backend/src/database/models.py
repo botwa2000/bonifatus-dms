@@ -435,3 +435,35 @@ class AuditLog(Base):
         return (
             f"<AuditLog(id={self.id}, action='{self.action}', user_id={self.user_id})>"
         )
+
+class SearchHistory(Base):
+    """Search history for analytics and user experience"""
+
+    __tablename__ = "search_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Search details
+    query = Column(String(500), nullable=False)
+    entity_type = Column(String(50), nullable=False)  # 'documents', 'categories', etc.
+    results_count = Column(Integer, default=0, nullable=False)
+
+    # Timestamp
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes for performance
+    __table_args__ = (
+        Index("idx_search_history_user", "user_id"),
+        Index("idx_search_history_query", "query"),
+        Index("idx_search_history_created", "created_at"),
+        Index("idx_search_history_user_query", "user_id", "query"),
+    )
+
+    def __repr__(self):
+        return f"<SearchHistory(id={self.id}, user_id={self.user_id}, query='{self.query}')>"

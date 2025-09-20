@@ -14,6 +14,7 @@ from .models import (
     UserSettings,
     SystemSettings,
     AuditLog,
+    SearchHistory,
     UserTier,
     DocumentStatus,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "UserSettings",
     "SystemSettings",
     "AuditLog",
+    "SearchHistory",
     "UserTier",
     "DocumentStatus",
 ]
