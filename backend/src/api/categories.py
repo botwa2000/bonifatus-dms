@@ -277,6 +277,7 @@ async def delete_category(
 
 # backend/src/api/categories.py - Fix async endpoints
 
+
 @router.post("/suggest")
 def suggest_category(  # REMOVED async
     text: str = Query(..., min_length=10, description="Text content to analyze"),
@@ -295,7 +296,9 @@ def suggest_category(  # REMOVED async
             )
 
         category_service = CategoryService(db)
-        suggestions = category_service.suggest_categories(text, user.id, limit)  # REMOVED await
+        suggestions = category_service.suggest_categories(
+            text, user.id, limit
+        )  # REMOVED await
 
         return {
             "suggestions": suggestions,

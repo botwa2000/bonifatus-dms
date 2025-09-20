@@ -273,7 +273,9 @@ class CategoryService:
             logger.error(f"Delete category failed: {e}")
             return False
 
-    def suggest_categories(self, text: str, user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+    def suggest_categories(
+        self, text: str, user_id: int, limit: int = 5
+    ) -> List[Dict[str, Any]]:
         """Suggest categories based on document content - FIXED: Removed async"""
         try:
             # Get all categories available to user (from database)

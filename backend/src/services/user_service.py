@@ -62,7 +62,9 @@ class UserService:
             logger.error(f"Failed to get complete profile for user {user_id}: {e}")
             return {}
 
-    def get_usage_statistics(self, user_id: int, period: str = "month") -> Dict[str, Any]:
+    def get_usage_statistics(
+        self, user_id: int, period: str = "month"
+    ) -> Dict[str, Any]:
         """
         Get detailed usage statistics for specified period
         FIXED: Removed async - this method doesn't need to be async
@@ -235,16 +237,12 @@ class UserService:
 
             # Get all user documents
             documents = (
-                self.db.query(Document)
-                .filter(Document.user_id == user_id)
-                .all()
+                self.db.query(Document).filter(Document.user_id == user_id).all()
             )
 
             # Get user categories
             categories = (
-                self.db.query(Category)
-                .filter(Category.user_id == user_id)
-                .all()
+                self.db.query(Category).filter(Category.user_id == user_id).all()
             )
 
             # Get user settings
@@ -261,7 +259,9 @@ class UserService:
                     "full_name": user.full_name,
                     "tier": user.tier.value,
                     "created_at": user.created_at.isoformat(),
-                    "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                    "last_login_at": (
+                        user.last_login_at.isoformat() if user.last_login_at else None
+                    ),
                 },
                 "documents": [
                     {
@@ -283,41 +283,51 @@ class UserService:
                     }
                     for cat in categories
                 ],
-                "settings": {
-                    "auto_categorization_enabled": settings.auto_categorization_enabled if settings else True,
-                    "ocr_enabled": settings.ocr_enabled if settings else True,
-                    "documents_per_page": settings.documents_per_page if settings else 20,
-                } if settings else {},
+                "settings": (
+                    {
+                        "auto_categorization_enabled": (
+                            settings.auto_categorization_enabled if settings else True
+                        ),
+                        "ocr_enabled": settings.ocr_enabled if settings else True,
+                        "documents_per_page": (
+                            settings.documents_per_page if settings else 20
+                        ),
+                    }
+                    if settings
+                    else {}
+                ),
             }
 
             if format == "csv":
                 # Convert to CSV format
                 output = io.StringIO()
                 writer = csv.writer(output)
-                
+
                 # Write documents CSV
                 writer.writerow(["Type", "Filename", "Title", "Created At", "Size"])
                 for doc in documents:
-                    writer.writerow([
-                        "Document",
-                        doc.filename,
-                        doc.title,
-                        doc.created_at.isoformat(),
-                        doc.file_size_bytes
-                    ])
-                
+                    writer.writerow(
+                        [
+                            "Document",
+                            doc.filename,
+                            doc.title,
+                            doc.created_at.isoformat(),
+                            doc.file_size_bytes,
+                        ]
+                    )
+
                 return {
                     "success": True,
                     "format": "csv",
                     "data": output.getvalue(),
-                    "filename": f"user_data_{user_id}.csv"
+                    "filename": f"user_data_{user_id}.csv",
                 }
             else:
                 return {
                     "success": True,
                     "format": "json",
                     "data": export_data,
-                    "filename": f"user_data_{user_id}.json"
+                    "filename": f"user_data_{user_id}.json",
                 }
 
         except Exception as e:
