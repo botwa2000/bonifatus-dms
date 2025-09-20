@@ -37,7 +37,7 @@ class CategoryUpdate(BaseModel):
 
 
 @router.get("/")
-async def list_categories(
+def list_categories(
     include_system: bool = Query(True, description="Include system categories"),
     include_user: bool = Query(True, description="Include user categories"),
     language: str = Query(
@@ -59,7 +59,7 @@ async def list_categories(
         category_service = CategoryService(db)
 
         # Simply retrieve categories from database (no initialization)
-        categories = await category_service.get_user_categories(
+        categories = category_service.get_user_categories(
             user_id=user.id,
             include_system=include_system,
             include_user=include_user,
@@ -83,7 +83,7 @@ async def list_categories(
 
 
 @router.post("/")
-async def create_category(
+def create_category(
     category_data: CategoryCreate,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
@@ -99,7 +99,7 @@ async def create_category(
             )
 
         category_service = CategoryService(db)
-        category = await category_service.create_user_category(
+        category = category_service.create_user_category(
             user_id=user.id, category_data=category_data.dict()
         )
 
@@ -129,7 +129,7 @@ async def create_category(
 
 
 @router.get("/{category_id}")
-async def get_category(
+def get_category(
     category_id: int,
     language: str = Query("en", pattern="^(en|de)$"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -193,7 +193,7 @@ async def get_category(
 
 
 @router.put("/{category_id}")
-async def update_category(
+def update_category(
     category_id: int,
     updates: CategoryUpdate,
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -210,7 +210,7 @@ async def update_category(
             )
 
         category_service = CategoryService(db)
-        category = await category_service.update_category(
+        category = category_service.update_category(
             category_id, user.id, updates.dict(exclude_unset=True)
         )
 
@@ -237,7 +237,7 @@ async def update_category(
 
 
 @router.delete("/{category_id}")
-async def delete_category(
+def delete_category(
     category_id: int,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
@@ -253,7 +253,7 @@ async def delete_category(
             )
 
         category_service = CategoryService(db)
-        success = await category_service.delete_category(category_id, user.id)
+        success = category_service.delete_category(category_id, user.id)
 
         if not success:
             raise HTTPException(

@@ -18,7 +18,7 @@ class CategoryService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def get_user_categories(
+    def get_user_categories(
         self,
         user_id: int,
         include_system: bool = True,
@@ -95,7 +95,7 @@ class CategoryService:
             logger.error(f"Get user categories failed: {e}")
             return []
 
-    async def initialize_default_categories(self) -> bool:
+    def initialize_default_categories(self) -> bool:
         """
         Initialize default system categories (compatibility method for tests)
         Note: Default categories are actually created by database connection initialization
@@ -121,7 +121,7 @@ class CategoryService:
             logger.error(f"Initialize default categories failed: {e}")
             return False
 
-    async def create_user_category(
+    def create_user_category(
         self, user_id: int, category_data: Dict[str, Any]
     ) -> Optional[Category]:
         """Create user-defined category"""
@@ -168,7 +168,7 @@ class CategoryService:
             logger.error(f"Create user category failed: {e}")
             return None
 
-    async def update_category(
+    def update_category(
         self, category_id: int, user_id: int, updates: Dict[str, Any]
     ) -> Optional[Category]:
         """Update user category (system categories cannot be updated)"""
@@ -214,7 +214,7 @@ class CategoryService:
             logger.error(f"Update category failed: {e}")
             return None
 
-    async def delete_category(self, category_id: int, user_id: int) -> bool:
+    def delete_category(self, category_id: int, user_id: int) -> bool:
         """Delete user category and reassign documents"""
         try:
             category = (
@@ -422,7 +422,7 @@ class CategoryService:
         """Search categories by name, description, or keywords"""
         try:
             if not query.strip():
-                return await self.get_user_categories(
+                return self.get_user_categories(
                     user_id, include_system, include_user, language
                 )
 

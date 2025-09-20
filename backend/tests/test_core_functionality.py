@@ -95,7 +95,7 @@ class TestDocumentProcessing:
 
             mock_doc_service = Mock()
             mock_doc_class.return_value = mock_doc_service
-            mock_doc_service.list_documents = AsyncMock(
+            mock_doc_service.list_documents = Mock(
                 return_value={
                     "documents": [
                         {
@@ -165,12 +165,8 @@ class TestCategorization:
 
             mock_cat_service = Mock()
             mock_cat_class.return_value = mock_cat_service
-            mock_cat_service.initialize_default_categories = AsyncMock(
-                return_value=True
-            )
-            mock_cat_service.create_user_category = AsyncMock(
-                return_value=mock_category
-            )
+            mock_cat_service.initialize_default_categories = Mock(return_value=True)
+            mock_cat_service.create_user_category = Mock(return_value=mock_category)
 
             category_data = {
                 "name_en": "Test Category",
@@ -219,7 +215,7 @@ class TestSearch:
 
             mock_search_service = Mock()
             mock_search_class.return_value = mock_search_service
-            mock_search_service.search_documents = AsyncMock(
+            mock_search_service.search_documents = Mock(
                 return_value={
                     "documents": [
                         {
@@ -278,7 +274,7 @@ class TestSearch:
 
             mock_search_service = Mock()
             mock_search_class.return_value = mock_search_service
-            mock_search_service.search_categories = AsyncMock(
+            mock_search_service.search_categories = Mock(
                 return_value={
                     "categories": [
                         {
@@ -318,7 +314,7 @@ class TestSearch:
 
             mock_search_service = Mock()
             mock_search_class.return_value = mock_search_service
-            mock_search_service.global_search = AsyncMock(
+            mock_search_service.global_search = Mock(
                 return_value={
                     "results": {
                         "documents": {
@@ -376,15 +372,13 @@ class TestFullWorkflow:
             with patch("src.api.documents.DocumentService") as mock_doc_class:
                 mock_doc_service = Mock()
                 mock_doc_class.return_value = mock_doc_service
-                mock_doc_service.validate_upload = AsyncMock(
-                    return_value={"valid": True}
-                )
+                mock_doc_service.validate_upload = Mock(return_value={"valid": True})
 
                 mock_document = Mock()
                 mock_document.id = 1
                 mock_document.filename = "test.pdf"
                 mock_document.status = DocumentStatus.UPLOADING
-                mock_doc_service.create_document_record = AsyncMock(
+                mock_doc_service.create_document_record = Mock(
                     return_value=mock_document
                 )
 
@@ -400,10 +394,8 @@ class TestFullWorkflow:
             with patch("src.api.categories.CategoryService") as mock_cat_class:
                 mock_cat_service = Mock()
                 mock_cat_class.return_value = mock_cat_service
-                mock_cat_service.initialize_default_categories = AsyncMock(
-                    return_value=True
-                )
-                mock_cat_service.get_user_categories = AsyncMock(
+                mock_cat_service.initialize_default_categories = Mock(return_value=True)
+                mock_cat_service.get_user_categories = Mock(
                     return_value=[
                         {
                             "id": 1,
@@ -425,7 +417,7 @@ class TestFullWorkflow:
             with patch("src.api.search.SearchService") as mock_search_class:
                 mock_search_service = Mock()
                 mock_search_class.return_value = mock_search_service
-                mock_search_service.search_documents = AsyncMock(
+                mock_search_service.search_documents = Mock(
                     return_value={
                         "documents": [
                             {
