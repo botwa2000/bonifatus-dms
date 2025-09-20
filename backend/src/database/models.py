@@ -436,6 +436,7 @@ class AuditLog(Base):
             f"<AuditLog(id={self.id}, action='{self.action}', user_id={self.user_id})>"
         )
 
+
 class SearchHistory(Base):
     """Search history for analytics and user experience"""
 
