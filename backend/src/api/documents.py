@@ -34,6 +34,7 @@ security = HTTPBearer()
 
 router = APIRouter()
 
+
 @router.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -47,7 +48,7 @@ async def upload_document(
 ):
     """Upload document to Google Drive with automatic processing"""
     document = None  # Initialize at function start
-    
+
     try:
         # Authentication
         auth_service = AuthService(db)
@@ -63,8 +64,7 @@ async def upload_document(
         validation = await document_service.validate_upload(user, file)
         if not validation["valid"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=validation["error"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=validation["error"]
             )
 
         # Create document record
@@ -79,16 +79,14 @@ async def upload_document(
 
         # Schedule background processing
         background_tasks.add_task(
-            process_document_background,
-            document.id,
-            settings.database_url
+            process_document_background, document.id, settings.database_url
         )
 
         return {
             "id": document.id,
             "filename": document.filename,
             "status": document.status.value,
-            "message": "Document uploaded successfully, processing in background"
+            "message": "Document uploaded successfully, processing in background",
         }
 
     except HTTPException:
@@ -96,15 +94,14 @@ async def upload_document(
     except Exception as e:
         logger.error(f"Document upload failed: {e}")
         # Safe cleanup
-        if document and hasattr(document, 'id'):
+        if document and hasattr(document, "id"):
             try:
                 db.delete(document)
                 db.commit()
             except Exception:
                 pass
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Upload failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload failed"
         )
 
 
