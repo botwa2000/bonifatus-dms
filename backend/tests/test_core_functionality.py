@@ -131,11 +131,11 @@ class TestCategorization:
         """Test default category initialization"""
         category_service = CategoryService(test_db_session)
 
-        result = await category_service.initialize_default_categories()
+        result = category_service.initialize_default_categories()
         assert result is True
 
         # Check that categories were created
-        categories = await category_service.get_user_categories(
+        categories = category_service.get_user_categories(
             user_id=1, include_system=True, include_user=False
         )
         assert len(categories) > 0
@@ -192,11 +192,11 @@ class TestCategorization:
         category_service = CategoryService(test_db_session)
 
         # Initialize default categories first
-        await category_service.initialize_default_categories()
+        category_service.initialize_default_categories()
 
         # Test suggestion
         test_text = "This is an invoice for office supplies with payment due date"
-        suggestions = await category_service.suggest_categories(test_text, test_user.id)
+        suggestions = category_service.suggest_categories(test_text, test_user.id)
 
         assert len(suggestions) > 0
         # Should suggest Finance category for invoice-related content
