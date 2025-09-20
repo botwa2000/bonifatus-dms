@@ -86,7 +86,9 @@ class UserService:
             user.updated_at = datetime.utcnow()
             self.db.commit()
 
-            self._log_user_activity(user_id, "profile_updated", {"updates": list(updates.keys())})
+            self._log_user_activity(
+                user_id, "profile_updated", {"updates": list(updates.keys())}
+            )
 
             return {"success": True}
 
@@ -153,7 +155,9 @@ class UserService:
             settings.updated_at = datetime.utcnow()
             self.db.commit()
 
-            self._log_user_activity(user_id, "settings_updated", {"updates": list(updates.keys())})
+            self._log_user_activity(
+                user_id, "settings_updated", {"updates": list(updates.keys())}
+            )
 
             return {"success": True}
 
@@ -166,15 +170,14 @@ class UserService:
         """Get user usage statistics"""
         try:
             total_documents = (
-                self.db.query(Document)
-                .filter(Document.user_id == user_id)
-                .count()
+                self.db.query(Document).filter(Document.user_id == user_id).count()
             )
 
             total_storage = (
                 self.db.query(func.sum(Document.file_size_bytes))
                 .filter(Document.user_id == user_id)
-                .scalar() or 0
+                .scalar()
+                or 0
             )
 
             documents_by_status = (
@@ -188,9 +191,10 @@ class UserService:
                 self.db.query(func.count())
                 .filter(
                     Document.user_id == user_id,
-                    Document.created_at >= datetime.utcnow() - timedelta(days=30)
+                    Document.created_at >= datetime.utcnow() - timedelta(days=30),
                 )
-                .scalar() or 0
+                .scalar()
+                or 0
             )
 
             most_used_categories = (
@@ -379,7 +383,9 @@ class UserService:
                 user_id, "feedback_submitted", {"type": feedback_data["type"]}
             )
 
-            logger.info(f"Feedback submitted by user {user_id}: {feedback_data['type']}")
+            logger.info(
+                f"Feedback submitted by user {user_id}: {feedback_data['type']}"
+            )
 
             return {
                 "success": True,
@@ -396,13 +402,12 @@ class UserService:
             total_size = (
                 self.db.query(func.sum(Document.file_size_bytes))
                 .filter(Document.user_id == user_id)
-                .scalar() or 0
+                .scalar()
+                or 0
             )
 
             document_count = (
-                self.db.query(Document)
-                .filter(Document.user_id == user_id)
-                .count()
+                self.db.query(Document).filter(Document.user_id == user_id).count()
             )
 
             return {
@@ -474,6 +479,7 @@ class UserService:
 
             size_names = ["B", "KB", "MB", "GB", "TB"]
             import math
+
             i = int(math.floor(math.log(size_bytes, 1024)))
             power = math.pow(1024, i)
             size = round(size_bytes / power, 2)
@@ -482,9 +488,7 @@ class UserService:
         except Exception:
             return f"{size_bytes} B"
 
-    def _log_user_activity(
-        self, user_id: int, action: str, details: Dict[str, Any]
-    ):
+    def _log_user_activity(self, user_id: int, action: str, details: Dict[str, Any]):
         """Log user activity"""
         try:
             activity = UserActivity(
@@ -492,7 +496,7 @@ class UserService:
                 action=action,
                 details=details,
                 ip_address="127.0.0.1",  # Would be populated from request
-                user_agent="Unknown",     # Would be populated from request
+                user_agent="Unknown",  # Would be populated from request
             )
 
             self.db.add(activity)

@@ -58,8 +58,12 @@ def list_categories(
             )
 
         category_service = CategoryService(db)
-        
-        if not category_service.db.query(Category).filter(Category.user_id.is_(None)).first():
+
+        if (
+            not category_service.db.query(Category)
+            .filter(Category.user_id.is_(None))
+            .first()
+        ):
             category_service.initialize_default_categories()
 
         categories = category_service.get_user_categories(
@@ -106,7 +110,7 @@ def create_category(
             )
 
         category_service = CategoryService(db)
-        
+
         category = category_service.create_user_category(
             user_id=user.id, category_data=category_data.model_dump()
         )
@@ -143,11 +147,12 @@ def get_category(
             )
 
         from src.database.models import Category
+
         category = (
             db.query(Category)
             .filter(
                 Category.id == category_id,
-                (Category.user_id == user.id) | (Category.user_id.is_(None))
+                (Category.user_id == user.id) | (Category.user_id.is_(None)),
             )
             .first()
         )
@@ -159,7 +164,9 @@ def get_category(
             )
 
         category_service = CategoryService(db)
-        document_count = category_service._get_category_document_count(category_id, user.id)
+        document_count = category_service._get_category_document_count(
+            category_id, user.id
+        )
 
         return {
             "id": category.id,
@@ -173,7 +180,9 @@ def get_category(
             "is_system": category.user_id is None,
             "document_count": document_count,
             "created_at": category.created_at.isoformat(),
-            "updated_at": category.updated_at.isoformat() if category.updated_at else None,
+            "updated_at": (
+                category.updated_at.isoformat() if category.updated_at else None
+            ),
         }
 
     except HTTPException:
@@ -204,11 +213,11 @@ def update_category(
             )
 
         category_service = CategoryService(db)
-        
+
         update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
-        
+
         success = category_service.update_category(category_id, user.id, update_data)
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -245,7 +254,7 @@ def delete_category(
 
         category_service = CategoryService(db)
         result = category_service.delete_category(category_id, user.id)
-        
+
         if not result["success"]:
             if "not found" in result["error"]:
                 raise HTTPException(
@@ -258,9 +267,7 @@ def delete_category(
                     detail=result["error"],
                 )
 
-        return {
-            "message": result["message"]
-        }
+        return {"message": result["message"]}
 
     except HTTPException:
         raise

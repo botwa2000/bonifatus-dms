@@ -25,33 +25,41 @@ class SearchService:
     def search_documents(self, search_params: Dict[str, Any]) -> Dict[str, Any]:
         """Perform basic document search with optional filters"""
         start_time = time.time()
-        
+
         try:
             query = self.db.query(Document).filter(
                 Document.user_id == search_params["user_id"]
             )
 
             search_query = search_params.get("query", "").strip()
-            
+
             if search_query:
                 search_filter = or_(
                     Document.title.ilike(f"%{search_query}%"),
                     Document.filename.ilike(f"%{search_query}%"),
                     Document.extracted_text.ilike(f"%{search_query}%"),
                     Document.description.ilike(f"%{search_query}%"),
-                    func.array_to_string(Document.extracted_keywords, ' ').ilike(f"%{search_query}%"),
-                    func.array_to_string(Document.user_keywords, ' ').ilike(f"%{search_query}%"),
+                    func.array_to_string(Document.extracted_keywords, " ").ilike(
+                        f"%{search_query}%"
+                    ),
+                    func.array_to_string(Document.user_keywords, " ").ilike(
+                        f"%{search_query}%"
+                    ),
                 )
                 query = query.filter(search_filter)
 
             if search_params.get("category_id"):
-                query = query.filter(Document.category_id == search_params["category_id"])
+                query = query.filter(
+                    Document.category_id == search_params["category_id"]
+                )
 
             if search_params.get("status"):
                 query = query.filter(Document.status == search_params["status"])
 
             if search_params.get("language"):
-                query = query.filter(Document.language_detected == search_params["language"])
+                query = query.filter(
+                    Document.language_detected == search_params["language"]
+                )
 
             sort_by = search_params.get("sort_by", "relevance")
             sort_order = search_params.get("sort_order", "desc")
@@ -169,12 +177,12 @@ class SearchService:
     def search_categories(self, search_params: Dict[str, Any]) -> Dict[str, Any]:
         """Search available categories"""
         start_time = time.time()
-        
+
         try:
             query = self.db.query(Category).filter(
                 or_(
                     Category.user_id == search_params["user_id"],
-                    Category.user_id.is_(None)
+                    Category.user_id.is_(None),
                 )
             )
 
@@ -186,18 +194,22 @@ class SearchService:
                     search_filter = or_(
                         Category.name_en.ilike(f"%{search_query}%"),
                         Category.description_en.ilike(f"%{search_query}%"),
-                        func.array_to_string(Category.keywords, ' ').ilike(f"%{search_query}%"),
+                        func.array_to_string(Category.keywords, " ").ilike(
+                            f"%{search_query}%"
+                        ),
                     )
                 else:
                     search_filter = or_(
                         Category.name_de.ilike(f"%{search_query}%"),
                         Category.description_de.ilike(f"%{search_query}%"),
-                        func.array_to_string(Category.keywords, ' ').ilike(f"%{search_query}%"),
+                        func.array_to_string(Category.keywords, " ").ilike(
+                            f"%{search_query}%"
+                        ),
                     )
                 query = query.filter(search_filter)
 
             query = query.order_by(Category.name_en)
-            
+
             limit = search_params.get("limit", 10)
             categories = query.limit(limit).all()
 
@@ -213,7 +225,9 @@ class SearchService:
                     "name_en": category.name_en,
                     "name_de": category.name_de,
                     "description": (
-                        category.description_en if language == "en" else category.description_de
+                        category.description_en
+                        if language == "en"
+                        else category.description_de
                     ),
                     "color": category.color,
                     "icon": category.icon,
@@ -228,7 +242,10 @@ class SearchService:
 
             if search_query:
                 self._save_search_history(
-                    search_params["user_id"], search_query, "categories", len(categories)
+                    search_params["user_id"],
+                    search_query,
+                    "categories",
+                    len(categories),
                 )
 
             return {
@@ -244,7 +261,7 @@ class SearchService:
     def global_search(self, search_params: Dict[str, Any]) -> Dict[str, Any]:
         """Search across multiple entity types"""
         start_time = time.time()
-        
+
         try:
             results = {}
             entities = search_params.get("entities", ["documents", "categories"])
@@ -281,7 +298,10 @@ class SearchService:
                 search_params["user_id"],
                 search_params["query"],
                 "global",
-                sum(entity_results.get("total", 0) for entity_results in results.values())
+                sum(
+                    entity_results.get("total", 0)
+                    for entity_results in results.values()
+                ),
             )
 
             return {
@@ -293,28 +313,34 @@ class SearchService:
             logger.error(f"Global search failed: {e}")
             return {"results": {}, "search_time_ms": 0}
 
-    def semantic_search(self, user_id: int, query: str, limit: int = 20) -> Dict[str, Any]:
+    def semantic_search(
+        self, user_id: int, query: str, limit: int = 20
+    ) -> Dict[str, Any]:
         """Perform semantic search using keyword similarity"""
         try:
             start_time = time.time()
-            
+
             # Extract keywords from query
             query_keywords = self._extract_keywords_from_text(query.lower())
-            
+
             if not query_keywords:
                 return {"documents": [], "total": 0, "search_time_ms": 0}
 
             # Find documents with similar keywords
             base_query = self.db.query(Document).filter(Document.user_id == user_id)
-            
+
             # Build semantic search conditions
             semantic_conditions = []
             for keyword in query_keywords:
                 condition = or_(
-                    func.array_to_string(Document.extracted_keywords, ' ').ilike(f"%{keyword}%"),
-                    func.array_to_string(Document.user_keywords, ' ').ilike(f"%{keyword}%"),
+                    func.array_to_string(Document.extracted_keywords, " ").ilike(
+                        f"%{keyword}%"
+                    ),
+                    func.array_to_string(Document.user_keywords, " ").ilike(
+                        f"%{keyword}%"
+                    ),
                     Document.extracted_text.ilike(f"%{keyword}%"),
-                    Document.title.ilike(f"%{keyword}%")
+                    Document.title.ilike(f"%{keyword}%"),
                 )
                 semantic_conditions.append(condition)
 
@@ -322,71 +348,82 @@ class SearchService:
                 base_query = base_query.filter(or_(*semantic_conditions))
 
             # Calculate relevance scores
-            relevance_score = case([
-                (Document.title.ilike(f"%{query}%"), 10),
-                (Document.filename.ilike(f"%{query}%"), 8),
-                (Document.description.ilike(f"%{query}%"), 6),
-                (Document.extracted_text.ilike(f"%{query}%"), 4)
-            ], else_=2)
+            relevance_score = case(
+                [
+                    (Document.title.ilike(f"%{query}%"), 10),
+                    (Document.filename.ilike(f"%{query}%"), 8),
+                    (Document.description.ilike(f"%{query}%"), 6),
+                    (Document.extracted_text.ilike(f"%{query}%"), 4),
+                ],
+                else_=2,
+            )
 
             # Order by relevance
-            base_query = base_query.order_by(desc(relevance_score), desc(Document.view_count))
-            
+            base_query = base_query.order_by(
+                desc(relevance_score), desc(Document.view_count)
+            )
+
             documents = base_query.limit(limit).all()
-            
-            formatted_documents = self._format_search_results(documents, query, highlight=True)
-            
+
+            formatted_documents = self._format_search_results(
+                documents, query, highlight=True
+            )
+
             search_time_ms = int((time.time() - start_time) * 1000)
-            
+
             return {
                 "documents": formatted_documents,
                 "total": len(documents),
                 "search_time_ms": search_time_ms,
-                "search_type": "semantic"
+                "search_type": "semantic",
             }
 
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return {"documents": [], "total": 0, "search_time_ms": 0}
 
-    def full_text_search(self, user_id: int, query: str, filters: Dict[str, Any] = None) -> Dict[str, Any]:
+    def full_text_search(
+        self, user_id: int, query: str, filters: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """PostgreSQL full-text search implementation"""
         try:
             start_time = time.time()
-            
+
             # Use PostgreSQL full-text search capabilities
-            search_vector = func.to_tsvector('english', 
-                func.coalesce(Document.title, '') + ' ' +
-                func.coalesce(Document.filename, '') + ' ' +
-                func.coalesce(Document.extracted_text, '') + ' ' +
-                func.coalesce(Document.description, '')
+            search_vector = func.to_tsvector(
+                "english",
+                func.coalesce(Document.title, "")
+                + " "
+                + func.coalesce(Document.filename, "")
+                + " "
+                + func.coalesce(Document.extracted_text, "")
+                + " "
+                + func.coalesce(Document.description, ""),
             )
-            
-            search_query_ts = func.plainto_tsquery('english', query)
-            
+
+            search_query_ts = func.plainto_tsquery("english", query)
+
             base_query = (
                 self.db.query(
-                    Document,
-                    func.ts_rank(search_vector, search_query_ts).label('rank')
+                    Document, func.ts_rank(search_vector, search_query_ts).label("rank")
                 )
                 .filter(
-                    Document.user_id == user_id,
-                    search_vector.op('@@')(search_query_ts)
+                    Document.user_id == user_id, search_vector.op("@@")(search_query_ts)
                 )
-                .order_by(desc('rank'))
+                .order_by(desc("rank"))
             )
 
             if filters:
                 base_query = self._apply_advanced_filters(base_query, filters)
 
             total_count = base_query.count()
-            
+
             page = filters.get("page", 1) if filters else 1
             per_page = filters.get("per_page", 20) if filters else 20
             offset = (page - 1) * per_page
 
             results = base_query.offset(offset).limit(per_page).all()
-            
+
             formatted_documents = []
             for doc, rank in results:
                 document_data = self._format_document_result(doc, query)
@@ -399,7 +436,7 @@ class SearchService:
                 "documents": formatted_documents,
                 "total": total_count,
                 "search_time_ms": search_time_ms,
-                "search_type": "full_text"
+                "search_type": "full_text",
             }
 
         except Exception as e:
@@ -419,7 +456,7 @@ class SearchService:
                     .filter(
                         Document.user_id == user_id,
                         Document.title.ilike(f"%{query}%"),
-                        Document.title.isnot(None)
+                        Document.title.isnot(None),
                     )
                     .distinct()
                     .limit(limit)
@@ -432,11 +469,8 @@ class SearchService:
                 cat_suggestions = (
                     self.db.query(Category.name_en)
                     .filter(
-                        or_(
-                            Category.user_id == user_id,
-                            Category.user_id.is_(None)
-                        ),
-                        Category.name_en.ilike(f"%{query}%")
+                        or_(Category.user_id == user_id, Category.user_id.is_(None)),
+                        Category.name_en.ilike(f"%{query}%"),
                     )
                     .distinct()
                     .limit(remaining_limit)
@@ -463,13 +497,15 @@ class SearchService:
 
             formatted_history = []
             for entry in history:
-                formatted_history.append({
-                    "id": entry.id,
-                    "query": entry.query,
-                    "entity_type": entry.entity_type,
-                    "results_count": entry.results_count,
-                    "created_at": entry.created_at.isoformat(),
-                })
+                formatted_history.append(
+                    {
+                        "id": entry.id,
+                        "query": entry.query,
+                        "entity_type": entry.entity_type,
+                        "results_count": entry.results_count,
+                        "created_at": entry.created_at.isoformat(),
+                    }
+                )
 
             return formatted_history
 
@@ -477,13 +513,15 @@ class SearchService:
             logger.error(f"Get search history failed: {e}")
             return []
 
-    def get_popular_searches(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_popular_searches(
+        self, user_id: int, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Get popular search terms for user"""
         try:
             popular_queries = (
                 self.db.query(
                     SearchHistory.query,
-                    func.count(SearchHistory.query).label("frequency")
+                    func.count(SearchHistory.query).label("frequency"),
                 )
                 .filter(SearchHistory.user_id == user_id)
                 .group_by(SearchHistory.query)
@@ -494,16 +532,18 @@ class SearchService:
 
             popular_searches = []
             for query, frequency in popular_queries:
-                popular_searches.append({
-                    "query": query,
-                    "frequency": frequency,
-                    "type": "query",
-                })
+                popular_searches.append(
+                    {
+                        "query": query,
+                        "frequency": frequency,
+                        "type": "query",
+                    }
+                )
 
             keywords_query = (
                 self.db.query(
                     func.unnest(Document.extracted_keywords).label("keyword"),
-                    func.count().label("frequency")
+                    func.count().label("frequency"),
                 )
                 .filter(Document.user_id == user_id)
                 .group_by("keyword")
@@ -514,11 +554,13 @@ class SearchService:
 
             for keyword, frequency in keywords_query:
                 if len(popular_searches) < limit:
-                    popular_searches.append({
-                        "query": keyword,
-                        "frequency": frequency,
-                        "type": "keyword",
-                    })
+                    popular_searches.append(
+                        {
+                            "query": keyword,
+                            "frequency": frequency,
+                            "type": "keyword",
+                        }
+                    )
 
             return popular_searches
 
@@ -530,13 +572,13 @@ class SearchService:
         """Get search analytics for user"""
         try:
             start_date = datetime.utcnow() - timedelta(days=days)
-            
+
             # Total searches
             total_searches = (
                 self.db.query(SearchHistory)
                 .filter(
                     SearchHistory.user_id == user_id,
-                    SearchHistory.created_at >= start_date
+                    SearchHistory.created_at >= start_date,
                 )
                 .count()
             )
@@ -544,12 +586,11 @@ class SearchService:
             # Top search terms
             top_searches = (
                 self.db.query(
-                    SearchHistory.query,
-                    func.count(SearchHistory.query).label("count")
+                    SearchHistory.query, func.count(SearchHistory.query).label("count")
                 )
                 .filter(
                     SearchHistory.user_id == user_id,
-                    SearchHistory.created_at >= start_date
+                    SearchHistory.created_at >= start_date,
                 )
                 .group_by(SearchHistory.query)
                 .order_by(desc("count"))
@@ -561,11 +602,11 @@ class SearchService:
             daily_searches = (
                 self.db.query(
                     func.date(SearchHistory.created_at).label("date"),
-                    func.count().label("searches")
+                    func.count().label("searches"),
                 )
                 .filter(
                     SearchHistory.user_id == user_id,
-                    SearchHistory.created_at >= start_date
+                    SearchHistory.created_at >= start_date,
                 )
                 .group_by(func.date(SearchHistory.created_at))
                 .order_by("date")
@@ -575,23 +616,29 @@ class SearchService:
             return {
                 "total_searches": total_searches,
                 "top_searches": [{"query": q, "count": c} for q, c in top_searches],
-                "daily_trends": [{"date": d.isoformat(), "searches": s} for d, s in daily_searches],
+                "daily_trends": [
+                    {"date": d.isoformat(), "searches": s} for d, s in daily_searches
+                ],
                 "period_days": days,
-                "start_date": start_date.isoformat()
+                "start_date": start_date.isoformat(),
             }
 
         except Exception as e:
             logger.error(f"Search analytics failed: {e}")
             return {"total_searches": 0, "top_searches": [], "daily_trends": []}
 
-    def save_search_query(self, user_id: int, query: str, entity_type: str, results_count: int):
+    def save_search_query(
+        self, user_id: int, query: str, entity_type: str, results_count: int
+    ):
         """Save search query for analytics"""
         self._save_search_history(user_id, query, entity_type, results_count)
 
     def clear_search_history(self, user_id: int) -> bool:
         """Clear user's search history"""
         try:
-            self.db.query(SearchHistory).filter(SearchHistory.user_id == user_id).delete()
+            self.db.query(SearchHistory).filter(
+                SearchHistory.user_id == user_id
+            ).delete()
             self.db.commit()
             return True
         except Exception as e:
@@ -608,14 +655,14 @@ class SearchService:
             "excluded_terms": [],
             "phrases": [],
             "field_searches": {},
-            "should_have": []
+            "should_have": [],
         }
 
         phrases = re.findall(r'"([^"]*)"', query)
         parsed["phrases"] = phrases
 
         query_without_quotes = re.sub(r'"[^"]*"', "", query)
-        
+
         terms = query_without_quotes.split()
         for term in terms:
             if term.startswith("-"):
@@ -639,7 +686,7 @@ class SearchService:
                 Document.title.ilike(f"%{term}%"),
                 Document.filename.ilike(f"%{term}%"),
                 Document.extracted_text.ilike(f"%{term}%"),
-                Document.description.ilike(f"%{term}%")
+                Document.description.ilike(f"%{term}%"),
             )
             conditions.append(term_conditions)
 
@@ -647,7 +694,7 @@ class SearchService:
             phrase_conditions = or_(
                 Document.title.ilike(f"%{phrase}%"),
                 Document.extracted_text.ilike(f"%{phrase}%"),
-                Document.description.ilike(f"%{phrase}%")
+                Document.description.ilike(f"%{phrase}%"),
             )
             conditions.append(phrase_conditions)
 
@@ -656,7 +703,7 @@ class SearchService:
                 ~Document.title.ilike(f"%{term}%"),
                 ~Document.filename.ilike(f"%{term}%"),
                 ~Document.extracted_text.ilike(f"%{term}%"),
-                ~Document.description.ilike(f"%{term}%")
+                ~Document.description.ilike(f"%{term}%"),
             )
             conditions.append(exclude_conditions)
 
@@ -671,12 +718,14 @@ class SearchService:
         if parsed_query["should_have"]:
             should_conditions = []
             for term in parsed_query["should_have"]:
-                should_conditions.append(or_(
-                    Document.title.ilike(f"%{term}%"),
-                    Document.filename.ilike(f"%{term}%"),
-                    Document.extracted_text.ilike(f"%{term}%"),
-                    Document.description.ilike(f"%{term}%")
-                ))
+                should_conditions.append(
+                    or_(
+                        Document.title.ilike(f"%{term}%"),
+                        Document.filename.ilike(f"%{term}%"),
+                        Document.extracted_text.ilike(f"%{term}%"),
+                        Document.description.ilike(f"%{term}%"),
+                    )
+                )
             if should_conditions:
                 conditions.append(or_(*should_conditions))
 
@@ -688,10 +737,12 @@ class SearchService:
             query = query.filter(Document.category_id == filters["category_id"])
 
         if filters.get("mime_types"):
-            mime_conditions = or_(*[
-                Document.mime_type.ilike(f"{mime}%") 
-                for mime in filters["mime_types"]
-            ])
+            mime_conditions = or_(
+                *[
+                    Document.mime_type.ilike(f"{mime}%")
+                    for mime in filters["mime_types"]
+                ]
+            )
             query = query.filter(mime_conditions)
 
         if filters.get("date_from"):
@@ -720,19 +771,15 @@ class SearchService:
             return query.order_by(desc(Document.updated_at))
 
         rank_expressions = []
-        
+
         terms = search_query.lower().split()
         for term in terms:
-            title_rank = case(
-                [(Document.title.ilike(f"%{term}%"), 3)], else_=0
-            )
-            filename_rank = case(
-                [(Document.filename.ilike(f"%{term}%"), 2)], else_=0
-            )
+            title_rank = case([(Document.title.ilike(f"%{term}%"), 3)], else_=0)
+            filename_rank = case([(Document.filename.ilike(f"%{term}%"), 2)], else_=0)
             content_rank = case(
                 [(Document.extracted_text.ilike(f"%{term}%"), 1)], else_=0
             )
-            
+
             rank_expressions.extend([title_rank, filename_rank, content_rank])
 
         total_rank = sum(rank_expressions) if rank_expressions else 0
@@ -743,7 +790,7 @@ class SearchService:
     ) -> List[Dict[str, Any]]:
         """Format search results with optional highlighting"""
         formatted_documents = []
-        
+
         for doc in documents:
             document_data = {
                 "id": doc.id,
@@ -773,9 +820,13 @@ class SearchService:
 
             if highlight and query:
                 if doc.title:
-                    document_data["highlighted_title"] = self._highlight_text(doc.title, query)
+                    document_data["highlighted_title"] = self._highlight_text(
+                        doc.title, query
+                    )
                 if doc.description:
-                    document_data["highlighted_description"] = self._highlight_text(doc.description, query)
+                    document_data["highlighted_description"] = self._highlight_text(
+                        doc.description, query
+                    )
 
             formatted_documents.append(document_data)
 
@@ -806,43 +857,45 @@ class SearchService:
             "view_count": doc.view_count,
             "created_at": doc.created_at.isoformat(),
             "updated_at": doc.updated_at.isoformat(),
-            "highlighted_title": self._highlight_text(doc.title, query) if doc.title else None,
+            "highlighted_title": (
+                self._highlight_text(doc.title, query) if doc.title else None
+            ),
         }
 
     def _generate_search_suggestions(self, user_id: int, query: str) -> List[str]:
         """Generate search suggestions based on query"""
         suggestions = []
-        
+
         try:
             query_lower = query.lower()
-            
+
             similar_searches = (
                 self.db.query(SearchHistory.query)
                 .filter(
                     SearchHistory.user_id == user_id,
                     SearchHistory.query.ilike(f"%{query}%"),
-                    SearchHistory.query != query
+                    SearchHistory.query != query,
                 )
                 .distinct()
                 .limit(3)
                 .all()
             )
-            
+
             suggestions.extend([s[0] for s in similar_searches])
-            
+
             keyword_suggestions = (
                 self.db.query(func.unnest(Document.extracted_keywords))
                 .filter(
                     Document.user_id == user_id,
-                    func.unnest(Document.extracted_keywords).ilike(f"%{query}%")
+                    func.unnest(Document.extracted_keywords).ilike(f"%{query}%"),
                 )
                 .distinct()
                 .limit(5)
                 .all()
             )
-            
+
             suggestions.extend([s[0] for s in keyword_suggestions if s[0]])
-            
+
             return list(set(suggestions))[:5]
 
         except Exception as e:
@@ -854,15 +907,49 @@ class SearchService:
         try:
             # Simple keyword extraction - remove common stop words
             stop_words = {
-                'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 
-                'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-                'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-                'should', 'may', 'might', 'must', 'shall', 'can'
+                "the",
+                "a",
+                "an",
+                "and",
+                "or",
+                "but",
+                "in",
+                "on",
+                "at",
+                "to",
+                "for",
+                "of",
+                "with",
+                "by",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "being",
+                "have",
+                "has",
+                "had",
+                "do",
+                "does",
+                "did",
+                "will",
+                "would",
+                "could",
+                "should",
+                "may",
+                "might",
+                "must",
+                "shall",
+                "can",
             }
-            
-            words = re.findall(r'\b\w+\b', text.lower())
-            keywords = [word for word in words if word not in stop_words and len(word) > 2]
-            
+
+            words = re.findall(r"\b\w+\b", text.lower())
+            keywords = [
+                word for word in words if word not in stop_words and len(word) > 2
+            ]
+
             return list(set(keywords))[:10]  # Return unique keywords, max 10
 
         except Exception as e:
@@ -887,8 +974,7 @@ class SearchService:
             return (
                 self.db.query(Document)
                 .filter(
-                    Document.category_id == category_id,
-                    Document.user_id == user_id
+                    Document.category_id == category_id, Document.user_id == user_id
                 )
                 .count()
             )
@@ -905,7 +991,7 @@ class SearchService:
                 .filter(
                     SearchHistory.user_id == user_id,
                     SearchHistory.query == query,
-                    SearchHistory.entity_type == entity_type
+                    SearchHistory.entity_type == entity_type,
                 )
                 .first()
             )
