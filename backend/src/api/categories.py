@@ -275,8 +275,10 @@ async def delete_category(
         )
 
 
+# backend/src/api/categories.py - Fix async endpoints
+
 @router.post("/suggest")
-async def suggest_category(
+def suggest_category(  # REMOVED async
     text: str = Query(..., min_length=10, description="Text content to analyze"),
     limit: int = Query(5, ge=1, le=10, description="Maximum number of suggestions"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -293,7 +295,7 @@ async def suggest_category(
             )
 
         category_service = CategoryService(db)
-        suggestions = await category_service.suggest_categories(text, user.id, limit)
+        suggestions = category_service.suggest_categories(text, user.id, limit)  # REMOVED await
 
         return {
             "suggestions": suggestions,
@@ -312,7 +314,7 @@ async def suggest_category(
 
 
 @router.get("/statistics/usage")
-async def get_category_statistics(
+def get_category_statistics(  # REMOVED async
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
@@ -327,7 +329,7 @@ async def get_category_statistics(
             )
 
         category_service = CategoryService(db)
-        statistics = await category_service.get_category_statistics(user.id)
+        statistics = category_service.get_category_statistics(user.id)  # REMOVED await
 
         return statistics
 

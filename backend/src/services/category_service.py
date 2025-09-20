@@ -273,13 +273,11 @@ class CategoryService:
             logger.error(f"Delete category failed: {e}")
             return False
 
-    async def suggest_categories(
-        self, text: str, user_id: int, limit: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Suggest categories based on document content"""
+    def suggest_categories(self, text: str, user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+        """Suggest categories based on document content - FIXED: Removed async"""
         try:
             # Get all categories available to user (from database)
-            categories = await self.get_user_categories(
+            categories = self.get_user_categories(
                 user_id, include_system=True, include_user=True
             )
 
@@ -330,8 +328,8 @@ class CategoryService:
             logger.error(f"Category suggestion failed: {e}")
             return []
 
-    async def get_category_statistics(self, user_id: int) -> Dict[str, Any]:
-        """Get category usage statistics for user"""
+    def get_category_statistics(self, user_id: int) -> Dict[str, Any]:
+        """Get category usage statistics for user - FIXED: Removed async"""
         try:
             # Get category document counts
             category_stats = (
@@ -365,41 +363,39 @@ class CategoryService:
             total_documents = 0
 
             for stat in category_stats:
-                doc_count = stat.document_count
-                total_documents += doc_count
-
+                total_documents += stat.document_count
                 formatted_stats.append(
                     {
-                        "category_id": stat.id,
+                        "id": stat.id,
                         "name_en": stat.name_en,
                         "name_de": stat.name_de,
                         "color": stat.color,
                         "icon": stat.icon,
-                        "document_count": doc_count,
+                        "document_count": stat.document_count,
+                        "percentage": 0,  # Will calculate after getting total
                     }
                 )
 
             # Calculate percentages
             for stat in formatted_stats:
                 if total_documents > 0:
-                    stat["percentage"] = (
-                        stat["document_count"] / total_documents
-                    ) * 100
-                else:
-                    stat["percentage"] = 0
-
-            # Sort by document count
-            formatted_stats.sort(key=lambda x: x["document_count"], reverse=True)
+                    stat["percentage"] = round(
+                        (stat["document_count"] / total_documents) * 100, 1
+                    )
 
             return {
-                "categories": formatted_stats,
+                "category_usage": formatted_stats,
                 "total_documents": total_documents,
                 "total_categories": len(formatted_stats),
             }
 
         except Exception as e:
             logger.error(f"Get category statistics failed: {e}")
-            return {"categories": [], "total_documents": 0, "total_categories": 0}
+            return {
+                "category_usage": [],
+                "total_documents": 0,
+                "total_categories": 0,
+            }
 
     async def mark_category_used(self, category_id: int) -> None:
         """Mark category as recently used"""

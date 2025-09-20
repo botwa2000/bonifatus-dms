@@ -62,11 +62,10 @@ class UserService:
             logger.error(f"Failed to get complete profile for user {user_id}: {e}")
             return {}
 
-    async def get_usage_statistics(
-        self, user_id: int, period: str = "month"
-    ) -> Dict[str, Any]:
+    def get_usage_statistics(self, user_id: int, period: str = "month") -> Dict[str, Any]:
         """
         Get detailed usage statistics for specified period
+        FIXED: Removed async - this method doesn't need to be async
         """
         try:
             # Calculate date range
@@ -187,9 +186,10 @@ class UserService:
             logger.error(f"Failed to get usage statistics for user {user_id}: {e}")
             return {}
 
-    async def start_premium_trial(self, user_id: int) -> Dict[str, Any]:
+    def start_premium_trial(self, user_id: int) -> Dict[str, Any]:
         """
         Start premium trial for eligible user
+        FIXED: Removed async - doesn't need to be async
         """
         try:
             user = self.db.query(User).filter(User.id == user_id).first()
@@ -223,106 +223,106 @@ class UserService:
             self.db.rollback()
             return {"success": False, "error": str(e)}
 
-    async def export_user_data(
-        self, user_id: int, format: str = "json"
-    ) -> Dict[str, Any]:
+    def export_user_data(self, user_id: int, format: str = "json") -> Dict[str, Any]:
         """
         Export all user data for GDPR compliance
+        FIXED: Removed async - doesn't need to be async
         """
         try:
             user = self.db.query(User).filter(User.id == user_id).first()
             if not user:
-                return {}
+                return {"success": False, "error": "User not found"}
 
-            # Get user profile data
-            user_data = {
-                "profile": {
-                    "id": user.id,
-                    "email": user.email,
-                    "full_name": user.full_name,
-                    "tier": user.tier.value,
-                    "preferred_language": user.preferred_language,
-                    "timezone": user.timezone,
-                    "theme": user.theme,
-                    "created_at": user.created_at.isoformat(),
-                    "last_login_at": (
-                        user.last_login_at.isoformat() if user.last_login_at else None
-                    ),
-                }
-            }
-
-            # Get documents data
+            # Get all user documents
             documents = (
-                self.db.query(Document).filter(Document.user_id == user_id).all()
+                self.db.query(Document)
+                .filter(Document.user_id == user_id)
+                .all()
             )
 
-            user_data["documents"] = [
-                {
-                    "id": doc.id,
-                    "filename": doc.filename,
-                    "original_filename": doc.original_filename,
-                    "title": doc.title,
-                    "description": doc.description,
-                    "file_size_bytes": doc.file_size_bytes,
-                    "mime_type": doc.mime_type,
-                    "status": doc.status.value,
-                    "extracted_keywords": doc.extracted_keywords,
-                    "user_keywords": doc.user_keywords,
-                    "notes": doc.notes,
-                    "is_favorite": doc.is_favorite,
-                    "view_count": doc.view_count,
-                    "created_at": doc.created_at.isoformat(),
-                    "updated_at": doc.updated_at.isoformat(),
-                }
-                for doc in documents
-            ]
-
-            # Get categories data
+            # Get user categories
             categories = (
-                self.db.query(Category).filter(Category.user_id == user_id).all()
+                self.db.query(Category)
+                .filter(Category.user_id == user_id)
+                .all()
             )
-
-            user_data["categories"] = [
-                {
-                    "id": cat.id,
-                    "name_en": cat.name_en,
-                    "name_de": cat.name_de,
-                    "description_en": cat.description_en,
-                    "description_de": cat.description_de,
-                    "color": cat.color,
-                    "keywords": cat.keywords,
-                    "created_at": cat.created_at.isoformat(),
-                }
-                for cat in categories
-            ]
 
             # Get user settings
-            user_settings = (
+            settings = (
                 self.db.query(UserSettings)
                 .filter(UserSettings.user_id == user_id)
                 .first()
             )
 
-            if user_settings:
-                user_data["settings"] = {
-                    "auto_categorization_enabled": user_settings.auto_categorization_enabled,
-                    "ocr_enabled": user_settings.ocr_enabled,
-                    "ai_suggestions_enabled": user_settings.ai_suggestions_enabled,
-                    "email_notifications": user_settings.email_notifications,
-                    "sync_frequency_minutes": user_settings.sync_frequency_minutes,
-                    "documents_per_page": user_settings.documents_per_page,
-                    "default_view_mode": user_settings.default_view_mode,
+            # Prepare export data
+            export_data = {
+                "user_profile": {
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "tier": user.tier.value,
+                    "created_at": user.created_at.isoformat(),
+                    "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                },
+                "documents": [
+                    {
+                        "filename": doc.filename,
+                        "title": doc.title,
+                        "description": doc.description,
+                        "created_at": doc.created_at.isoformat(),
+                        "file_size_bytes": doc.file_size_bytes,
+                    }
+                    for doc in documents
+                ],
+                "categories": [
+                    {
+                        "name_en": cat.name_en,
+                        "name_de": cat.name_de,
+                        "description_en": cat.description_en,
+                        "description_de": cat.description_de,
+                        "color": cat.color,
+                    }
+                    for cat in categories
+                ],
+                "settings": {
+                    "auto_categorization_enabled": settings.auto_categorization_enabled if settings else True,
+                    "ocr_enabled": settings.ocr_enabled if settings else True,
+                    "documents_per_page": settings.documents_per_page if settings else 20,
+                } if settings else {},
+            }
+
+            if format == "csv":
+                # Convert to CSV format
+                output = io.StringIO()
+                writer = csv.writer(output)
+                
+                # Write documents CSV
+                writer.writerow(["Type", "Filename", "Title", "Created At", "Size"])
+                for doc in documents:
+                    writer.writerow([
+                        "Document",
+                        doc.filename,
+                        doc.title,
+                        doc.created_at.isoformat(),
+                        doc.file_size_bytes
+                    ])
+                
+                return {
+                    "success": True,
+                    "format": "csv",
+                    "data": output.getvalue(),
+                    "filename": f"user_data_{user_id}.csv"
+                }
+            else:
+                return {
+                    "success": True,
+                    "format": "json",
+                    "data": export_data,
+                    "filename": f"user_data_{user_id}.json"
                 }
 
-            # Format output based on requested format
-            if format == "csv":
-                return self._format_data_as_csv(user_data)
-            else:
-                return user_data
-
         except Exception as e:
-            logger.error(f"Failed to export data for user {user_id}: {e}")
-            return {}
+            logger.error(f"Failed to export user data for user {user_id}: {e}")
+            return {"success": False, "error": str(e)}
 
     async def delete_user_account(
         self, user_id: int, delete_google_drive_files: bool = False
