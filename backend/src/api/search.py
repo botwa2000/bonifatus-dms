@@ -114,7 +114,7 @@ async def search_documents(
         )
 
 
-@router.post("/categories")
+@router.get("/categories")
 async def search_categories(
     query: str,
     include_system: bool = Query(True),

@@ -11,6 +11,7 @@ from fastapi import status
 from io import BytesIO
 
 from src.database.models import User, UserTier, Document, Category, DocumentStatus
+from fastapi import status
 from src.services.document_service import DocumentService
 from src.services.category_service import CategoryService
 from src.services.search_service import SearchService
