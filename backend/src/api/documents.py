@@ -35,6 +35,7 @@ security = HTTPBearer()
 router = APIRouter()
 
 
+# backend/src/api/documents.py - Fixed upload function
 @router.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -47,24 +48,62 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """Upload document to Google Drive with automatic processing"""
-    
-    document = None  # ✅ CRITICAL: Initialize at the very start
-    
+
+    document = None  # Initialize at the very start
+
     try:
-        # ... rest of the function remains the same
-        
+        # Authentication
+        auth_service = AuthService(db)
+        user = auth_service.get_current_user(credentials.credentials)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+
+        # Validate upload
+        document_service = DocumentService(db)
+        validation = await document_service.validate_upload(user, file)
+        if not validation["valid"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=validation["error"]
+            )
+
+        # Create document record
+        document = await document_service.create_document_record(
+            user_id=user.id,
+            file=file,
+            category_id=category_id,
+            title=title,
+            description=description,
+            keywords=keywords.split(",") if keywords else None,
+        )
+
+        # Schedule background processing
+        background_tasks.add_task(
+            process_document_background, document.id, settings.database_url
+        )
+
+        return {
+            "id": document.id,
+            "filename": document.filename,
+            "status": document.status.value,
+            "message": "Document uploaded successfully, processing in background",
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Document upload failed: {e}")
-        # Now document is always defined
-        if document and hasattr(document, 'id'):
+        # Clean up document record if created
+        if document and hasattr(document, "id"):
             try:
                 db.delete(document)
                 db.commit()
             except Exception:
                 pass
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Upload failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload failed"
         )
 
 
