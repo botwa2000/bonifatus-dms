@@ -10,7 +10,7 @@ from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
-from src.core.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

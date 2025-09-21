@@ -38,6 +38,7 @@ class GoogleSettings(BaseSettings):
     google_client_secret: str = Field(..., description="Google OAuth client secret")
     google_redirect_uri: str = Field(default="", description="OAuth redirect URI")
     google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
+    google_oauth_issuers: str = Field(default="accounts.google.com,https://accounts.google.com", description="Valid OAuth issuers")
 
     class Config:
         env_file = "../.env"
@@ -52,6 +53,9 @@ class SecuritySettings(BaseSettings):
     security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=30, description="JWT expiration")
+    refresh_token_expire_days: int = Field(default=30, description="Refresh token expiration")
+    default_user_tier: str = Field(default="free", description="Default user tier")
+    admin_emails: str = Field(default="admin@bonifatus.com", description="Admin email list")
 
     class Config:
         env_file = "../.env"
@@ -94,6 +98,16 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.app.app_environment == "development"
+    
+    @property
+    def admin_email_list(self) -> List[str]:
+        """Get admin emails as list"""
+        return [email.strip() for email in self.security.admin_emails.split(",")]
+    
+    @property
+    def google_oauth_issuer_list(self) -> List[str]:
+        """Get Google OAuth issuers as list"""
+        return [issuer.strip() for issuer in self.google.google_oauth_issuers.split(",")]
 
     class Config:
         env_file = "../.env"

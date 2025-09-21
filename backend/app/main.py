@@ -12,8 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.core.config import settings
-from src.database.connection import init_database, close_database
+from app.core.config import settings
+from app.database.connection import init_database, close_database
+from app.api.auth import router as auth_router
 
 # Configure logging
 logging.basicConfig(
@@ -74,6 +75,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+# Include API routers
+app.include_router(auth_router)
+
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -86,7 +91,8 @@ async def health_check():
         "status": "healthy" if database_healthy else "unhealthy",
         "service": "bonifatus-dms",
         "database": "connected" if database_healthy else "disconnected",
-        "environment": settings.app.app_environment
+        "environment": settings.app.app_environment,
+        "authentication": "enabled"
     }
 
 
@@ -98,7 +104,8 @@ async def root():
         "message": "Bonifatus DMS API",
         "version": "1.0.0",
         "environment": settings.app.app_environment,
-        "docs": "/api/docs" if settings.is_development else "disabled"
+        "docs": "/api/docs" if settings.is_development else "disabled",
+        "authentication": "enabled"
     }
 
 
