@@ -427,3 +427,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Active Development**: ✅ Yes
 
 Built with ❤️ for efficient document management# Trigger deployment with Secret Manager integration
+# Fix Cloud Run service account secret access
