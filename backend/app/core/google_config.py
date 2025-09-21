@@ -60,7 +60,15 @@ class GoogleDriveConfig:
                 logger.error("Google Drive service account key not configured")
                 return None
 
-            if service_account_key.endswith('.json'):
+            # Check if it's a mounted secret path
+            if service_account_key.startswith('/secrets/'):
+                with open(service_account_key, 'r') as f:
+                    service_account_info = json.load(f)
+                credentials = Credentials.from_service_account_info(
+                    service_account_info, 
+                    scopes=self._drive_scopes
+                )
+            elif service_account_key.endswith('.json'):
                 credentials = Credentials.from_service_account_file(
                     service_account_key, 
                     scopes=self._drive_scopes

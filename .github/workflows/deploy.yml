@@ -16,6 +16,11 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
       
+      - name: Store service account key in Secret Manager
+        run: |
+          echo '${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}' | gcloud secrets create bonifatus-drive-service-key --data-file=- --replication-policy=automatic || \
+          echo '${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}' | gcloud secrets versions add bonifatus-drive-service-key --data-file=-
+      
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
       
@@ -32,14 +37,4 @@ jobs:
           gcloud run deploy bonifatus-dms \
             --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms:${{ github.sha }} \
             --platform managed \
-            --region us-central1 \
-            --allow-unauthenticated \
-            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --set-env-vars="GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
-            --set-env-vars="GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            --set-env-vars="SECURITY_SECRET_KEY=${{ secrets.SECURITY_SECRET_KEY }}" \
-            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT }}" \
-            --set-env-vars="GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY=${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}" \
-            --set-env-vars="GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS" \
-            --set-env-vars="GOOGLE_VISION_ENABLED=true" \
-            --set-env-vars="APP_ENVIRONMENT=production"
+            --region
