@@ -6,6 +6,7 @@ Production-ready Google Drive integration with service account authentication
 
 import logging
 import json
+import os
 from typing import Optional, Dict, Any
 from functools import lru_cache
 from google.oauth2.service_account import Credentials
@@ -60,9 +61,10 @@ class GoogleDriveConfig:
                 logger.error("Google Drive service account key not configured")
                 return None
 
-            # Check if it's a mounted secret path
-            if service_account_key.startswith('/secrets/'):
-                with open(service_account_key, 'r') as f:
+            # Check if it's a mounted secret (Cloud Run mounts secrets as files)
+            secret_path = '/secrets/GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY'
+            if os.path.exists(secret_path):
+                with open(secret_path, 'r') as f:
                     service_account_info = json.load(f)
                 credentials = Credentials.from_service_account_info(
                     service_account_info, 
