@@ -426,4 +426,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Production Ready**: Q2 2025
 - **Active Development**: ✅ Yes
 
-Built with ❤️ for efficient document management
+Built with ❤️ for efficient document management# Trigger deployment with Secret Manager integration
