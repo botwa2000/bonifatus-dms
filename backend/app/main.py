@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.database.connection import init_database, close_database
 from app.api.auth import router as auth_router
+from app.api.documents import router as documents_router
 
 # Configure logging
 logging.basicConfig(
@@ -80,6 +81,7 @@ from app.api.users import router as users_router
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(documents_router)
 
 
 # Health check endpoint

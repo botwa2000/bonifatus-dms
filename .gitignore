@@ -1,3 +1,8 @@
 .env
 __pycache__/
 *.pyc
+drive-service-key.json
+drive-service-key.json
+.env
+__pycache__/
+*.pyc
