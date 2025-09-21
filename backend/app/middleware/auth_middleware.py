@@ -1,4 +1,4 @@
-# backend/src/middleware/auth_middleware.py
+# backend/app/middleware/auth_middleware.py
 """
 Bonifatus DMS - Authentication Middleware
 JWT token validation for protected routes
@@ -9,9 +9,9 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from src.core.config import settings
-from src.database.models import User
-from src.services.auth_service import auth_service
+from app.core.config import settings
+from app.database.models import User
+from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
 
