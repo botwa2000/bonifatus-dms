@@ -76,7 +76,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Include API routers
+from app.api.users import router as users_router
+
 app.include_router(auth_router)
+app.include_router(users_router)
 
 
 # Health check endpoint
