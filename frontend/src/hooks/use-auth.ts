@@ -1,147 +1,332 @@
-// frontend/src/hooks/use-auth.ts
+// src/hooks/use-auth.ts
+/**
+ * Authentication hook for managing user authentication state
+ * Handles login, logout, token refresh, and Google OAuth callback
+ */
 
-'use client';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { authService } from '@/services/auth.service'
+import { AuthState, User } from '@/types/auth.types'
 
-import { useState, useEffect, useCallback } from 'react';
-import { authService } from '../services/auth.service';
-import { User, AuthError } from '../types/auth.types';
-
-interface UseAuthReturn {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: AuthError | null;
-  login: (googleToken: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAuth: () => Promise<void>;
-  clearError: () => void;
+interface UseAuthReturn extends AuthState {
+  login: (googleToken: string) => Promise<void>
+  logout: () => Promise<void>
+  refreshTokens: () => Promise<boolean>
+  initializeAuth: () => Promise<void>
+  handleGoogleCallback: () => Promise<void>
+  redirectToGoogleAuth: () => Promise<void>
 }
 
 export function useAuth(): UseAuthReturn {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<AuthError | null>(null);
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true
+  })
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  // Ref to prevent multiple simultaneous auth operations
+  const authOperationRef = useRef<Promise<void> | null>(null)
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleAuthError = useCallback((error: any) => {
-    try {
-      const parsedError = JSON.parse(error.message);
-      setError(parsedError);
-    } catch {
-      setError({
-        error: 'unknown_error',
-        message: error.message || 'An unexpected error occurred',
-      });
+  /**
+   * Clear token refresh schedule
+   */
+  const clearTokenRefreshSchedule = useCallback(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+      refreshTimeoutRef.current = null
     }
-  }, []);
+  }, [])
 
-  const login = useCallback(async (googleToken: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await authService.authenticateWithGoogle(googleToken);
-      setUser(response.user);
-      setIsAuthenticated(true);
-    } catch (error) {
-      handleAuthError(error);
-      setIsAuthenticated(false);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleAuthError]);
-
-  const logout = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      await authService.logout();
-    } catch (error) {
-      console.warn('Logout error:', error);
-    } finally {
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsLoading(false);
-      setError(null);
-    }
-  }, []);
-
-  const refreshAuth = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const user = await authService.getCurrentUser();
-      setUser(user);
-      setIsAuthenticated(true);
-    } catch (error) {
-      handleAuthError(error);
-      setIsAuthenticated(false);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [handleAuthError]);
-
-  const initializeAuth = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      
-      authService.initializeAuth();
-      
-      if (authService.isAuthenticated()) {
-        const storedUser = authService.getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-          setIsAuthenticated(true);
-          
-          // Verify token is still valid
-          try {
-            const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
-          } catch (error) {
-            // Token might be expired, try refresh
-            try {
-              await authService.refreshAccessToken();
-              const currentUser = await authService.getCurrentUser();
-              setUser(currentUser);
-            } catch (refreshError) {
-              // Both failed, clear authentication
-              await authService.logout();
-              setIsAuthenticated(false);
-              setUser(null);
-            }
-          }
-        } else {
-          setIsAuthenticated(false);
+  /**
+   * Schedule automatic token refresh
+   */
+  const scheduleTokenRefresh = useCallback(() => {
+    clearTokenRefreshSchedule()
+    
+    refreshTimeoutRef.current = setTimeout(async () => {
+      try {
+        const storedTokens = authService.getStoredTokens()
+        if (storedTokens) {
+          await authService.refreshToken(storedTokens.refresh_token)
+          const user = await authService.getCurrentUser()
+          setAuthState({
+            user,
+            isAuthenticated: true,
+            isLoading: false
+          })
+          scheduleTokenRefresh() // Reschedule next refresh
         }
-      } else {
-        setIsAuthenticated(false);
+      } catch {
+        setAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false
+        })
       }
-    } catch (error) {
-      setIsAuthenticated(false);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    }, 45 * 60 * 1000) // 45 minutes
+  }, [clearTokenRefreshSchedule])
 
+  /**
+   * Update authentication state
+   */
+  const updateAuthState = useCallback((user: User | null): void => {
+    setAuthState({
+      user,
+      isAuthenticated: !!user,
+      isLoading: false
+    })
+
+    clearTokenRefreshSchedule()
+    
+    if (user) {
+      scheduleTokenRefresh()
+    }
+  }, [clearTokenRefreshSchedule, scheduleTokenRefresh])
+
+  /**
+   * Refresh authentication tokens
+   */
+  const refreshTokens = useCallback(async (): Promise<boolean> => {
+    try {
+      const storedTokens = authService.getStoredTokens()
+      if (!storedTokens) {
+        updateAuthState(null)
+        return false
+      }
+
+      await authService.refreshToken(storedTokens.refresh_token)
+      
+      const user = await authService.getCurrentUser()
+      updateAuthState(user)
+      
+      return true
+    } catch (refreshError) {
+      console.error('Token refresh failed:', refreshError)
+      updateAuthState(null)
+      return false
+    }
+  }, [updateAuthState])
+
+  /**
+   * Login with Google OAuth token
+   */
+  const login = useCallback(async (googleToken: string): Promise<void> => {
+    // Prevent multiple simultaneous login attempts
+    if (authOperationRef.current) {
+      await authOperationRef.current
+      return
+    }
+
+    const loginOperation = async () => {
+      try {
+        setAuthState(prev => ({ ...prev, isLoading: true }))
+        
+        await authService.exchangeGoogleToken(googleToken)
+        
+        const user = await authService.getCurrentUser()
+        updateAuthState(user)
+        
+      } catch (loginError) {
+        console.error('Login failed:', loginError)
+        updateAuthState(null)
+        throw loginError
+      }
+    }
+
+    authOperationRef.current = loginOperation()
+    await authOperationRef.current
+    authOperationRef.current = null
+  }, [updateAuthState])
+
+  /**
+   * Logout user
+   */
+  const logout = useCallback(async (): Promise<void> => {
+    // Prevent multiple simultaneous logout attempts
+    if (authOperationRef.current) {
+      await authOperationRef.current
+      return
+    }
+
+    const logoutOperation = async () => {
+      try {
+        setAuthState(prev => ({ ...prev, isLoading: true }))
+        await authService.logout()
+      } catch (logoutError) {
+        console.error('Logout error:', logoutError)
+      } finally {
+        updateAuthState(null)
+      }
+    }
+
+    authOperationRef.current = logoutOperation()
+    await authOperationRef.current
+    authOperationRef.current = null
+  }, [updateAuthState])
+
+  /**
+   * Initialize authentication state from stored tokens
+   */
+  const initializeAuth = useCallback(async (): Promise<void> => {
+    // Prevent multiple simultaneous initialization
+    if (authOperationRef.current) {
+      await authOperationRef.current
+      return
+    }
+
+    const initOperation = async () => {
+      try {
+        const storedTokens = authService.getStoredTokens()
+        if (!storedTokens) {
+          updateAuthState(null)
+          return
+        }
+
+        // Validate token format
+        if (!authService.validateTokenFormat(storedTokens)) {
+          console.warn('Invalid token format, clearing tokens')
+          authService.clearTokens()
+          updateAuthState(null)
+          return
+        }
+
+        // Check if tokens are likely expired
+        if (authService.areTokensLikelyExpired()) {
+          console.info('Tokens likely expired, attempting refresh')
+          const refreshSuccess = await refreshTokens()
+          if (!refreshSuccess) {
+            updateAuthState(null)
+          }
+          return
+        }
+
+        // Try to get user with existing tokens
+        try {
+          const user = await authService.getCurrentUser()
+          updateAuthState(user)
+        } catch {
+          console.info('Failed to get user, attempting token refresh')
+          const refreshSuccess = await refreshTokens()
+          if (!refreshSuccess) {
+            updateAuthState(null)
+          }
+        }
+        
+      } catch (initError) {
+        console.error('Auth initialization failed:', initError)
+        updateAuthState(null)
+      }
+    }
+
+    authOperationRef.current = initOperation()
+    await authOperationRef.current
+    authOperationRef.current = null
+  }, [refreshTokens, updateAuthState])
+
+  /**
+   * Handle Google OAuth callback from URL parameters
+   */
+  const handleGoogleCallback = useCallback(async (): Promise<void> => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const code = urlParams.get('code')
+      const error = urlParams.get('error')
+
+      if (error) {
+        console.error('OAuth callback error:', error)
+        const errorDescription = urlParams.get('error_description') || 'Unknown OAuth error'
+        updateAuthState(null)
+        throw new Error(`Authentication failed: ${errorDescription}`)
+      }
+
+      if (code) {
+        await login(code)
+        
+        // Clean up URL parameters after successful login
+        const cleanUrl = window.location.pathname
+        window.history.replaceState({}, document.title, cleanUrl)
+      }
+    } catch (callbackError) {
+      console.error('Google callback handling failed:', callbackError)
+      updateAuthState(null)
+      throw callbackError
+    }
+  }, [login, updateAuthState])
+
+  /**
+   * Redirect to Google OAuth authorization
+   */
+  const redirectToGoogleAuth = useCallback(async (): Promise<void> => {
+    try {
+      const authUrl = await authService.initializeGoogleOAuth()
+      window.location.href = authUrl
+    } catch (redirectError) {
+      console.error('Google auth redirect failed:', redirectError)
+      throw new Error('Failed to initialize authentication')
+    }
+  }, [])
+
+  /**
+   * Initialize authentication on mount
+   */
   useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
+    initializeAuth()
+    
+    // Cleanup on unmount
+    return () => {
+      clearTokenRefreshSchedule()
+      authOperationRef.current = null
+    }
+  }, [initializeAuth, clearTokenRefreshSchedule])
+
+  /**
+   * Handle OAuth callback if present in URL
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasOAuthParams = urlParams.has('code') || urlParams.has('error')
+    
+    if (hasOAuthParams) {
+      handleGoogleCallback().catch(error => {
+        console.error('OAuth callback failed:', error)
+      })
+    }
+  }, [handleGoogleCallback])
+
+  /**
+   * Handle browser tab visibility changes to refresh tokens
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && authState.isAuthenticated) {
+        // Check if tokens need refresh when tab becomes visible
+        if (authService.areTokensLikelyExpired()) {
+          refreshTokens()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [authState.isAuthenticated, refreshTokens])
 
   return {
-    user,
-    isAuthenticated,
-    isLoading,
-    error,
+    ...authState,
     login,
     logout,
-    refreshAuth,
-    clearError,
-  };
+    refreshTokens,
+    initializeAuth,
+    handleGoogleCallback,
+    redirectToGoogleAuth
+  }
 }
