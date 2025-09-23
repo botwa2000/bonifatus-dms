@@ -1,14 +1,21 @@
-/* src/app/globals.css */
+/* frontend/src/app/globals.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+}
+
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-md bg-admin-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-admin-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-primary focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center rounded-md bg-admin-primary px-4 py-2 text-sm font-medium text-white shadow hover:bg-admin-primary/90 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none transition-colors;
   }
   
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none transition-colors;
   }
 }

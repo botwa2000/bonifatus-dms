@@ -1,14 +1,13 @@
-// src/app/layout.tsx
-/**
- * Root layout for Bonifatus DMS
- * Provides global styles and basic structure
- */
+// frontend/src/app/layout.tsx
 
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-geist-sans',
+})
 
 export const metadata: Metadata = {
   title: 'Bonifatus DMS',
@@ -21,11 +20,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
+      <head>
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+      </head>
       <body className={inter.className}>
-        <div className="min-h-screen bg-neutral-50">
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   )
