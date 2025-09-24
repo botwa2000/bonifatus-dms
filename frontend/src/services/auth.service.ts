@@ -45,10 +45,14 @@ export class AuthService {
 
   /**
    * Exchange Google OAuth code for JWT tokens
+   * Handles first-time user creation with 30-day premium trial
    */
   async exchangeGoogleToken(googleToken: string): Promise<TokenResponse> {
     try {
-      const request = { google_token: googleToken }
+      const request = { 
+        google_token: googleToken,
+        new_user_trial: true // Signal backend to provide 30-day trial for new users
+      }
       const tokenResponse = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', request)
       
       // Store tokens immediately after successful exchange
@@ -56,6 +60,11 @@ export class AuthService {
         access_token: tokenResponse.access_token,
         refresh_token: tokenResponse.refresh_token
       })
+
+      // Store user creation timestamp for trial tracking
+      if (tokenResponse.tier === 'trial') {
+        this.storeTrialInfo(tokenResponse)
+      }
       
       return tokenResponse
     } catch (error) {
@@ -174,7 +183,7 @@ export class AuthService {
   }
 
   /**
-   * Clear all stored tokens
+   * Clear all stored tokens and trial info
    */
   clearTokens(): void {
     if (typeof window === 'undefined') return
@@ -183,6 +192,7 @@ export class AuthService {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('tokens_stored_at')
+      localStorage.removeItem('trial_info') // Also clear trial info on logout
     } catch (error) {
       console.error('Failed to clear tokens:', error)
     }
@@ -232,6 +242,62 @@ export class AuthService {
       console.error('Failed to check token expiry:', error)
       return true
     }
+  }
+
+  /**
+   * Store trial information for new users
+   */
+  private storeTrialInfo(tokenResponse: TokenResponse): void {
+    if (typeof window === 'undefined') return
+
+    try {
+      const trialInfo = {
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        tier: tokenResponse.tier,
+        user_id: tokenResponse.user_id
+      }
+      
+      localStorage.setItem('trial_info', JSON.stringify(trialInfo))
+    } catch (error) {
+      console.error('Failed to store trial info:', error)
+    }
+  }
+
+  /**
+   * Get trial information for current user
+   */
+  getTrialInfo(): { start_date: string; end_date: string; tier: string; user_id: string; days_remaining: number } | null {
+    if (typeof window === 'undefined') return null
+
+    try {
+      const trialInfoStr = localStorage.getItem('trial_info')
+      if (!trialInfoStr) return null
+
+      const trialInfo = JSON.parse(trialInfoStr)
+      const endDate = new Date(trialInfo.end_date)
+      const now = new Date()
+      const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+
+      return {
+        ...trialInfo,
+        days_remaining: daysRemaining
+      }
+    } catch (error) {
+      console.error('Failed to get trial info:', error)
+      return null
+    }
+  }
+
+  /**
+   * Check if user is in active trial period
+   */
+  isTrialActive(): boolean {
+    const trialInfo = this.getTrialInfo()
+    if (!trialInfo) return false
+
+    const endDate = new Date(trialInfo.end_date)
+    return new Date() < endDate
   }
 
   /**
