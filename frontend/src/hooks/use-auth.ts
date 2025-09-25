@@ -1,175 +1,245 @@
-// src/hooks/use-auth.ts
+// frontend/src/hooks/use-auth.ts
 /**
- * Authentication hook for managing user authentication state
- * Handles login, logout, token refresh, and Google OAuth callback
+ * Authentication Hook - Production Grade Implementation
+ * React hook for managing authentication state and operations
+ * Thread-safe, type-safe, with comprehensive error handling
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { authService } from '@/services/auth.service'
-import { AuthState, User } from '@/types/auth.types'
+import { AuthState, User, AuthError } from '@/types/auth.types'
 
-interface UseAuthReturn extends AuthState {
-  login: (googleToken: string) => Promise<void>
+interface UseAuthReturn {
+  authState: AuthState
+  login: (code: string, state?: string) => Promise<void>
   logout: () => Promise<void>
   refreshTokens: () => Promise<boolean>
-  initializeAuth: () => Promise<void>
-  handleGoogleCallback: () => Promise<void>
-  redirectToGoogleAuth: () => Promise<void>
+  initializeGoogleAuth: () => Promise<void>
+  getCurrentUser: () => Promise<User | null>
+  clearError: () => void
+}
+
+const initialAuthState: AuthState = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  error: null
 }
 
 export function useAuth(): UseAuthReturn {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true
-  })
-
-  // Ref to prevent multiple simultaneous auth operations
+  const [authState, setAuthState] = useState<AuthState>(initialAuthState)
+  const router = useRouter()
+  
+  // Refs to prevent race conditions in async operations
   const authOperationRef = useRef<Promise<void> | null>(null)
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const mountedRef = useRef(true)
 
   /**
-   * Clear token refresh schedule
+   * Update authentication state in a type-safe manner
    */
-  const clearTokenRefreshSchedule = useCallback(() => {
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current)
-      refreshTimeoutRef.current = null
-    }
+  const updateAuthState = useCallback((updates: Partial<AuthState>) => {
+    if (!mountedRef.current) return
+    
+    setAuthState(prev => ({
+      ...prev,
+      ...updates
+    }))
   }, [])
 
   /**
-   * Schedule automatic token refresh
+   * Handle authentication errors consistently
    */
-  const scheduleTokenRefresh = useCallback(() => {
-    clearTokenRefreshSchedule()
+  const handleAuthError = useCallback((error: any, context: string) => {
+    console.error(`Authentication error in ${context}:`, error)
     
-    refreshTimeoutRef.current = setTimeout(async () => {
-      try {
-        const storedTokens = authService.getStoredTokens()
-        if (storedTokens) {
-          await authService.refreshToken(storedTokens.refresh_token)
-          const user = await authService.getCurrentUser()
-          setAuthState({
-            user,
-            isAuthenticated: true,
-            isLoading: false
-          })
-          scheduleTokenRefresh() // Reschedule next refresh
-        }
-      } catch {
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false
-        })
-      }
-    }, 45 * 60 * 1000) // 45 minutes
-  }, [clearTokenRefreshSchedule])
-
-  /**
-   * Update authentication state
-   */
-  const updateAuthState = useCallback((user: User | null): void => {
-    setAuthState({
-      user,
-      isAuthenticated: !!user,
-      isLoading: false
+    const errorMessage = error?.message || error?.details || 'Authentication failed'
+    
+    updateAuthState({
+      error: errorMessage,
+      isLoading: false,
+      isAuthenticated: false,
+      user: null
     })
-
-    clearTokenRefreshSchedule()
     
-    if (user) {
-      scheduleTokenRefresh()
-    }
-  }, [clearTokenRefreshSchedule, scheduleTokenRefresh])
-
-  /**
-   * Refresh authentication tokens
-   */
-  const refreshTokens = useCallback(async (): Promise<boolean> => {
-    try {
-      const storedTokens = authService.getStoredTokens()
-      if (!storedTokens) {
-        updateAuthState(null)
-        return false
-      }
-
-      await authService.refreshToken(storedTokens.refresh_token)
-      
-      const user = await authService.getCurrentUser()
-      updateAuthState(user)
-      
-      return true
-    } catch (refreshError) {
-      console.error('Token refresh failed:', refreshError)
-      updateAuthState(null)
-      return false
-    }
+    return errorMessage
   }, [updateAuthState])
 
   /**
-   * Login with Google OAuth token
+   * Clear authentication error
    */
-  const login = useCallback(async (googleToken: string): Promise<void> => {
-    // Prevent multiple simultaneous login attempts
+  const clearError = useCallback(() => {
+    updateAuthState({ error: null })
+  }, [updateAuthState])
+
+  /**
+   * Login with Google OAuth code
+   */
+  const login = useCallback(async (code: string, state?: string): Promise<void> => {
+    // Prevent concurrent login attempts
     if (authOperationRef.current) {
       await authOperationRef.current
-      return
     }
 
     const loginOperation = async () => {
       try {
-        setAuthState(prev => ({ ...prev, isLoading: true }))
+        updateAuthState({ 
+          isLoading: true, 
+          error: null 
+        })
+
+        const tokenResponse = await authService.exchangeGoogleToken(code, state)
         
-        await authService.exchangeGoogleToken(googleToken)
-        
+        // Get user profile with the new tokens
         const user = await authService.getCurrentUser()
-        updateAuthState(user)
-        
-      } catch (loginError) {
-        console.error('Login failed:', loginError)
-        updateAuthState(null)
-        throw loginError
+
+        updateAuthState({
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null
+        })
+
+        console.info(`User ${user.email} authenticated successfully`)
+
+      } catch (error) {
+        handleAuthError(error, 'login')
+        throw error
       }
     }
 
     authOperationRef.current = loginOperation()
     await authOperationRef.current
     authOperationRef.current = null
-  }, [updateAuthState])
+  }, [updateAuthState, handleAuthError])
 
   /**
-   * Logout user
+   * Logout user and redirect
    */
   const logout = useCallback(async (): Promise<void> => {
-    // Prevent multiple simultaneous logout attempts
+    // Prevent concurrent logout attempts
     if (authOperationRef.current) {
       await authOperationRef.current
-      return
     }
 
     const logoutOperation = async () => {
       try {
-        setAuthState(prev => ({ ...prev, isLoading: true }))
+        updateAuthState({ 
+          isLoading: true, 
+          error: null 
+        })
+
         await authService.logout()
-      } catch (logoutError) {
-        console.error('Logout error:', logoutError)
-      } finally {
-        updateAuthState(null)
+
+        updateAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null
+        })
+
+        // Redirect to home page
+        router.push('/')
+
+      } catch (error) {
+        // Even if server logout fails, clear local state
+        updateAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null
+        })
+        
+        console.warn('Logout completed with warnings:', error)
+        router.push('/')
       }
     }
 
     authOperationRef.current = logoutOperation()
     await authOperationRef.current
     authOperationRef.current = null
+  }, [updateAuthState, router])
+
+  /**
+   * Refresh JWT tokens
+   */
+  const refreshTokens = useCallback(async (): Promise<boolean> => {
+    try {
+      await authService.refreshToken()
+      
+      // Get updated user profile
+      const user = await authService.getCurrentUser()
+      
+      updateAuthState({
+        user,
+        isAuthenticated: true,
+        error: null
+      })
+
+      return true
+
+    } catch (error) {
+      console.warn('Token refresh failed:', error)
+      
+      // Clear authentication state on refresh failure
+      updateAuthState({
+        user: null,
+        isAuthenticated: false,
+        error: null
+      })
+
+      return false
+    }
   }, [updateAuthState])
 
   /**
-   * Initialize authentication state from stored tokens
+   * Get current user profile
+   */
+  const getCurrentUser = useCallback(async (): Promise<User | null> => {
+    try {
+      if (!authService.isAuthenticated()) {
+        return null
+      }
+
+      const user = await authService.getCurrentUser()
+      
+      updateAuthState({
+        user,
+        isAuthenticated: true,
+        error: null
+      })
+
+      return user
+
+    } catch (error) {
+      console.warn('Failed to get current user:', error)
+      return null
+    }
+  }, [updateAuthState])
+
+  /**
+   * Initialize Google OAuth flow
+   */
+  const initializeGoogleAuth = useCallback(async (): Promise<void> => {
+    try {
+      updateAuthState({ 
+        isLoading: true, 
+        error: null 
+      })
+
+      await authService.initializeGoogleOAuth()
+
+    } catch (error) {
+      handleAuthError(error, 'initializeGoogleAuth')
+      throw error
+    }
+  }, [updateAuthState, handleAuthError])
+
+  /**
+   * Initialize authentication state on mount
    */
   const initializeAuth = useCallback(async (): Promise<void> => {
-    // Prevent multiple simultaneous initialization
+    // Prevent concurrent initialization
     if (authOperationRef.current) {
       await authOperationRef.current
       return
@@ -177,156 +247,137 @@ export function useAuth(): UseAuthReturn {
 
     const initOperation = async () => {
       try {
-        const storedTokens = authService.getStoredTokens()
-        if (!storedTokens) {
-          updateAuthState(null)
-          return
-        }
+        updateAuthState({ 
+          isLoading: true, 
+          error: null 
+        })
 
-        // Validate token format
-        if (!authService.validateTokenFormat(storedTokens)) {
-          console.warn('Invalid token format, clearing tokens')
-          authService.clearTokens()
-          updateAuthState(null)
-          return
-        }
+        // Check if user has valid authentication
+        if (authService.isAuthenticated()) {
+          try {
+            const user = await authService.getCurrentUser()
+            
+            updateAuthState({
+              user,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null
+            })
 
-        // Check if tokens are likely expired
-        if (authService.areTokensLikelyExpired()) {
-          console.info('Tokens likely expired, attempting refresh')
-          const refreshSuccess = await refreshTokens()
-          if (!refreshSuccess) {
-            updateAuthState(null)
+          } catch (userError) {
+            console.info('Failed to get user, attempting token refresh')
+            const refreshSuccess = await refreshTokens()
+            
+            if (!refreshSuccess) {
+              updateAuthState({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+                error: null
+              })
+            }
           }
-          return
+        } else {
+          // No valid authentication found
+          updateAuthState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null
+          })
         }
 
-        // Try to get user with existing tokens
-        try {
-          const user = await authService.getCurrentUser()
-          updateAuthState(user)
-        } catch {
-          console.info('Failed to get user, attempting token refresh')
-          const refreshSuccess = await refreshTokens()
-          if (!refreshSuccess) {
-            updateAuthState(null)
-          }
-        }
-        
       } catch (initError) {
         console.error('Auth initialization failed:', initError)
-        updateAuthState(null)
+        updateAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: 'Authentication initialization failed'
+        })
       }
     }
 
     authOperationRef.current = initOperation()
     await authOperationRef.current
     authOperationRef.current = null
-  }, [refreshTokens, updateAuthState])
+  }, [updateAuthState, refreshTokens])
 
   /**
-   * Handle Google OAuth callback from URL parameters
+   * Handle OAuth callback from URL parameters
    */
-  const handleGoogleCallback = useCallback(async (): Promise<void> => {
+  const handleOAuthCallback = useCallback(async (): Promise<void> => {
     if (typeof window === 'undefined') return
 
     try {
       const urlParams = new URLSearchParams(window.location.search)
       const code = urlParams.get('code')
+      const state = urlParams.get('state')
       const error = urlParams.get('error')
+      const errorDescription = urlParams.get('error_description')
 
+      // Handle OAuth errors
       if (error) {
-        console.error('OAuth callback error:', error)
-        const errorDescription = urlParams.get('error_description') || 'Unknown OAuth error'
-        updateAuthState(null)
-        throw new Error(`Authentication failed: ${errorDescription}`)
+        const errorMsg = errorDescription || `OAuth error: ${error}`
+        console.error('OAuth callback error:', errorMsg)
+        
+        updateAuthState({
+          error: errorMsg,
+          isLoading: false
+        })
+        
+        // Clean up URL
+        const cleanUrl = window.location.pathname
+        window.history.replaceState({}, document.title, cleanUrl)
+        return
       }
 
+      // Handle successful OAuth callback
       if (code) {
-        await login(code)
+        await login(code, state || undefined)
         
         // Clean up URL parameters after successful login
         const cleanUrl = window.location.pathname
         window.history.replaceState({}, document.title, cleanUrl)
       }
+
     } catch (callbackError) {
-      console.error('Google callback handling failed:', callbackError)
-      updateAuthState(null)
-      throw callbackError
+      console.error('OAuth callback handling failed:', callbackError)
+      handleAuthError(callbackError, 'handleOAuthCallback')
     }
-  }, [login, updateAuthState])
+  }, [login, updateAuthState, handleAuthError])
 
   /**
-   * Redirect to Google OAuth authorization
-   */
-  const redirectToGoogleAuth = useCallback(async (): Promise<void> => {
-    try {
-      const authUrl = await authService.initializeGoogleOAuth()
-      window.location.href = authUrl
-    } catch (redirectError) {
-      console.error('Google auth redirect failed:', redirectError)
-      throw new Error('Failed to initialize authentication')
-    }
-  }, [])
-
-  /**
-   * Initialize authentication on mount
+   * Initialize authentication on component mount
    */
   useEffect(() => {
-    initializeAuth()
-    
-    // Cleanup on unmount
-    return () => {
-      clearTokenRefreshSchedule()
-      authOperationRef.current = null
-    }
-  }, [initializeAuth, clearTokenRefreshSchedule])
+    mountedRef.current = true
 
-  /**
-   * Handle OAuth callback if present in URL
-   */
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    
-    const urlParams = new URLSearchParams(window.location.search)
-    const hasOAuthParams = urlParams.has('code') || urlParams.has('error')
-    
-    if (hasOAuthParams) {
-      handleGoogleCallback().catch(error => {
-        console.error('OAuth callback failed:', error)
+    // Handle OAuth callback first
+    handleOAuthCallback().then(() => {
+      // Then initialize regular auth state
+      return initializeAuth()
+    }).catch(error => {
+      console.error('Auth initialization failed:', error)
+      updateAuthState({
+        isLoading: false,
+        error: 'Failed to initialize authentication'
       })
-    }
-  }, [handleGoogleCallback])
+    })
 
-  /**
-   * Handle browser tab visibility changes to refresh tokens
-   */
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && authState.isAuthenticated) {
-        // Check if tokens need refresh when tab becomes visible
-        if (authService.areTokensLikelyExpired()) {
-          refreshTokens()
-        }
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+    // Cleanup function
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      mountedRef.current = false
     }
-  }, [authState.isAuthenticated, refreshTokens])
+  }, [handleOAuthCallback, initializeAuth, updateAuthState])
 
   return {
-    ...authState,
+    authState,
     login,
     logout,
     refreshTokens,
-    initializeAuth,
-    handleGoogleCallback,
-    redirectToGoogleAuth
+    initializeGoogleAuth,
+    getCurrentUser,
+    clearError
   }
 }

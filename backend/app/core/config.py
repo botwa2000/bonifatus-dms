@@ -25,7 +25,7 @@ class DatabaseSettings(BaseSettings):
     database_connect_timeout: int = Field(..., description="Connection timeout")
 
     class Config:
-        env_file = "../.env"
+        env_file = "../../.env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
@@ -41,10 +41,10 @@ class GoogleSettings(BaseSettings):
     google_oauth_issuers: str = Field(..., description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(..., description="Google Drive service account key JSON, file path, or Secret Manager path")
     google_drive_folder_name: str = Field(..., description="Google Drive folder name for documents")
-    google_project_id: str = Field(alias="GCP_PROJECT", description="Google Cloud Project ID")
+    google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
 
     class Config:
-        env_file = "../.env"
+        env_file = "../../.env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
@@ -61,7 +61,7 @@ class SecuritySettings(BaseSettings):
     admin_emails: str = Field(..., description="Admin email list")
 
     class Config:
-        env_file = "../.env"
+        env_file = "../../.env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
@@ -71,13 +71,16 @@ class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
     
     app_environment: str = Field(..., description="Environment")
-    debug_mode: bool = Field(..., description="Enable debug mode")
-    cors_origins: str = Field(..., description="CORS origins")
-    host: str = Field(..., description="Application host")
-    port: int = Field(..., description="Application port")
+    app_debug_mode: bool = Field(..., description="Enable debug mode")
+    app_cors_origins: str = Field(..., description="CORS origins")
+    app_host: str = Field(..., description="Application host")
+    app_port: int = Field(..., description="Application port")
+    app_title: str = Field(..., description="Application title")
+    app_description: str = Field(..., description="Application description")
+    app_version: str = Field(..., description="Application version")
 
     class Config:
-        env_file = "../.env"
+        env_file = "../../.env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
@@ -102,6 +105,10 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.app.app_environment == "development"
+
+    @property
+    def is_staging(self) -> bool:
+        return self.app.app_environment == "staging"
     
     @property
     def admin_email_list(self) -> List[str]:
@@ -116,10 +123,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""
-        return [origin.strip() for origin in self.app.cors_origins.split(",")]
+        return [origin.strip() for origin in self.app.app_cors_origins.split(",")]
 
     class Config:
-        env_file = "../.env"
+        env_file = "../../.env"
         env_file_encoding = "utf-8"
         case_sensitive = False
         extra = "ignore"
