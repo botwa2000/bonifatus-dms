@@ -1,4 +1,4 @@
-# backend/src/main.py
+# backend/app/main.py
 """
 Bonifatus DMS - Main FastAPI Application
 Production-ready document management system with Google Drive integration
@@ -14,17 +14,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.database.connection import init_database, close_database
-from app.api.auth import router as auth_router
-from app.api.documents import router as documents_router
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI application
 app = FastAPI(
     title="Bonifatus DMS",
     description="Professional Document Management System",
@@ -33,11 +29,9 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.is_development else None,
 )
 
-# CORS configuration
-cors_origins = [origin.strip() for origin in settings.app.cors_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
@@ -76,74 +70,51 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Include API routers
+@app.on_event("startup")
+async def startup_event():
+    """Application startup configuration"""
+    logger.info("Bonifatus DMS starting up...")
+    await init_database()
+    logger.info(f"Environment: {settings.app.app_environment}")
+    logger.info(f"CORS origins configured: {settings.cors_origins_list}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown cleanup"""
+    logger.info("Bonifatus DMS shutting down...")
+    await close_database()
+
+
+from app.api.auth import router as auth_router
 from app.api.users import router as users_router
+from app.api.documents import router as documents_router
 
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(documents_router)
 
 
-# Health check endpoint
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    from src.database.connection import db_manager
-    
-    database_healthy = await db_manager.health_check()
-    
-    return {
-        "status": "healthy" if database_healthy else "unhealthy",
-        "service": "bonifatus-dms",
-        "database": "connected" if database_healthy else "disconnected",
-        "environment": settings.app.app_environment,
-        "authentication": "enabled"
-    }
-
-
-# Root endpoint
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "Bonifatus DMS API",
-        "version": "1.0.0",
-        "environment": settings.app.app_environment,
-        "docs": "/api/docs" if settings.is_development else "disabled",
-        "authentication": "enabled"
-    }
-
-
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connection"""
-    logger.info(f"Starting Bonifatus DMS in {settings.app.app_environment} environment")
     try:
-        await init_database()
-        logger.info("Database initialized successfully")
+        from app.database.connection import db_manager
+        database_healthy = await db_manager.health_check()
+        
+        return {
+            "status": "healthy" if database_healthy else "unhealthy",
+            "service": "bonifatus-dms",
+            "version": "1.0.0",
+            "environment": settings.app.app_environment,
+            "database": "connected" if database_healthy else "disconnected"
+        }
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        if not settings.is_production:
-            raise
-    
-    logger.info("Application startup completed successfully")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Close database connections"""
-    logger.info("Shutting down Bonifatus DMS")
-    await close_database()
-    logger.info("Database connections closed")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=settings.app.port,
-        log_level="info" if settings.is_production else "debug"
-    )
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "service": "bonifatus-dms",
+            "version": "1.0.0",
+            "environment": settings.app.app_environment,
+            "error": str(e)
+        }

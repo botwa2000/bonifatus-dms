@@ -1,4 +1,4 @@
-# backend/src/core/config.py
+# backend/app/core/config.py
 """
 Bonifatus DMS - Configuration Management System
 All settings loaded from environment variables and database
@@ -7,7 +7,7 @@ Zero hardcoded configuration values
 
 import logging
 from functools import lru_cache
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
@@ -18,11 +18,11 @@ class DatabaseSettings(BaseSettings):
     """Database configuration from environment variables"""
     
     database_url: str = Field(..., description="Supabase PostgreSQL connection URL")
-    database_pool_size: int = Field(default=5, description="Connection pool size")
-    database_pool_recycle: int = Field(default=3600, description="Pool recycle time")
-    database_echo: bool = Field(default=False, description="Enable SQL query logging")
-    database_pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
-    database_connect_timeout: int = Field(default=30, description="Connection timeout")
+    database_pool_size: int = Field(..., description="Connection pool size")
+    database_pool_recycle: int = Field(..., description="Pool recycle time")
+    database_echo: bool = Field(..., description="Enable SQL query logging")
+    database_pool_pre_ping: bool = Field(..., description="Enable connection health checks")
+    database_connect_timeout: int = Field(..., description="Connection timeout")
 
     class Config:
         env_file = "../.env"
@@ -36,11 +36,11 @@ class GoogleSettings(BaseSettings):
     
     google_client_id: str = Field(..., description="Google OAuth client ID")
     google_client_secret: str = Field(..., description="Google OAuth client secret")
-    google_redirect_uri: str = Field(default="", description="OAuth redirect URI")
-    google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
-    google_oauth_issuers: str = Field(default="accounts.google.com,https://accounts.google.com", description="Valid OAuth issuers")
+    google_redirect_uri: str = Field(..., description="OAuth redirect URI")
+    google_vision_enabled: bool = Field(..., description="Enable Google Vision OCR")
+    google_oauth_issuers: str = Field(..., description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(..., description="Google Drive service account key JSON, file path, or Secret Manager path")
-    google_drive_folder_name: str = Field(default="Bonifatus_DMS", description="Google Drive folder name for documents")
+    google_drive_folder_name: str = Field(..., description="Google Drive folder name for documents")
     google_project_id: str = Field(alias="GCP_PROJECT", description="Google Cloud Project ID")
 
     class Config:
@@ -54,11 +54,11 @@ class SecuritySettings(BaseSettings):
     """Security configuration from environment variables"""
     
     security_secret_key: str = Field(..., description="JWT secret key")
-    algorithm: str = Field(default="HS256", description="JWT algorithm")
-    access_token_expire_minutes: int = Field(default=30, description="JWT expiration")
-    refresh_token_expire_days: int = Field(default=30, description="Refresh token expiration")
-    default_user_tier: str = Field(default="free", description="Default user tier")
-    admin_emails: str = Field(default="admin@bonifatus.com", description="Admin email list")
+    algorithm: str = Field(..., description="JWT algorithm")
+    access_token_expire_minutes: int = Field(..., description="JWT expiration")
+    refresh_token_expire_days: int = Field(..., description="Refresh token expiration")
+    default_user_tier: str = Field(..., description="Default user tier")
+    admin_emails: str = Field(..., description="Admin email list")
 
     class Config:
         env_file = "../.env"
@@ -70,10 +70,11 @@ class SecuritySettings(BaseSettings):
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
     
-    app_environment: str = Field(default="development", description="Environment")
-    debug_mode: bool = Field(default=False, description="Enable debug mode")
-    cors_origins: str = Field(default="http://localhost:3000", description="CORS origins")
-    port: int = Field(default=8000, description="Application port")
+    app_environment: str = Field(..., description="Environment")
+    debug_mode: bool = Field(..., description="Enable debug mode")
+    cors_origins: str = Field(..., description="CORS origins")
+    host: str = Field(..., description="Application host")
+    port: int = Field(..., description="Application port")
 
     class Config:
         env_file = "../.env"
@@ -111,6 +112,11 @@ class Settings(BaseSettings):
     def google_oauth_issuer_list(self) -> List[str]:
         """Get Google OAuth issuers as list"""
         return [issuer.strip() for issuer in self.google.google_oauth_issuers.split(",")]
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Get CORS origins as list"""
+        return [origin.strip() for origin in self.app.cors_origins.split(",")]
 
     class Config:
         env_file = "../.env"

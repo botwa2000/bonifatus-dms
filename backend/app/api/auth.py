@@ -15,15 +15,44 @@ from app.schemas.auth_schemas import (
     RefreshTokenRequest, 
     RefreshTokenResponse,
     UserResponse,
-    ErrorResponse
+    ErrorResponse,
+    GoogleOAuthConfigResponse
 )
 from app.services.auth_service import auth_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
+
+
+@router.get(
+    "/google/config",
+    response_model=GoogleOAuthConfigResponse,
+    responses={
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_google_oauth_config() -> GoogleOAuthConfigResponse:
+    """
+    Get Google OAuth configuration for frontend
+    
+    Returns client ID and redirect URI for OAuth flow initiation
+    """
+    try:
+        return GoogleOAuthConfigResponse(
+            google_client_id=settings.google.google_client_id,
+            redirect_uri=settings.google.google_redirect_uri
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get OAuth config: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OAuth configuration unavailable"
+        )
 
 
 @router.post(
@@ -124,42 +153,42 @@ async def refresh_token(
     response_model=UserResponse,
     responses={
         401: {"model": ErrorResponse, "description": "Authentication required"},
-        403: {"model": ErrorResponse, "description": "User account inactive"}
+        500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
-async def get_current_user_info(
+async def get_current_user(
     current_user: User = Depends(get_current_active_user)
 ) -> UserResponse:
     """
-    Get current authenticated user information
+    Get current authenticated user profile
     
-    Returns user profile data for authenticated user
+    Returns user information based on valid JWT token
     """
     try:
         return UserResponse(
-            id=str(current_user.id),
+            id=current_user.id,
             email=current_user.email,
             full_name=current_user.full_name,
-            profile_picture=current_user.profile_picture,
             tier=current_user.tier,
             is_active=current_user.is_active,
-            last_login_at=current_user.last_login_at.isoformat() if current_user.last_login_at else None,
-            created_at=current_user.created_at.isoformat()
+            is_admin=current_user.is_admin,
+            created_at=current_user.created_at,
+            updated_at=current_user.updated_at
         )
         
     except Exception as e:
-        logger.error(f"Get user info error: {e}")
+        logger.error(f"Get current user error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve user information"
+            detail="Unable to retrieve user profile"
         )
 
 
-@router.post(
+@router.delete(
     "/logout",
     responses={
-        200: {"description": "Successfully logged out"},
-        401: {"model": ErrorResponse, "description": "Authentication required"}
+        200: {"description": "Logout successful"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
 async def logout(
@@ -167,38 +196,20 @@ async def logout(
     current_user: User = Depends(get_current_active_user)
 ) -> JSONResponse:
     """
-    Logout current user
+    Logout current user and invalidate tokens
     
-    Invalidates current session (client should discard tokens)
+    Invalidates user session and clears authentication tokens
     """
     try:
         ip_address = get_client_ip(request)
         
-        # Log logout event for audit trail
-        from app.database.connection import db_manager
-        from app.database.models import AuditLog
-        
-        session = db_manager.session_local()
-        try:
-            audit_log = AuditLog(
-                user_id=str(current_user.id),
-                action="logout",
-                resource_type="authentication",
-                resource_id=str(current_user.id),
-                ip_address=ip_address,
-                status="success",
-                endpoint="/api/v1/auth/logout"
-            )
-            session.add(audit_log)
-            session.commit()
-        finally:
-            session.close()
+        await auth_service.logout_user(current_user.id, ip_address)
         
         logger.info(f"User {current_user.email} logged out from IP: {ip_address}")
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"message": "Successfully logged out"}
+            content={"message": "Logout successful"}
         )
         
     except Exception as e:
@@ -206,38 +217,4 @@ async def logout(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout service error"
-        )
-
-
-@router.get(
-    "/verify",
-    responses={
-        200: {"description": "Token is valid"},
-        401: {"model": ErrorResponse, "description": "Invalid token"}
-    }
-)
-async def verify_token(
-    current_user: User = Depends(get_current_active_user)
-) -> JSONResponse:
-    """
-    Verify JWT token validity
-    
-    Returns success if token is valid and user is active
-    """
-    try:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "valid": True,
-                "user_id": str(current_user.id),
-                "email": current_user.email,
-                "tier": current_user.tier
-            }
-        )
-        
-    except Exception as e:
-        logger.error(f"Token verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token verification service error"
         )
