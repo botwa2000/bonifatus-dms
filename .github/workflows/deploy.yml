@@ -85,4 +85,4 @@ jobs:
             --memory=1Gi \
             --cpu=1 \
             --max-instances=100 \
-            --set-secrets="GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY=/secrets/google-drive-key:bonifatus-drive-service-key:latest"
+            --set-secrets="/secrets/google-drive-key=bonifatus-drive-service-key:latest"
