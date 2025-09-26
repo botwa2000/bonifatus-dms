@@ -45,12 +45,36 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars="DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }}" \
+            --port 8080 \
+            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars="DATABASE_POOL_SIZE=10" \
+            --set-env-vars="DATABASE_POOL_RECYCLE=3600" \
+            --set-env-vars="DATABASE_ECHO=false" \
+            --set-env-vars="DATABASE_POOL_PRE_PING=true" \
+            --set-env-vars="DATABASE_CONNECT_TIMEOUT=60" \
             --set-env-vars="GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
             --set-env-vars="GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            --set-env-vars="SECURITY_SECRET_KEY=${{ secrets.SECURITY_SECRET_KEY }}" \
-            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT }}" \
-            --set-env-vars="GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS" \
+            --set-env-vars="GOOGLE_REDIRECT_URI=https://bonifatus-dms-mmdbxdflfa-uc.a.run.app/auth/callback" \
             --set-env-vars="GOOGLE_VISION_ENABLED=true" \
+            --set-env-vars="GOOGLE_OAUTH_ISSUERS=https://accounts.google.com" \
+            --set-env-vars="GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS" \
+            --set-env-vars="GCP_PROJECT=${{ secrets.GCP_PROJECT }}" \
+            --set-env-vars="SECURITY_SECRET_KEY=${{ secrets.SECURITY_SECRET_KEY }}" \
+            --set-env-vars="ALGORITHM=HS256" \
+            --set-env-vars="ACCESS_TOKEN_EXPIRE_MINUTES=30" \
+            --set-env-vars="REFRESH_TOKEN_EXPIRE_DAYS=30" \
+            --set-env-vars="DEFAULT_USER_TIER=free" \
+            --set-env-vars="ADMIN_EMAILS=${{ secrets.ADMIN_EMAILS }}" \
             --set-env-vars="APP_ENVIRONMENT=production" \
+            --set-env-vars="APP_DEBUG_MODE=false" \
+            --set-env-vars="APP_CORS_ORIGINS=*" \
+            --set-env-vars="APP_HOST=0.0.0.0" \
+            --set-env-vars="APP_PORT=8080" \
+            --set-env-vars="APP_TITLE=Bonifatus DMS" \
+            --set-env-vars="APP_DESCRIPTION=Professional Document Management System" \
+            --set-env-vars="APP_VERSION=1.0.0" \
+            --timeout=900 \
+            --memory=1Gi \
+            --cpu=1 \
+            --max-instances=100 \
             --set-secrets="GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY=bonifatus-drive-service-key:latest"
