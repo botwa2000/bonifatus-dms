@@ -41,10 +41,10 @@ USER bonifatus
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Expose port from environment
-EXPOSE ${PORT}
+# Expose port 8080 for Cloud Run
+EXPOSE 8080
 
-# Run application with Cloud Run port binding
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --log-level info"]
+# Run application with proper port handling using Python
+CMD ["python", "-c", "import os; import uvicorn; from app.main import app; uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), workers=1, log_level='info')"]
