@@ -5,6 +5,7 @@ Production-ready document management system with Google Drive integration
 """
 import logging
 import time
+import os
 from typing import Callable
 
 from fastapi import FastAPI, Request, HTTPException
@@ -124,7 +125,8 @@ async def health_check():
             "service": "bonifatus-dms",
             "version": settings.app.app_version,
             "environment": settings.app.app_environment,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "port": os.getenv("PORT", "unknown")
         }
         
         try:
@@ -156,7 +158,8 @@ async def health_check():
             "service": "bonifatus-dms",
             "version": settings.app.app_version,
             "environment": settings.app.app_environment,
-            "error": str(e) if not settings.is_production else "Health check failed"
+            "error": str(e) if not settings.is_production else "Health check failed",
+            "port": os.getenv("PORT", "unknown")
         }
 
 
@@ -240,6 +243,7 @@ async def startup_event():
     logger.info(f"Starting {settings.app.app_title} v{settings.app.app_version}")
     logger.info(f"Environment: {settings.app.app_environment}")
     logger.info(f"Debug mode: {settings.app.app_debug_mode}")
+    logger.info(f"Port: {os.getenv('PORT', 'not set')}")
     logger.info(f"CORS origins: {settings.cors_origins_list}")
     
     try:
@@ -271,10 +275,15 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Use Cloud Run PORT if available, otherwise fallback to config
+    port = int(os.getenv("PORT", settings.app.app_port))
+    host = os.getenv("HOST", settings.app.app_host)
+    
     uvicorn.run(
         app,
-        host=settings.app.app_host,
-        port=settings.app.app_port,
+        host=host,
+        port=port,
         log_level="info" if settings.is_production else "debug",
         access_log=not settings.is_production
     )
