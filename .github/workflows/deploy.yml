@@ -54,7 +54,7 @@ jobs:
             --set-env-vars="DATABASE_CONNECT_TIMEOUT=60" \
             --set-env-vars="GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
             --set-env-vars="GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-            --set-env-vars="GOOGLE_REDIRECT_URI=https://bonifatus-dms-mmdbxdflfa-uc.a.run.app/auth/callback" \
+            --set-env-vars="GOOGLE_REDIRECT_URI=https://bonifatus-dms-mmdbxdflfa-uc.a.run.app/api/v1/auth/google/callback" \
             --set-env-vars="GOOGLE_VISION_ENABLED=true" \
             --set-env-vars="GOOGLE_OAUTH_ISSUERS=https://accounts.google.com" \
             --set-env-vars="GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS" \
