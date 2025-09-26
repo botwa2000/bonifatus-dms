@@ -62,26 +62,30 @@ class GoogleDriveConfig:
                 return None
 
             # Check if it's a mounted secret (Cloud Run mounts secrets as files)
-            secret_path = '/secrets/GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY'
+            secret_path = '/secrets/google-drive-key'
             if os.path.exists(secret_path):
+                logger.info("Reading service account key from mounted secret")
                 with open(secret_path, 'r') as f:
                     service_account_info = json.load(f)
                 credentials = Credentials.from_service_account_info(
                     service_account_info, 
                     scopes=self._drive_scopes
                 )
-            elif service_account_key.endswith('.json'):
+            elif os.path.exists(service_account_key):
+                logger.info("Reading service account key from file path")
                 credentials = Credentials.from_service_account_file(
                     service_account_key, 
                     scopes=self._drive_scopes
                 )
             else:
+                logger.info("Reading service account key from environment variable")
                 service_account_info = json.loads(service_account_key)
                 credentials = Credentials.from_service_account_info(
                     service_account_info, 
                     scopes=self._drive_scopes
                 )
 
+            logger.info("Drive credentials created successfully")
             return credentials
 
         except Exception as e:
@@ -94,20 +98,34 @@ class GoogleDriveConfig:
             service_account_key = settings.google.google_drive_service_account_key
             
             if not service_account_key:
+                logger.warning("Google Drive service account key not configured")
                 return None
 
-            if service_account_key.endswith('.json'):
+            # Check if it's a mounted secret (Cloud Run mounts secrets as files)
+            secret_path = '/secrets/google-drive-key'
+            if os.path.exists(secret_path):
+                logger.info("Reading service account key from mounted secret for Vision")
+                with open(secret_path, 'r') as f:
+                    service_account_info = json.load(f)
+                credentials = Credentials.from_service_account_info(
+                    service_account_info, 
+                    scopes=self._vision_scopes
+                )
+            elif os.path.exists(service_account_key):
+                logger.info("Reading service account key from file path for Vision")
                 credentials = Credentials.from_service_account_file(
                     service_account_key, 
                     scopes=self._vision_scopes
                 )
             else:
+                logger.info("Reading service account key from environment variable for Vision")
                 service_account_info = json.loads(service_account_key)
                 credentials = Credentials.from_service_account_info(
                     service_account_info, 
                     scopes=self._vision_scopes
                 )
 
+            logger.info("Vision credentials created successfully")
             return credentials
 
         except Exception as e:
@@ -165,109 +183,20 @@ class GoogleDriveConfig:
                 return True
 
             if not self.vision_service:
+                logger.warning("Vision service not available")
                 return False
 
-            # Simple test - just check if service is accessible
             logger.info("Vision connection test successful")
             return True
 
-        except HttpError as e:
-            logger.error(f"Vision connection test failed: {e}")
-            return False
         except Exception as e:
             logger.error(f"Vision connection test error: {e}")
             return False
 
-    async def create_bonifatus_folder(self, user_email: str) -> Optional[str]:
-        """Create Bonifatus DMS folder in user's Drive"""
-        try:
-            folder_name = settings.google.google_drive_folder_name
-            
-            existing_folder = await self.find_bonifatus_folder(user_email)
-            if existing_folder:
-                logger.info(f"Bonifatus folder already exists: {existing_folder}")
-                return existing_folder
-
-            if not self.drive_service:
-                logger.error("Drive service not available")
-                return None
-
-            folder_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'description': 'Bonifatus DMS Document Storage'
-            }
-
-            folder = self.drive_service.files().create(
-                body=folder_metadata,
-                fields='id'
-            ).execute()
-
-            folder_id = folder.get('id')
-            logger.info(f"Created Bonifatus folder for {user_email}: {folder_id}")
-            return folder_id
-
-        except HttpError as e:
-            logger.error(f"Failed to create Bonifatus folder: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error creating Bonifatus folder: {e}")
-            return None
-
-    async def find_bonifatus_folder(self, user_email: str) -> Optional[str]:
-        """Find existing Bonifatus DMS folder"""
-        try:
-            folder_name = settings.google.google_drive_folder_name
-            
-            if not self.drive_service:
-                logger.error("Drive service not available")
-                return None
-            
-            query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            
-            results = self.drive_service.files().list(
-                q=query,
-                fields='files(id, name)',
-                pageSize=1
-            ).execute()
-
-            files = results.get('files', [])
-            if files:
-                folder_id = files[0]['id']
-                logger.info(f"Found existing Bonifatus folder: {folder_id}")
-                return folder_id
-
-            return None
-
-        except HttpError as e:
-            logger.error(f"Failed to find Bonifatus folder: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error finding Bonifatus folder: {e}")
-            return None
-
-    async def get_health_status(self) -> Dict[str, Any]:
-        """Get comprehensive health status of Google services"""
-        drive_healthy = await self.test_drive_connection()
-        vision_healthy = await self.test_vision_connection()
-        
-        return {
-            "google_drive": {
-                "status": "healthy" if drive_healthy else "unhealthy",
-                "credentials": "configured" if self.drive_credentials else "missing",
-                "service": "available" if self.drive_service else "unavailable"
-            },
-            "google_vision": {
-                "status": "healthy" if vision_healthy else "unhealthy",
-                "enabled": settings.google.google_vision_enabled,
-                "service": "available" if self.vision_service else "unavailable"
-            }
-        }
-
 
 @lru_cache()
 def get_google_config() -> GoogleDriveConfig:
-    """Get cached Google Drive configuration instance"""
+    """Get cached Google configuration instance"""
     return GoogleDriveConfig()
 
 

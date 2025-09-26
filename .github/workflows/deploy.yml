@@ -20,6 +20,20 @@ jobs:
         run: |
           gcloud services enable run.googleapis.com
           gcloud services enable cloudbuild.googleapis.com
+          gcloud services enable artifactregistry.googleapis.com
+          gcloud services enable secretmanager.googleapis.com
+      
+      - name: Store service account key in Secret Manager
+        run: |
+          echo '${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}' | gcloud secrets create bonifatus-drive-service-key --data-file=- --replication-policy=automatic || \
+          echo '${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}' | gcloud secrets versions add bonifatus-drive-service-key --data-file=-
+      
+      - name: Create Artifact Registry repository
+        run: |
+          gcloud artifacts repositories create bonifatus-dms \
+            --repository-format=docker \
+            --location=us-central1 \
+            --description="Bonifatus DMS Docker Repository" || echo "Repository already exists"
       
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
@@ -53,7 +67,6 @@ jobs:
             --set-env-vars "GOOGLE_OAUTH_ISSUERS=https://accounts.google.com" \
             --set-env-vars "GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS" \
             --set-env-vars "GCP_PROJECT=${{ secrets.GCP_PROJECT }}" \
-            --set-env-vars "GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY=${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY }}" \
             --set-env-vars "SECURITY_SECRET_KEY=${{ secrets.SECURITY_SECRET_KEY }}" \
             --set-env-vars "ALGORITHM=HS256" \
             --set-env-vars "ACCESS_TOKEN_EXPIRE_MINUTES=30" \
@@ -71,4 +84,5 @@ jobs:
             --timeout=900 \
             --memory=1Gi \
             --cpu=1 \
-            --max-instances=100
+            --max-instances=100 \
+            --set-secrets="GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY=/secrets/google-drive-key:bonifatus-drive-service-key:latest"

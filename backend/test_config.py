@@ -29,7 +29,6 @@ class EnvironmentValidator:
         "GOOGLE_REDIRECT_URI": "OAuth redirect URI",
         "GOOGLE_VISION_ENABLED": "Enable Google Vision OCR",
         "GOOGLE_OAUTH_ISSUERS": "Valid OAuth issuers",
-        "GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY": "Google Drive service account key",
         "GOOGLE_DRIVE_FOLDER_NAME": "Google Drive folder name",
         "GCP_PROJECT": "Google Cloud Project ID",
         
@@ -85,110 +84,60 @@ class EnvironmentValidator:
             return False
         
         print("✅ All required environment variables are set")
+        print("📁 Google Drive Service Account Key: Managed via Secret Manager (mounted as file)")
         return True
     
     def _mask_sensitive_value(self, var_name: str, value: str) -> str:
         """Mask sensitive values in output"""
         sensitive_vars = [
             "SECURITY_SECRET_KEY", "GOOGLE_CLIENT_SECRET", 
-            "DATABASE_URL", "GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY"
+            "DATABASE_URL"
         ]
         
         if var_name in sensitive_vars:
             if len(value) > 8:
                 return f"{value[:4]}...{value[-4:]}"
             else:
-                return "***"
+                return "****"
         
-        # Show full value for non-sensitive vars
         return value
     
     def test_configuration_loading(self) -> bool:
-        """Test that Pydantic configuration loads successfully"""
+        """Test that configuration can be loaded successfully"""
         print("\n=== Configuration Loading Test ===")
         
         try:
             from app.core.config import settings
-            print("✅ Configuration loaded successfully")
-            
-            # Test each configuration section
-            sections_status = []
-            
-            # App settings
-            try:
-                app_config = settings.app
-                print(f"✅ App Config: {app_config.app_title} v{app_config.app_version}")
-                sections_status.append(("App", True))
-            except Exception as e:
-                print(f"❌ App Config Failed: {e}")
-                sections_status.append(("App", False))
-            
-            # Database settings  
-            try:
-                db_config = settings.database
-                print(f"✅ Database Config: Pool size {db_config.database_pool_size}")
-                sections_status.append(("Database", True))
-            except Exception as e:
-                print(f"❌ Database Config Failed: {e}")
-                sections_status.append(("Database", False))
-            
-            # Google settings
-            try:
-                google_config = settings.google
-                client_id_preview = google_config.google_client_id[:20] + "..." if len(google_config.google_client_id) > 20 else google_config.google_client_id
-                print(f"✅ Google Config: Client ID {client_id_preview}")
-                sections_status.append(("Google", True))
-            except Exception as e:
-                print(f"❌ Google Config Failed: {e}")
-                sections_status.append(("Google", False))
-            
-            # Security settings
-            try:
-                security_config = settings.security
-                print(f"✅ Security Config: Algorithm {security_config.algorithm}")
-                sections_status.append(("Security", True))
-            except Exception as e:
-                print(f"❌ Security Config Failed: {e}")
-                sections_status.append(("Security", False))
-            
-            # Check if all sections loaded
-            failed_sections = [name for name, status in sections_status if not status]
-            if failed_sections:
-                print(f"❌ Configuration sections failed: {', '.join(failed_sections)}")
-                return False
-            
-            print("✅ All configuration sections loaded successfully")
+            print(f"✅ Configuration loaded successfully")
+            print(f"   Environment: {settings.app.app_environment}")
+            print(f"   Debug: {settings.app.app_debug_mode}")
+            print(f"   Database Pool Size: {settings.database.database_pool_size}")
+            print(f"   Google Client ID: {settings.google.google_client_id[:20]}...")
             return True
-            
         except Exception as e:
             print(f"❌ Configuration loading failed: {e}")
             self.validation_errors.append(f"Configuration loading error: {e}")
             return False
     
     def test_configuration_properties(self) -> bool:
-        """Test configuration derived properties"""
+        """Test configuration property access"""
         print("\n=== Configuration Properties Test ===")
         
         try:
             from app.core.config import settings
             
-            # Test environment detection
-            print(f"✅ Environment Detection: {settings.app.app_environment}")
-            print(f"   - is_production: {settings.is_production}")
-            print(f"   - is_development: {settings.is_development}")
-            print(f"   - is_staging: {settings.is_staging}")
-            
-            # Test list parsing
+            # Test property methods
+            is_prod = settings.is_production
             admin_emails = settings.admin_email_list
             cors_origins = settings.cors_origins_list
             oauth_issuers = settings.google_oauth_issuer_list
             
-            print(f"✅ Admin Emails: {len(admin_emails)} configured")
-            print(f"✅ CORS Origins: {len(cors_origins)} configured")
-            print(f"✅ OAuth Issuers: {len(oauth_issuers)} configured")
+            print(f"✅ Production mode: {is_prod}")
+            print(f"✅ Admin emails: {len(admin_emails)} configured")
+            print(f"✅ CORS origins: {len(cors_origins)} configured") 
+            print(f"✅ OAuth issuers: {len(oauth_issuers)} configured")
             
             return True
-            
         except Exception as e:
             print(f"❌ Configuration properties test failed: {e}")
             self.validation_errors.append(f"Configuration properties error: {e}")

@@ -38,7 +38,7 @@ class GoogleSettings(BaseSettings):
     google_redirect_uri: str = Field(..., description="OAuth redirect URI")
     google_vision_enabled: bool = Field(..., description="Enable Google Vision OCR")
     google_oauth_issuers: str = Field(..., description="Valid OAuth issuers")
-    google_drive_service_account_key: str = Field(..., description="Google Drive service account key JSON, file path, or Secret Manager path")
+    google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
     google_drive_folder_name: str = Field(..., description="Google Drive folder name for documents")
     google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
 
