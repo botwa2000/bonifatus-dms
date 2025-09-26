@@ -46,5 +46,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 # Expose port 8080 for Cloud Run
 EXPOSE 8080
 
-# Run application with proper port handling using Python
-CMD ["python", "-c", "import os; import uvicorn; from app.main import app; uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), workers=1, log_level='info')"]
+# Run application using main.py which properly handles PORT
+CMD ["python", "-m", "app.main"]
