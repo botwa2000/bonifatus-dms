@@ -17,6 +17,12 @@ interface JWTPayload {
   [key: string]: unknown
 }
 
+interface TrialInfo {
+  days_remaining: number
+  expires_at: string
+  features: string[]
+}
+
 export class AuthService {
   private readonly config: AuthServiceConfig
   private tokenRefreshPromise: Promise<TokenResponse> | null = null
@@ -59,21 +65,23 @@ export class AuthService {
 
   async exchangeGoogleToken(code: string, state?: string): Promise<TokenResponse> {
     try {
-      this.validateOAuthState(state)
-      
-      const response = await apiClient.post<TokenResponse>('/api/v1/auth/token', {
+      if (state) {
+        this.validateOAuthState(state)
+      }
+
+      const tokenResponse = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
         code,
         state
       })
 
-      this.storeTokens(response)
-      this.scheduleTokenRefresh(response.access_token)
+      this.storeTokens(tokenResponse)
+      this.scheduleTokenRefresh(tokenResponse.access_token)
       this.clearStoredOAuthState()
 
-      return response
+      return tokenResponse
 
     } catch (error) {
-      console.error('Token exchange failed:', error)
+      this.clearStoredOAuthState()
       throw this.handleAuthError(error)
     }
   }
@@ -83,18 +91,16 @@ export class AuthService {
       const refreshToken = this.getStoredRefreshToken()
       
       if (refreshToken) {
-        await apiClient.delete('/api/v1/auth/logout', true, {
-          headers: {
-            'X-Refresh-Token': refreshToken
-          }
-        })
+        await apiClient.post('/api/v1/auth/logout', {
+          refresh_token: refreshToken
+        }, true)
       }
 
     } catch (error) {
       console.error('Logout request failed:', error)
     } finally {
-      this.clearAllAuthData()
       this.clearTokenRefresh()
+      this.clearAllAuthData()
     }
   }
 
@@ -110,15 +116,17 @@ export class AuthService {
 
     const refreshToken = this.getStoredRefreshToken()
     if (!refreshToken) {
+      this.clearAllAuthData()
       return false
     }
 
-    this.tokenRefreshPromise = this.performTokenRefresh(refreshToken)
-
     try {
-      const response = await this.tokenRefreshPromise
-      this.storeTokens(response)
-      this.scheduleTokenRefresh(response.access_token)
+      this.tokenRefreshPromise = this.performTokenRefresh(refreshToken)
+      const tokenResponse = await this.tokenRefreshPromise
+
+      this.storeTokens(tokenResponse)
+      this.scheduleTokenRefresh(tokenResponse.access_token)
+
       return true
 
     } catch (error) {
@@ -151,6 +159,36 @@ export class AuthService {
     }
   }
 
+  getTrialInfo(): TrialInfo | null {
+    try {
+      const user = this.getStoredUserProfile()
+      if (!user) return null
+
+      const trialEndDate = new Date(user.created_at)
+      trialEndDate.setDate(trialEndDate.getDate() + 30)
+      
+      const now = new Date()
+      const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+
+      if (daysRemaining <= 0) return null
+
+      return {
+        days_remaining: daysRemaining,
+        expires_at: trialEndDate.toISOString(),
+        features: ['unlimited_documents', 'ai_search', 'priority_support']
+      }
+
+    } catch (error) {
+      console.error('Failed to get trial info:', error)
+      return null
+    }
+  }
+
+  isTrialActive(): boolean {
+    const trialInfo = this.getTrialInfo()
+    return trialInfo !== null && trialInfo.days_remaining > 0
+  }
+
   private async getOAuthConfig(): Promise<GoogleOAuthConfig> {
     return apiClient.get<GoogleOAuthConfig>('/api/v1/auth/google/config')
   }
@@ -176,6 +214,17 @@ export class AuthService {
   private storeUserProfile(user: User): void {
     if (typeof window === 'undefined') return
     localStorage.setItem('user_profile', JSON.stringify(user))
+  }
+
+  private getStoredUserProfile(): User | null {
+    if (typeof window === 'undefined') return null
+    
+    try {
+      const stored = localStorage.getItem('user_profile')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
   }
 
   private getStoredAccessToken(): string | null {

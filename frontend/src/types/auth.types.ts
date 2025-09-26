@@ -3,6 +3,7 @@
 export interface User {
   id: string
   email: string
+  full_name?: string
   name?: string
   picture?: string
   google_id: string
@@ -10,6 +11,13 @@ export interface User {
   created_at: string
   updated_at: string
   last_login?: string
+  is_active: boolean
+}
+
+export interface TrialInfo {
+  days_remaining: number
+  expires_at: string
+  features: string[]
 }
 
 export interface TokenResponse {
@@ -60,8 +68,7 @@ export interface RefreshTokenRequest {
   refresh_token: string
 }
 
-export interface ApiError {
-  message: string
+export interface ApiError extends Error {
   status?: number
   code?: string
   details?: string

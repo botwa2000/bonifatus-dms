@@ -15,6 +15,7 @@ interface UseAuthReturn {
   refreshTokens: () => Promise<boolean>
   initializeGoogleAuth: () => Promise<void>
   getCurrentUser: () => Promise<User | null>
+  handleGoogleCallback: () => Promise<void>
   clearError: () => void
 }
 
@@ -216,7 +217,7 @@ export function useAuth(): UseAuthReturn {
     }
   }, [updateAuthState])
 
-  const handleOAuthCallback = useCallback(async () => {
+  const handleGoogleCallback = useCallback(async () => {
     try {
       const urlParams = new URLSearchParams(window.location.search)
       const code = urlParams.get('code')
@@ -247,27 +248,34 @@ export function useAuth(): UseAuthReturn {
 
     } catch (callbackError) {
       console.error('OAuth callback handling failed:', callbackError)
-      handleAuthError(callbackError, 'handleOAuthCallback')
+      handleAuthError(callbackError, 'handleGoogleCallback')
     }
   }, [login, updateAuthState, handleAuthError])
 
   useEffect(() => {
     mountedRef.current = true
 
-    handleOAuthCallback().then(() => {
-      return initializeAuth()
-    }).catch(error => {
-      console.error('Auth initialization failed:', error)
-      updateAuthState({
-        isLoading: false,
-        error: 'Failed to initialize authentication'
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasOAuthParams = urlParams.get('code') || urlParams.get('error')
+
+    if (hasOAuthParams) {
+      handleGoogleCallback().then(() => {
+        return initializeAuth()
+      }).catch(error => {
+        console.error('Auth initialization failed:', error)
+        updateAuthState({
+          isLoading: false,
+          error: 'Failed to initialize authentication'
+        })
       })
-    })
+    } else {
+      initializeAuth()
+    }
 
     return () => {
       mountedRef.current = false
     }
-  }, [handleOAuthCallback, initializeAuth, updateAuthState])
+  }, [handleGoogleCallback, initializeAuth, updateAuthState])
 
   return {
     user: authState.user,
@@ -279,6 +287,7 @@ export function useAuth(): UseAuthReturn {
     refreshTokens,
     initializeGoogleAuth,
     getCurrentUser,
+    handleGoogleCallback,
     clearError
   }
 }
