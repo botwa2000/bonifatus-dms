@@ -1,9 +1,6 @@
 // frontend/src/services/api-client.ts
-/**
- * API Client - Production Grade Implementation
- * Handles HTTP requests, authentication, retries, and error handling
- * Zero hardcoded values, comprehensive logging, request/response interceptors
- */
+
+import { ApiResponse, ApiError, RequestConfig } from '@/types/auth.types'
 
 interface ApiClientConfig {
   baseURL: string
@@ -12,55 +9,22 @@ interface ApiClientConfig {
   retryDelay: number
 }
 
-interface RequestConfig {
-  headers?: Record<string, string>
-  params?: Record<string, string>
-  timeout?: number
-  retries?: number
-}
-
-interface ApiResponse<T = any> {
-  data: T
-  status: number
-  statusText: string
-  headers: Record<string, string>
-}
-
-interface ApiError {
-  message: string
-  status?: number
-  response?: {
-    data?: any
-    status?: number
-    statusText?: string
-  }
-  request?: any
-}
-
 export class ApiClient {
   private readonly config: ApiClientConfig
-  private requestId = 0
+  private requestCounter = 0
 
   constructor() {
     this.config = {
-      baseURL: process.env.NEXT_PUBLIC_API_URL || '',
-      timeout: 30000, // 30 seconds
+      baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-mmdbxdflfa-uc.a.run.app',
+      timeout: 30000,
       maxRetries: 3,
-      retryDelay: 1000 // 1 second
+      retryDelay: 1000
     }
 
-    if (!this.config.baseURL) {
-      throw new Error('Missing required environment variable: NEXT_PUBLIC_API_URL')
-    }
-
-    // Ensure baseURL doesn't end with slash
     this.config.baseURL = this.config.baseURL.replace(/\/$/, '')
   }
 
-  /**
-   * Perform GET request
-   */
-  async get<T = any>(
+  async get<T = unknown>(
     endpoint: string, 
     requireAuth = false, 
     config?: RequestConfig
@@ -68,34 +32,25 @@ export class ApiClient {
     return this.request<T>('GET', endpoint, undefined, requireAuth, config)
   }
 
-  /**
-   * Perform POST request
-   */
-  async post<T = any>(
+  async post<T = unknown>(
     endpoint: string, 
-    data?: any, 
+    data?: unknown, 
     requireAuth = false, 
     config?: RequestConfig
   ): Promise<T> {
     return this.request<T>('POST', endpoint, data, requireAuth, config)
   }
 
-  /**
-   * Perform PUT request
-   */
-  async put<T = any>(
+  async put<T = unknown>(
     endpoint: string, 
-    data?: any, 
+    data?: unknown, 
     requireAuth = false, 
     config?: RequestConfig
   ): Promise<T> {
     return this.request<T>('PUT', endpoint, data, requireAuth, config)
   }
 
-  /**
-   * Perform DELETE request
-   */
-  async delete<T = any>(
+  async delete<T = unknown>(
     endpoint: string, 
     requireAuth = false, 
     config?: RequestConfig
@@ -103,183 +58,99 @@ export class ApiClient {
     return this.request<T>('DELETE', endpoint, undefined, requireAuth, config)
   }
 
-  /**
-   * Perform PATCH request
-   */
-  async patch<T = any>(
+  async patch<T = unknown>(
     endpoint: string, 
-    data?: any, 
+    data?: unknown, 
     requireAuth = false, 
     config?: RequestConfig
   ): Promise<T> {
     return this.request<T>('PATCH', endpoint, data, requireAuth, config)
   }
 
-  // Private Methods
-
-  /**
-   * Core request method with retry logic and error handling
-   */
   private async request<T>(
     method: string,
     endpoint: string,
-    data?: any,
+    data?: unknown,
     requireAuth = false,
     config: RequestConfig = {}
   ): Promise<T> {
-    const requestId = ++this.requestId
+    const currentRequestId = ++this.requestCounter
     const startTime = Date.now()
     
     const maxRetries = config.retries ?? this.config.maxRetries
-    let lastError: ApiError | null = null
+    let lastError: Error | null = null
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        console.debug(`[API ${requestId}] ${method} ${endpoint} (attempt ${attempt}/${maxRetries})`)
+        const url = this.buildUrl(endpoint, config.params)
+        const headers = await this.buildHeaders(requireAuth, config.headers)
         
-        const response = await this.performRequest<T>(
-          method, 
-          endpoint, 
-          data, 
-          requireAuth, 
-          config,
-          requestId
-        )
+        const requestConfig: RequestInit = {
+          method,
+          headers,
+          signal: this.createTimeoutSignal(config.timeout)
+        }
 
-        const duration = Date.now() - startTime
-        console.debug(`[API ${requestId}] Success in ${duration}ms`)
+        if (data && method !== 'GET' && method !== 'DELETE') {
+          requestConfig.body = JSON.stringify(data)
+        }
 
-        return response.data
+        console.log(`[API ${currentRequestId}] ${method} ${url} (attempt ${attempt + 1}/${maxRetries + 1})`)
 
-      } catch (error) {
-        lastError = this.normalizeError(error as Error)
+        const response = await fetch(url, requestConfig)
+        const responseHeaders = this.parseHeaders(response.headers)
         
-        const duration = Date.now() - startTime
-        console.warn(`[API ${requestId}] Attempt ${attempt} failed in ${duration}ms:`, lastError.message)
-
-        // Don't retry on client errors (4xx) or authentication errors
-        if (lastError.status && (lastError.status < 500 || lastError.status === 401 || lastError.status === 403)) {
-          break
-        }
-
-        // Don't retry on the last attempt
-        if (attempt === maxRetries) {
-          break
-        }
-
-        // Exponential backoff with jitter
-        const delay = this.config.retryDelay * Math.pow(2, attempt - 1) + Math.random() * 1000
-        console.debug(`[API ${requestId}] Retrying in ${Math.round(delay)}ms...`)
-        
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-    }
-
-    const totalDuration = Date.now() - startTime
-    console.error(`[API ${requestId}] Final failure after ${totalDuration}ms:`, lastError)
-    
-    throw lastError
-  }
-
-  /**
-   * Perform actual HTTP request
-   */
-  private async performRequest<T>(
-    method: string,
-    endpoint: string,
-    data?: any,
-    requireAuth = false,
-    config: RequestConfig = {},
-    requestId?: number
-  ): Promise<ApiResponse<T>> {
-    const url = this.buildUrl(endpoint, config.params)
-    const headers = await this.buildHeaders(requireAuth, config.headers)
-    const timeout = config.timeout ?? this.config.timeout
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-    try {
-      const requestOptions: RequestInit = {
-        method,
-        headers,
-        signal: controller.signal
-      }
-
-      // Add body for methods that support it
-      if (data && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        if (data instanceof FormData) {
-          requestOptions.body = data
-          // Remove Content-Type header for FormData (browser sets it automatically)
-          delete (headers as any)['Content-Type']
-        } else {
-          requestOptions.body = JSON.stringify(data)
-        }
-      }
-
-      const response = await fetch(url, requestOptions)
-      
-      clearTimeout(timeoutId)
-
-      // Handle non-ok responses
-      if (!response.ok) {
-        let errorData: any
-        try {
-          const contentType = response.headers.get('content-type')
-          if (contentType?.includes('application/json')) {
-            errorData = await response.json()
-          } else {
-            errorData = { message: await response.text() }
-          }
-        } catch {
-          errorData = { message: `HTTP ${response.status} ${response.statusText}` }
-        }
-
-        throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`, {
-          cause: {
-            status: response.status,
-            statusText: response.statusText,
-            data: errorData
-          }
-        })
-      }
-
-      // Parse response data
-      let responseData: T
-      try {
+        let responseData: unknown
         const contentType = response.headers.get('content-type')
+        
         if (contentType?.includes('application/json')) {
           responseData = await response.json()
         } else {
-          responseData = (await response.text()) as unknown as T
+          responseData = await response.text()
         }
+
+        const duration = Date.now() - startTime
+        console.log(`[API ${currentRequestId}] Response ${response.status} in ${duration}ms`)
+
+        if (!response.ok) {
+          const error = this.createHttpError(response, responseData)
+          
+          if (this.shouldRetry(response.status, attempt, maxRetries)) {
+            lastError = error
+            await this.delay(this.config.retryDelay * Math.pow(2, attempt))
+            continue
+          }
+          
+          throw error
+        }
+
+        const apiResponse: ApiResponse<T> = {
+          data: responseData as T,
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders
+        }
+
+        return apiResponse.data
+
       } catch (error) {
-        throw new Error('Failed to parse response data', { cause: error })
+        lastError = error as Error
+        
+        if (this.isRetriableError(error as Error) && attempt < maxRetries) {
+          console.warn(`[API ${currentRequestId}] Attempt ${attempt + 1} failed, retrying:`, (error as Error).message)
+          await this.delay(this.config.retryDelay * Math.pow(2, attempt))
+          continue
+        }
+        
+        console.error(`[API ${currentRequestId}] Request failed after ${attempt + 1} attempts:`, error)
+        throw this.normalizeError(error as Error)
       }
-
-      return {
-        data: responseData,
-        status: response.status,
-        statusText: response.statusText,
-        headers: this.parseHeaders(response.headers)
-      }
-
-    } catch (error) {
-      clearTimeout(timeoutId)
-      
-      if (controller.signal.aborted) {
-        throw new Error(`Request timeout after ${timeout}ms`)
-      }
-      
-      throw error
     }
+
+    throw this.normalizeError(lastError || new Error('Unknown error occurred'))
   }
 
-  /**
-   * Build complete URL with query parameters
-   */
   private buildUrl(endpoint: string, params?: Record<string, string>): string {
-    // Ensure endpoint starts with /
     if (!endpoint.startsWith('/')) {
       endpoint = '/' + endpoint
     }
@@ -303,9 +174,6 @@ export class ApiClient {
     return url
   }
 
-  /**
-   * Build request headers with authentication
-   */
   private async buildHeaders(
     requireAuth = false, 
     customHeaders: Record<string, string> = {}
@@ -316,7 +184,6 @@ export class ApiClient {
       ...customHeaders
     }
 
-    // Add authentication header if required
     if (requireAuth) {
       const token = this.getStoredAccessToken()
       if (token) {
@@ -329,9 +196,6 @@ export class ApiClient {
     return headers
   }
 
-  /**
-   * Parse response headers to object
-   */
   private parseHeaders(headers: Headers): Record<string, string> {
     const headerObj: Record<string, string> = {}
     headers.forEach((value, key) => {
@@ -340,47 +204,79 @@ export class ApiClient {
     return headerObj
   }
 
-  /**
-   * Get stored access token
-   */
   private getStoredAccessToken(): string | null {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('access_token')
   }
 
-  /**
-   * Normalize errors to consistent format
-   */
+  private createTimeoutSignal(timeout?: number): AbortSignal {
+    const controller = new AbortController()
+    const timeoutMs = timeout ?? this.config.timeout
+    
+    setTimeout(() => controller.abort(), timeoutMs)
+    
+    return controller.signal
+  }
+
+  private createHttpError(response: Response, data: unknown): ApiError {
+    const errorData = data as Record<string, unknown>
+    
+    return {
+      name: 'HttpError',
+      message: errorData?.message as string || errorData?.detail as string || `HTTP ${response.status}: ${response.statusText}`,
+      status: response.status,
+      response: {
+        data: errorData,
+        status: response.status,
+        statusText: response.statusText
+      }
+    } as ApiError
+  }
+
+  private shouldRetry(status: number, attempt: number, maxRetries: number): boolean {
+    if (attempt >= maxRetries) return false
+    
+    return status >= 500 || status === 408 || status === 429
+  }
+
+  private isRetriableError(error: Error): boolean {
+    return error.name === 'TypeError' || error.name === 'AbortError'
+  }
+
   private normalizeError(error: Error): ApiError {
     const apiError: ApiError = {
+      name: 'ApiError',
       message: error.message || 'Unknown error occurred'
     }
 
-    // Extract status and response data from error cause
-    if (error.cause && typeof error.cause === 'object') {
-      const cause = error.cause as any
+    const errorWithCause = error as Error & { cause?: Record<string, unknown> }
+    
+    if (errorWithCause.cause && typeof errorWithCause.cause === 'object') {
+      const cause = errorWithCause.cause
       
       if (cause.status) {
-        apiError.status = cause.status
+        apiError.status = cause.status as number
       }
       
       if (cause.statusText || cause.data) {
         apiError.response = {
-          status: cause.status,
-          statusText: cause.statusText,
-          data: cause.data
+          status: cause.status as number,
+          statusText: cause.statusText as string,
+          data: cause.data as Record<string, unknown>
         }
       }
     }
 
-    // Handle network errors
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       apiError.message = 'Network error - please check your internet connection'
     }
 
     return apiError
   }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
 }
 
-// Export singleton instance
 export const apiClient = new ApiClient()

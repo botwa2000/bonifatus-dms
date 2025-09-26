@@ -1,282 +1,332 @@
-# backend/src/services/auth_service.py
-"""
-Bonifatus DMS - JWT Authentication Service
-Token generation, validation, and Google OAuth integration
-"""
+// frontend/src/services/auth.service.ts
 
-import logging
-import jwt
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from google.auth.transport import requests
-from google.oauth2 import id_token
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+import { apiClient } from './api-client'
+import { TokenResponse, User, GoogleOAuthConfig, RefreshTokenResponse, AuthError, ApiError } from '@/types/auth.types'
 
-from app.core.config import settings
-from app.database.models import User, AuditLog
-from app.database.connection import db_manager
+interface AuthServiceConfig {
+  apiUrl: string
+  clientId: string
+  tokenRefreshThreshold: number
+  maxRetries: number
+}
 
-logger = logging.getLogger(__name__)
+interface JWTPayload {
+  exp: number
+  iat: number
+  sub: string
+  email?: string
+  [key: string]: unknown
+}
 
+export class AuthService {
+  private readonly config: AuthServiceConfig
+  private tokenRefreshPromise: Promise<TokenResponse> | null = null
+  private refreshTimeoutId: NodeJS.Timeout | null = null
 
-class AuthService:
-    """JWT authentication and Google OAuth integration service"""
+  constructor() {
+    this.config = {
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || '',
+      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
+      tokenRefreshThreshold: 5 * 60 * 1000,
+      maxRetries: 3
+    }
 
-    def __init__(self):
-        self.secret_key = settings.security.security_secret_key
-        self.algorithm = settings.security.algorithm
-        self.access_token_expire_minutes = settings.security.access_token_expire_minutes
-        self.refresh_token_expire_days = settings.security.refresh_token_expire_days
-        self.default_user_tier = settings.security.default_user_tier
-        self.google_oauth_issuers = settings.google_oauth_issuer_list
+    if (!this.config.apiUrl || !this.config.clientId) {
+      throw new Error('Missing required environment variables: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID')
+    }
 
-    def generate_access_token(self, user_id: str, email: str, tier: str = None) -> str:
-        """Generate JWT access token with user claims"""
-        try:
-            if tier is None:
-                tier = self.default_user_tier
-                
-            expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
-            payload = {
-                "sub": user_id,
-                "email": email,
-                "tier": tier,
-                "exp": expire,
-                "iat": datetime.utcnow(),
-                "type": "access"
-            }
-            return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
-        except Exception as e:
-            logger.error(f"Failed to generate access token: {e}")
-            raise
+    this.initializeTokenRefresh()
+  }
 
-    def generate_refresh_token(self, user_id: str) -> str:
-        """Generate JWT refresh token with extended expiry"""
-        try:
-            expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
-            payload = {
-                "sub": user_id,
-                "exp": expire,
-                "iat": datetime.utcnow(),
-                "type": "refresh"
-            }
-            return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
-        except Exception as e:
-            logger.error(f"Failed to generate refresh token: {e}")
-            raise
+  async initializeGoogleOAuth(): Promise<void> {
+    try {
+      const config = await this.getOAuthConfig()
+      
+      const params = new URLSearchParams({
+        client_id: config.google_client_id,
+        redirect_uri: config.redirect_uri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'offline',
+        prompt: 'consent',
+        state: this.generateSecureState()
+      })
 
-    def verify_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
-        """Verify and decode JWT token"""
-        try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            
-            if payload.get("type") != token_type:
-                logger.warning(f"Invalid token type. Expected: {token_type}, Got: {payload.get('type')}")
-                return None
-                
-            return payload
-        except jwt.ExpiredSignatureError:
-            logger.warning("Token has expired")
-            return None
-        except jwt.InvalidTokenError as e:
-            logger.warning(f"Invalid token: {e}")
-            return None
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+      
+      this.storeOAuthState(params.get('state')!)
+      window.location.href = authUrl
+      
+    } catch (error) {
+      console.error('Failed to initialize Google OAuth:', error)
+      throw new Error('Authentication service unavailable')
+    }
+  }
 
-    async def verify_google_token(self, google_token: str) -> Optional[Dict[str, Any]]:
-        """Verify Google OAuth ID token"""
-        try:
-            id_info = id_token.verify_oauth2_token(
-                google_token, 
-                requests.Request(), 
-                settings.google.google_client_id
-            )
-            
-            if id_info['iss'] not in self.google_oauth_issuers:
-                logger.warning(f"Invalid Google token issuer: {id_info['iss']}")
-                return None
-                
-            return {
-                "google_id": id_info['sub'],
-                "email": id_info['email'],
-                "full_name": id_info.get('name', ''),
-                "profile_picture": id_info.get('picture', ''),
-                "email_verified": id_info.get('email_verified', False)
-            }
-        except ValueError as e:
-            logger.error(f"Google token verification failed: {e}")
-            return None
+  async exchangeGoogleToken(code: string, state?: string): Promise<TokenResponse> {
+    try {
+      this.validateOAuthState(state)
+      
+      const response = await apiClient.post<TokenResponse>('/api/v1/auth/token', {
+        code,
+        state
+      })
 
-    async def authenticate_with_google(self, google_token: str, ip_address: str = None) -> Optional[Dict[str, str]]:
-        """Authenticate user with Google OAuth and return JWT tokens"""
-        session = db_manager.session_local()
-        try:
-            google_user_info = await self.verify_google_token(google_token)
-            if not google_user_info:
-                await self._log_auth_attempt(None, "google_auth_failed", "invalid_token", ip_address, session)
-                return None
+      this.storeTokens(response)
+      this.scheduleTokenRefresh(response.access_token)
+      this.clearStoredOAuthState()
 
-            if not google_user_info.get('email_verified'):
-                await self._log_auth_attempt(None, "google_auth_failed", "email_not_verified", ip_address, session)
-                return None
+      return response
 
-            user = await self._get_or_create_user(google_user_info, session)
-            if not user:
-                await self._log_auth_attempt(None, "user_creation_failed", "database_error", ip_address, session)
-                return None
+    } catch (error) {
+      console.error('Token exchange failed:', error)
+      throw this.handleAuthError(error)
+    }
+  }
 
-            if not user.is_active:
-                await self._log_auth_attempt(str(user.id), "auth_failed", "user_inactive", ip_address, session)
-                return None
+  async logout(): Promise<void> {
+    try {
+      const refreshToken = this.getStoredRefreshToken()
+      
+      if (refreshToken) {
+        await apiClient.delete('/api/v1/auth/logout', true, {
+          headers: {
+            'X-Refresh-Token': refreshToken
+          }
+        })
+      }
 
-            # Update last login
-            user.last_login_at = datetime.utcnow()
-            session.commit()
+    } catch (error) {
+      console.error('Logout request failed:', error)
+    } finally {
+      this.clearAllAuthData()
+      this.clearTokenRefresh()
+    }
+  }
 
-            # Generate tokens
-            access_token = self.generate_access_token(str(user.id), user.email, user.tier)
-            refresh_token = self.generate_refresh_token(str(user.id))
+  async refreshTokens(): Promise<boolean> {
+    if (this.tokenRefreshPromise) {
+      try {
+        await this.tokenRefreshPromise
+        return true
+      } catch {
+        return false
+      }
+    }
 
-            await self._log_auth_attempt(str(user.id), "login_success", "google_oauth", ip_address, session)
+    const refreshToken = this.getStoredRefreshToken()
+    if (!refreshToken) {
+      return false
+    }
 
-            return {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "bearer",
-                "user_id": str(user.id),
-                "email": user.email,
-                "tier": user.tier
-            }
+    this.tokenRefreshPromise = this.performTokenRefresh(refreshToken)
 
-        except Exception as e:
-            logger.error(f"Authentication error: {e}")
-            session.rollback()
-            return None
-        finally:
-            session.close()
+    try {
+      const response = await this.tokenRefreshPromise
+      this.storeTokens(response)
+      this.scheduleTokenRefresh(response.access_token)
+      return true
 
-    async def refresh_access_token(self, refresh_token: str, ip_address: str = None) -> Optional[Dict[str, str]]:
-        """Generate new access token from refresh token"""
-        session = db_manager.session_local()
-        try:
-            payload = self.verify_token(refresh_token, "refresh")
-            if not payload:
-                await self._log_auth_attempt(None, "token_refresh_failed", "invalid_token", ip_address, session)
-                return None
+    } catch (error) {
+      console.error('Token refresh failed:', error)
+      this.clearAllAuthData()
+      return false
 
-            user_id = payload.get("sub")
-            user = session.get(User, user_id)
-            
-            if not user or not user.is_active:
-                await self._log_auth_attempt(user_id, "token_refresh_failed", "user_not_found", ip_address, session)
-                return None
+    } finally {
+      this.tokenRefreshPromise = null
+    }
+  }
 
-            access_token = self.generate_access_token(str(user.id), user.email, user.tier)
-            
-            await self._log_auth_attempt(str(user.id), "token_refresh_success", "refresh_token", ip_address, session)
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const token = this.getStoredAccessToken()
+      if (!token || this.isTokenExpired(token)) {
+        const refreshed = await this.refreshTokens()
+        if (!refreshed) {
+          return null
+        }
+      }
 
-            return {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user_id": str(user.id),
-                "email": user.email,
-                "tier": user.tier
-            }
+      const user = await apiClient.get<User>('/api/v1/users/profile', true)
+      this.storeUserProfile(user)
+      return user
 
-        except Exception as e:
-            logger.error(f"Token refresh error: {e}")
-            return None
-        finally:
-            session.close()
+    } catch (error) {
+      console.error('Failed to get current user:', error)
+      return null
+    }
+  }
 
-    async def get_current_user(self, token: str) -> Optional[User]:
-        """Get current user from JWT access token"""
-        session = db_manager.session_local()
-        try:
-            payload = self.verify_token(token, "access")
-            if not payload:
-                return None
+  private async getOAuthConfig(): Promise<GoogleOAuthConfig> {
+    return apiClient.get<GoogleOAuthConfig>('/api/v1/auth/google/config')
+  }
 
-            user_id = payload.get("sub")
-            user = session.get(User, user_id)
-            
-            if not user or not user.is_active:
-                return None
+  private async performTokenRefresh(refreshToken: string): Promise<TokenResponse> {
+    return apiClient.post<TokenResponse>('/api/v1/auth/refresh', {
+      refresh_token: refreshToken
+    })
+  }
 
-            return user
+  private storeTokens(tokenResponse: TokenResponse): void {
+    if (typeof window === 'undefined') return
 
-        except Exception as e:
-            logger.error(f"Get current user error: {e}")
-            return None
-        finally:
-            session.close()
+    localStorage.setItem('access_token', tokenResponse.access_token)
+    localStorage.setItem('refresh_token', tokenResponse.refresh_token)
+    localStorage.setItem('tokens_stored_at', Date.now().toString())
+    
+    if (tokenResponse.user) {
+      this.storeUserProfile(tokenResponse.user)
+    }
+  }
 
-    async def _get_or_create_user(self, google_user_info: Dict[str, Any], session: Session) -> Optional[User]:
-        """Get existing user or create new user from Google info"""
-        try:
-            # Try to find existing user by Google ID
-            stmt = select(User).where(User.google_id == google_user_info["google_id"])
-            user = session.execute(stmt).scalar_one_or_none()
+  private storeUserProfile(user: User): void {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('user_profile', JSON.stringify(user))
+  }
 
-            if user:
-                # Update user info from Google
-                user.email = google_user_info["email"]
-                user.full_name = google_user_info["full_name"]
-                user.profile_picture = google_user_info["profile_picture"]
-                session.commit()
-                return user
+  private getStoredAccessToken(): string | null {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('access_token')
+  }
 
-            # Try to find by email (user might have changed Google account)
-            stmt = select(User).where(User.email == google_user_info["email"])
-            user = session.execute(stmt).scalar_one_or_none()
+  private getStoredRefreshToken(): string | null {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('refresh_token')
+  }
 
-            if user:
-                # Link Google account to existing user
-                user.google_id = google_user_info["google_id"]
-                user.full_name = google_user_info["full_name"]
-                user.profile_picture = google_user_info["profile_picture"]
-                session.commit()
-                return user
+  private initializeTokenRefresh(): void {
+    if (typeof window === 'undefined') return
 
-            # Create new user
-            user = User(
-                google_id=google_user_info["google_id"],
-                email=google_user_info["email"],
-                full_name=google_user_info["full_name"],
-                profile_picture=google_user_info["profile_picture"],
-                tier=self.default_user_tier,
-                is_active=True
-            )
-            session.add(user)
-            session.commit()
-            session.refresh(user)
-            
-            logger.info(f"Created new user: {user.email}")
-            return user
+    const token = this.getStoredAccessToken()
+    if (token && !this.isTokenExpired(token)) {
+      this.scheduleTokenRefresh(token)
+    }
+  }
 
-        except Exception as e:
-            logger.error(f"User creation/update error: {e}")
-            session.rollback()
-            return None
+  private scheduleTokenRefresh(token: string): void {
+    try {
+      const payload = this.decodeJWTPayload(token)
+      const expiresAt = payload.exp * 1000
+      const refreshAt = expiresAt - this.config.tokenRefreshThreshold
+      const delay = refreshAt - Date.now()
 
-    async def _log_auth_attempt(self, user_id: str, action: str, status: str, ip_address: str, session: Session):
-        """Log authentication attempt for audit trail"""
-        try:
-            audit_log = AuditLog(
-                user_id=user_id,
-                action=action,
-                resource_type="authentication",
-                resource_id=user_id,
-                ip_address=ip_address,
-                status="success" if "success" in action else "failed",
-                new_values=status,
-                endpoint="/api/v1/auth"
-            )
-            session.add(audit_log)
-            session.commit()
-        except Exception as e:
-            logger.error(f"Failed to log auth attempt: {e}")
+      if (delay > 0) {
+        this.refreshTimeoutId = setTimeout(() => {
+          this.refreshTokens().catch(error => {
+            console.error('Scheduled token refresh failed:', error)
+          })
+        }, delay)
+      }
 
+    } catch (error) {
+      console.error('Failed to schedule token refresh:', error)
+    }
+  }
 
-# Global auth service instance
-auth_service = AuthService()
+  private clearTokenRefresh(): void {
+    if (this.refreshTimeoutId) {
+      clearTimeout(this.refreshTimeoutId)
+      this.refreshTimeoutId = null
+    }
+  }
+
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = this.decodeJWTPayload(token)
+      const expiresAt = payload.exp * 1000
+      const bufferTime = 5 * 60 * 1000
+      
+      return Date.now() >= (expiresAt - bufferTime)
+
+    } catch {
+      return true
+    }
+  }
+
+  private validateOAuthState(providedState?: string): void {
+    const storedState = this.getStoredOAuthState()
+    
+    if (!storedState || !providedState || storedState !== providedState) {
+      throw new Error('Invalid OAuth state - potential CSRF attack')
+    }
+  }
+
+  private decodeJWTPayload(token: string): JWTPayload {
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format')
+    }
+    
+    const payload = parts[1]
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(decoded) as JWTPayload
+  }
+
+  private generateSecureState(): string {
+    const array = new Uint8Array(16)
+    crypto.getRandomValues(array)
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  private storeOAuthState(state: string): void {
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem('oauth_state', state)
+  }
+
+  private getStoredOAuthState(): string | null {
+    if (typeof window === 'undefined') return null
+    return sessionStorage.getItem('oauth_state')
+  }
+
+  private clearStoredOAuthState(): void {
+    if (typeof window === 'undefined') return
+    sessionStorage.removeItem('oauth_state')
+  }
+
+  private clearAllAuthData(): void {
+    if (typeof window === 'undefined') return
+    
+    const keysToRemove = [
+      'access_token',
+      'refresh_token', 
+      'tokens_stored_at',
+      'user_profile'
+    ]
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key))
+    this.clearStoredOAuthState()
+  }
+
+  private handleAuthError(error: unknown): AuthError {
+    if (error && typeof error === 'object') {
+      const errorObj = error as Record<string, unknown>
+      
+      if (errorObj.response && typeof errorObj.response === 'object') {
+        const response = errorObj.response as Record<string, unknown>
+        
+        if (response.data && typeof response.data === 'object') {
+          const data = response.data as Record<string, unknown>
+          
+          return {
+            name: 'AuthError',
+            message: (data.message || data.detail || 'Authentication failed') as string,
+            status: response.status as number,
+            code: (data.error || 'authentication_failed') as string,
+            details: data.details as string
+          }
+        }
+      }
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : 'Network error occurred'
+    
+    return {
+      name: 'AuthError',
+      message: errorMessage,
+      code: 'network_error',
+      details: 'Unable to communicate with authentication service'
+    }
+  }
+}
+
+export const authService = new AuthService()

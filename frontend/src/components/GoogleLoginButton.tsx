@@ -1,8 +1,4 @@
-// src/components/GoogleLoginButton.tsx
-/**
- * Google OAuth login button component
- * Handles authentication flow and redirects
- */
+// frontend/src/components/GoogleLoginButton.tsx
 
 'use client'
 
@@ -22,13 +18,13 @@ export function GoogleLoginButton({
   className = '',
   children 
 }: GoogleLoginButtonProps) {
-  const { redirectToGoogleAuth, isLoading } = useAuth()
+  const { initializeGoogleAuth, isLoading } = useAuth()
   const [isRedirecting, setIsRedirecting] = useState(false)
 
   const handleLogin = async () => {
     try {
       setIsRedirecting(true)
-      await redirectToGoogleAuth()
+      await initializeGoogleAuth()
     } catch (error) {
       console.error('Google login failed:', error)
       setIsRedirecting(false)
