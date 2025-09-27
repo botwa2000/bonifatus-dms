@@ -11,10 +11,13 @@ from fastapi.responses import JSONResponse
 
 
 from app.core.config import settings
-from app.core.logging_config import setup_logging
 
-# Configure logging
-setup_logging()
+# Configure basic logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
