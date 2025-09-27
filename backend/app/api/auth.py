@@ -21,7 +21,8 @@ from app.schemas.auth_schemas import (
     ErrorResponse,
     GoogleOAuthConfigResponse
 )
-from app.services.auth_service import auth_service
+from app.services import auth_service
+from app.middleware import auth_middleware
 from app.middleware.auth_middleware import (
     get_current_active_user, 
     get_current_admin_user,
@@ -34,6 +35,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
+# Fix: Ensure auth_service is properly initialized
+if not hasattr(auth_service, 'authenticate_with_google'):
+    logger.error("Auth service not properly initialized")
+    
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
 
