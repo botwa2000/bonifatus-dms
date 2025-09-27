@@ -192,8 +192,8 @@ async def root():
 
 # Include routers
 try:
-    from app.api.v1.auth import router as auth_router
-    app.include_router(auth_router, prefix="/api/v1")
+    from app.api.auth import router as auth_router
+    app.include_router(auth_router)
     logger.info("Auth router loaded successfully")
 except ImportError as e:
     logger.warning(f"Auth router not available: {e}")
