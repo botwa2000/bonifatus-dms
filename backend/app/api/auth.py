@@ -21,8 +21,7 @@ from app.schemas.auth_schemas import (
     ErrorResponse,
     GoogleOAuthConfigResponse
 )
-from app.services import auth_service
-from app.middleware import auth_middleware
+from app.services.auth_service import auth_service
 from app.middleware.auth_middleware import (
     get_current_active_user, 
     get_current_admin_user,
