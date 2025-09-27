@@ -62,7 +62,6 @@ jobs:
             --max-instances=100 \
             --timeout=900 \
             --concurrency=1000 \
-            --set-env-vars "PORT=8080" \
             --set-env-vars "HOST=0.0.0.0" \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "DATABASE_POOL_SIZE=10" \
