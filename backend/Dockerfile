@@ -9,6 +9,7 @@ LABEL version="1.0.0"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH="/app"
+ENV PORT=8080
 
 WORKDIR /app
 
@@ -30,11 +31,13 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy application code
 COPY app/ ./app/
+COPY test_config.py ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/temp \
     && chown -R bonifatus:bonifatus /app \
-    && chmod -R 755 /app
+    && chmod -R 755 /app \
+    && chmod +x test_config.py
 
 # Switch to non-root user
 USER bonifatus
@@ -46,5 +49,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 # Expose port 8080 for Cloud Run
 EXPOSE 8080
 
-# Run application using main.py which properly handles PORT
+# Use main.py directly for Cloud Run deployment
 CMD ["python", "-m", "app.main"]
