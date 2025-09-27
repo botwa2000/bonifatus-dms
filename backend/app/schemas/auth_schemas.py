@@ -114,3 +114,17 @@ class ErrorResponse(BaseModel):
                 "details": "Token has expired or is malformed"
             }
         }
+
+
+class GoogleOAuthConfigResponse(BaseModel):
+    """Response model for Google OAuth configuration"""
+    google_client_id: str = Field(..., description="Google OAuth client ID")
+    redirect_uri: str = Field(..., description="OAuth redirect URI")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "google_client_id": "356302004293-example.apps.googleusercontent.com",
+                "redirect_uri": "https://bonifatus-dms-356302004293.us-central1.run.app/api/v1/auth/google/callback"
+            }
+        }
