@@ -208,9 +208,8 @@ except ImportError as e:
 if __name__ == "__main__":
     import uvicorn
     
-    # Cloud Run requires binding to 0.0.0.0 and using PORT environment variable
-    port = int(os.getenv("PORT"))
-    host = os.getenv("HOST")
+    port = int(os.getenv("PORT", "8080"))
+    host = os.getenv("HOST", "0.0.0.0")
     
     logger.info(f"Starting Bonifatus DMS server on {host}:{port}")
     logger.info(f"Environment: {settings.app.app_environment}")
