@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from typing import Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 
 
