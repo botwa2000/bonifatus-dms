@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from app.core.config import settings
 from app.database.connection import get_db
 from app.database.models import User
-from app.api.schemas.auth import TokenData, UserCreate, UserResponse
+from app.schemas.auth_schemas import TokenData, UserCreate, UserResponse
 
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

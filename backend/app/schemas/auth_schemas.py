@@ -5,7 +5,7 @@ Pydantic models for authentication requests and responses
 """
 
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 
 
 class GoogleTokenRequest(BaseModel):
@@ -128,3 +128,42 @@ class GoogleOAuthConfigResponse(BaseModel):
                 "redirect_uri": "https://bonifatus-dms-356302004293.us-central1.run.app/api/v1/auth/google/callback"
             }
         }
+
+class TokenData(BaseModel):
+    """Data extracted from JWT token payload"""
+    user_id: str = Field(..., description="User ID from token")
+    email: Optional[str] = Field(None, description="User email from token")
+    exp: Optional[int] = Field(None, description="Token expiration timestamp")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                "email": "user@example.com",
+                "exp": 1672531200
+            }
+        }
+
+
+class UserCreate(BaseModel):
+    """Request model for user creation/registration"""
+    email: EmailStr = Field(..., description="User email address")
+    full_name: str = Field(..., min_length=1, max_length=255, description="User full name")
+    google_id: str = Field(..., description="Google OAuth user ID")
+    profile_picture: Optional[str] = Field(None, description="Profile picture URL from Google")
+    
+    @validator('full_name')
+    def validate_full_name(cls, v):
+        if v.strip() == "":
+            raise ValueError('Full name cannot be empty')
+        return v.strip()
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "full_name": "John Doe",
+                "google_id": "108123456789012345678",
+                "profile_picture": "https://lh3.googleusercontent.com/..."
+            }
+        }        
