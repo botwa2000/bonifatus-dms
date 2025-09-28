@@ -319,6 +319,31 @@ export class AuthService {
 
     return authError
   }
+
+  async getTrialInfo(): Promise<{ days_remaining: number; expires_at: string; features: string[] } | null> {
+    try {
+      const user = await this.getCurrentUser()
+      if (!user) return null
+
+      // For now, return placeholder trial info
+      // This should be implemented when trial system is added
+      return {
+        days_remaining: 30,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        features: ['premium_storage', 'ai_categorization', 'priority_support']
+      }
+    } catch (error) {
+      console.error('Failed to get trial info:', error)
+      return null
+    }
+  }
+
+  isTrialActive(): boolean {
+    // Placeholder implementation
+    // This should check actual trial status when trial system is implemented
+    return true
+  }
+
 }
 
 export const authService = new AuthService()
