@@ -1,4 +1,4 @@
-# Bonifatus DMS - Professional Document Management System
+# Bonifatus DMS - Professional Document Management System - Sep 2025
 
 [![Deploy to Cloud Run](https://github.com/yourusername/bonifatus-dms/actions/workflows/deploy.yml/badge.svg)](https://github.com/yourusername/bonifatus-dms/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
