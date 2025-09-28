@@ -37,6 +37,7 @@ class GoogleSettings(BaseSettings):
     google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
 
     class Config:
+        env_prefix = "GOOGLE_"
         case_sensitive = False
         extra = "ignore"
 
