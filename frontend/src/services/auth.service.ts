@@ -17,12 +17,6 @@ interface JWTPayload {
   [key: string]: unknown
 }
 
-interface TrialInfo {
-  days_remaining: number
-  expires_at: string
-  features: string[]
-}
-
 export class AuthService {
   private readonly config: AuthServiceConfig
   private tokenRefreshPromise: Promise<TokenResponse> | null = null
@@ -30,7 +24,7 @@ export class AuthService {
 
   constructor() {
     this.config = {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-mmdbxdflfa-uc.a.run.app',
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-356302004293.us-central1.run.app',
       tokenRefreshThreshold: 5 * 60 * 1000,
       maxRetries: 3
     }
@@ -38,23 +32,74 @@ export class AuthService {
     this.initializeTokenRefresh()
   }
 
+  async getOAuthConfig(): Promise<GoogleOAuthConfig> {
+    try {
+      const response = await apiClient.get<{ google_client_id: string; redirect_uri: string }>('/api/v1/auth/google/config')
+      
+      return {
+        google_client_id: response.google_client_id,
+        redirect_uri: response.redirect_uri,
+        scope: 'openid email profile'
+      }
+    } catch (error) {
+      console.error('Failed to fetch OAuth config:', error)
+      throw new Error('Unable to initialize authentication')
+    }
+  }
+
+  generateSecureState(): string {
+    const array = new Uint8Array(32)
+    crypto.getRandomValues(array)
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+
+  storeOAuthState(state: string): void {
+    sessionStorage.setItem('oauth_state', state)
+    sessionStorage.setItem('oauth_state_timestamp', Date.now().toString())
+  }
+
+  validateOAuthState(receivedState: string): boolean {
+    const storedState = sessionStorage.getItem('oauth_state')
+    const timestamp = sessionStorage.getItem('oauth_state_timestamp')
+    
+    if (!storedState || !timestamp) {
+      return false
+    }
+
+    const age = Date.now() - parseInt(timestamp)
+    const maxAge = 10 * 60 * 1000 // 10 minutes
+
+    if (age > maxAge) {
+      this.clearStoredOAuthState()
+      return false
+    }
+
+    return storedState === receivedState
+  }
+
+  clearStoredOAuthState(): void {
+    sessionStorage.removeItem('oauth_state')
+    sessionStorage.removeItem('oauth_state_timestamp')
+  }
+
   async initializeGoogleOAuth(): Promise<void> {
     try {
       const config = await this.getOAuthConfig()
       
+      const state = this.generateSecureState()
       const params = new URLSearchParams({
         client_id: config.google_client_id,
         redirect_uri: config.redirect_uri,
         response_type: 'code',
-        scope: 'openid email profile',
+        scope: config.scope,
         access_type: 'offline',
         prompt: 'consent',
-        state: this.generateSecureState()
+        state
       })
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       
-      this.storeOAuthState(params.get('state')!)
+      this.storeOAuthState(state)
       window.location.href = authUrl
       
     } catch (error) {
@@ -66,19 +111,20 @@ export class AuthService {
   async exchangeGoogleToken(code: string, state?: string): Promise<TokenResponse> {
     try {
       if (state) {
-        this.validateOAuthState(state)
+        if (!this.validateOAuthState(state)) {
+          throw new Error('Invalid OAuth state - possible CSRF attack')
+        }
       }
 
-      const tokenResponse = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
-        code,
-        state
+      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
+        google_token: code
       })
 
-      this.storeTokens(tokenResponse)
-      this.scheduleTokenRefresh(tokenResponse.access_token)
+      this.storeTokens(response)
+      this.scheduleTokenRefresh(response.access_token)
       this.clearStoredOAuthState()
 
-      return tokenResponse
+      return response
 
     } catch (error) {
       this.clearStoredOAuthState()
@@ -86,21 +132,66 @@ export class AuthService {
     }
   }
 
-  async logout(): Promise<void> {
+  storeTokens(tokenResponse: TokenResponse): void {
+    const { access_token, refresh_token, expires_in } = tokenResponse
+    
+    localStorage.setItem('access_token', access_token)
+    localStorage.setItem('refresh_token', refresh_token)
+    localStorage.setItem('token_expires_at', (Date.now() + expires_in * 1000).toString())
+    
+    document.cookie = `bonifatus_has_token=true; path=/; max-age=${expires_in}; SameSite=Strict; Secure`
+  }
+
+  getStoredAccessToken(): string | null {
+    return localStorage.getItem('access_token')
+  }
+
+  getStoredRefreshToken(): string | null {
+    return localStorage.getItem('refresh_token')
+  }
+
+  isTokenExpired(token: string): boolean {
     try {
-      const refreshToken = this.getStoredRefreshToken()
+      const payload = this.decodeJWTPayload(token)
+      return Date.now() >= payload.exp * 1000 - this.config.tokenRefreshThreshold
+    } catch {
+      return true
+    }
+  }
+
+  decodeJWTPayload(token: string): JWTPayload {
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format')
+    }
+    
+    const payload = parts[1]
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(decoded)
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const token = this.getStoredAccessToken()
       
-      if (refreshToken) {
-        await apiClient.post('/api/v1/auth/logout', {
-          refresh_token: refreshToken
-        }, true)
+      if (!token) {
+        return null
       }
 
+      if (this.isTokenExpired(token)) {
+        const refreshed = await this.refreshTokens()
+        if (!refreshed) {
+          return null
+        }
+      }
+
+      const response = await apiClient.get<User>('/api/v1/auth/me', true)
+      return response
+
     } catch (error) {
-      console.error('Logout request failed:', error)
-    } finally {
-      this.clearTokenRefresh()
+      console.error('Failed to get current user:', error)
       this.clearAllAuthData()
+      return null
     }
   }
 
@@ -123,267 +214,110 @@ export class AuthService {
     try {
       this.tokenRefreshPromise = this.performTokenRefresh(refreshToken)
       const tokenResponse = await this.tokenRefreshPromise
-
+      
       this.storeTokens(tokenResponse)
       this.scheduleTokenRefresh(tokenResponse.access_token)
-
+      
       return true
 
     } catch (error) {
       console.error('Token refresh failed:', error)
       this.clearAllAuthData()
       return false
-
     } finally {
       this.tokenRefreshPromise = null
     }
   }
 
-  async getCurrentUser(): Promise<User | null> {
-    try {
-      const token = this.getStoredAccessToken()
-      if (!token || this.isTokenExpired(token)) {
-        const refreshed = await this.refreshTokens()
-        if (!refreshed) {
-          return null
-        }
-      }
-
-      const user = await apiClient.get<User>('/api/v1/users/profile', true)
-      this.storeUserProfile(user)
-      return user
-
-    } catch (error) {
-      console.error('Failed to get current user:', error)
-      return null
-    }
-  }
-
-  getTrialInfo(): TrialInfo | null {
-    try {
-      const user = this.getStoredUserProfile()
-      if (!user) return null
-
-      const trialEndDate = new Date(user.created_at)
-      trialEndDate.setDate(trialEndDate.getDate() + 30)
-      
-      const now = new Date()
-      const daysRemaining = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-
-      if (daysRemaining <= 0) return null
-
-      return {
-        days_remaining: daysRemaining,
-        expires_at: trialEndDate.toISOString(),
-        features: ['unlimited_documents', 'ai_search', 'priority_support']
-      }
-
-    } catch (error) {
-      console.error('Failed to get trial info:', error)
-      return null
-    }
-  }
-
-  isTrialActive(): boolean {
-    const trialInfo = this.getTrialInfo()
-    return trialInfo !== null && trialInfo.days_remaining > 0
-  }
-
-  private async getOAuthConfig(): Promise<GoogleOAuthConfig> {
-    return apiClient.get<GoogleOAuthConfig>('/api/v1/auth/google/config')
-  }
-
   private async performTokenRefresh(refreshToken: string): Promise<TokenResponse> {
-    return apiClient.post<TokenResponse>('/api/v1/auth/refresh', {
+    const response = await apiClient.post<TokenResponse>('/api/v1/auth/refresh', {
       refresh_token: refreshToken
     })
-  }
-
-  private storeTokens(tokenResponse: TokenResponse): void {
-    if (typeof window === 'undefined') return
-
-    localStorage.setItem('access_token', tokenResponse.access_token)
-    localStorage.setItem('refresh_token', tokenResponse.refresh_token)
-    localStorage.setItem('tokens_stored_at', Date.now().toString())
     
-    if (tokenResponse.user) {
-      this.storeUserProfile(tokenResponse.user)
-    }
+    return response
   }
 
-  private storeUserProfile(user: User): void {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('user_profile', JSON.stringify(user))
-  }
-
-  private getStoredUserProfile(): User | null {
-    if (typeof window === 'undefined') return null
+  scheduleTokenRefresh(accessToken: string): void {
+    this.clearTokenRefresh()
     
     try {
-      const stored = localStorage.getItem('user_profile')
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  }
-
-  private getStoredAccessToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem('access_token')
-  }
-
-  private getStoredRefreshToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem('refresh_token')
-  }
-
-  private initializeTokenRefresh(): void {
-    if (typeof window === 'undefined') return
-
-    const token = this.getStoredAccessToken()
-    if (token && !this.isTokenExpired(token)) {
-      this.scheduleTokenRefresh(token)
-    }
-  }
-
-  private scheduleTokenRefresh(token: string): void {
-    try {
-      const payload = this.decodeJWTPayload(token)
-      const expiresAt = payload.exp * 1000
-      const refreshAt = expiresAt - this.config.tokenRefreshThreshold
-      const delay = refreshAt - Date.now()
-
-      if (delay > 0) {
-        this.refreshTimeoutId = setTimeout(() => {
-          this.refreshTokens().catch(error => {
-            console.error('Scheduled token refresh failed:', error)
-          })
-        }, delay)
-      }
-
+      const payload = this.decodeJWTPayload(accessToken)
+      const expiresIn = payload.exp * 1000 - Date.now()
+      const refreshIn = Math.max(expiresIn - this.config.tokenRefreshThreshold, 60000)
+      
+      this.refreshTimeoutId = setTimeout(() => {
+        this.refreshTokens().catch(error => {
+          console.error('Scheduled token refresh failed:', error)
+        })
+      }, refreshIn)
+      
     } catch (error) {
       console.error('Failed to schedule token refresh:', error)
     }
   }
 
-  private clearTokenRefresh(): void {
+  clearTokenRefresh(): void {
     if (this.refreshTimeoutId) {
       clearTimeout(this.refreshTimeoutId)
       this.refreshTimeoutId = null
     }
   }
 
-  private isTokenExpired(token: string): boolean {
+  initializeTokenRefresh(): void {
+    const token = this.getStoredAccessToken()
+    if (token && !this.isTokenExpired(token)) {
+      this.scheduleTokenRefresh(token)
+    }
+  }
+
+  async logout(): Promise<void> {
     try {
-      const payload = this.decodeJWTPayload(token)
-      const expiresAt = payload.exp * 1000
-      const bufferTime = 5 * 60 * 1000
+      const refreshToken = this.getStoredRefreshToken()
       
-      return Date.now() >= (expiresAt - bufferTime)
-
-    } catch {
-      return true
-    }
-  }
-
-  private validateOAuthState(providedState?: string): void {
-    const storedState = this.getStoredOAuthState()
-    
-    if (!storedState || !providedState || storedState !== providedState) {
-      throw new Error('Invalid OAuth state - potential CSRF attack')
-    }
-  }
-
-  private decodeJWTPayload(token: string): JWTPayload {
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      throw new Error('Invalid JWT format')
-    }
-    
-    const payload = parts[1]
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    return JSON.parse(decoded) as JWTPayload
-  }
-
-  private generateSecureState(): string {
-    const array = new Uint8Array(16)
-    crypto.getRandomValues(array)
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-  }
-
-  private storeOAuthState(state: string): void {
-    if (typeof window === 'undefined') return
-    sessionStorage.setItem('oauth_state', state)
-  }
-
-  private getStoredOAuthState(): string | null {
-    if (typeof window === 'undefined') return null
-    return sessionStorage.getItem('oauth_state')
-  }
-
-  private clearStoredOAuthState(): void {
-    if (typeof window === 'undefined') return
-    sessionStorage.removeItem('oauth_state')
-  }
-
-  private clearAllAuthData(): void {
-    if (typeof window === 'undefined') return
-    
-    const keysToRemove = [
-      'access_token',
-      'refresh_token', 
-      'tokens_stored_at',
-      'user_profile'
-    ]
-    
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-    this.clearStoredOAuthState()
-  }
-
-  private handleAuthError(error: unknown): AuthError {
-    if (this.isErrorWithResponse(error)) {
-      const errorData = this.extractErrorData(error)
-      
-      return {
-        name: 'AuthError',
-        message: errorData.message,
-        status: errorData.status,
-        code: errorData.code,
-        details: errorData.details
+      if (refreshToken) {
+        await apiClient.post('/api/v1/auth/logout', {
+          refresh_token: refreshToken
+        }, true)
       }
-    }
-    
-    const errorMessage = error instanceof Error ? error.message : 'Network error occurred'
-    
-    return {
-      name: 'AuthError',
-      message: errorMessage,
-      code: 'network_error',
-      details: 'Unable to communicate with authentication service'
+
+    } catch (error) {
+      console.error('Logout request failed:', error)
+    } finally {
+      this.clearTokenRefresh()
+      this.clearAllAuthData()
     }
   }
 
-  private isErrorWithResponse(error: unknown): error is { response: { data: Record<string, unknown>; status: number } } {
-    return error !== null && 
-           typeof error === 'object' && 
-           'response' in error && 
-           typeof (error as Record<string, unknown>).response === 'object'
+  clearAllAuthData(): void {
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token_expires_at')
+    
+    document.cookie = 'bonifatus_has_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure'
+    
+    this.clearStoredOAuthState()
+    this.clearTokenRefresh()
   }
 
-  private extractErrorData(error: { response: { data: Record<string, unknown>; status: number } }): {
-    message: string
-    status: number
-    code: string
-    details: string
-  } {
-    const { data, status } = error.response
-    
-    return {
-      message: String(data.message || data.detail || 'Authentication failed'),
-      status: status || 0,
-      code: String(data.error || 'authentication_failed'),
-      details: String(data.details || '')
+  handleAuthError(error: unknown): AuthError {
+    let authError: AuthError
+
+    if (error instanceof Error) {
+      authError = error as AuthError
+    } else if (typeof error === 'object' && error !== null) {
+      const errorObj = error as Record<string, unknown>
+      authError = new Error(errorObj.message as string || 'Authentication failed') as AuthError
+      authError.status = errorObj.status as number
+      authError.code = errorObj.code as string
+    } else {
+      authError = new Error('Unknown authentication error') as AuthError
     }
+
+    if (authError.status === 401 || authError.status === 403) {
+      this.clearAllAuthData()
+    }
+
+    return authError
   }
 }
 
