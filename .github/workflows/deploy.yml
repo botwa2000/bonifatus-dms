@@ -120,27 +120,21 @@ jobs:
       - name: Setup Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
       
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
+      - name: Build frontend Docker image
+        run: |
+          cd frontend
+          docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }} .
       
-      - name: Build frontend
-        working-directory: ./frontend
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-        run: npm run build
+      - name: Push frontend Docker image
+        run: docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }}
       
       - name: Deploy frontend to Cloud Run
         run: |
           gcloud run deploy bonifatus-dms-frontend \
-            --source ./frontend \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }} \
             --region=us-central1 \
             --platform=managed \
             --allow-unauthenticated \
