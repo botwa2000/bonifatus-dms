@@ -27,9 +27,9 @@ class DatabaseSettings(BaseSettings):
 class GoogleSettings(BaseSettings):
     """Google services configuration"""
     
-    google_client_id: str = Field(..., description="Google OAuth client ID")
-    google_client_secret: str = Field(..., description="Google OAuth client secret")
-    google_redirect_uri: str = Field(..., description="OAuth redirect URI")
+    google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID", description="Google OAuth client ID")
+    google_client_secret: str = Field(..., env="GOOGLE_CLIENT_SECRET", description="Google OAuth client secret")
+    google_redirect_uri: str = Field(..., env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
     google_vision_enabled: bool = Field(..., description="Enable Google Vision OCR")
     google_oauth_issuers: str = Field(..., description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(..., description="Google Drive service account key file path")
@@ -117,9 +117,8 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 
-@lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Get settings instance without caching to ensure fresh environment variable reads"""
     return Settings()
 
 
