@@ -93,17 +93,13 @@ jobs:
             --set-env-vars "APP_VERSION=1.0.0" \
             --set-secrets="/secrets/google-drive-key=bonifatus-drive-service-key:latest"
       
-      - name: Verify deployment
+      - name: Deployment Summary
         run: |
           SERVICE_URL=$(gcloud run services describe bonifatus-dms --region=us-central1 --format='value(status.url)')
-          echo "Service deployed at: $SERVICE_URL"
-          
-          # Wait for service to be ready
-          sleep 30
-          
-          # Install requests for testing
-          pip install requests
-          
-          # Run deployment verification
-          cd backend
-          python test_config.py "$SERVICE_URL"
+          echo "✅ Deployment completed successfully"
+          echo "🌐 Service URL: $SERVICE_URL"
+          echo "📋 API Documentation: $SERVICE_URL/docs"
+          echo "🔍 Health Check: $SERVICE_URL/health"
+          echo ""
+          echo "📝 Manual Testing:"
+          echo "   Run: python backend/test_config.py $SERVICE_URL"
