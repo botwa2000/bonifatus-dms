@@ -3,7 +3,7 @@ name: Deploy to Google Cloud Run
 on:
   push:
     branches: [main]
-    paths: [backend/**, .github/workflows/**]
+    paths: [backend/**, frontend/**, .github/workflows/**]
 
 jobs:
   deploy:
@@ -104,3 +104,51 @@ jobs:
           echo ""
           echo "📝 Manual Testing:"
           echo "   Run: python backend/test_config.py $SERVICE_URL"
+
+  frontend-deploy:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: npm run build
+      
+      - name: Deploy frontend to Cloud Run
+        run: |
+          gcloud run deploy bonifatus-dms-frontend \
+            --source ./frontend \
+            --region=us-central1 \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=3000 \
+            --set-env-vars "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}"
+
+      - name: Frontend Deployment Summary
+        run: |
+          FRONTEND_URL=$(gcloud run services describe bonifatus-dms-frontend --region=us-central1 --format='value(status.url)')
+          echo "🌐 Frontend URL: $FRONTEND_URL"
+          echo "📋 OAuth Redirect URI: $FRONTEND_URL/login"
