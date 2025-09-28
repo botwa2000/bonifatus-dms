@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.database.connection import get_db
 from app.models.user import User
 from app.schemas.auth_schemas import TokenData, UserCreate, UserResponse
 
