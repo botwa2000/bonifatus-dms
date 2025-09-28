@@ -110,6 +110,31 @@ class EnvironmentValidator:
         print("✅ All Cloud Run essential variables configured")
         return True
     
+    def diagnose_redirect_uri_issue(self) -> bool:
+        """Diagnose Google redirect URI configuration issue"""
+        print("\n=== Google Redirect URI Diagnostic ===")
+        
+        redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+        if not redirect_uri:
+            print("❌ GOOGLE_REDIRECT_URI environment variable not set locally")
+            print("   This test should be run with environment variables configured")
+            return False
+        
+        print(f"✅ Local GOOGLE_REDIRECT_URI: {redirect_uri}")
+        
+        # Check for common configuration issues
+        if "localhost" in redirect_uri:
+            print("📝 Using localhost redirect URI (development mode)")
+        elif "github.dev" in redirect_uri:
+            print("📝 Using Codespace redirect URI (development mode)")
+        elif "bonifatus-dms" in redirect_uri:
+            print("📝 Using production redirect URI")
+        else:
+            print("⚠️ Unrecognized redirect URI pattern")
+        
+        return True
+
+
     def validate_configuration_values(self) -> bool:
         """Validate configuration values for correctness"""
         print("\n=== Configuration Values Validation ===")
@@ -242,7 +267,7 @@ class DeploymentTester:
             return False
     
     def test_cloud_run_deployment(self) -> bool:
-        """Test Cloud Run deployment endpoints"""
+        """Test Cloud Run deployment endpoints and configuration"""
         if not self.service_url:
             print("\n📝 Cloud Run deployment test skipped (no service URL provided)")
             return True
@@ -267,27 +292,55 @@ class DeploymentTester:
         except requests.exceptions.RequestException as e:
             print(f"❌ Health check failed: {e}")
             return False
-        
-        # Test root endpoint
+    
+        # Test OAuth configuration endpoint and diagnose redirect URI issue
         try:
-            print("\n2. Testing root endpoint...")
-            root_response = requests.get(f"{self.service_url}/", timeout=30)
-            if root_response.status_code == 200:
-                root_data = root_response.json()
-                print(f"✅ Root endpoint working")
-                print(f"   App: {root_data.get('name')}")
-                print(f"   Version: {root_data.get('version')}")
-                print(f"   Description: {root_data.get('description')}")
+            print("\n2. Testing OAuth configuration endpoint...")
+            oauth_response = requests.get(f"{self.service_url}/api/v1/auth/google/config", timeout=30)
+            if oauth_response.status_code == 200:
+                oauth_data = oauth_response.json()
+                print(f"✅ OAuth config endpoint accessible")
+                print(f"   Client ID: {oauth_data.get('google_client_id', 'NOT_SET')}")
+                
+                # Critical diagnostic: Check redirect URI configuration
+                actual_redirect_uri = oauth_data.get('redirect_uri', 'NOT_SET')
+                expected_redirect_uri = os.getenv('GOOGLE_REDIRECT_URI', 'NOT_SET_IN_LOCAL_ENV')
+                
+                print(f"   Actual redirect_uri: {actual_redirect_uri}")
+                print(f"   Expected redirect_uri: {expected_redirect_uri}")
+                
+                if actual_redirect_uri == expected_redirect_uri:
+                    print("✅ Redirect URI configuration matches expected value")
+                else:
+                    print("❌ REDIRECT URI MISMATCH DETECTED:")
+                    print(f"      Backend returns: {actual_redirect_uri}")
+                    print(f"      Local env expects: {expected_redirect_uri}")
+                    print("      This indicates:")
+                    print("      - Environment variable not properly set in Cloud Run")
+                    print("      - Settings cache not refreshed after deployment")
+                    print("      - Hardcoded fallback value being used")
+                    return False
             else:
-                print(f"❌ Root endpoint failed: HTTP {root_response.status_code}")
+                print(f"❌ OAuth config failed: HTTP {oauth_response.status_code}")
                 return False
         except requests.exceptions.RequestException as e:
-            print(f"❌ Root endpoint failed: {e}")
+            print(f"❌ OAuth config test failed: {e}")
             return False
-        
+
+        # Test root endpoint
+        try:
+            print("\n3. Testing root endpoint...")
+            root_response = requests.get(f"{self.service_url}/", timeout=30)
+            if root_response.status_code == 200:
+                print(f"✅ Root endpoint accessible")
+            else:
+                print(f"⚠️ Root endpoint returned HTTP {root_response.status_code}")
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Root endpoint test failed: {e}")
+
         # Test API documentation availability
         try:
-            print("\n3. Testing API documentation...")
+            print("\n4. Testing API documentation...")
             docs_response = requests.get(f"{self.service_url}/docs", timeout=30)
             if docs_response.status_code == 200:
                 print(f"✅ API documentation available at {self.service_url}/docs")

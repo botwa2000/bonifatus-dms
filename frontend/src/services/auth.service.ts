@@ -29,7 +29,13 @@ export class AuthService {
       maxRetries: 3
     }
 
-    this.initializeTokenRefresh()
+    if (typeof window !== 'undefined') {
+      this.initializeTokenRefresh()
+    }
+  }
+
+  private isClientSide(): boolean {
+    return typeof window !== 'undefined'
   }
 
   async getOAuthConfig(): Promise<GoogleOAuthConfig> {
@@ -133,6 +139,8 @@ export class AuthService {
   }
 
   storeTokens(tokenResponse: TokenResponse): void {
+    if (!this.isClientSide()) return
+    
     const { access_token, refresh_token, expires_in } = tokenResponse
     
     localStorage.setItem('access_token', access_token)
@@ -143,10 +151,12 @@ export class AuthService {
   }
 
   getStoredAccessToken(): string | null {
+    if (!this.isClientSide()) return null
     return localStorage.getItem('access_token')
   }
 
   getStoredRefreshToken(): string | null {
+    if (!this.isClientSide()) return null
     return localStorage.getItem('refresh_token')
   }
 
