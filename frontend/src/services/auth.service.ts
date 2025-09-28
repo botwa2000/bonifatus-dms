@@ -23,10 +23,14 @@ export class AuthService {
   private refreshTimeoutId: NodeJS.Timeout | null = null
 
   constructor() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    
+    if (!apiUrl) {
+      throw new Error('NEXT_PUBLIC_API_URL environment variable is required. Create frontend/.env.local with NEXT_PUBLIC_API_URL=https://bonifatus-dms-vpm3xabjwq-uc.a.run.app')
+    }
+    
     this.config = {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || (() => {
-        throw new Error('NEXT_PUBLIC_API_URL environment variable is required')
-      })(),
+      apiUrl,
       tokenRefreshThreshold: 5 * 60 * 1000,
       maxRetries: 3
     }
@@ -113,6 +117,50 @@ export class AuthService {
     } catch (error) {
       console.error('Failed to initialize Google OAuth:', error)
       throw new Error('Authentication service unavailable')
+    }
+  }
+
+  async exchangeGoogleToken(code: string, state?: string | null): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Validate state if provided
+      if (state && !this.validateOAuthState(state)) {
+        throw new Error('Invalid OAuth state - possible security issue')
+      }
+
+      // Exchange authorization code for JWT tokens via backend
+      const response = await apiClient.post<{
+        access_token: string
+        refresh_token: string
+        user: User
+        expires_at: string
+      }>('/api/v1/auth/google/callback', {
+        code,
+        state: state || ''
+      })
+
+      // Store tokens securely
+      if (typeof window !== 'undefined') {
+        // Store in httpOnly cookies via backend or localStorage for development
+        localStorage.setItem('access_token', response.access_token)
+        localStorage.setItem('refresh_token', response.refresh_token)
+        localStorage.setItem('user', JSON.stringify(response.user))
+        localStorage.setItem('expires_at', response.expires_at)
+      }
+
+      // Clear OAuth state
+      this.clearStoredOAuthState()
+
+      // Initialize token refresh
+      this.initializeTokenRefresh()
+
+      return { success: true }
+
+    } catch (error) {
+      console.error('Token exchange failed:', error)
+      this.clearStoredOAuthState()
+      
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
+      return { success: false, error: errorMessage }
     }
   }
 

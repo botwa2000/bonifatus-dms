@@ -1,116 +1,163 @@
-// src/app/login/page.tsx
-/**
- * Login page with Google OAuth integration
- * Handles authentication and redirects to dashboard after login
- */
-
+// frontend/src/app/login/page.tsx
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/use-auth'
-import { GoogleLoginButton } from '@/components/GoogleLoginButton'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { authService } from '@/services/auth.service'
 
 export default function LoginPage() {
-  const { handleGoogleCallback, isLoading, isAuthenticated, user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'login'>('loading')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const code = urlParams.get('code')
-    const error = urlParams.get('error')
+    const handleOAuthCallback = async () => {
+      try {
+        const code = searchParams.get('code')
+        const state = searchParams.get('state')
+        const error = searchParams.get('error')
+        
+        if (error) {
+          setStatus('error')
+          setError(`OAuth error: ${error}`)
+          return
+        }
 
-    // Handle OAuth callback if parameters are present
-    if (code || error) {
-      handleGoogleCallback().then(() => {
-        // Redirect will be handled by the authentication state change
-      }).catch(callbackError => {
-        console.error('OAuth callback failed:', callbackError)
-      })
+        if (!code) {
+          // No code means user came directly to login page
+          setStatus('login')
+          return
+        }
+
+        // Exchange authorization code for JWT tokens
+        const result = await authService.exchangeGoogleToken(code, state)
+        
+        if (result.success) {
+          setStatus('success')
+          // Redirect to dashboard or redirect URL from state
+          const redirectUrl = searchParams.get('redirect') || '/dashboard'
+          router.push(redirectUrl)
+        } else {
+          setStatus('error')
+          setError('Authentication failed. Please try again.')
+        }
+      } catch (error) {
+        console.error('OAuth callback error:', error)
+        setStatus('error')
+        setError(error instanceof Error ? error.message : 'Authentication failed')
+      }
     }
-  }, [handleGoogleCallback])
 
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      router.push('/dashboard')
+    handleOAuthCallback()
+  }, [searchParams, router])
+
+  const handleGoogleLogin = async () => {
+    try {
+      setStatus('loading')
+      await authService.initializeGoogleOAuth()
+    } catch (error) {
+      console.error('Login initialization failed:', error)
+      setStatus('error')
+      setError('Failed to initialize login. Please try again.')
     }
-  }, [isAuthenticated, user, router])
+  }
 
-  if (isLoading) {
+  if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Processing authentication...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              Processing Authentication
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Please wait while we complete your sign-in...
+            </p>
+          </div>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50">
-      <div className="w-full max-w-md space-y-8 p-8">
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 rounded-lg bg-admin-primary flex items-center justify-center">
-            <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+  if (status === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="h-12 w-12 text-green-600 mx-auto">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              Sign In Successful
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Redirecting to dashboard...
+            </p>
           </div>
-          <h1 className="mt-6 text-3xl font-bold text-neutral-900">
-            Welcome to Bonifatus DMS
-          </h1>
-          <p className="mt-2 text-sm text-neutral-600">
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="h-12 w-12 text-red-600 mx-auto">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+              Authentication Failed
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {error}
+            </p>
+            <div className="mt-6">
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login form for direct access
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            Sign In to Bonifatus DMS
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
             Professional Document Management System
           </p>
         </div>
-        
-        <div className="rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-lg font-semibold text-neutral-900">
-                Sign in to your account
-              </h2>
-              <p className="mt-1 text-sm text-neutral-500">
-                Get started with secure document management
-              </p>
-            </div>
-
-            <GoogleLoginButton 
-              size="lg" 
-              className="w-full"
-            >
-              Sign in with Google
-            </GoogleLoginButton>
-
-            <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-              <div className="flex items-start">
-                <svg className="h-5 w-5 text-green-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-800">
-                    New Users Welcome!
-                  </h3>
-                  <p className="text-sm text-green-700 mt-1">
-                    First-time login includes 30 days of premium features absolutely free.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center space-y-2">
-          <p className="text-xs text-neutral-400">
-            By signing in, you agree to our Terms of Service and Privacy Policy
-          </p>
-          <div className="flex justify-center space-x-4 text-xs">
-            <a href="/legal/terms" className="text-admin-primary hover:underline">Terms</a>
-            <a href="/legal/privacy" className="text-admin-primary hover:underline">Privacy</a>
-            <a href="/about" className="text-admin-primary hover:underline">About</a>
-            <a href="/contact" className="text-admin-primary hover:underline">Contact</a>
-          </div>
+        <div className="mt-8 space-y-6">
+          <button
+            onClick={handleGoogleLogin}
+            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Sign in with Google
+          </button>
         </div>
       </div>
     </div>

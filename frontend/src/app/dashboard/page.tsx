@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
@@ -39,8 +39,24 @@ export default function DashboardPage() {
   }
 
   // Get trial information
-  const trialInfo = authService.getTrialInfo()
+  const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
   const isTrialActive = authService.isTrialActive()
+
+  // Load trial info asynchronously
+  useEffect(() => {
+    const loadTrialInfo = async () => {
+      try {
+        const info = await authService.getTrialInfo()
+        setTrialInfo(info)
+      } catch (error) {
+        console.error('Failed to load trial info:', error)
+      }
+    }
+    
+    if (isAuthenticated) {
+      loadTrialInfo()
+    }
+  }, [isAuthenticated])
 
   const handleLogout = async () => {
     await logout()
@@ -74,7 +90,7 @@ export default function DashboardPage() {
               {/* Trial Status */}
               {isTrialActive && trialInfo && (
                 <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Premium Trial: {trialInfo.days_remaining} days left
+                  Premium Trial: {typeof trialInfo === 'object' && 'days_remaining' in trialInfo ? String(trialInfo.days_remaining) : 'Loading...'} days left
                 </div>
               )}
               
@@ -116,7 +132,7 @@ export default function DashboardPage() {
                   🎉 Welcome to your Premium Trial!
                 </h3>
                 <p className="text-green-700 mb-4">
-                  You have <strong>{trialInfo.days_remaining} days remaining</strong> of premium features including 
+                  You have <strong>{String(trialInfo.days_remaining)} days remaining</strong> of premium features including 
                   unlimited documents, AI-powered search, and priority support.
                 </p>
                 <div className="flex space-x-3">
