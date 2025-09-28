@@ -24,7 +24,9 @@ export class AuthService {
 
   constructor() {
     this.config = {
-      apiUrl: process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-356302004293.us-central1.run.app',
+      apiUrl: process.env.NEXT_PUBLIC_API_URL || (() => {
+        throw new Error('NEXT_PUBLIC_API_URL environment variable is required')
+      })(),
       tokenRefreshThreshold: 5 * 60 * 1000,
       maxRetries: 3
     }

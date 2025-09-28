@@ -134,7 +134,6 @@ class EnvironmentValidator:
         
         return True
 
-
     def validate_configuration_values(self) -> bool:
         """Validate configuration values for correctness"""
         print("\n=== Configuration Values Validation ===")
@@ -202,7 +201,7 @@ class EnvironmentValidator:
 
 
 class DeploymentTester:
-    """Tests deployment endpoints and functionality"""
+    """Tests deployment endpoints and functionality with enhanced debugging"""
     
     def __init__(self, service_url: Optional[str] = None):
         self.service_url = service_url
@@ -267,12 +266,12 @@ class DeploymentTester:
             return False
     
     def test_cloud_run_deployment(self) -> bool:
-        """Test Cloud Run deployment endpoints and configuration"""
+        """Test Cloud Run deployment endpoints with enhanced environment variable debugging"""
         if not self.service_url:
             print("\n📝 Cloud Run deployment test skipped (no service URL provided)")
             return True
             
-        print(f"\n=== Cloud Run Deployment Test ===")
+        print(f"\n=== Cloud Run Deployment Test & Environment Variable Analysis ===")
         print(f"Service URL: {self.service_url}")
         
         # Test health endpoint
@@ -293,33 +292,61 @@ class DeploymentTester:
             print(f"❌ Health check failed: {e}")
             return False
     
-        # Test OAuth configuration endpoint and diagnose redirect URI issue
+        # Test OAuth configuration endpoint with detailed analysis
         try:
             print("\n2. Testing OAuth configuration endpoint...")
             oauth_response = requests.get(f"{self.service_url}/api/v1/auth/google/config", timeout=30)
             if oauth_response.status_code == 200:
                 oauth_data = oauth_response.json()
                 print(f"✅ OAuth config endpoint accessible")
-                print(f"   Client ID: {oauth_data.get('google_client_id', 'NOT_SET')}")
                 
-                # Critical diagnostic: Check redirect URI configuration
-                actual_redirect_uri = oauth_data.get('redirect_uri', 'NOT_SET')
-                expected_redirect_uri = os.getenv('GOOGLE_REDIRECT_URI', 'NOT_SET_IN_LOCAL_ENV')
+                # Detailed OAuth configuration analysis
+                client_id = oauth_data.get('google_client_id', 'NOT_SET')
+                redirect_uri = oauth_data.get('redirect_uri', 'NOT_SET')
                 
-                print(f"   Actual redirect_uri: {actual_redirect_uri}")
-                print(f"   Expected redirect_uri: {expected_redirect_uri}")
+                print(f"📊 OAuth Configuration from Cloud Run:")
+                print(f"   Client ID: {self._mask_client_id(client_id)}")
+                print(f"   Redirect URI: {redirect_uri}")
                 
-                if actual_redirect_uri == expected_redirect_uri:
-                    print("✅ Redirect URI configuration matches expected value")
+                # Analyze redirect URI in detail
+                print(f"\n🔍 Redirect URI Detailed Analysis:")
+                local_redirect_uri = os.getenv('GOOGLE_REDIRECT_URI', 'NOT_SET_IN_LOCAL_ENV')
+                print(f"   Cloud Run Value: {redirect_uri}")
+                print(f"   Local Env Value: {local_redirect_uri}")
+                
+                if redirect_uri == local_redirect_uri:
+                    print("   ✅ Redirect URI values match")
                 else:
-                    print("❌ REDIRECT URI MISMATCH DETECTED:")
-                    print(f"      Backend returns: {actual_redirect_uri}")
-                    print(f"      Local env expects: {expected_redirect_uri}")
-                    print("      This indicates:")
-                    print("      - Environment variable not properly set in Cloud Run")
-                    print("      - Settings cache not refreshed after deployment")
-                    print("      - Hardcoded fallback value being used")
+                    print("   ❌ REDIRECT URI MISMATCH DETECTED!")
+                    print(f"   🔧 Issue Analysis:")
+                    
+                    # Extract and compare Codespace IDs
+                    if 'supreme-lamp-' in redirect_uri and 'supreme-lamp-' in local_redirect_uri:
+                        cloud_id = self._extract_codespace_id(redirect_uri)
+                        local_id = self._extract_codespace_id(local_redirect_uri)
+                        
+                        print(f"      Cloud Run Codespace ID: {cloud_id}")
+                        print(f"      Local Env Codespace ID: {local_id}")
+                        
+                        if cloud_id != local_id:
+                            print(f"      ❌ Codespace ID mismatch - deployment used old environment variable")
+                            print(f"      🔧 Solution: Force new deployment after GitHub secret update")
+                        else:
+                            print(f"      ✅ Codespace IDs match")
+                    elif 'supreme-lamp-' in redirect_uri:
+                        cloud_id = self._extract_codespace_id(redirect_uri)
+                        print(f"      Cloud Run uses Codespace: {cloud_id}")
+                        print(f"      Local env not set or different format")
+                    else:
+                        print(f"      ⚠️  Unknown redirect URI format")
+                    
+                    print(f"\n   📋 Environment Variable Source Analysis:")
+                    print(f"      The Cloud Run service is returning: {redirect_uri}")
+                    print(f"      This value comes from GOOGLE_REDIRECT_URI environment variable")
+                    print(f"      Check GitHub Actions deployment logs to verify variable was set")
+                    
                     return False
+                    
             else:
                 print(f"❌ OAuth config failed: HTTP {oauth_response.status_code}")
                 return False
@@ -334,9 +361,9 @@ class DeploymentTester:
             if root_response.status_code == 200:
                 print(f"✅ Root endpoint accessible")
             else:
-                print(f"⚠️ Root endpoint returned HTTP {root_response.status_code}")
+                print(f"📝 Root endpoint returned HTTP {root_response.status_code} (may be expected)")
         except requests.exceptions.RequestException as e:
-            print(f"⚠️ Root endpoint test failed: {e}")
+            print(f"📝 Root endpoint not accessible: {e} (may be expected)")
 
         # Test API documentation availability
         try:
@@ -351,13 +378,31 @@ class DeploymentTester:
         
         print("\n✅ All essential endpoints are working correctly")
         return True
+    
+    def _mask_client_id(self, client_id: str) -> str:
+        """Mask Google Client ID for security"""
+        if len(client_id) > 20:
+            return f"{client_id[:15]}...{client_id[-15:]}"
+        return client_id
+    
+    def _extract_codespace_id(self, url: str) -> str:
+        """Extract Codespace ID from URL"""
+        try:
+            if 'supreme-lamp-' in url:
+                start = url.find('supreme-lamp-') + len('supreme-lamp-')
+                end = url.find('-3000', start)
+                if end > start:
+                    return url[start:end]
+            return "UNKNOWN"
+        except Exception:
+            return "PARSE_ERROR"
 
 
 def run_full_configuration_test(service_url: Optional[str] = None) -> bool:
-    """Run complete configuration and deployment test suite"""
-    print("=" * 60)
+    """Run complete configuration and deployment test suite with enhanced debugging"""
+    print("=" * 70)
     print("BONIFATUS DMS - CONFIGURATION TEST SUITE")
-    print("=" * 60)
+    print("=" * 70)
     
     validator = EnvironmentValidator()
     tester = DeploymentTester(service_url)
@@ -389,9 +434,9 @@ def run_full_configuration_test(service_url: Optional[str] = None) -> bool:
     deployment_valid = tester.test_cloud_run_deployment()
     
     # Summary
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("TEST SUMMARY")
-    print("=" * 60)
+    print("=" * 70)
     
     tests = [
         ("Environment Variables", env_valid),
@@ -410,6 +455,21 @@ def run_full_configuration_test(service_url: Optional[str] = None) -> bool:
             passed += 1
     
     print(f"\nOverall: {passed}/{len(tests)} tests passed")
+    
+    # Enhanced troubleshooting guidance
+    if not deployment_valid and service_url:
+        print("\n" + "=" * 70)
+        print("TROUBLESHOOTING GUIDANCE")
+        print("=" * 70)
+        print("🔧 Environment Variable Issue Detected:")
+        print("   1. Verify GitHub Secret GOOGLE_REDIRECT_URI is correct")
+        print("   2. Check GitHub Actions deployment logs for env var setting")
+        print("   3. Force new deployment if secret was recently updated")
+        print("   4. Verify Google Cloud Console OAuth configuration")
+        print("\n📋 Next Steps:")
+        print("   - Update GitHub secret if incorrect")
+        print("   - Force deployment: echo '# debug' >> backend/README.md && git add . && git commit -m 'debug' && git push")
+        print("   - Check Cloud Run service environment variables in GCP Console")
     
     if is_deployment_test:
         if passed >= 3:  # Allow import/app tests to be skipped in deployment mode

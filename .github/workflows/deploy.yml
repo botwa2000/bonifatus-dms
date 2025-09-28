@@ -96,6 +96,7 @@ jobs:
       - name: Deployment Summary
         run: |
           SERVICE_URL=$(gcloud run services describe bonifatus-dms --region=us-central1 --format='value(status.url)')
+          echo "NEXT_PUBLIC_API_URL=$SERVICE_URL" >> $GITHUB_ENV
           echo "✅ Deployment completed successfully"
           echo "🌐 Service URL: $SERVICE_URL"
           echo "📋 API Documentation: $SERVICE_URL/docs"
