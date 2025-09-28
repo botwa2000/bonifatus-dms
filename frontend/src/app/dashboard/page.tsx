@@ -15,32 +15,16 @@ import { authService } from '@/services/auth.service'
 export default function DashboardPage() {
   const { isAuthenticated, user, isLoading, logout } = useAuth()
   const router = useRouter()
-
+  
+  // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
+  const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
+  
   // Redirect unauthenticated users to login
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router])
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || !user) {
-    return null // Will redirect to login
-  }
-
-  // Get trial information
-  const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
-  const isTrialActive = authService.isTrialActive()
 
   // Load trial info asynchronously
   useEffect(() => {
@@ -57,6 +41,24 @@ export default function DashboardPage() {
       loadTrialInfo()
     }
   }, [isAuthenticated])
+
+  const isTrialActive = authService.isTrialActive()
+
+  // CONDITIONAL RETURNS COME AFTER ALL HOOKS
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-sm text-neutral-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || !user) {
+    return null // Will redirect to login
+  }
 
   const handleLogout = async () => {
     await logout()
@@ -90,7 +92,7 @@ export default function DashboardPage() {
               {/* Trial Status */}
               {isTrialActive && trialInfo && (
                 <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Premium Trial: {typeof trialInfo === 'object' && 'days_remaining' in trialInfo ? String(trialInfo.days_remaining) : 'Loading...'} days left
+                  Premium Trial: {String(trialInfo.days_remaining)} days left
                 </div>
               )}
               
@@ -129,7 +131,7 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-green-900 mb-2">
-                  🎉 Welcome to your Premium Trial!
+                  Welcome to your Premium Trial!
                 </h3>
                 <p className="text-green-700 mb-4">
                   You have <strong>{String(trialInfo.days_remaining)} days remaining</strong> of premium features including 

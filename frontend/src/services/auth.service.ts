@@ -119,6 +119,7 @@ export class AuthService {
       throw new Error('Authentication service unavailable')
     }
   }
+  
 
   async exchangeGoogleToken(code: string, state?: string | null): Promise<{ success: boolean; error?: string }> {
     try {
@@ -161,30 +162,6 @@ export class AuthService {
       
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
       return { success: false, error: errorMessage }
-    }
-  }
-
-  async exchangeGoogleToken(code: string, state?: string): Promise<TokenResponse> {
-    try {
-      if (state) {
-        if (!this.validateOAuthState(state)) {
-          throw new Error('Invalid OAuth state - possible CSRF attack')
-        }
-      }
-
-      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
-        google_token: code
-      })
-
-      this.storeTokens(response)
-      this.scheduleTokenRefresh(response.access_token)
-      this.clearStoredOAuthState()
-
-      return response
-
-    } catch (error) {
-      this.clearStoredOAuthState()
-      throw this.handleAuthError(error)
     }
   }
 

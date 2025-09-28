@@ -68,39 +68,47 @@ export function useAuth(): UseAuthReturn {
     updateAuthState({ error: null })
   }, [updateAuthState])
 
-  const login = useCallback(async (code: string, state?: string) => {
-    if (authOperationRef.current) {
-      return authOperationRef.current
-    }
+  const login = useCallback(async (code: string, state?: string): Promise<void> => {
+  if (authOperationRef.current) {
+    await authOperationRef.current
+    return
+  }
 
-    const operation = async () => {
-      try {
-        updateAuthState({ 
-          isLoading: true, 
-          error: null 
-        })
+  const operation = async () => {
+    try {
+      updateAuthState({ 
+        isLoading: true, 
+        error: null 
+      })
 
-        const response = await authService.exchangeGoogleToken(code, state)
+      const response = await authService.exchangeGoogleToken(code, state)
+      
+      if (response.success) {
+        // Get user data from stored token after successful authentication
+        const user = await authService.getCurrentUser()
         
         updateAuthState({
-          user: response.user,
+          user: user,
           isAuthenticated: true,
           isLoading: false,
           error: null
         })
-
-        router.push('/dashboard')
-
-      } catch (error) {
-        handleAuthError(error, 'login')
-      } finally {
-        authOperationRef.current = null
+      } else {
+        throw new Error(response.error || 'Authentication failed')
       }
-    }
 
-    authOperationRef.current = operation()
-    return authOperationRef.current
-  }, [updateAuthState, handleAuthError, router])
+      router.push('/dashboard')
+
+    } catch (error) {
+      handleAuthError(error, 'login')
+    } finally {
+      authOperationRef.current = null
+    }
+  }
+
+  authOperationRef.current = operation()
+  await authOperationRef.current
+}, [updateAuthState, handleAuthError, router])
 
   const logout = useCallback(async () => {
     if (authOperationRef.current) {
