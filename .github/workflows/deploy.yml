@@ -126,7 +126,9 @@ jobs:
       - name: Build frontend Docker image
         run: |
           cd frontend
-          docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }} .
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }} .
       
       - name: Push frontend Docker image
         run: docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/bonifatus-dms/bonifatus-dms-frontend:${{ github.sha }}
