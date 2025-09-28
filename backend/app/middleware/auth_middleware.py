@@ -73,7 +73,7 @@ async def require_premium_user(current_user: User = Depends(get_current_active_u
     return current_user
 
 
-async def require_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
+async def get_current_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
     """Require user to have admin privileges"""
     
     admin_emails = settings.admin_email_list
