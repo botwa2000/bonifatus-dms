@@ -196,7 +196,15 @@ try:
     app.include_router(auth_router)
     logger.info("Auth router loaded successfully")
 except ImportError as e:
-    logger.warning(f"Auth router not available: {e}")
+    logger.error(f"CRITICAL: Auth router import failed: {e}")
+    import traceback
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    raise e  # Don't silently ignore the error
+except Exception as e:
+    logger.error(f"CRITICAL: Auth router registration failed: {e}")
+    import traceback
+    logger.error(f"Full traceback: {traceback.format_exc()}")
+    raise e
 
 try:
     from app.api.v1.documents import router as documents_router
