@@ -170,5 +170,123 @@ class AuthService:
             "token_type": "bearer"
         }
 
+    async def authenticate_with_google_code(
+            self, 
+            authorization_code: str,
+            ip_address: str,
+            user_agent: str
+        ) -> Optional[Dict[str, Any]]:
+            """
+            Authenticate user with Google authorization code
+            Exchanges code for ID token, verifies it, and creates/updates user
+            """
+            try:
+                import httpx
+                from google.oauth2 import id_token
+                from google.auth.transport import requests as google_requests
+                
+                # Exchange authorization code for tokens
+                token_url = "https://oauth2.googleapis.com/token"
+                token_data = {
+                    "code": authorization_code,
+                    "client_id": settings.google.google_client_id,
+                    "client_secret": settings.google.google_client_secret,
+                    "redirect_uri": settings.google.google_redirect_uri,
+                    "grant_type": "authorization_code"
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    token_response = await client.post(token_url, data=token_data)
+                    
+                    if token_response.status_code != 200:
+                        logger.error(f"Token exchange failed: {token_response.text}")
+                        return None
+                    
+                    tokens = token_response.json()
+                    google_id_token = tokens.get("id_token")
+                    
+                    if not google_id_token:
+                        logger.error("No ID token in response")
+                        return None
+                
+                # Verify ID token
+                try:
+                    id_info = id_token.verify_oauth2_token(
+                        google_id_token,
+                        google_requests.Request(),
+                        settings.google.google_client_id
+                    )
+                    
+                    if id_info.get("iss") not in settings.google.google_oauth_issuers:
+                        logger.error(f"Invalid token issuer: {id_info.get('iss')}")
+                        return None
+                        
+                except ValueError as e:
+                    logger.error(f"Token verification failed: {e}")
+                    return None
+                
+                # Extract user information
+                google_id = id_info.get("sub")
+                email = id_info.get("email")
+                full_name = id_info.get("name", email.split("@")[0])
+                profile_picture = id_info.get("picture")
+                
+                if not email or not google_id:
+                    logger.error("Missing required user information")
+                    return None
+                
+                # Get or create user
+                db = next(get_db())
+                try:
+                    user = db.query(User).filter(User.email == email).first()
+                    
+                    if not user:
+                        user = User(
+                            email=email,
+                            full_name=full_name,
+                            google_id=google_id,
+                            profile_picture=profile_picture,
+                            is_active=True,
+                            is_admin=email in settings.security.admin_emails,
+                            tier=settings.security.default_user_tier
+                        )
+                        db.add(user)
+                        logger.info(f"Creating new user: {email}")
+                    else:
+                        user.google_id = google_id
+                        user.profile_picture = profile_picture
+                        user.full_name = full_name
+                        logger.info(f"Updating existing user: {email}")
+                    
+                    user.last_login_at = datetime.utcnow()
+                    user.last_login_ip = ip_address
+                    
+                    db.commit()
+                    db.refresh(user)
+                    
+                    if not user.is_active:
+                        logger.warning(f"Inactive user attempted login: {email}")
+                        return None
+                    
+                    # Generate JWT tokens
+                    access_token = self.create_access_token(data={"sub": str(user.id)})
+                    refresh_token = self.create_refresh_token(data={"sub": str(user.id)})
+                    
+                    return {
+                        "access_token": access_token,
+                        "refresh_token": refresh_token,
+                        "token_type": "bearer",
+                        "user_id": str(user.id),
+                        "email": user.email,
+                        "tier": user.tier
+                    }
+                    
+                finally:
+                    db.close()
+                    
+            except Exception as e:
+                logger.error(f"Google authentication error: {e}")
+                return None
+
 
 auth_service = AuthService()

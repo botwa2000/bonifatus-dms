@@ -9,13 +9,15 @@ from pydantic import BaseModel, EmailStr, Field, validator
 
 
 class GoogleTokenRequest(BaseModel):
-    """Request model for Google OAuth token authentication"""
-    google_token: str = Field(..., description="Google OAuth ID token")
+    """Request model for Google OAuth callback"""
+    code: str = Field(..., description="Authorization code from Google OAuth")
+    state: Optional[str] = Field(None, description="OAuth state parameter for CSRF protection")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "google_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjE2N..."
+                "code": "4/0AQjqE-3h...",
+                "state": "random_state_string"
             }
         }
 

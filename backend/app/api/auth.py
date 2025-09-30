@@ -141,8 +141,8 @@ async def google_oauth_callback(
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "unknown")
         
-        auth_result = await auth_service.authenticate_with_google(
-            google_request.google_token, 
+        auth_result = await auth_service.authenticate_with_google_code(
+            google_request.code, 
             ip_address,
             user_agent
         )
