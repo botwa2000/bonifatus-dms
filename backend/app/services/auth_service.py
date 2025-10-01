@@ -247,7 +247,6 @@ class AuthService:
                             google_id=google_id,
                             profile_picture=profile_picture,
                             is_active=True,
-                            is_admin=email in settings.security.admin_emails,
                             tier=settings.security.default_user_tier
                         )
                         db.add(user)
@@ -258,7 +257,7 @@ class AuthService:
                         user.full_name = full_name
                         logger.info(f"Updating existing user: {email}")
                     
-                    user.last_login_at = datetime.utcnow()
+                    user.last_login_at = datetime.now(datetime.timezone.utc)
                     user.last_login_ip = ip_address
                     
                     db.commit()
