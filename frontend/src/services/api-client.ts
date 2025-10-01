@@ -14,8 +14,14 @@ export class ApiClient {
   private requestCounter = 0
 
   constructor() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    
+    if (!apiUrl) {
+      throw new Error('NEXT_PUBLIC_API_URL must be set in environment variables')
+    }
+    
     this.config = {
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-mmdbxdflfa-uc.a.run.app',
+      baseURL: apiUrl,
       timeout: 30000,
       maxRetries: 3,
       retryDelay: 1000
