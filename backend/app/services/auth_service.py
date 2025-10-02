@@ -2,7 +2,7 @@
 import logging
 import time
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from jwt import InvalidTokenError
 from passlib.context import CryptContext
@@ -148,7 +148,7 @@ class AuthService:
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if user:
-                user.last_login_at = datetime.utcnow()
+                user.last_login_at = datetime.now(timezone.utc)
                 user.last_login_ip = ip_address
                 db.commit()
                 
