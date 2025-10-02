@@ -257,7 +257,7 @@ class AuthService:
                         user.full_name = full_name
                         logger.info(f"Updating existing user: {email}")
                     
-                    user.last_login_at = datetime.now(datetime.timezone.utc)
+                    user.last_login_at = datetime.now(timezone.utc)
                     user.last_login_ip = ip_address
                     
                     db.commit()
