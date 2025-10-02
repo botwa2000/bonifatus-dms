@@ -33,7 +33,9 @@ class User(Base, TimestampMixin):
     profile_picture = Column(Text, nullable=True)
     tier = Column(String(20), nullable=False, default="free")
     is_active = Column(Boolean, default=True, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_ip = Column(String(45), nullable=True)
     
     # Relationships
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
