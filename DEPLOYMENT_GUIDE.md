@@ -1,4 +1,9 @@
-# Bonifatus DMS - Production Deployment Guide v3.0
+# Bonifatus DMS - Complete Deployment Guide v4.0
+
+**Last Updated:** October 2, 2025  
+**Status:** Authentication Flow - Database Schema Fix Required
+
+---
 
 ## **🌐 Production URLs**
 
@@ -152,7 +157,29 @@ APP_DESCRIPTION: "Professional Document Management System"
 APP_VERSION: "1.0.0"
 ```
 
-#### **Deployment Secrets (2 secrets)**
+#### **Cloud Run Configuration (6 secrets)**
+```yaml
+GCP_REGION: "us-central1"
+CLOUD_RUN_SERVICE_NAME: "bonifatus-dms"
+CLOUD_RUN_MEMORY: "2Gi"
+CLOUD_RUN_CPU: "2"
+CLOUD_RUN_MAX_INSTANCES: "10"
+CLOUD_RUN_TIMEOUT: "300"
+```
+
+#### **Monitoring & Logging (2 secrets)**
+```yaml
+LOG_LEVEL: "INFO"
+SENTRY_DSN: "https://xxx@sentry.io/xxx"  # Optional
+```
+
+#### **Frontend Configuration (2 secrets)**
+```yaml
+NEXT_PUBLIC_API_URL: "https://bonifatus-dms-vpm3xabjwq-uc.a.run.app"
+NODE_ENV: "production"
+```
+
+#### **Deployment Secrets (5 secrets)**
 ```yaml
 GCP_SA_KEY: |
   {
@@ -166,7 +193,9 @@ GCP_SA_KEY: |
     "token_uri": "https://oauth2.googleapis.com/token"
   }
 
-NEXT_PUBLIC_API_URL: "https://bonifatus-dms-vpm3xabjwq-uc.a.run.app"
+DOCKER_REGISTRY: "us-central1-docker.pkg.dev"
+ARTIFACT_REGISTRY_REPO: "bonifatus-dms"
+PORT: "8080"
 ```
 
 ### **Generate Security Secret**
@@ -222,92 +251,75 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.writer"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
 
 # Generate and download key
 gcloud iam service-accounts keys create key.json \
   --iam-account=bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com
 
-# Add to GitHub Secrets as GCP_SA_KEY (copy entire JSON contents)
+# Add to GitHub Secrets as GCP_SA_KEY
 cat key.json
 ```
 
-### **2.4 Create Artifact Registry**
+### **2.4 Create Artifact Registry Repository**
 ```bash
 gcloud artifacts repositories create bonifatus-dms \
   --repository-format=docker \
   --location=us-central1 \
-  --description="Bonifatus DMS container images"
-```
-
-### **2.5 Create Secret for Google Drive Service Account**
-```bash
-# Create service account for Google Drive access
-gcloud iam service-accounts create bonifatus-drive \
-  --description="Bonifatus DMS Google Drive Access" \
-  --display-name="Bonifatus Drive"
-
-# Generate key
-gcloud iam service-accounts keys create drive-key.json \
-  --iam-account=bonifatus-drive@$PROJECT_ID.iam.gserviceaccount.com
-
-# Store in Secret Manager
-gcloud secrets create bonifatus-drive-service-key \
-  --data-file=drive-key.json \
-  --replication-policy=automatic
-
-# Grant Cloud Run service account access to secret
-gcloud secrets add-iam-policy-binding bonifatus-drive-service-key \
-  --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
+  --description="Bonifatus DMS Docker images"
 ```
 
 ---
 
-## **🗄️ Step 3: Setup Supabase Database**
+## **🗄️ Step 3: Setup Database (Supabase)**
 
 ### **3.1 Create Supabase Project**
 ```
-1. Visit https://supabase.com/dashboard
+1. Visit https://supabase.com
 2. Click "New Project"
-3. Enter details:
+3. Enter project details:
    - Name: bonifatus-dms
-   - Database Password: (generate strong password)
-   - Region: (choose closest to Cloud Run region)
-4. Wait for provisioning (2-3 minutes)
+   - Database Password: [generate strong password]
+   - Region: [closest to your users]
+4. Wait for provisioning to complete
 ```
 
-### **3.2 Get Connection String**
+### **3.2 Get Database Connection String**
 ```
 1. Go to Project Settings → Database
-2. Copy "Connection string" under "Connection pooling"
-3. Replace [YOUR-PASSWORD] with your database password
-4. Add to GitHub Secrets as DATABASE_URL
+2. Copy "Connection string" under "Connection Pooling"
+3. Format: postgresql://postgres.xxx:[PASSWORD]@xxx.supabase.co:5432/postgres
 ```
 
-### **3.3 Initialize Database Schema**
+### **3.3 Run Database Migrations**
 ```bash
-# Clone repository
-git clone https://github.com/YOUR_USERNAME/bonifatus-dms.git
-cd bonifatus-dms/backend
+# Navigate to backend directory
+cd backend
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run migrations (requires DATABASE_URL environment variable)
-export DATABASE_URL="your-supabase-connection-string"
+# Set database URL
+export DATABASE_URL="your-connection-string"
+
+# Run migrations
 alembic upgrade head
+
+# Verify tables created
+psql $DATABASE_URL -c "\dt"
+```
+
+### **3.4 Seed Initial Data (Optional)**
+```bash
+# Run seed script to populate system categories
+python scripts/seed_database.py
 ```
 
 ---
 
-## **🔒 Step 4: Configure Google OAuth**
+## **🔑 Step 4: Configure Google OAuth**
 
-### **4.1 Create OAuth Credentials**
+### **4.1 Create OAuth 2.0 Credentials**
 ```
 1. Visit https://console.cloud.google.com
 2. Select your project
@@ -536,9 +548,11 @@ gcloud run services update bonifatus-dms \
 
 ---
 
-## **🚨 Troubleshooting**
+## **🚨 Troubleshooting Guide**
 
-### **Deployment Fails - Missing Environment Variables**
+### **Common Issues & Solutions**
+
+#### **Issue 1: Deployment Fails - Missing Environment Variables**
 ```bash
 # Check GitHub Secrets are set
 gh secret list
@@ -552,15 +566,17 @@ gcloud run services describe bonifatus-dms \
   --format='value(spec.template.spec.containers[0].env)'
 ```
 
-### **OAuth Authentication Fails**
+#### **Issue 2: OAuth Authentication Fails - Redirect URI Mismatch**
+**Error:** `redirect_uri_mismatch` or `401 Unauthorized`
+
+**Solution:**
 ```bash
 # Verify redirect URI matches (should return frontend URL)
 curl https://bonifatus-dms-vpm3xabjwq-uc.a.run.app/api/v1/auth/google/config
 # Expected: {"redirect_uri": "https://bonifatus-dms-frontend-vpm3xabjwq-uc.a.run.app/login"}
 
 # Check Google Cloud Console OAuth configuration
-# Ensure redirect URI in Google Console matches:
-# https://bonifatus-dms-frontend-vpm3xabjwq-uc.a.run.app/login
+# Ensure redirect URI in Google Console matches exactly
 
 # Update GitHub Secret if needed
 # GitHub → Settings → Secrets → GOOGLE_REDIRECT_URI
@@ -571,7 +587,7 @@ git commit --allow-empty -m "redeploy: force refresh environment variables"
 git push origin main
 ```
 
-### **Database Connection Fails**
+#### **Issue 3: Database Connection Fails**
 ```bash
 # Test connection string
 psql "your-database-url"
@@ -587,7 +603,7 @@ gcloud run services update bonifatus-dms \
   --set-env-vars "DATABASE_URL=new-connection-string"
 ```
 
-### **Application Won't Start**
+#### **Issue 4: Application Won't Start**
 ```bash
 # View startup logs
 gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=bonifatus-dms" \
@@ -599,6 +615,207 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 # 2. Invalid environment variable value → Validate format
 # 3. Database migration needed → Run: alembic upgrade head
 ```
+
+---
+
+## **🔍 Current Deployment Issues**
+
+### **ACTIVE ISSUE: User Model Missing is_admin Field**
+
+**Status:** ⚠️ **REQUIRES FIX BEFORE PRODUCTION USE**
+
+**Error Message:**
+```
+'User' object has no attribute 'is_admin'
+```
+
+**Root Cause:**
+The User database model is missing the `is_admin` field, but the authentication service tries to access it when retrieving user profiles.
+
+**Impact:**
+- ✅ OAuth authentication succeeds
+- ✅ Token exchange works
+- ✅ User created in database
+- ❌ `/api/v1/auth/me` endpoint fails with 500 error
+- ❌ Frontend cannot retrieve user profile
+- ❌ User redirected back to login page
+
+**Authentication Flow Status:**
+1. ✅ User clicks "Continue with Google"
+2. ✅ Redirects to Google OAuth
+3. ✅ User authenticates with Google
+4. ✅ Google redirects back with authorization code
+5. ✅ Backend exchanges code for tokens (200 OK)
+6. ✅ User record created in database
+7. ❌ Frontend tries to get user profile → FAILS
+8. ❌ Redirects back to login page
+
+**Fix Required:**
+
+Add `is_admin` field to User model and create database migration.
+
+**Step 1: Update User Model**
+
+File: `backend/app/database/models.py`
+
+Find the User class (around line 26) and add the `is_admin` field:
+
+```python
+class User(Base, TimestampMixin):
+    """User account with Google OAuth integration"""
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    google_id = Column(String(50), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    full_name = Column(String(255), nullable=False)
+    profile_picture = Column(Text, nullable=True)
+    tier = Column(String(20), nullable=False, default="free")
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)  # ADD THIS LINE
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_ip = Column(String(45), nullable=True)  # ADD THIS LINE TOO
+```
+
+**Step 2: Create Database Migration**
+
+```bash
+cd backend
+
+# Generate migration
+alembic revision --autogenerate -m "add is_admin and last_login_ip to users"
+
+# This will create a new file in backend/alembic/versions/
+# Review the generated migration file to ensure it's correct
+```
+
+**Step 3: Apply Migration to Database**
+
+```bash
+# For local development
+export DATABASE_URL="your-database-url"
+alembic upgrade head
+
+# For production (after deploying the migration)
+# The migration will run automatically on deployment
+```
+
+**Step 4: Update Initial Migration (Optional but Recommended)**
+
+File: `backend/alembic/versions/0283144cf0fb_initial_database_schema.py`
+
+Find the users table creation (around line 44) and add the missing fields:
+
+```python
+op.create_table('users',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('google_id', sa.String(length=50), nullable=False),
+    sa.Column('email', sa.String(length=255), nullable=False),
+    sa.Column('full_name', sa.String(length=255), nullable=False),
+    sa.Column('profile_picture', sa.Text(), nullable=True),
+    sa.Column('tier', sa.String(length=20), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_admin', sa.Boolean(), nullable=False, server_default='false'),  # ADD
+    sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_login_ip', sa.String(length=45), nullable=True),  # ADD
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+)
+```
+
+**Step 5: Deploy the Fix**
+
+```bash
+# Commit all changes
+git add backend/app/database/models.py
+git add backend/alembic/versions/*.py
+git commit -m "fix: add is_admin and last_login_ip fields to User model"
+git push origin main
+
+# Monitor deployment
+gh workflow view deploy --web
+```
+
+**Step 6: Verify Fix**
+
+After deployment completes:
+
+```bash
+# Test the /me endpoint
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://bonifatus-dms-vpm3xabjwq-uc.a.run.app/api/v1/auth/me
+
+# Should return user profile without errors
+```
+
+**Step 7: Test Complete Authentication Flow**
+
+1. Visit: https://bonifatus-dms-frontend-vpm3xabjwq-uc.a.run.app
+2. Click "Sign In with Google"
+3. Authenticate
+4. Should successfully redirect to dashboard
+5. Verify user profile loads correctly
+
+---
+
+## **🔄 Issues Fixed**
+
+### **Fixed Issue 1: Datetime Timezone Import Error**
+
+**Error Message:** `type object 'datetime.datetime' has no attribute 'timezone'`
+
+**Root Cause:** Missing `timezone` import in `backend/app/services/auth_service.py`
+
+**Fix Applied:**
+```python
+# Line 5 - Updated import
+from datetime import datetime, timedelta, timezone
+
+# Line 120 - Fixed usage
+user.last_login_at = datetime.now(timezone.utc)
+
+# Line 260 - Fixed usage
+user.last_login_at = datetime.now(timezone.utc)
+```
+
+**Status:** ✅ RESOLVED - Deployed and verified
+
+---
+
+## **📋 Deployment Checklist**
+
+### **Before First Deployment**
+- [ ] All 43 GitHub Secrets configured
+- [ ] GCP project created and billing enabled
+- [ ] All GCP APIs enabled
+- [ ] Service accounts created with correct permissions
+- [ ] Artifact Registry repository created
+- [ ] Supabase database created and initialized
+- [ ] Database migrations run successfully
+- [ ] User model has is_admin field
+- [ ] Google OAuth credentials configured
+- [ ] OAuth consent screen configured
+- [ ] Test users added (for development)
+
+### **Before Each Deployment**
+- [ ] Code passes local tests
+- [ ] All required environment variables present in workflow
+- [ ] No hardcoded values in code
+- [ ] No .env files committed to repository
+- [ ] Database migrations prepared (if needed)
+- [ ] Breaking changes documented
+
+### **After Deployment**
+- [ ] Automated tests pass (`python test_config.py <URL>`)
+- [ ] Health endpoint returns 200
+- [ ] OAuth configuration endpoint accessible
+- [ ] API documentation loads
+- [ ] End-to-end OAuth flow works
+- [ ] User profile endpoint works (/auth/me)
+- [ ] Application logs show no errors
+- [ ] Database connections successful
+- [ ] Dashboard loads correctly after login
 
 ---
 
@@ -658,38 +875,6 @@ gcloud run services update-traffic bonifatus-dms-frontend \
 
 ---
 
-## **📋 Deployment Checklist**
-
-### **Before First Deployment**
-- [ ] All 43 GitHub Secrets configured
-- [ ] GCP project created and billing enabled
-- [ ] All GCP APIs enabled
-- [ ] Service accounts created with correct permissions
-- [ ] Artifact Registry repository created
-- [ ] Supabase database created and initialized
-- [ ] Google OAuth credentials configured
-- [ ] OAuth consent screen configured
-- [ ] Test users added (for development)
-
-### **Before Each Deployment**
-- [ ] Code passes local tests
-- [ ] All required environment variables present in workflow
-- [ ] No hardcoded values in code
-- [ ] No .env files committed to repository
-- [ ] Database migrations prepared (if needed)
-- [ ] Breaking changes documented
-
-### **After Deployment**
-- [ ] Automated tests pass (`python test_config.py <URL>`)
-- [ ] Health endpoint returns 200
-- [ ] OAuth configuration endpoint accessible
-- [ ] API documentation loads
-- [ ] End-to-end OAuth flow works
-- [ ] Application logs show no errors
-- [ ] Database connections successful
-
----
-
 ## **📞 Support & Resources**
 
 ### **Official Documentation**
@@ -738,6 +923,37 @@ gcloud run services describe bonifatus-dms-frontend --region=us-central1 --forma
 
 ---
 
-**Last Updated:** September 30, 2025  
-**Version:** 3.0  
-**Status:** Production Ready ✅
+## **🎓 Troubleshooting Decision Tree**
+
+```
+Is the service running?
+├─ NO → Check deployment logs in GitHub Actions
+│       Check Cloud Run service exists
+│       Check service account permissions
+└─ YES → Is health endpoint responding?
+        ├─ NO → Check application startup logs
+        │       Check environment variables
+        │       Check database connectivity
+        └─ YES → Can you access /docs?
+                ├─ NO → Check CORS configuration
+                │       Check network/firewall rules
+                └─ YES → Does OAuth redirect work?
+                        ├─ NO → Check redirect URI in Google Console
+                        │       Check redirect URI in backend config
+                        │       Verify frontend URL matches
+                        └─ YES → Does token exchange succeed?
+                                ├─ NO → Check Google OAuth credentials
+                                │       Check client secret
+                                │       View backend error logs
+                                └─ YES → Does /me endpoint work?
+                                        ├─ NO → Check database schema
+                                        │       Check user model fields
+                                        │       Run pending migrations
+                                        └─ YES → Authentication complete!
+```
+
+---
+
+**Last Updated:** October 2, 2025  
+**Version:** 4.0  
+**Status:** Requires is_admin Migration ⚠️
