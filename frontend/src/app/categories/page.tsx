@@ -57,9 +57,11 @@ export default function CategoriesPage() {
       await categoryService.createCategory(categoryData)
       setShowCreateModal(false)
       await loadCategories()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Create category error:', err)
-      alert('Failed to create category')
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to create category'
+      setError(errorMessage)
+      setTimeout(() => setError(null), 5000)
     }
   }
 
@@ -68,9 +70,11 @@ export default function CategoriesPage() {
       await categoryService.updateCategory(id, categoryData)
       setEditingCategory(null)
       await loadCategories()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update category error:', err)
-      alert('Failed to update category')
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to update category'
+      setError(errorMessage)
+      setTimeout(() => setError(null), 5000)
     }
   }
 
@@ -79,9 +83,11 @@ export default function CategoriesPage() {
       await categoryService.deleteCategory(id)
       setDeletingCategory(null)
       await loadCategories()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete category error:', err)
-      alert('Failed to delete category')
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to delete category'
+      setError(errorMessage)
+      setTimeout(() => setError(null), 5000)
     }
   }
 
