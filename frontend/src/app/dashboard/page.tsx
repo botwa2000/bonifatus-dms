@@ -181,21 +181,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
-        <Link href="/categories">
-          <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:border-purple-500 hover:shadow-md transition-all cursor-pointer">
-            <div className="flex items-center space-x-4">
-              <div className="bg-purple-100 rounded-lg p-3">
-                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-neutral-900">Organize</h3>
-                <p className="text-sm text-neutral-600">Manage categories and tags</p>
+          <Link href="/categories">
+            <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:border-purple-500 hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-4">
+                <div className="bg-purple-100 rounded-lg p-3">
+                  <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900">Organize</h3>
+                  <p className="text-sm text-neutral-600">Manage categories and tags</p>
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        </div>
 
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
