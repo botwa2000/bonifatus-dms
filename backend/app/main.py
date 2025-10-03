@@ -220,6 +220,13 @@ try:
 except ImportError as e:
     logger.warning(f"Settings router not available: {e}")
 
+try:
+    from app.api.categories import router as categories_router
+    app.include_router(categories_router)
+    logger.info("Categories router loaded successfully")
+except ImportError as e:
+    logger.warning(f"Categories router not available: {e}")
+    
 if __name__ == "__main__":
     import uvicorn
     

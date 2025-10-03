@@ -193,6 +193,163 @@ class GoogleDriveConfig:
             logger.error(f"Vision connection test error: {e}")
             return False
 
+    async def find_bonifatus_folder(self, user_email: str) -> Optional[str]:
+        """
+        Find Bonifatus_DMS folder in user's Google Drive
+        
+        Returns folder ID if found, None otherwise
+        """
+        try:
+            if not self.drive_service:
+                logger.error("Google Drive service not available")
+                return None
+
+            folder_name = settings.google.google_drive_folder_name
+            query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            
+            results = self.drive_service.files().list(
+                q=query,
+                spaces='drive',
+                fields='files(id, name)',
+                pageSize=1
+            ).execute()
+
+            files = results.get('files', [])
+            
+            if files:
+                folder_id = files[0]['id']
+                logger.info(f"Found existing Bonifatus folder for {user_email}: {folder_id}")
+                return folder_id
+            
+            logger.info(f"No Bonifatus folder found for {user_email}")
+            return None
+
+        except HttpError as e:
+            logger.error(f"Error finding Bonifatus folder: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error finding folder: {e}")
+            return None
+
+    async def create_bonifatus_folder(self, user_email: str) -> Optional[str]:
+        """
+        Create Bonifatus_DMS folder with category subfolders in user's Google Drive
+        
+        Returns root folder ID if successful, None otherwise
+        """
+        try:
+            if not self.drive_service:
+                logger.error("Google Drive service not available")
+                return None
+
+            folder_name = settings.google.google_drive_folder_name
+            
+            file_metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'description': 'Bonifatus DMS - Document Management System'
+            }
+
+            root_folder = self.drive_service.files().create(
+                body=file_metadata,
+                fields='id, name'
+            ).execute()
+
+            root_folder_id = root_folder.get('id')
+            logger.info(f"Created Bonifatus root folder for {user_email}: {root_folder_id}")
+
+            category_folder_ids = await self._create_category_subfolders(root_folder_id, user_email)
+            
+            if category_folder_ids:
+                logger.info(f"Created {len(category_folder_ids)} category subfolders for {user_email}")
+            
+            return root_folder_id
+
+        except HttpError as e:
+            logger.error(f"Error creating Bonifatus folder: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error creating folder: {e}")
+            return None
+
+    async def _create_category_subfolders(self, parent_folder_id: str, user_email: str) -> Dict[str, str]:
+        """
+        Create category subfolders from database configuration
+        
+        Returns dictionary mapping category names to folder IDs
+        """
+        try:
+            from app.database.models import SystemSetting
+            from app.database.connection import db_manager
+            
+            session = db_manager.session_local()
+            
+            try:
+                folder_structure_setting = session.query(SystemSetting).filter(
+                    SystemSetting.setting_key == 'google_drive_folder_structure'
+                ).first()
+                
+                if not folder_structure_setting:
+                    logger.warning("Google Drive folder structure setting not found in database")
+                    return {}
+                
+                import json
+                folder_config = json.loads(folder_structure_setting.setting_value)
+                subfolders = folder_config.get('subfolders', [])
+                
+                if not subfolders:
+                    logger.warning("No subfolders configured in google_drive_folder_structure")
+                    return {}
+                
+                folder_ids = {}
+                
+                for subfolder_name in subfolders:
+                    try:
+                        file_metadata = {
+                            'name': subfolder_name,
+                            'mimeType': 'application/vnd.google-apps.folder',
+                            'parents': [parent_folder_id],
+                            'description': f'Bonifatus DMS - {subfolder_name} Category'
+                        }
+                        
+                        subfolder = self.drive_service.files().create(
+                            body=file_metadata,
+                            fields='id, name'
+                        ).execute()
+                        
+                        folder_ids[subfolder_name] = subfolder.get('id')
+                        logger.info(f"Created subfolder '{subfolder_name}' for {user_email}")
+                        
+                    except HttpError as e:
+                        logger.error(f"Failed to create subfolder '{subfolder_name}': {e}")
+                        continue
+                
+                return folder_ids
+                
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error creating category subfolders: {e}")
+            return {}
+
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get health status of Google services"""
+        drive_status = await self.test_drive_connection()
+        vision_status = await self.test_vision_connection()
+        
+        return {
+            "google_drive": {
+                "status": "healthy" if drive_status else "unhealthy",
+                "service": "Google Drive API v3"
+            },
+            "google_vision": {
+                "status": "healthy" if vision_status else "unhealthy",
+                "service": "Google Vision API v1",
+                "enabled": settings.google.google_vision_enabled
+            }
+        }
+
 
 @lru_cache()
 def get_google_config() -> GoogleDriveConfig:
