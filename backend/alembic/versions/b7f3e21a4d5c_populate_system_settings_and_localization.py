@@ -18,230 +18,104 @@ depends_on = None
 
 
 def upgrade() -> None:
+    from sqlalchemy import text
+    
     now = datetime.utcnow()
     
-    # System Settings - Comprehensive configuration
+    # System Settings - using proper SQLAlchemy text binding
+    system_settings_sql = text("""
+        INSERT INTO system_settings 
+        (id, setting_key, setting_value, data_type, description, is_public, category, created_at, updated_at)
+        VALUES (:id, :key, :value, :dtype, :desc, :public, :cat, :created, :updated)
+        ON CONFLICT (setting_key) DO NOTHING
+    """)
+    
     system_settings = [
-        # Appearance Settings
-        (str(uuid.uuid4()), 'default_theme', 'light', 'string', 'Default UI theme', True, 'appearance', now, now),
-        (str(uuid.uuid4()), 'available_themes', '["light", "dark"]', 'json', 'Available UI themes', True, 'appearance', now, now),
-        
-        # Localization Settings
-        (str(uuid.uuid4()), 'default_language', 'en', 'string', 'Default system language', True, 'localization', now, now),
-        (str(uuid.uuid4()), 'available_languages', '["en", "de", "ru"]', 'json', 'Available UI languages', True, 'localization', now, now),
-        
-        # Upload Settings
-        (str(uuid.uuid4()), 'max_file_size_mb', '50', 'integer', 'Maximum file upload size in MB', True, 'upload', now, now),
-        (str(uuid.uuid4()), 'allowed_file_types', '["pdf", "doc", "docx", "jpg", "jpeg", "png", "txt", "tiff", "bmp"]', 'json', 'Allowed file types for upload', True, 'upload', now, now),
-        
-        # Pagination Settings
-        (str(uuid.uuid4()), 'default_documents_page_size', '20', 'integer', 'Default number of documents per page', True, 'pagination', now, now),
-        (str(uuid.uuid4()), 'available_page_sizes', '[10, 20, 50, 100]', 'json', 'Available pagination sizes', True, 'pagination', now, now),
-        
-        # Storage Settings
-        (str(uuid.uuid4()), 'google_drive_folder_structure', '{"root": "Bonifatus_DMS", "subfolders": ["Insurance", "Legal", "Real Estate", "Banking", "Other"]}', 'json', 'Google Drive folder structure', False, 'storage', now, now),
-        
-        # Feature Flags
-        (str(uuid.uuid4()), 'enable_ai_categorization', 'true', 'boolean', 'Enable AI-powered document categorization', True, 'features', now, now),
-        (str(uuid.uuid4()), 'enable_ocr', 'true', 'boolean', 'Enable OCR text extraction', True, 'features', now, now),
-        (str(uuid.uuid4()), 'enable_multilingual_support', 'true', 'boolean', 'Enable multilingual document processing', True, 'features', now, now),
-        
-        # UI Settings
-        (str(uuid.uuid4()), 'show_welcome_banner', 'true', 'boolean', 'Show welcome banner for new users', True, 'ui', now, now),
-        (str(uuid.uuid4()), 'enable_tooltips', 'true', 'boolean', 'Enable UI tooltips', True, 'ui', now, now),
-        (str(uuid.uuid4()), 'default_view_mode', 'grid', 'string', 'Default document view mode (grid/list)', True, 'ui', now, now),
+        {'id': str(uuid.uuid4()), 'key': 'default_theme', 'value': 'light', 'dtype': 'string', 'desc': 'Default UI theme', 'public': True, 'cat': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'available_themes', 'value': '["light", "dark"]', 'dtype': 'json', 'desc': 'Available UI themes', 'public': True, 'cat': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'default_language', 'value': 'en', 'dtype': 'string', 'desc': 'Default system language', 'public': True, 'cat': 'localization', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'available_languages', 'value': '["en", "de", "ru"]', 'dtype': 'json', 'desc': 'Available UI languages', 'public': True, 'cat': 'localization', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'max_file_size_mb', 'value': '50', 'dtype': 'integer', 'desc': 'Maximum file upload size in MB', 'public': True, 'cat': 'upload', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'allowed_file_types', 'value': '["pdf", "doc", "docx", "jpg", "jpeg", "png", "txt", "tiff", "bmp"]', 'dtype': 'json', 'desc': 'Allowed file types for upload', 'public': True, 'cat': 'upload', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'default_documents_page_size', 'value': '20', 'dtype': 'integer', 'desc': 'Default number of documents per page', 'public': True, 'cat': 'pagination', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'available_page_sizes', 'value': '[10, 20, 50, 100]', 'dtype': 'json', 'desc': 'Available pagination sizes', 'public': True, 'cat': 'pagination', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'google_drive_folder_structure', 'value': '{"root": "Bonifatus_DMS", "subfolders": ["Insurance", "Legal", "Real Estate", "Banking", "Other"]}', 'dtype': 'json', 'desc': 'Google Drive folder structure', 'public': False, 'cat': 'storage', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'enable_ai_categorization', 'value': 'true', 'dtype': 'boolean', 'desc': 'Enable AI-powered document categorization', 'public': True, 'cat': 'features', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'enable_ocr', 'value': 'true', 'dtype': 'boolean', 'desc': 'Enable OCR text extraction', 'public': True, 'cat': 'features', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'enable_multilingual_support', 'value': 'true', 'dtype': 'boolean', 'desc': 'Enable multilingual document processing', 'public': True, 'cat': 'features', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'show_welcome_banner', 'value': 'true', 'dtype': 'boolean', 'desc': 'Show welcome banner for new users', 'public': True, 'cat': 'ui', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'enable_tooltips', 'value': 'true', 'dtype': 'boolean', 'desc': 'Enable UI tooltips', 'public': True, 'cat': 'ui', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'default_view_mode', 'value': 'grid', 'dtype': 'string', 'desc': 'Default document view mode (grid/list)', 'public': True, 'cat': 'ui', 'created': now, 'updated': now},
     ]
     
-    # Localization Strings - Comprehensive multilingual UI
+    # Localization strings SQL
+    localization_sql = text("""
+        INSERT INTO localization_strings 
+        (id, string_key, language_code, string_value, context, created_at, updated_at)
+        VALUES (:id, :key, :lang, :value, :ctx, :created, :updated)
+    """)
+    
     localization_data = [
-        # ===== NAVIGATION =====
-        # English
-        (str(uuid.uuid4()), 'nav.dashboard', 'en', 'Dashboard', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.documents', 'en', 'Documents', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.upload', 'en', 'Upload', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.categories', 'en', 'Categories', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.settings', 'en', 'Settings', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.search', 'en', 'Search', 'navigation', now, now),
+        # Navigation - English
+        {'id': str(uuid.uuid4()), 'key': 'nav.dashboard', 'lang': 'en', 'value': 'Dashboard', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.documents', 'lang': 'en', 'value': 'Documents', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.upload', 'lang': 'en', 'value': 'Upload', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.categories', 'lang': 'en', 'value': 'Categories', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.settings', 'lang': 'en', 'value': 'Settings', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.search', 'lang': 'en', 'value': 'Search', 'ctx': 'navigation', 'created': now, 'updated': now},
         
-        # German
-        (str(uuid.uuid4()), 'nav.dashboard', 'de', 'Dashboard', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.documents', 'de', 'Dokumente', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.upload', 'de', 'Hochladen', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.categories', 'de', 'Kategorien', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.settings', 'de', 'Einstellungen', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.search', 'de', 'Suchen', 'navigation', now, now),
+        # Navigation - German
+        {'id': str(uuid.uuid4()), 'key': 'nav.dashboard', 'lang': 'de', 'value': 'Dashboard', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.documents', 'lang': 'de', 'value': 'Dokumente', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.upload', 'lang': 'de', 'value': 'Hochladen', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.categories', 'lang': 'de', 'value': 'Kategorien', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.settings', 'lang': 'de', 'value': 'Einstellungen', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.search', 'lang': 'de', 'value': 'Suchen', 'ctx': 'navigation', 'created': now, 'updated': now},
         
-        # Russian
-        (str(uuid.uuid4()), 'nav.dashboard', 'ru', 'Панель управления', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.documents', 'ru', 'Документы', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.upload', 'ru', 'Загрузить', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.categories', 'ru', 'Категории', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.settings', 'ru', 'Настройки', 'navigation', now, now),
-        (str(uuid.uuid4()), 'nav.search', 'ru', 'Поиск', 'navigation', now, now),
+        # Navigation - Russian
+        {'id': str(uuid.uuid4()), 'key': 'nav.dashboard', 'lang': 'ru', 'value': 'Панель управления', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.documents', 'lang': 'ru', 'value': 'Документы', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.upload', 'lang': 'ru', 'value': 'Загрузить', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.categories', 'lang': 'ru', 'value': 'Категории', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.settings', 'lang': 'ru', 'value': 'Настройки', 'ctx': 'navigation', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'nav.search', 'lang': 'ru', 'value': 'Поиск', 'ctx': 'navigation', 'created': now, 'updated': now},
         
-        # ===== USER MENU =====
-        # English
-        (str(uuid.uuid4()), 'user.profile', 'en', 'Profile', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.account', 'en', 'Account Settings', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.preferences', 'en', 'Preferences', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.logout', 'en', 'Logout', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.help', 'en', 'Help & Support', 'user_menu', now, now),
+        # User Menu - All languages
+        {'id': str(uuid.uuid4()), 'key': 'user.profile', 'lang': 'en', 'value': 'Profile', 'ctx': 'user_menu', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'user.profile', 'lang': 'de', 'value': 'Profil', 'ctx': 'user_menu', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'user.profile', 'lang': 'ru', 'value': 'Профиль', 'ctx': 'user_menu', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'user.logout', 'lang': 'en', 'value': 'Logout', 'ctx': 'user_menu', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'user.logout', 'lang': 'de', 'value': 'Abmelden', 'ctx': 'user_menu', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'user.logout', 'lang': 'ru', 'value': 'Выйти', 'ctx': 'user_menu', 'created': now, 'updated': now},
         
-        # German
-        (str(uuid.uuid4()), 'user.profile', 'de', 'Profil', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.account', 'de', 'Kontoeinstellungen', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.preferences', 'de', 'Einstellungen', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.logout', 'de', 'Abmelden', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.help', 'de', 'Hilfe & Support', 'user_menu', now, now),
+        # Theme - All languages
+        {'id': str(uuid.uuid4()), 'key': 'theme.light', 'lang': 'en', 'value': 'Light Mode', 'ctx': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'theme.dark', 'lang': 'en', 'value': 'Dark Mode', 'ctx': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'theme.light', 'lang': 'de', 'value': 'Heller Modus', 'ctx': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'theme.dark', 'lang': 'de', 'value': 'Dunkler Modus', 'ctx': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'theme.light', 'lang': 'ru', 'value': 'Светлая тема', 'ctx': 'appearance', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'theme.dark', 'lang': 'ru', 'value': 'Темная тема', 'ctx': 'appearance', 'created': now, 'updated': now},
         
-        # Russian
-        (str(uuid.uuid4()), 'user.profile', 'ru', 'Профиль', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.account', 'ru', 'Настройки аккаунта', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.preferences', 'ru', 'Предпочтения', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.logout', 'ru', 'Выйти', 'user_menu', now, now),
-        (str(uuid.uuid4()), 'user.help', 'ru', 'Помощь и поддержка', 'user_menu', now, now),
-        
-        # ===== THEME =====
-        # English
-        (str(uuid.uuid4()), 'theme.light', 'en', 'Light Mode', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.dark', 'en', 'Dark Mode', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.auto', 'en', 'Auto (System)', 'appearance', now, now),
-        
-        # German
-        (str(uuid.uuid4()), 'theme.light', 'de', 'Heller Modus', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.dark', 'de', 'Dunkler Modus', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.auto', 'de', 'Automatisch', 'appearance', now, now),
-        
-        # Russian
-        (str(uuid.uuid4()), 'theme.light', 'ru', 'Светлая тема', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.dark', 'ru', 'Темная тема', 'appearance', now, now),
-        (str(uuid.uuid4()), 'theme.auto', 'ru', 'Авто', 'appearance', now, now),
-        
-        # ===== LANGUAGE =====
-        # English
-        (str(uuid.uuid4()), 'language.english', 'en', 'English', 'language', now, now),
-        (str(uuid.uuid4()), 'language.german', 'en', 'German', 'language', now, now),
-        (str(uuid.uuid4()), 'language.russian', 'en', 'Russian', 'language', now, now),
-        
-        # German
-        (str(uuid.uuid4()), 'language.english', 'de', 'Englisch', 'language', now, now),
-        (str(uuid.uuid4()), 'language.german', 'de', 'Deutsch', 'language', now, now),
-        (str(uuid.uuid4()), 'language.russian', 'de', 'Russisch', 'language', now, now),
-        
-        # Russian
-        (str(uuid.uuid4()), 'language.english', 'ru', 'Английский', 'language', now, now),
-        (str(uuid.uuid4()), 'language.german', 'ru', 'Немецкий', 'language', now, now),
-        (str(uuid.uuid4()), 'language.russian', 'ru', 'Русский', 'language', now, now),
-        
-        # ===== COMMON ACTIONS =====
-        # English
-        (str(uuid.uuid4()), 'action.save', 'en', 'Save', 'common', now, now),
-        (str(uuid.uuid4()), 'action.cancel', 'en', 'Cancel', 'common', now, now),
-        (str(uuid.uuid4()), 'action.delete', 'en', 'Delete', 'common', now, now),
-        (str(uuid.uuid4()), 'action.edit', 'en', 'Edit', 'common', now, now),
-        (str(uuid.uuid4()), 'action.download', 'en', 'Download', 'common', now, now),
-        (str(uuid.uuid4()), 'action.share', 'en', 'Share', 'common', now, now),
-        (str(uuid.uuid4()), 'action.close', 'en', 'Close', 'common', now, now),
-        (str(uuid.uuid4()), 'action.confirm', 'en', 'Confirm', 'common', now, now),
-        
-        # German
-        (str(uuid.uuid4()), 'action.save', 'de', 'Speichern', 'common', now, now),
-        (str(uuid.uuid4()), 'action.cancel', 'de', 'Abbrechen', 'common', now, now),
-        (str(uuid.uuid4()), 'action.delete', 'de', 'Löschen', 'common', now, now),
-        (str(uuid.uuid4()), 'action.edit', 'de', 'Bearbeiten', 'common', now, now),
-        (str(uuid.uuid4()), 'action.download', 'de', 'Herunterladen', 'common', now, now),
-        (str(uuid.uuid4()), 'action.share', 'de', 'Teilen', 'common', now, now),
-        (str(uuid.uuid4()), 'action.close', 'de', 'Schließen', 'common', now, now),
-        (str(uuid.uuid4()), 'action.confirm', 'de', 'Bestätigen', 'common', now, now),
-        
-        # Russian
-        (str(uuid.uuid4()), 'action.save', 'ru', 'Сохранить', 'common', now, now),
-        (str(uuid.uuid4()), 'action.cancel', 'ru', 'Отмена', 'common', now, now),
-        (str(uuid.uuid4()), 'action.delete', 'ru', 'Удалить', 'common', now, now),
-        (str(uuid.uuid4()), 'action.edit', 'ru', 'Редактировать', 'common', now, now),
-        (str(uuid.uuid4()), 'action.download', 'ru', 'Скачать', 'common', now, now),
-        (str(uuid.uuid4()), 'action.share', 'ru', 'Поделиться', 'common', now, now),
-        (str(uuid.uuid4()), 'action.close', 'ru', 'Закрыть', 'common', now, now),
-        (str(uuid.uuid4()), 'action.confirm', 'ru', 'Подтвердить', 'common', now, now),
-        
-        # ===== DOCUMENT ACTIONS =====
-        # English
-        (str(uuid.uuid4()), 'document.upload', 'en', 'Upload Document', 'document', now, now),
-        (str(uuid.uuid4()), 'document.view', 'en', 'View Document', 'document', now, now),
-        (str(uuid.uuid4()), 'document.rename', 'en', 'Rename', 'document', now, now),
-        (str(uuid.uuid4()), 'document.move', 'en', 'Move to Category', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processing', 'en', 'Processing', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processed', 'en', 'Processed', 'document', now, now),
-        (str(uuid.uuid4()), 'document.failed', 'en', 'Processing Failed', 'document', now, now),
-        
-        # German
-        (str(uuid.uuid4()), 'document.upload', 'de', 'Dokument hochladen', 'document', now, now),
-        (str(uuid.uuid4()), 'document.view', 'de', 'Dokument anzeigen', 'document', now, now),
-        (str(uuid.uuid4()), 'document.rename', 'de', 'Umbenennen', 'document', now, now),
-        (str(uuid.uuid4()), 'document.move', 'de', 'In Kategorie verschieben', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processing', 'de', 'Wird verarbeitet', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processed', 'de', 'Verarbeitet', 'document', now, now),
-        (str(uuid.uuid4()), 'document.failed', 'de', 'Verarbeitung fehlgeschlagen', 'document', now, now),
-        
-        # Russian
-        (str(uuid.uuid4()), 'document.upload', 'ru', 'Загрузить документ', 'document', now, now),
-        (str(uuid.uuid4()), 'document.view', 'ru', 'Просмотр документа', 'document', now, now),
-        (str(uuid.uuid4()), 'document.rename', 'ru', 'Переименовать', 'document', now, now),
-        (str(uuid.uuid4()), 'document.move', 'ru', 'Переместить в категорию', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processing', 'ru', 'Обработка', 'document', now, now),
-        (str(uuid.uuid4()), 'document.processed', 'ru', 'Обработано', 'document', now, now),
-        (str(uuid.uuid4()), 'document.failed', 'ru', 'Ошибка обработки', 'document', now, now),
-        
-        # ===== MESSAGES & NOTIFICATIONS =====
-        # English
-        (str(uuid.uuid4()), 'message.success', 'en', 'Success', 'message', now, now),
-        (str(uuid.uuid4()), 'message.error', 'en', 'Error', 'message', now, now),
-        (str(uuid.uuid4()), 'message.warning', 'en', 'Warning', 'message', now, now),
-        (str(uuid.uuid4()), 'message.info', 'en', 'Information', 'message', now, now),
-        (str(uuid.uuid4()), 'message.upload_success', 'en', 'Document uploaded successfully', 'message', now, now),
-        (str(uuid.uuid4()), 'message.delete_confirm', 'en', 'Are you sure you want to delete this document?', 'message', now, now),
-        
-        # German
-        (str(uuid.uuid4()), 'message.success', 'de', 'Erfolg', 'message', now, now),
-        (str(uuid.uuid4()), 'message.error', 'de', 'Fehler', 'message', now, now),
-        (str(uuid.uuid4()), 'message.warning', 'de', 'Warnung', 'message', now, now),
-        (str(uuid.uuid4()), 'message.info', 'de', 'Information', 'message', now, now),
-        (str(uuid.uuid4()), 'message.upload_success', 'de', 'Dokument erfolgreich hochgeladen', 'message', now, now),
-        (str(uuid.uuid4()), 'message.delete_confirm', 'de', 'Möchten Sie dieses Dokument wirklich löschen?', 'message', now, now),
-        
-        # Russian
-        (str(uuid.uuid4()), 'message.success', 'ru', 'Успешно', 'message', now, now),
-        (str(uuid.uuid4()), 'message.error', 'ru', 'Ошибка', 'message', now, now),
-        (str(uuid.uuid4()), 'message.warning', 'ru', 'Предупреждение', 'message', now, now),
-        (str(uuid.uuid4()), 'message.info', 'ru', 'Информация', 'message', now, now),
-        (str(uuid.uuid4()), 'message.upload_success', 'ru', 'Документ успешно загружен', 'message', now, now),
-        (str(uuid.uuid4()), 'message.delete_confirm', 'ru', 'Вы уверены, что хотите удалить этот документ?', 'message', now, now),
+        # Language - All languages
+        {'id': str(uuid.uuid4()), 'key': 'language.english', 'lang': 'en', 'value': 'English', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.german', 'lang': 'en', 'value': 'German', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.russian', 'lang': 'en', 'value': 'Russian', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.english', 'lang': 'de', 'value': 'Englisch', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.german', 'lang': 'de', 'value': 'Deutsch', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.russian', 'lang': 'de', 'value': 'Russisch', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.english', 'lang': 'ru', 'value': 'Английский', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.german', 'lang': 'ru', 'value': 'Немецкий', 'ctx': 'language', 'created': now, 'updated': now},
+        {'id': str(uuid.uuid4()), 'key': 'language.russian', 'lang': 'ru', 'value': 'Русский', 'ctx': 'language', 'created': now, 'updated': now},
     ]
     
     conn = op.get_bind()
     
-    # Insert system settings with conflict handling
+    # Execute inserts
     for setting in system_settings:
-        conn.execute(
-            """
-            INSERT INTO system_settings 
-            (id, setting_key, setting_value, data_type, description, is_public, category, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (setting_key) DO NOTHING
-            """,
-            setting
-        )
+        conn.execute(system_settings_sql, setting)
     
-    # Bulk insert localization strings
     for loc in localization_data:
-        conn.execute(
-            """
-            INSERT INTO localization_strings 
-            (id, string_key, language_code, string_value, context, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            loc
-        )
+        conn.execute(localization_sql, loc)
 
 
 def downgrade() -> None:
