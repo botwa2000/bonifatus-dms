@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 
 revision = 'b7f3e21a4d5c'
-down_revision = 'ae442d52930d'
+down_revision = 'c1a2b3d4e5f6'
 branch_labels = None
 depends_on = None
 
