@@ -93,6 +93,18 @@ jobs:
             --set-env-vars "APP_VERSION=1.0.0" \
             --set-secrets="/secrets/google-drive-key=bonifatus-drive-service-key:latest"
       
+      - name: Run Database Migrations
+        run: |
+          # Install Python dependencies
+          pip install alembic psycopg2-binary sqlalchemy pydantic pydantic-settings
+          
+          # Run migrations
+          cd backend
+          export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+          alembic upgrade head
+          
+          echo "✅ Database migrations completed successfully"
+
       - name: Deployment Summary
         run: |
           SERVICE_URL=$(gcloud run services describe bonifatus-dms --region=us-central1 --format='value(status.url)')
