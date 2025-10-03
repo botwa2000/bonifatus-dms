@@ -76,18 +76,22 @@ class CategoryService {
 
   async deleteCategory(
     id: string,
-    moveToCategor yId?: string,
+    moveToCategoryId?: string,
     deleteDocuments: boolean = false
   ): Promise<void> {
-    const data = {
-      move_to_category_id: moveToCategoryId,
-      delete_documents: deleteDocuments
+    const params: Record<string, string> = {}
+    
+    if (moveToCategoryId) {
+      params.move_to_category_id = moveToCategoryId
+    }
+    if (deleteDocuments) {
+      params.delete_documents = String(deleteDocuments)
     }
 
     await apiClient.delete(
       `/api/v1/categories/${id}`,
-      data,
-      true
+      true,
+      { params }
     )
   }
 
