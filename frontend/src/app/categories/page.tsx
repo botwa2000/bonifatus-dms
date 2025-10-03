@@ -389,7 +389,7 @@ function DeleteConfirmModal({
         
         <p className="text-neutral-600 mb-6">
           Are you sure you want to delete <strong>{category.name_en}</strong>? 
-          Documents in this category will be moved to "Other".
+          Documents in this category will be moved to &ldquo;Other&rdquo;.
         </p>
 
         <div className="flex justify-end space-x-3">
