@@ -478,15 +478,28 @@ class CategoryService:
         finally:
             session.close()
 
-    async def _create_google_drive_folder(
-        self, 
-        user_email: str,
-        folder_name: str
-    ) -> Optional[str]:
+    async def _create_google_drive_folder(self, user_email: str, folder_name: str) -> Optional[str]:
         """Create category subfolder in Google Drive"""
         try:
-            logger.info(f"Creating Google Drive folder '{folder_name}' for {user_email}")
-            return None
+            # 1. Get Bonifatus_DMS root folder
+            root_folder_id = await google_config.find_bonifatus_folder(user_email)
+            if not root_folder_id:
+                root_folder_id = await google_config.create_bonifatus_folder(user_email)
+            
+            # 2. Create subfolder
+            file_metadata = {
+                'name': folder_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [root_folder_id]
+            }
+            
+            folder = google_drive_service.drive_service.files().create(
+                body=file_metadata,
+                fields='id'
+            ).execute()
+            
+            logger.info(f"Created Google Drive folder: {folder_name} ({folder['id']})")
+            return folder['id']
         except Exception as e:
             logger.error(f"Failed to create Google Drive folder: {e}")
             return None

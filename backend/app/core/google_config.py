@@ -350,6 +350,67 @@ class GoogleDriveConfig:
             }
         }
 
+    async def sync_all_category_folders(self, user_email: str, user_id: str) -> Dict[str, str]:
+        """
+        Sync all user's categories to Google Drive
+        Called after user first login or on-demand sync
+        """
+        try:
+            from app.services.category_service import category_service
+            
+            # Get all categories for user
+            categories = await category_service.list_categories(
+                user_id=user_id,
+                include_system=True,
+                include_documents_count=False
+            )
+            
+            # Get/create root folder
+            root_folder_id = await self.find_bonifatus_folder(user_email)
+            if not root_folder_id:
+                root_folder_id = await self.create_bonifatus_folder(user_email)
+            
+            folder_ids = {}
+            
+            # Create folder for each category
+            for category in categories.categories:
+                try:
+                    # Check if folder exists
+                    query = f"name='{category.name_en}' and '{root_folder_id}' in parents and trashed=false"
+                    results = self.drive_service.files().list(
+                        q=query,
+                        spaces='drive',
+                        fields='files(id)',
+                        pageSize=1
+                    ).execute()
+                    
+                    if results.get('files'):
+                        folder_ids[category.name_en] = results['files'][0]['id']
+                    else:
+                        # Create folder
+                        file_metadata = {
+                            'name': category.name_en,
+                            'mimeType': 'application/vnd.google-apps.folder',
+                            'parents': [root_folder_id]
+                        }
+                        
+                        folder = self.drive_service.files().create(
+                            body=file_metadata,
+                            fields='id'
+                        ).execute()
+                        
+                        folder_ids[category.name_en] = folder['id']
+                        logger.info(f"Created category folder: {category.name_en}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to sync folder {category.name_en}: {e}")
+                    continue
+            
+            return folder_ids
+            
+        except Exception as e:
+            logger.error(f"Failed to sync category folders: {e}")
+            return {}
 
 @lru_cache()
 def get_google_config() -> GoogleDriveConfig:

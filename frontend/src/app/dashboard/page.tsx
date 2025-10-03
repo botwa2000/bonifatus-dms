@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/services/auth.service'
+import Link from 'next/dist/client/link'
 
 export default function DashboardPage() {
   const { isAuthenticated, user, isLoading, logout } = useAuth()
@@ -180,11 +181,12 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
+        <Link href="/categories">
+          <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:border-purple-500 hover:shadow-md transition-all cursor-pointer">
             <div className="flex items-center space-x-4">
-              <div className="h-12 w-12 bg-purple-600 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <div className="bg-purple-100 rounded-lg p-3">
+                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
               <div>
@@ -193,7 +195,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
