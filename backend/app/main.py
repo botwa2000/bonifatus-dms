@@ -213,6 +213,13 @@ try:
 except ImportError as e:
     logger.warning(f"Documents router not available: {e}")
 
+try:
+    from app.api.settings import router as settings_router
+    app.include_router(settings_router)
+    logger.info("Settings router loaded successfully")
+except ImportError as e:
+    logger.warning(f"Settings router not available: {e}")
+
 if __name__ == "__main__":
     import uvicorn
     
