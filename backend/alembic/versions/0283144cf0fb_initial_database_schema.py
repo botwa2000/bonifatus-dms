@@ -54,7 +54,9 @@ def upgrade() -> None:
     sa.Column('profile_picture', sa.Text(), nullable=True),
     sa.Column('tier', sa.String(length=20), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_admin', sa.Boolean(), nullable=False, server_default='false'),
     sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_login_ip', sa.String(length=45), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id')
