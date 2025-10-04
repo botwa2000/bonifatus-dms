@@ -66,13 +66,18 @@ app = FastAPI(
 )
 
 # CORS configuration
+allowed_origins = ["*"] if settings.app.app_cors_origins == "*" else settings.app.app_cors_origins.split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+logger.info(f"CORS enabled for origins: {allowed_origins}")
 
 class ProcessTimeMiddleware(BaseHTTPMiddleware):
     """Middleware to add request ID and process time"""
