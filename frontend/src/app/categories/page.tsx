@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
-import { categoryService, type Category } from '@/services/category.service'
+import { categoryService, type Category, type CategoryCreateData, type CategoryUpdateData } from '@/services/category.service'
 
 type ViewMode = 'list' | 'grid'
 type SortField = 'name' | 'documents' | 'updated' | 'created'
@@ -52,7 +52,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleCreateCategory = async (categoryData: Partial<Category>) => {
+  const handleCreateCategory = async (categoryData: CategoryCreateData) => {
     try {
       await categoryService.createCategory(categoryData)
       setShowCreateModal(false)
@@ -66,7 +66,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleUpdateCategory = async (id: string, categoryData: Partial<Category>) => {
+  const handleUpdateCategory = async (id: string, categoryData: CategoryUpdateData) => {
     try {
       await categoryService.updateCategory(id, categoryData)
       setEditingCategory(null)
@@ -109,7 +109,7 @@ export default function CategoriesPage() {
 
       switch (sortField) {
         case 'name':
-          compareValue = a.name_en.localeCompare(b.name_en)
+          compareValue = a.name.localeCompare(b.name)
           break
         case 'documents':
           compareValue = (a.documents_count || 0) - (b.documents_count || 0)
@@ -348,13 +348,13 @@ export default function CategoriesPage() {
                             />
                           </div>
                           <div>
-                            <div className="font-medium text-neutral-900">{category.name_en}</div>
+                            <div className="font-medium text-neutral-900">{category.name}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-neutral-600 max-w-md truncate">
-                          {category.description_en || 'No description'}
+                          {category.description || 'No description'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -428,7 +428,7 @@ export default function CategoriesPage() {
                         />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-neutral-900">{category.name_en}</h3>
+                        <h3 className="font-semibold text-neutral-900">{category.name}</h3>
                         {category.is_system && (
                           <span className="text-xs text-neutral-500">System</span>
                         )}
@@ -456,7 +456,7 @@ export default function CategoriesPage() {
                   </div>
 
                   <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
-                    {category.description_en || 'No description'}
+                    {category.description || 'No description'}
                   </p>
 
                   <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
@@ -506,19 +506,37 @@ function CategoryModal({
 }: { 
   category?: Category
   onClose: () => void
-  onSave: (data: Partial<Category>) => void
+  onSave: (data: CategoryCreateData) => void
   title: string
 }) {
   const [formData, setFormData] = useState({
-    name_en: category?.name_en || '',
-    description_en: category?.description_en || '',
+    name: category?.name || '',
+    description: category?.description || '',
     color_hex: category?.color_hex || '#6366f1',
     icon_name: category?.icon_name || 'folder'
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
+    
+    // For now, send translation in English only
+    // TODO: Get user's current interface language from settings
+    const userLanguage = 'en'
+    
+    const submitData = {
+      translations: {
+        [userLanguage]: {
+          name: formData.name,
+          description: formData.description || undefined
+        }
+      },
+      color_hex: formData.color_hex,
+      icon_name: formData.icon_name,
+      sort_order: category?.sort_order || 999,
+      is_active: category?.is_active !== undefined ? category.is_active : true
+    }
+    
+    onSave(submitData)
   }
 
   return (
@@ -533,8 +551,8 @@ function CategoryModal({
             </label>
             <input
               type="text"
-              value={formData.name_en}
-              onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-admin-primary"
               required
             />
@@ -545,8 +563,8 @@ function CategoryModal({
               Description
             </label>
             <textarea
-              value={formData.description_en}
-              onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-admin-primary"
               rows={3}
             />
@@ -600,7 +618,7 @@ function DeleteConfirmModal({
         <h2 className="text-xl font-bold text-neutral-900 mb-4">Delete Category</h2>
         
         <p className="text-neutral-600 mb-6">
-          Are you sure you want to delete <strong>{category.name_en}</strong>? 
+          Are you sure you want to delete <strong>{category.name}</strong>? 
           Documents in this category will be moved to &ldquo;Other&rdquo;.
         </p>
 
