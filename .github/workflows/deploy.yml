@@ -102,7 +102,7 @@ jobs:
           echo "Available migrations:"
           ls -la alembic/versions/
           
-          alembic upgrade head --verbose
+          alembic upgrade head
           
           echo "✅ Database migrations completed successfully"
         continue-on-error: false
