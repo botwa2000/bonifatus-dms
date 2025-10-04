@@ -99,15 +99,13 @@ jobs:
           cd backend
           export DATABASE_URL="${{ secrets.DATABASE_URL }}"
           
-          # Verify migration files exist
           echo "Available migrations:"
           ls -la alembic/versions/
           
-          # Run migrations with verbose output
           alembic upgrade head --verbose
-        continue-on-error: false
           
           echo "✅ Database migrations completed successfully"
+        continue-on-error: false
 
       - name: Deployment Summary
         run: |
