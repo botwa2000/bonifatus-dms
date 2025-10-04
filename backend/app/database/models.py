@@ -50,16 +50,11 @@ class User(Base, TimestampMixin):
 
 
 class Category(Base, TimestampMixin):
-    """Document categories with multilingual support"""
+    """Document categories with dynamic multilingual support"""
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name_en = Column(String(100), nullable=False)
-    name_de = Column(String(100), nullable=False)
-    name_ru = Column(String(100), nullable=False)
-    description_en = Column(Text, nullable=True)
-    description_de = Column(Text, nullable=True)
-    description_ru = Column(Text, nullable=True)
+    reference_key = Column(String(100), unique=True, nullable=False, index=True)
     color_hex = Column(String(7), nullable=False, default="#6B7280")
     icon_name = Column(String(50), nullable=False, default="folder")
     is_system = Column(Boolean, default=False, nullable=False)
@@ -70,11 +65,33 @@ class Category(Base, TimestampMixin):
     # Relationships
     user = relationship("User", back_populates="categories")
     documents = relationship("Document", back_populates="category")
+    translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_category_user_id', 'user_id'),
         Index('idx_category_system', 'is_system'),
         Index('idx_category_active', 'is_active'),
+        Index('idx_category_reference_key', 'reference_key'),
+    )
+
+
+class CategoryTranslation(Base, TimestampMixin):
+    """Category translations - only user's language returned to frontend"""
+    __tablename__ = "category_translations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    language_code = Column(String(5), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Relationships
+    category = relationship("Category", back_populates="translations")
+
+    __table_args__ = (
+        Index('idx_category_trans_category_id', 'category_id'),
+        Index('idx_category_trans_lang', 'language_code'),
+        Index('idx_category_trans_category_lang', 'category_id', 'language_code', unique=True),
     )
 
 

@@ -3,14 +3,11 @@ import { apiClient } from './api-client'
 
 export interface Category {
   id: string
-  name_en: string
-  name_de?: string
-  name_ru?: string
-  description_en?: string
-  description_de?: string
-  description_ru?: string
+  reference_key: string
+  name: string
+  description?: string
   color_hex: string
-  icon_name?: string
+  icon_name: string
   sort_order: number
   is_active: boolean
   is_system: boolean
@@ -25,19 +22,24 @@ export interface CategoryListResponse {
   total_count: number
 }
 
+export interface CategoryTranslation {
+  name: string
+  description?: string
+}
+
 export interface CategoryCreateData {
-  name_en: string
-  name_de?: string
-  name_ru?: string
-  description_en?: string
-  description_de?: string
-  description_ru?: string
+  translations: Record<string, CategoryTranslation>
+  color_hex: string
+  icon_name: string
+  sort_order?: number
+  is_active?: boolean
+}
+
+export interface CategoryUpdateData {
+  translations?: Record<string, CategoryTranslation>
   color_hex?: string
   icon_name?: string
   sort_order?: number
-}
-
-export interface CategoryUpdateData extends Partial<CategoryCreateData> {
   is_active?: boolean
 }
 
@@ -58,7 +60,7 @@ class CategoryService {
     )
   }
 
-  async createCategory(data: Partial<Category>): Promise<Category> {
+  async createCategory(data: CategoryCreateData): Promise<Category> {
     return await apiClient.post<Category>(
       '/api/v1/categories',
       data,
@@ -66,7 +68,7 @@ class CategoryService {
     )
   }
 
-  async updateCategory(id: string, data: Partial<Category>): Promise<Category> {
+  async updateCategory(id: string, data: CategoryUpdateData): Promise<Category> {
     return await apiClient.put<Category>(
       `/api/v1/categories/${id}`,
       data,

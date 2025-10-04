@@ -11,7 +11,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_, or_
 
-from app.database.models import Category, Document, User, AuditLog, SystemSetting
+from app.database.models import Category, CategoryTranslation, Document, User, AuditLog, SystemSetting
 from app.database.connection import db_manager
 from app.schemas.category_schemas import (
     CategoryCreate, CategoryUpdate, CategoryResponse, CategoryListResponse,
@@ -27,48 +27,70 @@ class CategoryService:
     """Category management service"""
 
     async def list_categories(
-        self, 
+        self,
         user_id: str,
+        user_language: str = 'en',
         include_system: bool = True,
         include_documents_count: bool = True
     ) -> CategoryListResponse:
         """
-        List all categories accessible to user
-        
-        Returns both system categories and user's custom categories
+        List categories with translations in user's preferred language only
         """
         session = db_manager.session_local()
         try:
-            query = select(Category).where(
-                or_(
-                    Category.is_system == True,
-                    Category.user_id == user_id
+            # Build query
+            stmt = select(Category).options(
+                joinedload(Category.translations)
+            )
+            
+            if include_system:
+                stmt = stmt.where(
+                    or_(
+                        Category.user_id == user_id,
+                        Category.is_system == True
+                    )
                 )
-            ).where(Category.is_active == True).order_by(Category.sort_order, Category.name_en)
-
-            if not include_system:
-                query = query.where(Category.user_id == user_id)
-
-            categories = session.execute(query).scalars().all()
-
+            else:
+                stmt = stmt.where(Category.user_id == user_id)
+            
+            stmt = stmt.where(Category.is_active == True)
+            stmt = stmt.order_by(Category.sort_order, Category.created_at)
+            
+            categories = session.execute(stmt).unique().scalars().all()
+            
             category_responses = []
             for category in categories:
+                # Get translation for user's language
+                translation = next(
+                    (t for t in category.translations if t.language_code == user_language),
+                    None
+                )
+                
+                # Fallback to English if user's language not available
+                if not translation:
+                    translation = next(
+                        (t for t in category.translations if t.language_code == 'en'),
+                        category.translations[0] if category.translations else None
+                    )
+                
+                if not translation:
+                    logger.warning(f"No translation found for category {category.id}")
+                    continue
+                
+                # Get document count if requested
                 doc_count = 0
                 if include_documents_count:
-                    count_query = select(func.count(Document.id)).where(
-                        Document.category_id == category.id,
-                        Document.user_id == user_id
-                    )
-                    doc_count = session.execute(count_query).scalar() or 0
-
+                    doc_count = session.execute(
+                        select(func.count(Document.id))
+                        .where(Document.category_id == category.id)
+                        .where(Document.user_id == user_id)
+                    ).scalar() or 0
+                
                 category_responses.append(CategoryResponse(
                     id=str(category.id),
-                    name_en=category.name_en,
-                    name_de=category.name_de,
-                    name_ru=category.name_ru,
-                    description_en=category.description_en,
-                    description_de=category.description_de,
-                    description_ru=category.description_ru,
+                    reference_key=category.reference_key,
+                    name=translation.name,
+                    description=translation.description,
                     color_hex=category.color_hex,
                     icon_name=category.icon_name,
                     is_system=category.is_system,
@@ -79,12 +101,12 @@ class CategoryService:
                     created_at=category.created_at,
                     updated_at=category.updated_at
                 ))
-
+            
             return CategoryListResponse(
                 categories=category_responses,
                 total_count=len(category_responses)
             )
-
+            
         except Exception as e:
             logger.error(f"Failed to list categories: {e}")
             raise
@@ -95,21 +117,29 @@ class CategoryService:
         self, 
         user_id: str,
         user_email: str,
+        user_language: str,
         category_data: CategoryCreate,
         ip_address: str = None
     ) -> CategoryResponse:
         """
-        Create new category and sync to Google Drive
+        Create new category with dynamic translations
         """
         session = db_manager.session_local()
         try:
+            # Generate unique reference key
+            base_key = f"category.{category_data.translations.get('en', list(category_data.translations.values())[0]).name.lower().replace(' ', '_')}"
+            reference_key = base_key
+            counter = 1
+            
+            while session.execute(
+                select(Category).where(Category.reference_key == reference_key)
+            ).scalar_one_or_none():
+                reference_key = f"{base_key}_{counter}"
+                counter += 1
+            
+            # Create category
             new_category = Category(
-                name_en=category_data.name_en,
-                name_de=category_data.name_de,
-                name_ru=category_data.name_ru,
-                description_en=category_data.description_en,
-                description_de=category_data.description_de,
-                description_ru=category_data.description_ru,
+                reference_key=reference_key,
                 color_hex=category_data.color_hex,
                 icon_name=category_data.icon_name,
                 is_system=False,
@@ -117,35 +147,50 @@ class CategoryService:
                 sort_order=category_data.sort_order or 999,
                 is_active=category_data.is_active if category_data.is_active is not None else True
             )
-
+            
             session.add(new_category)
+            session.flush()
+            
+            # Create translations
+            for lang_code, translation_data in category_data.translations.items():
+                translation = CategoryTranslation(
+                    category_id=new_category.id,
+                    language_code=lang_code,
+                    name=translation_data.name,
+                    description=translation_data.description
+                )
+                session.add(translation)
+            
             session.commit()
             session.refresh(new_category)
-
-            await self._create_google_drive_folder(
-                user_email, 
-                category_data.name_en
+            
+            # Get user's language translation for response
+            user_translation = next(
+                (t for t in new_category.translations if t.language_code == user_language),
+                new_category.translations[0] if new_category.translations else None
             )
-
+            
+            # Create Google Drive folder (use English name or first available)
+            folder_name = category_data.translations.get('en', list(category_data.translations.values())[0]).name
+            await self._create_google_drive_folder(user_email, folder_name)
+            
+            # Audit log
             await self._log_audit(
                 session=session,
                 user_id=user_id,
                 action="category_created",
                 resource_id=str(new_category.id),
                 ip_address=ip_address,
-                new_values=category_data.dict()
+                new_values={'reference_key': reference_key, 'translations': len(category_data.translations)}
             )
-
+            
             logger.info(f"Category created: {new_category.id} by user {user_id}")
-
+            
             return CategoryResponse(
                 id=str(new_category.id),
-                name_en=new_category.name_en,
-                name_de=new_category.name_de,
-                name_ru=new_category.name_ru,
-                description_en=new_category.description_en,
-                description_de=new_category.description_de,
-                description_ru=new_category.description_ru,
+                reference_key=new_category.reference_key,
+                name=user_translation.name,
+                description=user_translation.description,
                 color_hex=new_category.color_hex,
                 icon_name=new_category.icon_name,
                 is_system=new_category.is_system,
@@ -156,7 +201,7 @@ class CategoryService:
                 created_at=new_category.created_at,
                 updated_at=new_category.updated_at
             )
-
+            
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to create category: {e}")
@@ -169,77 +214,109 @@ class CategoryService:
         category_id: str,
         user_id: str,
         user_email: str,
+        user_language: str,
         category_data: CategoryUpdate,
         ip_address: str = None
     ) -> Optional[CategoryResponse]:
         """
-        Update category - works for both system and user categories
-        No restrictions on system categories
+        Update category and/or translations
         """
         session = db_manager.session_local()
         try:
-            category = session.get(Category, category_id)
+            category = session.execute(
+                select(Category)
+                .options(joinedload(Category.translations))
+                .where(Category.id == category_id)
+            ).unique().scalar_one_or_none()
+            
             if not category:
                 return None
 
             if category.user_id and str(category.user_id) != user_id:
                 raise PermissionError("Cannot modify another user's category")
 
-            old_name = category.name_en
             old_values = {
-                "name_en": category.name_en,
-                "name_de": category.name_de,
-                "name_ru": category.name_ru,
+                "reference_key": category.reference_key,
                 "color_hex": category.color_hex,
                 "icon_name": category.icon_name
             }
 
-            update_data = category_data.dict(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(category, field, value)
+            # Update category fields
+            if category_data.color_hex is not None:
+                category.color_hex = category_data.color_hex
+            if category_data.icon_name is not None:
+                category.icon_name = category_data.icon_name
+            if category_data.sort_order is not None:
+                category.sort_order = category_data.sort_order
+            if category_data.is_active is not None:
+                category.is_active = category_data.is_active
 
-            category.updated_at = datetime.utcnow()
+            # Update or add translations
+            if category_data.translations:
+                for lang_code, translation_data in category_data.translations.items():
+                    # Find existing translation
+                    existing_translation = next(
+                        (t for t in category.translations if t.language_code == lang_code),
+                        None
+                    )
+                    
+                    if existing_translation:
+                        # Update existing
+                        existing_translation.name = translation_data.name
+                        existing_translation.description = translation_data.description
+                        existing_translation.updated_at = datetime.now(timezone.utc)
+                    else:
+                        # Add new translation
+                        new_translation = CategoryTranslation(
+                            category_id=category.id,
+                            language_code=lang_code,
+                            name=translation_data.name,
+                            description=translation_data.description
+                        )
+                        session.add(new_translation)
+
+            category.updated_at = datetime.now(timezone.utc)
             session.commit()
             session.refresh(category)
 
-            if category_data.name_en and category_data.name_en != old_name:
-                await self._rename_google_drive_folder(
-                    user_email,
-                    old_name,
-                    category_data.name_en
-                )
+            # Get user's language translation for response
+            user_translation = next(
+                (t for t in category.translations if t.language_code == user_language),
+                next((t for t in category.translations if t.language_code == 'en'), 
+                     category.translations[0] if category.translations else None)
+            )
 
+            # Audit log
+            new_values = {
+                "color_hex": category.color_hex,
+                "icon_name": category.icon_name,
+                "translations_updated": len(category_data.translations) if category_data.translations else 0
+            }
+            
             await self._log_audit(
                 session=session,
                 user_id=user_id,
                 action="category_updated",
-                resource_id=category_id,
+                resource_id=str(category.id),
                 ip_address=ip_address,
                 old_values=old_values,
-                new_values=update_data
+                new_values=new_values
             )
 
-            logger.info(f"Category updated: {category_id} by user {user_id}")
-
-            doc_count = session.execute(
-                select(func.count(Document.id)).where(Document.category_id == category.id)
-            ).scalar() or 0
+            logger.info(f"Category updated: {category.id}")
 
             return CategoryResponse(
                 id=str(category.id),
-                name_en=category.name_en,
-                name_de=category.name_de,
-                name_ru=category.name_ru,
-                description_en=category.description_en,
-                description_de=category.description_de,
-                description_ru=category.description_ru,
+                reference_key=category.reference_key,
+                name=user_translation.name,
+                description=user_translation.description,
                 color_hex=category.color_hex,
                 icon_name=category.icon_name,
                 is_system=category.is_system,
                 user_id=str(category.user_id) if category.user_id else None,
                 sort_order=category.sort_order,
                 is_active=category.is_active,
-                documents_count=doc_count,
+                documents_count=0,
                 created_at=category.created_at,
                 updated_at=category.updated_at
             )

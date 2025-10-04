@@ -5,7 +5,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
-import { categoryService, type Category, type CategoryCreateData, type CategoryUpdateData } from '@/services/category.service'
+import { 
+  categoryService, 
+  type Category, 
+  type CategoryCreateData, 
+  type CategoryUpdateData 
+} from '@/services/category.service'
 
 type ViewMode = 'list' | 'grid'
 type SortField = 'name' | 'documents' | 'updated' | 'created'

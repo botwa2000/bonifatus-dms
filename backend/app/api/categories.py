@@ -15,12 +15,31 @@ from app.schemas.category_schemas import (
 )
 from app.services.category_service import category_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
-from app.database.models import User
+from app.database.models import User, UserSetting
+from sqlalchemy import select
+
+async def get_user_language(user: User, session) -> str:
+    """Get user's preferred interface language from settings"""
+    try:
+        user_setting = session.execute(
+            select(UserSetting).where(
+                UserSetting.user_id == user.id,
+                UserSetting.setting_key == 'interface_language'
+            )
+        ).scalar_one_or_none()
+        
+        if user_setting:
+            return user_setting.setting_value
+        
+        # Default to English if not set
+        return 'en'
+    except Exception as e:
+        logger.warning(f"Failed to get user language, defaulting to 'en': {e}")
+        return 'en'
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
-
 
 @router.get(
     "",
@@ -36,19 +55,23 @@ async def list_categories(
     current_user: User = Depends(get_current_active_user)
 ) -> CategoryListResponse:
     """
-    List all categories accessible to user
+    List all categories in user's preferred language
     
-    Returns both system categories and user's custom categories.
-    All categories are fully editable and deletable.
+    Returns categories with translations in user's interface language only.
+    Falls back to English if user's language not available.
     """
+    session = db_manager.session_local()
     try:
+        user_language = await get_user_language(current_user, session)
+        
         categories = await category_service.list_categories(
             user_id=str(current_user.id),
+            user_language=user_language,
             include_system=include_system,
             include_documents_count=include_documents_count
         )
         
-        logger.info(f"Categories listed for user: {current_user.email}")
+        logger.info(f"Categories listed for user: {current_user.email} (language: {user_language})")
         return categories
 
     except Exception as e:
@@ -57,6 +80,8 @@ async def list_categories(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve categories"
         )
+    finally:
+        session.close()
 
 
 @router.post(
@@ -75,16 +100,20 @@ async def create_category(
     current_user: User = Depends(get_current_active_user)
 ) -> CategoryResponse:
     """
-    Create new category
+    Create new category with translations
     
-    Creates a new user category and syncs to Google Drive.
+    Accepts translations for multiple languages.
+    At least one translation is required.
     """
+    session = db_manager.session_local()
     try:
         ip_address = get_client_ip(request)
+        user_language = await get_user_language(current_user, session)
         
         category = await category_service.create_category(
             user_id=str(current_user.id),
             user_email=current_user.email,
+            user_language=user_language,
             category_data=category_data,
             ip_address=ip_address
         )
@@ -92,12 +121,19 @@ async def create_category(
         logger.info(f"Category created: {category.id} by user {current_user.email}")
         return category
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Create category error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to create category"
         )
+    finally:
+        session.close()
 
 
 @router.put(
@@ -120,15 +156,19 @@ async def update_category(
     """
     Update category
     
-    Updates any category (system or user-created). No restrictions on system categories.
+    Updates category and/or translations.
+    Only provided translations will be updated/added.
     """
+    session = db_manager.session_local()
     try:
         ip_address = get_client_ip(request)
+        user_language = await get_user_language(current_user, session)
         
         updated_category = await category_service.update_category(
             category_id=category_id,
             user_id=str(current_user.id),
             user_email=current_user.email,
+            user_language=user_language,
             category_data=category_data,
             ip_address=ip_address
         )
@@ -155,6 +195,8 @@ async def update_category(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to update category"
         )
+    finally:
+        session.close()
 
 
 @router.delete(

@@ -68,10 +68,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_google_id'), 'users', ['google_id'], unique=True)
     op.create_table('categories',
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('name_en', sa.String(length=100), nullable=False),
-    sa.Column('name_de', sa.String(length=100), nullable=False),
-    sa.Column('description_en', sa.Text(), nullable=True),
-    sa.Column('description_de', sa.Text(), nullable=True),
+    sa.Column('reference_key', sa.String(length=100), nullable=False, unique=True),
     sa.Column('color_hex', sa.String(length=7), nullable=False),
     sa.Column('icon_name', sa.String(length=50), nullable=False),
     sa.Column('is_system', sa.Boolean(), nullable=False),
@@ -86,6 +83,22 @@ def upgrade() -> None:
     op.create_index('idx_category_active', 'categories', ['is_active'], unique=False)
     op.create_index('idx_category_system', 'categories', ['is_system'], unique=False)
     op.create_index('idx_category_user_id', 'categories', ['user_id'], unique=False)
+    op.create_index('idx_category_reference_key', 'categories', ['reference_key'], unique=True)
+    # Create category_translations table
+    op.create_table('category_translations',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('category_id', sa.UUID(), nullable=False),
+    sa.Column('language_code', sa.String(length=5), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_category_trans_category_id', 'category_translations', ['category_id'], unique=False)
+    op.create_index('idx_category_trans_lang', 'category_translations', ['language_code'], unique=False)
+    op.create_index('idx_category_trans_category_lang', 'category_translations', ['category_id', 'language_code'], unique=True)
     op.create_table('user_settings',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
@@ -138,6 +151,11 @@ def downgrade() -> None:
     op.drop_index('idx_category_user_id', table_name='categories')
     op.drop_index('idx_category_system', table_name='categories')
     op.drop_index('idx_category_active', table_name='categories')
+    op.drop_index('idx_category_trans_category_lang', table_name='category_translations')
+    op.drop_index('idx_category_trans_lang', table_name='category_translations')
+    op.drop_index('idx_category_trans_category_id', table_name='category_translations')
+    op.drop_table('category_translations')
+    op.drop_index('idx_category_reference_key', table_name='categories')
     op.drop_table('categories')
     op.drop_index(op.f('ix_users_google_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
