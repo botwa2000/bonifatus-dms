@@ -15,8 +15,7 @@ from app.database.models import Category, CategoryTranslation, Document, User, A
 from app.database.connection import db_manager
 from app.schemas.category_schemas import (
     CategoryCreate, CategoryUpdate, CategoryResponse, CategoryListResponse,
-    CategoryDeleteRequest, CategoryDeleteResponse, RestoreDefaultsResponse,
-    CategoryWithDocumentsResponse
+    CategoryDeleteRequest, CategoryDeleteResponse, RestoreDefaultsResponse
 )
 from app.services.google_drive_service import google_drive_service
 
