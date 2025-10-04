@@ -190,42 +190,24 @@ async def root():
         "environment": settings.app.app_environment
     }
 
-# Include routers
-try:
-    from app.api.auth import router as auth_router
-    app.include_router(auth_router)
-    logger.info("Auth router loaded successfully")
-except ImportError as e:
-    logger.error(f"CRITICAL: Auth router import failed: {e}")
-    import traceback
-    logger.error(f"Full traceback: {traceback.format_exc()}")
-    raise e  # Don't silently ignore the error
-except Exception as e:
-    logger.error(f"CRITICAL: Auth router registration failed: {e}")
-    import traceback
-    logger.error(f"Full traceback: {traceback.format_exc()}")
-    raise e
+# Include routers - all prefixes defined in router files
+routers = [
+    ("app.api.auth", "Auth"),
+    ("app.api.users", "Users"),
+    ("app.api.settings", "Settings"),
+    ("app.api.categories", "Categories"),
+]
 
-try:
-    from app.api.v1.documents import router as documents_router
-    app.include_router(documents_router, prefix="/api/v1")
-    logger.info("Documents router loaded successfully")
-except ImportError as e:
-    logger.warning(f"Documents router not available: {e}")
-
-try:
-    from app.api.settings import router as settings_router
-    app.include_router(settings_router)
-    logger.info("Settings router loaded successfully")
-except ImportError as e:
-    logger.warning(f"Settings router not available: {e}")
-
-try:
-    from app.api.categories import router as categories_router
-    app.include_router(categories_router)
-    logger.info("Categories router loaded successfully")
-except ImportError as e:
-    logger.warning(f"Categories router not available: {e}")
+for module_path, name in routers:
+    try:
+        module = __import__(module_path, fromlist=["router"])
+        app.include_router(module.router)
+        logger.info(f"✓ {name} router loaded")
+    except Exception as e:
+        logger.error(f"✗ {name} router failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # Fail deployment if any router fails
     
 if __name__ == "__main__":
     import uvicorn
