@@ -95,13 +95,17 @@ jobs:
       
       - name: Run Database Migrations
         run: |
-          # Install Python dependencies
           pip install alembic psycopg2-binary sqlalchemy pydantic pydantic-settings
-          
-          # Run migrations
           cd backend
           export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-          alembic upgrade head
+          
+          # Verify migration files exist
+          echo "Available migrations:"
+          ls -la alembic/versions/
+          
+          # Run migrations with verbose output
+          alembic upgrade head --verbose
+        continue-on-error: false
           
           echo "✅ Database migrations completed successfully"
 
