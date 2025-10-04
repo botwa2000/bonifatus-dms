@@ -17,6 +17,7 @@ from app.services.category_service import category_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User, UserSetting
 from sqlalchemy import select
+from app.database.connection import db_manager
 
 async def get_user_language(user: User, session) -> str:
     """Get user's preferred interface language from settings"""
