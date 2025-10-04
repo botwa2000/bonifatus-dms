@@ -8,7 +8,7 @@ import logging
 import json
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, and_, or_
 
 from app.database.models import Category, CategoryTranslation, Document, User, AuditLog, SystemSetting
