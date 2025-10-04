@@ -156,28 +156,25 @@ export class ApiClient {
     throw this.normalizeError(lastError || new Error('Unknown error occurred'))
   }
 
-  private buildUrl(endpoint: string, params?: Record<string, string>): string {
-    if (!endpoint.startsWith('/')) {
-      endpoint = '/' + endpoint
+  private buildUrl(endpoint: string, params?: Record<string, string | number | boolean>): string {
+    const baseUrl = this.config.baseURL
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    
+    const fullUrl = `${baseUrl}${cleanEndpoint}`
+    
+    if (!params || Object.keys(params).length === 0) {
+      return fullUrl
     }
-
-    let url = this.config.baseURL + endpoint
-
-    if (params && Object.keys(params).length > 0) {
-      const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, value.toString())
-        }
-      })
-      
-      const queryString = searchParams.toString()
-      if (queryString) {
-        url += '?' + queryString
+    
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value))
       }
-    }
-
-    return url
+    })
+    
+    const queryString = queryParams.toString()
+    return queryString ? `${fullUrl}?${queryString}` : fullUrl
   }
 
   private async buildHeaders(
