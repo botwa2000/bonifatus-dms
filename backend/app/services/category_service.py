@@ -7,7 +7,7 @@ Business logic for category management with Google Drive sync
 import logging
 import json
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, and_, or_
 
@@ -18,6 +18,7 @@ from app.schemas.category_schemas import (
     CategoryDeleteRequest, CategoryDeleteResponse, RestoreDefaultsResponse
 )
 from app.services.google_drive_service import google_drive_service
+from app.core.google_config import google_config
 
 logger = logging.getLogger(__name__)
 
@@ -369,8 +370,11 @@ class CategoryService:
                     target_category_id = delete_request.move_to_category_id
                     if not target_category_id:
                         other_category = session.execute(
-                            select(Category).where(
-                                Category.name_en == "Other",
+                            select(Category)
+                            .join(CategoryTranslation)
+                            .where(
+                                CategoryTranslation.language_code == 'en',
+                                CategoryTranslation.name == 'Other',
                                 Category.is_system == True
                             )
                         ).scalar_one_or_none()
@@ -383,7 +387,11 @@ class CategoryService:
                     else:
                         target_cat = session.get(Category, target_category_id)
                         if target_cat:
-                            target_category_name = target_cat.name_en
+                            translation = next(
+                                (t for t in target_cat.translations if t.language_code == 'en'),
+                                target_cat.translations[0] if target_cat.translations else None
+                            )
+                            target_category_name = translation.name if translation else target_cat.reference_key
 
                     update_stmt = select(Document).where(Document.category_id == category_id)
                     documents = session.execute(update_stmt).scalars().all()
@@ -391,7 +399,11 @@ class CategoryService:
                         doc.category_id = target_category_id
                     documents_moved = doc_count
 
-            category_name = category.name_en
+            translation = next(
+                (t for t in category.translations if t.language_code == 'en'),
+                category.translations[0] if category.translations else None
+            )
+            category_name = translation.name if translation else category.reference_key
             session.delete(category)
             session.commit()
 
@@ -408,12 +420,17 @@ class CategoryService:
 
             logger.info(f"Category deleted: {category_id} by user {user_id}")
 
+            message = f"Category '{category_name}' deleted successfully"
+            if documents_moved > 0:
+                message += f". {documents_moved} documents moved to '{target_category_name}'"
+            elif documents_deleted > 0:
+                message += f". {documents_deleted} documents deleted"
+
             return CategoryDeleteResponse(
-                success=True,
-                message=f"Category '{category_name}' deleted successfully",
+                deleted_category_id=category_id,
                 documents_moved=documents_moved,
                 documents_deleted=documents_deleted,
-                move_to_category_name=target_category_name
+                message=message
             )
 
         except Exception as e:
@@ -429,71 +446,39 @@ class CategoryService:
         ip_address: str = None
     ) -> RestoreDefaultsResponse:
         """
-        Restore default system categories
+        Restore default system categories from database configuration
         Only creates missing categories, doesn't delete existing ones
         """
         session = db_manager.session_local()
         try:
-            default_categories = [
-                {
-                    'name_en': 'Insurance', 'name_de': 'Versicherung', 'name_ru': 'Страхование',
-                    'description_en': 'Insurance policies, claims, and related documents',
-                    'description_de': 'Versicherungspolicen, Schadensfälle und verwandte Dokumente',
-                    'description_ru': 'Страховые полисы, заявления и связанные документы',
-                    'color_hex': '#3B82F6', 'icon_name': 'shield', 'sort_order': 1
-                },
-                {
-                    'name_en': 'Legal', 'name_de': 'Rechtlich', 'name_ru': 'Юридические',
-                    'description_en': 'Legal documents, contracts, and agreements',
-                    'description_de': 'Rechtsdokumente, Verträge und Vereinbarungen',
-                    'description_ru': 'Юридические документы, договоры и соглашения',
-                    'color_hex': '#8B5CF6', 'icon_name': 'scales', 'sort_order': 2
-                },
-                {
-                    'name_en': 'Real Estate', 'name_de': 'Immobilien', 'name_ru': 'Недвижимость',
-                    'description_en': 'Property documents, deeds, and real estate transactions',
-                    'description_de': 'Immobiliendokumente, Urkunden und Immobilientransaktionen',
-                    'description_ru': 'Документы на недвижимость, сделки и операции',
-                    'color_hex': '#10B981', 'icon_name': 'home', 'sort_order': 3
-                },
-                {
-                    'name_en': 'Banking', 'name_de': 'Banking', 'name_ru': 'Банковские',
-                    'description_en': 'Bank statements, financial documents, and transactions',
-                    'description_de': 'Kontoauszüge, Finanzdokumente und Transaktionen',
-                    'description_ru': 'Банковские выписки, финансовые документы и операции',
-                    'color_hex': '#F59E0B', 'icon_name': 'bank', 'sort_order': 4
-                },
-                {
-                    'name_en': 'Other', 'name_de': 'Sonstige', 'name_ru': 'Прочие',
-                    'description_en': 'Miscellaneous documents and files',
-                    'description_de': 'Verschiedene Dokumente und Dateien',
-                    'description_ru': 'Разные документы и файлы',
-                    'color_hex': '#6B7280', 'icon_name': 'folder', 'sort_order': 5
-                }
-            ]
-
+            category_config = session.execute(
+                select(SystemSetting).where(
+                    SystemSetting.setting_key == 'default_system_categories'
+                )
+            ).scalar_one_or_none()
+            
+            if not category_config:
+                raise ValueError("Default category configuration not found in system_settings")
+            
+            default_categories = json.loads(category_config.setting_value)
+            
             created = []
             skipped = []
 
             for cat_data in default_categories:
                 existing = session.execute(
                     select(Category).where(
-                        Category.name_en == cat_data['name_en'],
+                        Category.reference_key == cat_data['reference_key'],
                         Category.is_system == True
                     )
                 ).scalar_one_or_none()
 
                 if existing:
-                    skipped.append(cat_data['name_en'])
+                    skipped.append(cat_data['translations']['en']['name'])
                     continue
 
                 new_category = Category(
-                    name_en=cat_data['name_en'],
-                    name_de=cat_data['name_de'],
-                    name_ru=cat_data['name_ru'],
-                    description_en=cat_data['description_en'],
-                    description_de=cat_data['description_de'],
-                    description_ru=cat_data['description_ru'],
+                    reference_key=cat_data['reference_key'],
                     color_hex=cat_data['color_hex'],
                     icon_name=cat_data['icon_name'],
                     is_system=True,
@@ -502,7 +487,18 @@ class CategoryService:
                     is_active=True
                 )
                 session.add(new_category)
-                created.append(cat_data['name_en'])
+                session.flush()
+
+                for lang_code, trans_data in cat_data['translations'].items():
+                    translation = CategoryTranslation(
+                        category_id=new_category.id,
+                        language_code=lang_code,
+                        name=trans_data['name'],
+                        description=trans_data['description']
+                    )
+                    session.add(translation)
+
+                created.append(cat_data['translations']['en']['name'])
 
             session.commit()
 
@@ -518,10 +514,9 @@ class CategoryService:
             logger.info(f"Default categories restored: created={created}, skipped={skipped}")
 
             return RestoreDefaultsResponse(
-                success=True,
-                message=f"Restored {len(created)} default categories",
-                categories_created=created,
-                categories_skipped=skipped
+                created=created,
+                skipped=skipped,
+                message=f"Restored {len(created)} default categories"
             )
 
         except Exception as e:

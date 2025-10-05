@@ -64,7 +64,7 @@ def upgrade() -> None:
             'updated': now
         })
     
-    # Localization Strings (sample - add more as needed)
+    # Localization Strings
     localization_data = [
         # Navigation
         {'id': str(uuid.uuid4()), 'key': 'nav.dashboard', 'lang': 'en', 'value': 'Dashboard', 'ctx': 'navigation'},
@@ -103,8 +103,8 @@ def upgrade() -> None:
             'updated': now
         })
     
-    # Default Categories
-    default_categories = [
+    # Default Categories Configuration
+    default_categories_config = [
         {
             'reference_key': 'category.insurance',
             'translations': {
@@ -162,7 +162,24 @@ def upgrade() -> None:
         }
     ]
     
-    for cat_data in default_categories:
+    # Store default categories configuration in system_settings
+    conn.execute(text("""
+        INSERT INTO system_settings (id, setting_key, setting_value, data_type, description, is_public, category, created_at, updated_at)
+        VALUES (:id, :key, :value, :dtype, :desc, :public, :cat, :created, :updated)
+    """), {
+        'id': str(uuid.uuid4()),
+        'key': 'default_system_categories',
+        'value': json.dumps(default_categories_config),
+        'dtype': 'json',
+        'desc': 'Default system category templates',
+        'public': False,
+        'cat': 'categories',
+        'created': now,
+        'updated': now
+    })
+    
+    # Create default categories using the configuration
+    for cat_data in default_categories_config:
         category_id = str(uuid.uuid4())
         
         conn.execute(text("""
