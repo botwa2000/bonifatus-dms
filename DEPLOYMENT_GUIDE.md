@@ -1,775 +1,666 @@
-# Bonifatus DMS - Complete Deployment Guide v5.0
+# Bonifatus DMS - Deployment Guide v6.0
 
-**Last Updated:** October 3, 2025  
-**Production Status:** Operational  
+**Last Updated:** October 5, 2025  
+**Production Status:** Operational - Categories Working  
 **Domain:** https://bonidoc.com
 
 ---
 
-## 📊 Current Deployment Status
+## Current Production Status
 
-### **✅ Operational Components**
+### Operational Components
 
-#### **Infrastructure**
-- ✅ Google Cloud Run (Backend & Frontend)
-- ✅ Supabase PostgreSQL Database
-- ✅ GitHub Actions CI/CD Pipeline
-- ✅ Domain configured (bonidoc.com)
-- ✅ SSL/TLS certificates active
+#### Infrastructure
+- Google Cloud Run (Backend & Frontend)
+- Supabase PostgreSQL Database
+- GitHub Actions CI/CD Pipeline
+- Domain configured (bonidoc.com)
+- SSL/TLS certificates active
 
-#### **Backend Services**
-- ✅ FastAPI application running
-- ✅ Authentication system (Google OAuth + JWT)
-- ✅ User management API
-- ✅ Document management API
-- ✅ Settings & localization API
-- ✅ Google Drive integration
-- ✅ Health monitoring endpoints
+#### Backend Services
+- FastAPI application running
+- Authentication system (Google OAuth + JWT)
+- User management API
+- Document management API
+- Settings & localization API
+- **Categories API (fully operational)**
+- Google Drive integration
+- Health monitoring endpoints
 
-#### **Database**
-- ✅ Complete schema deployed
-- ✅ System settings populated
-- ✅ Localization strings (EN, DE, RU)
-- ✅ Default categories (Insurance, Legal, Real Estate, Banking, Other)
-- ✅ Audit logging operational
+#### Database
+- Complete schema deployed
+- System settings populated
+- Localization strings (EN, DE, RU)
+- Default categories with dynamic translations
+- Categories CRUD operations working
+- Audit logging operational
 
-#### **Frontend**
-- ✅ Next.js 14 application
-- ✅ Authentication flow
-- ✅ Dashboard interface
-- ✅ Responsive design
-
-### **🚧 In Progress**
-
-#### **Categories Management (Current Sprint)**
-- ⏳ Categories API implementation
-- ⏳ Categories service layer
-- ⏳ Categories frontend page
-- ⏳ Google Drive folder sync for categories
-
-#### **Next Features (Upcoming)**
-- ⏳ Document processing and OCR
-- ⏳ AI-powered categorization
-- ⏳ Advanced search functionality
-- ⏳ Document sharing and collaboration
+#### Frontend
+- Next.js 14 application
+- Authentication flow
+- **Dashboard with navigation (ready to deploy)**
+- **Categories page (fully functional)**
+- **Settings page (ready to deploy)**
+- Responsive design
 
 ---
 
-## 🌐 Production URLs
+## Recent Fixes Applied (October 5, 2025)
 
-```
-Frontend:     https://bonidoc.com
-Backend API:  https://bonidoc.com/api (proxied)
-API Docs:     https://bonidoc.com/docs
-Health Check: https://bonidoc.com/health
+### Categories Service Fixes
 
-Direct Backend URL: https://bonifatus-dms-vpm3xabjwq-uc.a.run.app
-Direct Frontend URL: https://bonifatus-dms-frontend-vpm3xabjwq-uc.a.run.app
-```
+**Fixed Issues:**
+1. Missing `timezone` import causing datetime errors
+2. Missing `google_config` import for Drive operations
+3. Query for "Other" category using non-existent `Category.name_en` field
+4. Target category name retrieval using old schema
+5. Delete category using non-existent field references
+6. CategoryDeleteResponse schema mismatch
+7. Hardcoded default categories in restore function
 
-### **Domain Configuration**
+**Changes Made:**
+- Added proper imports (timezone, google_config)
+- Updated all queries to use `CategoryTranslation` table
+- Fixed `restore_default_categories` to read from database
+- Updated migration to store category config in system_settings
+- All category operations now use dynamic multilingual schema
 
-The application is deployed on **bonidoc.com** with the following setup:
-- Frontend served from root domain
-- Backend API proxied through frontend
-- SSL certificates managed by Cloud Run
-- DNS configured to point to Cloud Run services
+**Files Modified:**
+- `backend/app/services/category_service.py`
+- `backend/alembic/versions/f1a2b3c4d5e6_populate_initial_data.py`
 
----
+### Frontend Navigation Updates
 
-## ⚙️ Current Deployment Strategy
+**New Features:**
+- Dashboard header with main navigation tabs
+- User dropdown menu (Settings, Profile, Sign Out)
+- Settings page with theme/language preferences
+- Click-outside-to-close functionality
+- Premium trial status badge
+- User avatar with initials
 
-### **Direct Production Deployment**
+**Files Created:**
+- `frontend/src/app/settings/page.tsx`
 
-**Current Approach:**
-- All changes pushed to `main` branch deploy directly to production
-- No separate development environment yet
-- Rationale: Website not indexed by Google, low traffic during initial development
-
-**Why This Works Now:**
-- Rapid iteration during development phase
-- Immediate feedback on production environment
-- No user impact (pre-launch phase)
-- Simplified workflow for solo/small team development
-
-**Trade-offs:**
-- No staging environment for testing
-- Production is the testing ground
-- Higher risk of breaking changes reaching users
-- No environment parity testing
+**Files Modified:**
+- `frontend/src/app/dashboard/page.tsx`
 
 ---
 
-## 🔄 Future: Development Environment Setup
+## Pending Deployment
 
-### **When to Implement Dev Environment**
+### Ready to Deploy (Not Yet Pushed)
 
-Implement a development environment **before**:
-- Public launch and Google indexing
-- Significant user base (>100 active users)
-- Team expansion (>2 developers)
-- Critical business operations depend on uptime
+1. **Settings Page**
+   - Theme selection (light/dark)
+   - Interface language (en/de/ru)
+   - Timezone configuration
+   - Email notifications toggle
+   - AI auto-categorization toggle
 
-### **Recommended Approach: Subdomain Strategy**
+2. **Updated Dashboard**
+   - Navigation header with tabs
+   - User dropdown menu
+   - Improved layout and quick links
 
-**Option 1: Subdomain for Development (Recommended)**
+### Next Implementation Steps
 
-```
-Production:   https://bonidoc.com
-Development:  https://dev.bonidoc.com
-Staging:      https://staging.bonidoc.com (optional)
-```
+1. **User Profile Page** (Not Started)
+   - Account information
+   - Subscription management
+   - Account deletion with Google Drive retention notice
+   - Email/name updates
+   - Password/security settings
 
-**Advantages:**
-- Clear separation between environments
-- Same authentication domain
-- Easy to remember and access
-- Professional appearance
-- Minimal DNS configuration
+2. **Categories Page Stats Improvement** (Not Started)
+   - Reduce stats card sizes
+   - Replace "Custom Categories" with "Storage Used"
+   - Add additional useful metrics
+   - Improve visual hierarchy
 
-**Implementation:**
-
-1. **Create Development Cloud Run Service**
-   ```bash
-   # Deploy dev backend
-   gcloud run deploy bonifatus-dms-dev \
-     --image us-central1-docker.pkg.dev/PROJECT/bonifatus-dms/backend:dev \
-     --region=us-central1 \
-     --set-env-vars "APP_ENVIRONMENT=development"
-   
-   # Deploy dev frontend
-   gcloud run deploy bonifatus-dms-frontend-dev \
-     --image us-central1-docker.pkg.dev/PROJECT/bonifatus-dms/frontend:dev \
-     --region=us-central1 \
-     --set-env-vars "NEXT_PUBLIC_API_URL=https://dev.bonidoc.com/api"
-   ```
-
-2. **Configure DNS**
-   ```
-   # Add A/AAAA records in your DNS provider
-   dev.bonidoc.com → [Cloud Run IP for dev services]
-   staging.bonidoc.com → [Cloud Run IP for staging services]
-   ```
-
-3. **Update GitHub Actions**
-   ```yaml
-   # .github/workflows/deploy-dev.yml
-   on:
-     push:
-       branches: [develop]
-   
-   # .github/workflows/deploy-staging.yml
-   on:
-     push:
-       branches: [staging]
-   
-   # .github/workflows/deploy-prod.yml
-   on:
-     push:
-       branches: [main]
-   ```
-
-4. **Separate Databases**
-   ```
-   Production:   DATABASE_URL_PROD
-   Development:  DATABASE_URL_DEV
-   Staging:      DATABASE_URL_STAGING (copy of prod)
-   ```
-
-**Alternative Options:**
-
-**Option 2: Environment-based Routing**
-- Single domain with environment parameter
-- https://bonidoc.com?env=dev
-- Not recommended: confusing for users, harder to manage
-
-**Option 3: Separate Domain**
-- Different domain for development
-- https://bonidoc-dev.com
-- Not recommended: additional domain cost, more complex OAuth setup
-
-**Option 4: Cloud Run Revisions with Traffic Splitting**
-- Use Cloud Run traffic splitting
-- 100% to latest for prod, manual traffic for testing
-- Not recommended: complex, easy to make mistakes
+3. **Documents Page** (Placeholder Exists)
+   - Document upload functionality
+   - List view with filters
+   - Search functionality
+   - Integration with categories
 
 ---
 
-## 🔐 Complete Setup Guide
+## Deployment Instructions
 
-### **Step 1: Configure GitHub Secrets**
-
-Navigate to: `GitHub Repository → Settings → Secrets and variables → Actions`
-
-#### **Required Secrets (43 Total)**
-
-**Database Configuration (6 secrets)**
-```yaml
-DATABASE_URL: "postgresql://postgres.xxx:[PASSWORD]@xxx.supabase.co:5432/postgres"
-DATABASE_POOL_SIZE: "10"
-DATABASE_POOL_RECYCLE: "3600"
-DATABASE_ECHO: "false"
-DATABASE_POOL_PRE_PING: "true"
-DATABASE_CONNECT_TIMEOUT: "60"
-```
-
-**Google Services (8 secrets)**
-```yaml
-GOOGLE_CLIENT_ID: "356302004293-xxx.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET: "GOCSPX-xxxxxxxxxxxxxxxxxxxx"
-GOOGLE_REDIRECT_URI: "https://bonidoc.com/login"
-GOOGLE_VISION_ENABLED: "true"
-GOOGLE_OAUTH_ISSUERS: "https://accounts.google.com"
-GOOGLE_DRIVE_FOLDER_NAME: "Bonifatus_DMS"
-GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY: "/secrets/google-drive-key"
-GCP_PROJECT: "bonifatus-dms-356302"
-```
-
-**Security Configuration (6 secrets)**
-```yaml
-SECURITY_SECRET_KEY: "generated-secret-key-here"
-ALGORITHM: "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: "30"
-REFRESH_TOKEN_EXPIRE_DAYS: "30"
-DEFAULT_USER_TIER: "free"
-ADMIN_EMAILS: "admin@bonidoc.com,admin2@bonidoc.com"
-```
-
-**Application Configuration (8 secrets)**
-```yaml
-APP_ENVIRONMENT: "production"
-APP_DEBUG_MODE: "false"
-APP_CORS_ORIGINS: "https://bonidoc.com"
-APP_HOST: "0.0.0.0"
-APP_PORT: "8080"
-APP_TITLE: "Bonifatus DMS"
-APP_DESCRIPTION: "Professional Document Management System"
-APP_VERSION: "1.0.0"
-```
-
-**Cloud Run Configuration (6 secrets)**
-```yaml
-GCP_REGION: "us-central1"
-CLOUD_RUN_SERVICE_NAME: "bonifatus-dms"
-CLOUD_RUN_MEMORY: "2Gi"
-CLOUD_RUN_CPU: "2"
-CLOUD_RUN_MAX_INSTANCES: "10"
-CLOUD_RUN_TIMEOUT: "300"
-```
-
-**Monitoring & Logging (2 secrets)**
-```yaml
-LOG_LEVEL: "INFO"
-SENTRY_DSN: "https://xxx@sentry.io/xxx"  # Optional
-```
-
-**Frontend Configuration (2 secrets)**
-```yaml
-NEXT_PUBLIC_API_URL: "https://bonidoc.com/api"
-NODE_ENV: "production"
-```
-
-**Deployment Secrets (5 secrets)**
-```yaml
-GCP_SA_KEY: |
-  {
-    "type": "service_account",
-    "project_id": "bonifatus-dms-356302",
-    "private_key_id": "xxx",
-    "private_key": "-----BEGIN PRIVATE KEY-----\n...",
-    "client_email": "deploy@bonifatus-dms-356302.iam.gserviceaccount.com",
-    "client_id": "123456789",
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token"
-  }
-
-DOCKER_REGISTRY: "us-central1-docker.pkg.dev"
-ARTIFACT_REGISTRY_REPO: "bonifatus-dms"
-GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY: "[JSON service account key]"
-PORT: "8080"
-```
-
-### **Generate Security Secret**
+### Deploy Settings & Dashboard Updates
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+# Commit pending changes
+git add frontend/src/app/settings/page.tsx
+git add frontend/src/app/dashboard/page.tsx
 
----
+git commit -m "feat: add settings page and dashboard navigation
 
-### **Step 2: Setup Google Cloud Platform**
+- Settings page with theme/language preferences
+- Dashboard navigation header with user dropdown
+- User menu: Settings, Profile, Sign Out
+- Responsive design with mobile support"
 
-#### **2.1 Create GCP Project**
-```bash
-export PROJECT_ID="bonifatus-dms-356302"
-
-gcloud projects create $PROJECT_ID --name="Bonifatus DMS"
-gcloud config set project $PROJECT_ID
-
-# Link billing account
-gcloud billing projects link $PROJECT_ID --billing-account=YOUR_BILLING_ACCOUNT_ID
-```
-
-#### **2.2 Enable Required APIs**
-```bash
-gcloud services enable \
-  run.googleapis.com \
-  cloudbuild.googleapis.com \
-  drive.googleapis.com \
-  vision.googleapis.com \
-  secretmanager.googleapis.com \
-  artifactregistry.googleapis.com
-```
-
-#### **2.3 Create Service Account**
-```bash
-gcloud iam service-accounts create bonifatus-deploy \
-  --description="Bonifatus DMS CI/CD Deployment" \
-  --display-name="Bonifatus Deploy"
-
-# Grant permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/storage.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/iam.serviceAccountUser"
-
-# Generate key
-gcloud iam service-accounts keys create key.json \
-  --iam-account=bonifatus-deploy@$PROJECT_ID.iam.gserviceaccount.com
-
-cat key.json  # Add to GitHub Secrets as GCP_SA_KEY
-```
-
-#### **2.4 Create Artifact Registry**
-```bash
-gcloud artifacts repositories create bonifatus-dms \
-  --repository-format=docker \
-  --location=us-central1 \
-  --description="Bonifatus DMS Docker images"
-```
-
----
-
-### **Step 3: Setup Database (Supabase)**
-
-#### **3.1 Create Supabase Project**
-```
-1. Visit https://supabase.com
-2. Click "New Project"
-3. Enter details:
-   - Name: bonifatus-dms
-   - Database Password: [strong password]
-   - Region: us-east-1 (or closest to users)
-4. Wait for provisioning
-```
-
-#### **3.2 Get Connection String**
-```
-Settings → Database → Connection Pooling
-Copy: postgresql://postgres.xxx:[PASSWORD]@xxx.supabase.co:5432/postgres
-```
-
-#### **3.3 Run Migrations**
-```bash
-cd backend
-pip install -r requirements.txt
-
-export DATABASE_URL="your-connection-string"
-
-alembic upgrade head
-
-# Verify
-psql $DATABASE_URL -c "\dt"
-```
-
----
-
-### **Step 4: Configure Google OAuth**
-
-#### **4.1 Create OAuth Credentials**
-```
-1. https://console.cloud.google.com
-2. APIs & Services → Credentials
-3. Create Credentials → OAuth 2.0 Client ID
-4. Configure:
-   - Application type: Web application
-   - Name: Bonifatus DMS Production
-   - Authorized JavaScript origins:
-     * https://bonidoc.com
-   - Authorized redirect URIs:
-     * https://bonidoc.com/login
-5. Copy Client ID and Client Secret
-```
-
-#### **4.2 Configure OAuth Consent Screen**
-```
-1. APIs & Services → OAuth consent screen
-2. External user type
-3. Fill required fields:
-   - App name: Bonifatus DMS
-   - User support email: support@bonidoc.com
-   - Developer contact: dev@bonidoc.com
-4. Add scopes:
-   - .../auth/userinfo.email
-   - .../auth/userinfo.profile
-   - openid
-5. Submit for verification (for production)
-```
-
----
-
-### **Step 5: Deploy to Production**
-
-#### **5.1 Push to Main Branch**
-```bash
-git add .
-git commit -m "feat: initial production deployment"
 git push origin main
-```
+Monitor Deployment
+bash# Watch GitHub Actions
+# URL: https://github.com/your-repo/actions
 
-#### **5.2 Monitor Deployment**
-```bash
-# GitHub Actions
-gh run list --workflow=deploy.yml
-gh run watch
-
-# Cloud Run logs
+# Check deployment logs
 gcloud logging read "resource.type=cloud_run_revision" --limit 50
-```
 
-#### **5.3 Configure Custom Domain**
-
-**For Cloud Run:**
-```bash
-# Map domain to Cloud Run service
-gcloud run domain-mappings create \
-  --service=bonifatus-dms-frontend \
-  --domain=bonidoc.com \
-  --region=us-central1
-
-# Get verification token
-gcloud run domain-mappings describe \
-  --domain=bonidoc.com \
-  --region=us-central1
-```
-
-**DNS Configuration:**
-```
-# Add these records to your DNS provider (e.g., Google Domains, Cloudflare)
-
-Type: A
-Name: @
-Value: [Cloud Run IP from domain-mappings]
-
-Type: AAAA
-Name: @
-Value: [Cloud Run IPv6 from domain-mappings]
-
-Type: CNAME
-Name: www
-Value: bonidoc.com
-```
-
----
-
-### **Step 6: Verify Deployment**
-
-#### **6.1 Health Check**
-```bash
+# Verify health
 curl https://bonidoc.com/health
-# Expected: {"status": "healthy", "service": "bonifatus-dms"}
-```
+Post-Deployment Verification
 
-#### **6.2 OAuth Configuration**
-```bash
-curl https://bonidoc.com/api/v1/auth/google/config
-# Expected: {"google_client_id": "...", "redirect_uri": "https://bonidoc.com/login"}
-```
+Visit https://bonidoc.com/dashboard
+Verify navigation header displays correctly
+Click user dropdown, verify Settings/Profile links
+Navigate to https://bonidoc.com/settings
+Test theme selection
+Test language selection
+Save preferences and verify persistence
+Navigate to https://bonidoc.com/categories
+Test create/update/delete category operations
 
-#### **6.3 API Documentation**
-```
-Visit: https://bonidoc.com/docs
-Should display: Interactive Swagger UI
-```
 
-#### **6.4 End-to-End Test**
-```
-1. Visit: https://bonidoc.com
-2. Click "Sign In with Google"
-3. Authenticate
-4. Verify redirect to /dashboard
-5. Check localStorage for tokens
-```
+Production URLs
+Frontend:          https://bonidoc.com
+Dashboard:         https://bonidoc.com/dashboard
+Categories:        https://bonidoc.com/categories
+Settings:          https://bonidoc.com/settings
+Profile:           https://bonidoc.com/profile (not yet implemented)
+Documents:         https://bonidoc.com/documents (placeholder)
 
----
+Backend API:       https://bonidoc.com/api
+API Docs:          https://bonidoc.com/docs
+Health Check:      https://bonidoc.com/health
 
-## 🔧 Local Development
+Implementation Roadmap
+Phase 1: Core User Management (Current Sprint)
+Completed:
 
-### **7.1 Environment Variables (No .env files)**
+Categories full CRUD operations
+Settings page UI
+Dashboard navigation
 
-```bash
-# Create environment script (DO NOT COMMIT)
-cat > set_env_vars.sh << 'EOF'
-#!/bin/bash
+In Progress:
 
-# Database
-export DATABASE_URL="postgresql://postgres.xxx:[PASSWORD]@xxx.supabase.co:5432/postgres"
-export DATABASE_POOL_SIZE="10"
-export DATABASE_POOL_RECYCLE="3600"
-export DATABASE_ECHO="false"
-export DATABASE_POOL_PRE_PING="true"
-export DATABASE_CONNECT_TIMEOUT="60"
+Deploy settings and dashboard updates
 
-# Google Services
-export GOOGLE_CLIENT_ID="your-client-id"
-export GOOGLE_CLIENT_SECRET="your-client-secret"
-export GOOGLE_REDIRECT_URI="http://localhost:3000/login"
-export GOOGLE_VISION_ENABLED="true"
-export GOOGLE_OAUTH_ISSUERS="https://accounts.google.com"
-export GOOGLE_DRIVE_FOLDER_NAME="Bonifatus_DMS"
-export GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY="/path/to/key.json"
-export GCP_PROJECT="bonifatus-dms-356302"
+Next:
 
-# Security
-export SECURITY_SECRET_KEY="your-secret-key"
-export ALGORITHM="HS256"
-export ACCESS_TOKEN_EXPIRE_MINUTES="30"
-export REFRESH_TOKEN_EXPIRE_DAYS="30"
-export DEFAULT_USER_TIER="free"
-export ADMIN_EMAILS="admin@bonidoc.com"
+User profile page with account management
+Account deletion functionality
+Subscription/billing UI
 
-# Application
-export APP_ENVIRONMENT="development"
-export APP_DEBUG_MODE="true"
-export APP_CORS_ORIGINS="http://localhost:3000"
-export APP_HOST="0.0.0.0"
-export APP_PORT="8000"
-export APP_TITLE="Bonifatus DMS"
-export APP_DESCRIPTION="Professional Document Management System"
-export APP_VERSION="1.0.0"
+Timeline: 1-2 days
+Phase 2: Document Management (Next Sprint)
+Tasks:
 
-# Frontend
-export NEXT_PUBLIC_API_URL="http://localhost:8000"
-export NODE_ENV="development"
-EOF
+Document upload with Google Drive sync
+Document listing with pagination
+Document search and filters
+Category assignment
+Document metadata editing
 
-chmod +x set_env_vars.sh
-echo "set_env_vars.sh" >> .gitignore
-```
+Timeline: 3-5 days
+Phase 3: Enhanced Features
+Tasks:
 
-### **7.2 Run Backend Locally**
-```bash
-source set_env_vars.sh
+OCR text extraction
+AI-powered categorization
+Keyword extraction
+Multi-language document support
+Advanced search
 
-cd backend
-pip install -r requirements.txt
+Timeline: 1-2 weeks
+Phase 4: Collaboration Features
+Tasks:
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+Document sharing
+Collections/folders
+Document relationships
+Activity feeds
+Notifications
 
-# Verify: http://localhost:8000/health
-```
+Timeline: 2-3 weeks
 
-### **7.3 Run Frontend Locally**
-```bash
-source set_env_vars.sh
+Database Architecture
+Current Schema (20 Tables)
+Core Tables:
 
-cd frontend
-npm install
-npm run dev
+users
+system_settings (includes default_system_categories config)
+localization_strings
+user_settings
 
-# Visit: http://localhost:3000
-```
+Category Tables:
 
----
+categories (dynamic, no language-specific columns)
+category_translations (multilingual support)
 
-## 📊 Monitoring & Maintenance
+Document Tables:
 
-### **View Logs**
-```bash
-# Backend logs
-gcloud logging read "resource.type=cloud_run_revision AND \
-  resource.labels.service_name=bonifatus-dms" \
-  --limit 100 \
-  --format json
+documents
+document_languages
 
-# Frontend logs
-gcloud logging read "resource.type=cloud_run_revision AND \
-  resource.labels.service_name=bonifatus-dms-frontend" \
-  --limit 100 \
-  --format json
+Audit & System:
 
-# Errors only
-gcloud logging read "resource.type=cloud_run_revision AND \
-  severity>=ERROR" \
-  --limit 50
-```
+audit_logs
 
-### **Update Environment Variables**
-```bash
-# Update backend
-gcloud run services update bonifatus-dms \
-  --region=us-central1 \
-  --set-env-vars "LOG_LEVEL=DEBUG"
+Planned Tables (Not Yet Implemented)
+Priority 1:
 
-# Update frontend
-gcloud run services update bonifatus-dms-frontend \
-  --region=us-central1 \
-  --set-env-vars "NEXT_PUBLIC_API_URL=https://bonidoc.com/api"
-```
+keywords
+document_keywords
+ai_processing_queue
+user_storage_quotas
+document_entities
+ocr_results
 
-### **Rollback Deployment**
-```bash
-# List revisions
-gcloud run revisions list \
-  --service=bonifatus-dms \
-  --region=us-central1
+Priority 2:
 
-# Rollback to previous
+collections
+collection_documents
+document_relationships
+document_shares
+
+Priority 3:
+
+tags
+document_tags
+notifications
+search_analytics
+
+
+Configuration Management
+Environment Variables
+All configuration is managed via GitHub Secrets and deployed to Cloud Run.
+Critical Settings:
+
+Database connection (Supabase)
+Google OAuth credentials
+Google Drive service account
+JWT secret keys
+CORS origins
+Feature flags
+
+System Settings (Database-Driven)
+Default configurations stored in system_settings table:
+
+Default theme: light
+Available themes: ["light", "dark"]
+Default language: en
+Available languages: ["en", "de", "ru"]
+Max file size: 50 MB
+Allowed file types: pdf, doc, docx, jpg, jpeg, png, txt, tiff, bmp
+Storage quotas by tier (free: 1GB, premium: 10GB, enterprise: 100GB)
+Default system categories: JSON configuration
+
+Localization Strings
+UI text stored in localization_strings table with language_code and context.
+Current coverage:
+
+Navigation items
+Theme labels
+Common UI elements
+
+Needs expansion for:
+
+Settings page
+Profile page
+Document management
+Error messages
+Success notifications
+
+
+API Endpoints
+Authentication
+
+GET /api/v1/auth/google/login - Initiate OAuth
+POST /api/v1/auth/token - Exchange code for JWT
+POST /api/v1/auth/refresh - Refresh token
+DELETE /api/v1/auth/logout - Logout
+
+User Management
+
+GET /api/v1/users/profile - Get user profile
+PUT /api/v1/users/profile - Update profile
+GET /api/v1/users/preferences - Get preferences
+PUT /api/v1/users/preferences - Update preferences
+GET /api/v1/users/statistics - Get user stats
+
+Categories
+
+GET /api/v1/categories - List categories
+POST /api/v1/categories - Create category
+PUT /api/v1/categories/{id} - Update category
+DELETE /api/v1/categories/{id} - Delete category
+POST /api/v1/categories/restore-defaults - Restore defaults
+
+Settings
+
+GET /api/v1/settings/public - Public settings
+GET /api/v1/settings/localization/{lang} - Localization strings
+
+Documents (Placeholder)
+
+POST /api/v1/documents/upload - Upload document
+GET /api/v1/documents - List documents
+GET /api/v1/documents/{id} - Get document
+PUT /api/v1/documents/{id} - Update document
+DELETE /api/v1/documents/{id} - Delete document
+
+
+Development Standards
+Code Quality Requirements
+Before Every Commit:
+
+Modular structure, files <300 lines
+Zero hardcoded values (database-driven)
+Production-ready code only
+Check existing functions before adding new
+Professional comments, no workarounds
+Root cause fixes, not temporary solutions
+
+Testing:
+
+Manual testing in production (pre-launch phase)
+Verify all CRUD operations
+Test multilingual support
+Verify responsive design
+
+Deployment:
+
+Single-feature commits
+Clear commit messages
+Monitor GitHub Actions
+Verify health checks post-deployment
+
+
+Known Issues & Limitations
+Current Limitations
+
+No Development Environment
+
+All changes deploy directly to production
+No staging environment for testing
+Acceptable during pre-launch phase
+Plan dev environment before public launch
+
+
+Limited Error Handling
+
+Basic error messages
+Need user-friendly error pages
+Need retry mechanisms for API failures
+
+
+No Automated Testing
+
+Manual testing only
+Need unit tests for services
+Need integration tests for APIs
+Need E2E tests for critical flows
+
+
+Incomplete Localization
+
+Navigation and basic UI translated
+Settings/Profile pages need translations
+Error messages in English only
+
+
+Missing Features
+
+Document upload not implemented
+Search functionality not implemented
+OCR processing not implemented
+AI categorization not implemented
+
+
+
+Technical Debt
+
+Google Drive Integration
+
+Folder operations are placeholder stubs
+Need actual Drive API implementation
+Need error handling for quota limits
+
+
+Storage Quota Enforcement
+
+Quotas defined in database
+No enforcement logic implemented
+Need pre-upload quota checks
+
+
+Audit Logging
+
+Basic logging in place
+Need comprehensive event tracking
+Need log retention policies
+
+
+
+
+Security Considerations
+Current Security Measures
+
+Google OAuth 2.0 authentication
+JWT token-based sessions
+HTTPS/TLS encryption
+CORS configuration
+Database connection pooling
+Audit logging for sensitive operations
+
+Security Improvements Needed
+
+Rate limiting per endpoint
+File upload virus scanning
+Input validation strengthening
+SQL injection prevention audits
+XSS prevention audits
+CSRF token implementation
+Two-factor authentication
+Session timeout enforcement
+
+
+Performance Optimization
+Current Performance
+
+Database queries: <200ms (p95)
+API response time: <300ms (p95)
+Frontend load time: <2s
+No caching implemented
+
+Planned Optimizations
+
+Redis caching for system settings
+CDN for static assets
+Database query optimization
+Connection pooling tuning
+Image optimization
+Code splitting
+Lazy loading
+
+
+Backup & Recovery
+Current Backup Strategy
+Database:
+
+Supabase automatic daily backups
+Point-in-time recovery available
+7-day retention period
+
+Code:
+
+GitHub repository (primary)
+Cloud Run automatic versioning
+Docker images retained
+
+Configuration:
+
+GitHub Secrets (encrypted)
+Documentation in repository
+
+Recovery Procedures
+Database Restore:
+bash# Contact Supabase support for restore
+# Or use Supabase dashboard for point-in-time recovery
+Application Rollback:
+bash# List Cloud Run revisions
+gcloud run revisions list --service=bonifatus-dms --region=us-central1
+
+# Route 100% traffic to previous revision
 gcloud run services update-traffic bonifatus-dms \
   --region=us-central1 \
   --to-revisions=PREVIOUS_REVISION=100
-```
 
----
+Support & Resources
+Production Monitoring
 
-## 🚨 Troubleshooting
+Frontend: https://bonidoc.com
+Backend API: https://bonidoc.com/api
+API Docs: https://bonidoc.com/docs
+Health Check: https://bonidoc.com/health
 
-### **Common Issues**
+Cloud Resources
 
-#### **OAuth Redirect Mismatch**
-```bash
-# Problem: redirect_uri_mismatch error
+GCP Console: https://console.cloud.google.com
+Supabase Dashboard: https://supabase.com/dashboard
+GitHub Actions: https://github.com/yourusername/bonifatus-dms/actions
 
-# Solution 1: Verify redirect URI
-curl https://bonidoc.com/api/v1/auth/google/config
-# Should return: {"redirect_uri": "https://bonidoc.com/login"}
-
-# Solution 2: Check Google Console
-# Ensure authorized redirect URI is exactly: https://bonidoc.com/login
-
-# Solution 3: Update GitHub Secret
-# GOOGLE_REDIRECT_URI = "https://bonidoc.com/login"
-```
-
-#### **Database Connection Failed**
-```bash
-# Test connection
-psql "your-database-url"
-
-# Check environment variable
-gcloud run services describe bonifatus-dms \
-  --region=us-central1 \
-  --format='value(spec.template.spec.containers[0].env)' \
-  | grep DATABASE_URL
-```
-
-#### **Service Won't Start**
-```bash
-# View startup logs
-gcloud logging read "resource.type=cloud_run_revision AND \
-  resource.labels.service_name=bonifatus-dms" \
-  --limit 100 \
-  --format json | jq '.[] | select(.textPayload | contains("ERROR"))'
-
-# Common causes:
-# 1. Missing environment variable
-# 2. Invalid environment variable format
-# 3. Database migration not applied
-# 4. Service account key issue
-```
-
----
-
-## 🎯 Next Steps (Current Sprint)
-
-### **Immediate: Categories Management API**
-
-**Files to Create:**
-1. `backend/app/api/categories.py` - API endpoints
-2. `backend/app/services/category_service.py` - Business logic
-3. `backend/app/schemas/category_schemas.py` - Pydantic models
-
-**Endpoints to Implement:**
-- `GET /api/v1/categories` - List all categories
-- `POST /api/v1/categories` - Create new category
-- `PUT /api/v1/categories/{id}` - Update category
-- `DELETE /api/v1/categories/{id}` - Delete category
-- `POST /api/v1/categories/restore-defaults` - Recreate defaults
-- `GET /api/v1/categories/{id}/documents-count` - Get document count
-
-**Key Features:**
-- All categories fully editable (no restrictions on system categories)
-- Automatic Google Drive folder sync
-- Multilingual support (EN, DE, RU)
-- Document reassignment on category deletion
-
-### **After Categories API:**
-
-1. **Frontend Categories Page**
-   - `frontend/src/app/categories/page.tsx`
-   - Create/Edit/Delete UI
-   - Google Drive sync status
-   - Drag-and-drop reordering
-
-2. **Document Processing**
-   - OCR text extraction
-   - Keyword extraction
-   - Language detection
-
-3. **AI Categorization**
-   - Automatic category suggestion
-   - Confidence scoring
-   - User feedback loop
-
-4. **Advanced Search**
-   - Full-text search
-   - Filters by category, date, language
-   - Search suggestions
-
----
-
-## 📞 Support & Resources
-
-### **Production Monitoring**
-- **Frontend**: https://bonidoc.com
-- **Backend API**: https://bonidoc.com/api
-- **API Docs**: https://bonidoc.com/docs
-- **Health Check**: https://bonidoc.com/health
-
-### **Cloud Resources**
-- **GCP Console**: https://console.cloud.google.com
-- **Supabase Dashboard**: https://supabase.com/dashboard
-- **GitHub Actions**: https://github.com/yourusername/bonifatus-dms/actions
-
-### **Key Commands**
-```bash
-# Service status
+Key Commands
+bash# Service status
 gcloud run services describe bonifatus-dms --region=us-central1
 
 # View logs
 gcloud logging read "resource.type=cloud_run_revision" --limit 50
 
 # Update environment variable
-gcloud run services update bonifatus-dms --set-env-vars "KEY=VALUE" --region=us-central1
+gcloud run services update bonifatus-dms \
+  --set-env-vars "KEY=VALUE" \
+  --region=us-central1
 
 # Force redeploy
 git commit --allow-empty -m "redeploy" && git push
 
-# Database migrations
-cd backend && alembic upgrade head
-
 # Health check
 curl https://bonidoc.com/health
-```
 
----
+Next Immediate Actions
+Step 1: Deploy Pending Changes (Today)
+bashgit add frontend/src/app/settings/page.tsx
+git add frontend/src/app/dashboard/page.tsx
+git commit -m "feat: add settings page and dashboard navigation"
+git push origin main
+Step 2: Verify Deployment (Today)
 
-**Deployment Guide Version:** 5.0  
-**Last Updated:** October 3, 2025  
-**Status:** Production operational, categories API in development
+Monitor GitHub Actions
+Check Cloud Run logs
+Test dashboard navigation
+Test settings page functionality
+Verify preference persistence
+
+Step 3: Implement Profile Page (Tomorrow)
+Required Features:
+
+Display account information
+Update email/name
+Subscription status display
+Account deletion with confirmation
+Google Drive data retention notice
+
+Files to Create:
+
+frontend/src/app/profile/page.tsx
+
+Backend API (Already Exists):
+
+User profile endpoints ready
+Need account deactivation endpoint implementation
+
+Step 4: Update Categories Stats (Tomorrow)
+Changes Needed:
+
+Reduce stats card sizes (current: large, new: compact)
+Replace "Custom Categories" with "Storage Used"
+Add "Total Space" metric
+Improve visual hierarchy
+
+File to Modify:
+
+frontend/src/app/categories/page.tsx
+
+Step 5: Document Upload Implementation (Next Week)
+Backend Tasks:
+
+Implement file upload handler
+Google Drive integration
+Storage quota validation
+File type validation
+Virus scanning integration
+
+Frontend Tasks:
+
+Upload UI component
+Drag-and-drop support
+Progress indicators
+Error handling
+Success notifications
+
+
+Success Metrics
+Technical Metrics
+
+Deployment success rate: 100%
+API uptime: >99.5%
+Average response time: <300ms
+Error rate: <1%
+
+User Experience Metrics
+
+Page load time: <2s
+Time to interactive: <3s
+Navigation responsiveness: <100ms
+Settings save time: <500ms
+
+Business Metrics
+
+User registration completion: >80%
+Category creation rate: >50% of users
+Document upload success: >95%
+Feature adoption: Settings >60%, Categories >70%
+
+
+Changelog
+Version 6.0 (October 5, 2025)
+
+Fixed categories update/delete operations
+Implemented database-driven default categories
+Created settings page with preferences
+Updated dashboard with navigation
+Improved user experience with dropdown menu
+Enhanced multilingual support
+
+Version 5.0 (October 4, 2025)
+
+Deployed dynamic multilingual categories
+Fixed migration structure
+Categories CRUD operations working
+System settings and localization in place
+
+Version 4.0 (October 3, 2025)
+
+Initial production deployment
+Google OAuth authentication
+Basic dashboard
+Database schema deployed
+
+
+Deployment Guide Version: 6.0
+Last Updated: October 5, 2025
+Status: Categories operational, Settings/Dashboard ready to deploy, Profile pending
