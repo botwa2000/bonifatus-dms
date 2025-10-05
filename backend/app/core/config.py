@@ -13,15 +13,16 @@ class DatabaseSettings(BaseSettings):
     """Database configuration from environment variables"""
     
     database_url: str = Field(..., description="Database connection URL")
-    database_pool_size: int = Field(..., description="Connection pool size")
-    database_pool_recycle: int = Field(..., description="Pool recycle time")
-    database_echo: bool = Field(..., description="Enable SQL query logging")
-    database_pool_pre_ping: bool = Field(..., description="Enable connection health checks")
-    database_connect_timeout: int = Field(..., description="Connection timeout")
+    database_pool_size: int = Field(default=10, description="Connection pool size")
+    database_pool_recycle: int = Field(default=3600, description="Pool recycle time")
+    database_echo: bool = Field(default=False, description="Enable SQL query logging")
+    database_pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
+    database_connect_timeout: int = Field(default=60, description="Connection timeout")
 
     class Config:
         case_sensitive = False
         extra = "ignore"
+        env_file = ".env"
 
 
 class GoogleSettings(BaseSettings):
@@ -30,30 +31,32 @@ class GoogleSettings(BaseSettings):
     google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID", description="Google OAuth client ID")
     google_client_secret: str = Field(..., env="GOOGLE_CLIENT_SECRET", description="Google OAuth client secret")
     google_redirect_uri: str = Field(..., env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
-    google_vision_enabled: bool = Field(..., description="Enable Google Vision OCR")
-    google_oauth_issuers: str = Field(..., description="Valid OAuth issuers")
-    google_drive_service_account_key: str = Field(..., description="Google Drive service account key file path")
-    google_drive_folder_name: str = Field(..., description="Google Drive folder name for documents")
+    google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
+    google_oauth_issuers: str = Field(default="https://accounts.google.com", description="Valid OAuth issuers")
+    google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
+    google_drive_folder_name: str = Field(default="Bonifatus_DMS", description="Google Drive folder name for documents")
     google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
 
     class Config:
         case_sensitive = False
         extra = "ignore"
+        env_file = ".env"
 
 
 class SecuritySettings(BaseSettings):
     """Security configuration from environment variables"""
     
     security_secret_key: str = Field(..., description="JWT secret key")
-    algorithm: str = Field(..., description="JWT algorithm")
-    access_token_expire_minutes: int = Field(..., description="JWT expiration")
-    refresh_token_expire_days: int = Field(..., description="Refresh token expiration")
-    default_user_tier: str = Field(..., description="Default user tier")
-    admin_emails: str = Field(..., description="Admin email list")
+    algorithm: str = Field(default="HS256", description="JWT algorithm")
+    access_token_expire_minutes: int = Field(default=60, description="JWT expiration")
+    refresh_token_expire_days: int = Field(default=7, description="Refresh token expiration")
+    default_user_tier: str = Field(default="free", description="Default user tier")
+    admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")
 
     class Config:
         case_sensitive = False
         extra = "ignore"
+        env_file = ".env"
 
 
 class AppSettings(BaseSettings):
@@ -71,6 +74,7 @@ class AppSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
+        env_file = ".env"
 
 
 class Settings(BaseSettings):
@@ -115,6 +119,7 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
+        env_file = ".env"
 
 
 def get_settings() -> Settings:
