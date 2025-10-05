@@ -26,7 +26,12 @@ interface SystemSettings {
 export default function SettingsPage() {
   const { isAuthenticated, user, isLoading } = useAuth()
   const router = useRouter()
-  const { theme: currentTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [saving, setSaving] = useState(false)
@@ -138,7 +143,12 @@ export default function SettingsPage() {
                   onChange={(e) => {
                     const newTheme = e.target.value as 'light' | 'dark'
                     setPreferences({ ...preferences, theme: newTheme })
-                    setTheme(newTheme)
+                    if (mounted && typeof window !== 'undefined') {
+                      localStorage.setItem('theme', newTheme)
+                      const root = document.documentElement
+                      root.classList.remove('light', 'dark')
+                      root.classList.add(newTheme)
+                    }
                   }}
                   className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
                 >

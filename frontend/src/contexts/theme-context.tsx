@@ -10,7 +10,10 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'light',
+  setTheme: () => {},
+})
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light')
@@ -26,6 +29,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const applyTheme = (newTheme: Theme) => {
+    if (typeof window === 'undefined') return
     const root = document.documentElement
     root.classList.remove('light', 'dark')
     root.classList.add(newTheme)
@@ -33,7 +37,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme)
-    localStorage.setItem('theme', newTheme)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', newTheme)
+    }
     applyTheme(newTheme)
   }
 
@@ -50,8 +56,5 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme() {
   const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
-  }
   return context
 }
