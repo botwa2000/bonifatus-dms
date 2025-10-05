@@ -19,3 +19,48 @@
     @apply inline-flex items-center justify-center rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-admin-primary focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none transition-colors;
   }
 }
+
+/* Dark mode styles */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  @apply bg-neutral-900 text-neutral-100;
+}
+
+.dark .bg-neutral-50 {
+  @apply bg-neutral-900;
+}
+
+.dark .bg-white {
+  @apply bg-neutral-800;
+}
+
+.dark .text-neutral-900 {
+  @apply text-neutral-100;
+}
+
+.dark .text-neutral-600 {
+  @apply text-neutral-400;
+}
+
+.dark .text-neutral-700 {
+  @apply text-neutral-300;
+}
+
+.dark .border-neutral-200 {
+  @apply border-neutral-700;
+}
+
+.dark .border-neutral-300 {
+  @apply border-neutral-600;
+}
+
+.dark .hover\:bg-neutral-50:hover {
+  @apply bg-neutral-700;
+}
+
+.dark .hover\:bg-neutral-100:hover {
+  @apply bg-neutral-700;
+}

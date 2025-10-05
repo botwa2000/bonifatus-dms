@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { apiClient } from '@/services/api-client'
+import { useTheme } from '@/contexts/theme-context'
 
 interface UserPreferences {
   language: string
@@ -25,6 +26,7 @@ interface SystemSettings {
 export default function SettingsPage() {
   const { isAuthenticated, user, isLoading } = useAuth()
   const router = useRouter()
+  const { theme: currentTheme, setTheme } = useTheme()
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [saving, setSaving] = useState(false)
@@ -60,12 +62,21 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!preferences) return
     
+    const oldLanguage = preferences.language
+    
     setSaving(true)
     setMessage(null)
     
     try {
       await apiClient.put('/api/v1/users/preferences', preferences, true)
       setMessage({ type: 'success', text: 'Settings saved successfully' })
+      
+      // Trigger a page reload if language changed to update all content
+      if (preferences.language !== oldLanguage) {
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      }
     } catch (error) {
       console.error('Failed to save settings:', error)
       setMessage({ type: 'error', text: 'Failed to save settings' })
@@ -124,7 +135,11 @@ export default function SettingsPage() {
                 <select
                   id="theme"
                   value={preferences.theme || systemSettings.default_theme}
-                  onChange={(e) => setPreferences({ ...preferences, theme: e.target.value })}
+                  onChange={(e) => {
+                    const newTheme = e.target.value as 'light' | 'dark'
+                    setPreferences({ ...preferences, theme: newTheme })
+                    setTheme(newTheme)
+                  }}
                   className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
                 >
                   {systemSettings.available_themes.map(theme => (
@@ -150,7 +165,9 @@ export default function SettingsPage() {
                 <select
                   id="language"
                   value={preferences.language}
-                  onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
+                  onChange={(e) => {
+                    setPreferences({ ...preferences, language: e.target.value })
+                  }}
                   className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
                 >
                   {systemSettings.available_languages.map(lang => (

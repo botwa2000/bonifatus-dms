@@ -43,6 +43,18 @@ export default function CategoriesPage() {
     }
   }, [isAuthenticated])
 
+  // Reload categories when navigating back to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        loadCategories()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isAuthenticated])
+
   const loadCategories = async () => {
     try {
       setIsLoading(true)
