@@ -40,6 +40,7 @@ router = APIRouter(prefix="/api/v1/documents", tags=["document_management"])
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
+    category_ids: str = Form(...),  # Comma-separated category IDs
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_active_user)
@@ -61,12 +62,21 @@ async def upload_document(
         file_content = await file.read()
         file_stream = io.BytesIO(file_content)
 
+        # Parse category IDs from comma-separated string
+        category_id_list = [cid.strip() for cid in category_ids.split(',') if cid.strip()]
+        if not category_id_list:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one category must be selected"
+            )
+        
         upload_result = await document_service.upload_document(
             user_id=str(current_user.id),
             user_email=current_user.email,
             user_tier=current_user.tier,
             file_content=file_stream,
             filename=file.filename,
+            category_ids=category_id_list,
             title=title,
             description=description,
             ip_address=ip_address

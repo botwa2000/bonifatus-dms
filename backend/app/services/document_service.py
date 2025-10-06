@@ -32,6 +32,35 @@ class DocumentService:
         self._cache_timestamp = None
         self._cache_ttl_seconds = 300
 
+    def generate_document_filename(
+        self,
+        original_filename: str,
+        category_code: str,
+        upload_date: datetime
+    ) -> str:
+        """
+        Generate standardized document filename
+        Format: YYYY-MM-DD_HHMMSS_[CODE]_OriginalName.ext
+        """
+        name_parts = original_filename.rsplit('.', 1)
+        base_name = name_parts[0] if len(name_parts) > 1 else original_filename
+        extension = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # Sanitize filename
+        safe_name = base_name.replace(' ', '_')
+        safe_name = ''.join(c for c in safe_name if c.isalnum() or c in ('_', '-'))
+        
+        # Generate timestamp
+        date_str = upload_date.strftime('%Y-%m-%d')
+        time_str = upload_date.strftime('%H%M%S')
+        
+        # Build filename
+        filename = f"{date_str}_{time_str}_{category_code}_{safe_name}"
+        if extension:
+            filename = f"{filename}.{extension}"
+        
+        return filename
+
     async def _get_system_setting(self, key: str, default: Any = None) -> Any:
         """Get system setting from database with caching"""
         session = db_manager.session_local()
@@ -120,12 +149,13 @@ class DocumentService:
             return False
 
     async def upload_document(
-        self, 
-        user_id: str, 
-        user_email: str, 
+        self,
+        user_id: str,
+        user_email: str,
         user_tier: str,
-        file_content: BinaryIO, 
+        file_content: BinaryIO,
         filename: str,
+        category_ids: List[str],
         title: Optional[str] = None,
         description: Optional[str] = None,
         ip_address: str = None
@@ -151,8 +181,31 @@ class DocumentService:
             if not mime_type:
                 mime_type = 'application/octet-stream'
 
+            # Get primary category for filename and folder
+            from app.database.models import Category
+            primary_category = session.get(Category, category_ids[0])
+            if not primary_category:
+                raise ValueError("Primary category not found")
+            
+            # Generate standardized filename
+            upload_date = datetime.utcnow()
+            standardized_filename = self.generate_document_filename(
+                filename,
+                primary_category.category_code,
+                upload_date
+            )
+            
+            # Get category folder name (use English translation)
+            category_folder = next(
+                (t.name for t in primary_category.translations if t.language_code == 'en'),
+                primary_category.translations[0].name if primary_category.translations else "Other"
+            )
+
             drive_result = await google_drive_service.upload_document(
-                file_content, filename, user_email, mime_type
+                file_content=file_content,
+                filename=standardized_filename,
+                user_email=user_email,
+                mime_type=mime_type
             )
             
             if not drive_result:
@@ -163,17 +216,28 @@ class DocumentService:
             document = Document(
                 title=document_title,
                 description=description,
-                file_name=filename,
+                file_name=standardized_filename,
                 file_size=file_size,
                 mime_type=mime_type,
                 google_drive_file_id=drive_result['drive_file_id'],
-                processing_status="pending",
-                user_id=user_id
+                processing_status="uploaded",
+                user_id=user_id,
+                category_id=category_ids[0]  # Primary category for backward compatibility
             )
             
             session.add(document)
             session.commit()
             session.refresh(document)
+
+            from app.database.models import DocumentCategory
+            for idx, category_id in enumerate(category_ids):
+                doc_category = DocumentCategory(
+                    document_id=document.id,
+                    category_id=category_id,
+                    is_primary=(idx == 0),
+                    assigned_by_ai=False
+                )
+                session.add(doc_category)
 
             await self._log_document_action(
                 user_id, "document_upload", "document", str(document.id),
@@ -182,10 +246,16 @@ class DocumentService:
 
             logger.info(f"Document uploaded successfully: {document.id} for user {user_email}")
 
+            category_names = []
+            for cat_id in category_ids:
+                cat = session.get(Category, cat_id)
+                if cat and cat.translations:
+                    category_names.append(cat.translations[0].name)
+            
             return DocumentUploadResponse(
                 id=str(document.id),
                 title=document.title,
-                file_name=document.file_name,
+                file_name=standardized_filename,
                 file_size=document.file_size,
                 mime_type=document.mime_type,
                 google_drive_file_id=document.google_drive_file_id,

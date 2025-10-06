@@ -65,9 +65,10 @@ class Category(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relationships
-    user = relationship("User", back_populates="categories")
-    documents = relationship("Document", back_populates="category")
-    translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="documents")
+    category = relationship("Category", back_populates="documents")  # Keep for backward compatibility
+    categories = relationship("DocumentCategory", back_populates="document", cascade="all, delete-orphan")
+    languages = relationship("DocumentLanguage", back_populates="document", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_category_user_id', 'user_id'),
@@ -137,7 +138,28 @@ class Document(Base, TimestampMixin):
         Index('idx_document_primary_lang', 'primary_language'),
     )
 
+class DocumentCategory(Base):
+    """Many-to-many relationship between documents and categories"""
+    __tablename__ = "document_categories"
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    assigned_by_ai = Column(Boolean, default=False, nullable=False)
+
+    # Relationships
+    document = relationship("Document", back_populates="categories")
+    category = relationship("Category")
+
+    __table_args__ = (
+        Index('idx_doc_cats_document', 'document_id'),
+        Index('idx_doc_cats_category', 'category_id'),
+        Index('idx_doc_cats_primary', 'document_id', 'is_primary'),
+        sa.UniqueConstraint('document_id', 'category_id', name='uq_document_category'),
+    )
+    
 class SystemSetting(Base, TimestampMixin):
     """System-wide configuration stored in database"""
     __tablename__ = "system_settings"

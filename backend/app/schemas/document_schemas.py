@@ -138,3 +138,32 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="Error type")
     message: str = Field(..., description="Error message")
     details: Optional[str] = Field(None, description="Additional error details")
+
+
+class DocumentUploadRequest(BaseModel):
+    """Request model for document upload"""
+    category_ids: List[str] = Field(..., min_items=1, description="Category IDs (first is primary)")
+    title: Optional[str] = Field(None, min_length=1, max_length=255, description="Document title")
+    description: Optional[str] = Field(None, max_length=1000, description="Document description")
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response model for document upload"""
+    id: str = Field(..., description="Document UUID")
+    title: str = Field(..., description="Document title")
+    filename: str = Field(..., description="Standardized filename")
+    original_filename: str = Field(..., description="Original uploaded filename")
+    file_size: int = Field(..., description="File size in bytes")
+    mime_type: str = Field(..., description="MIME type")
+    category_ids: List[str] = Field(..., description="Assigned category IDs")
+    category_names: List[str] = Field(..., description="Category names")
+    google_drive_file_id: str = Field(..., description="Google Drive file ID")
+    web_view_link: Optional[str] = Field(None, description="Google Drive view link")
+    processing_status: str = Field(..., description="Processing status")
+    created_at: datetime = Field(..., description="Upload timestamp")
+
+
+class DocumentCategoriesUpdateRequest(BaseModel):
+    """Request model for updating document categories"""
+    category_ids: List[str] = Field(..., min_items=1, description="New category IDs")
+    primary_category_id: Optional[str] = Field(None, description="Primary category ID")
