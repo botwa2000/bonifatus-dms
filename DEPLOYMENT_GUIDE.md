@@ -640,3 +640,394 @@ git commit -m "feat: add profile page and update deployment guide
 - Document all features, APIs, and operational procedures"
 
 git push origin main
+
+
+Deployment Guide Update - Version 9.0
+I'll provide the key sections to add/update in your deployment guide:
+
+Add to "Recent Deployments" section (after Version 8.0):
+markdown### Version 9.0 (October 6, 2025)
+
+**Document Naming & Category Codes:**
+- ✅ Implemented 3-character category code system
+- ✅ Language-agnostic document naming convention
+- ✅ Conflict-free code generation for user categories
+- ✅ Database schema migration for category codes
+- ✅ Updated category service and API responses
+- ✅ System category codes stored in database
+
+**Database Changes:**
+- Added `category_code` field to categories table
+- Migration: `k1l2m3n4o5p6_add_category_code.py`
+- Updated initial data population with predefined codes
+- Unique constraint per user for category codes
+
+**Files Modified:**
+- `backend/alembic/versions/k1l2m3n4o5p6_add_category_code.py` (new)
+- `backend/alembic/versions/f1a2b3c4d5e6_populate_initial_data.py`
+- `backend/app/database/models.py`
+- `backend/app/schemas/category_schemas.py`
+- `backend/app/services/category_service.py`
+
+**Breaking Changes:**
+- CategoryResponse now includes `category_code` field
+- Frontend must be updated to display codes
+- Document upload will use codes in filenames
+
+Add new section: "Document Naming Convention"
+markdown## Document Naming Convention
+
+### Overview
+
+Bonifatus DMS uses a structured, language-agnostic naming convention that ensures:
+- Chronological sortability
+- Cross-language compatibility
+- Uniqueness guarantee
+- Human readability
+- Professional DMS standards compliance
+
+### Naming Format
+YYYY-MM-DD_HHMMSS_[CODE]_OriginalName.ext
+
+### Format Components
+
+| Component | Format | Purpose | Example |
+|-----------|--------|---------|---------|
+| **Date** | `YYYY-MM-DD` | ISO 8601 sortability | `2025-10-06` |
+| **Time** | `HHMMSS` | Millisecond uniqueness | `143022` |
+| **Category Code** | 3-char uppercase | Quick visual identification | `INS`, `C01` |
+| **Original Name** | Sanitized filename | Human readability | `Health_Insurance_Policy` |
+| **Extension** | Original extension | File type preservation | `.pdf`, `.docx` |
+
+### Examples
+```bash
+# System category documents
+2025-10-06_143022_INS_Health_Insurance_Policy.pdf
+2025-10-06_143145_LEG_Employment_Contract.pdf
+2025-10-06_144200_BNK_Account_Statement_Q3.pdf
+2025-10-06_145310_RES_Property_Deed_Berlin.pdf
+
+# User category documents
+2025-10-06_150420_C01_Vacation_Receipts_2025.pdf
+2025-10-06_151530_C02_Family_Photos_Summer.jpg
+2025-10-06_152640_C03_Project_Documentation.docx
+Benefits
+
+Automatic Chronological Sorting: Files sort naturally by upload date/time
+Searchability: Category codes enable quick filtering (*_INS_*, *_C01_*)
+Uniqueness: Timestamp + user isolation prevents naming conflicts
+User-Friendly: Preserves original filename for recognition
+Multilingual: Codes work across all languages
+Cross-Platform: No special characters, universal compatibility
+Professional: Meets enterprise DMS expectations
+Scalable: Supports unlimited categories per user
+
+Filename Sanitization Rules
+python# Original filename transformations
+"Health Insurance Policy 2024.pdf"  →  "Health_Insurance_Policy_2024.pdf"
+"Договор аренды (копия).docx"      →  "Dogovor_arendy_kopiya.docx"
+"Büro-Miete #123.pdf"              →  "Buro_Miete_123.pdf"
+
+# Rules:
+# - Replace spaces with underscores
+# - Remove special characters
+# - Transliterate non-ASCII characters
+# - Preserve alphanumeric and underscores only
+# - Maintain original extension
+Storage Location
+Documents are stored in Google Drive with the following structure:
+Bonifatus_DMS/
+├── user@example.com/
+│   ├── Insurance/
+│   │   ├── 2025-10-06_143022_INS_Health_Insurance.pdf
+│   │   └── 2025-10-05_120000_INS_Auto_Policy.pdf
+│   ├── Legal/
+│   │   └── 2025-10-06_143145_LEG_Contract.pdf
+│   ├── Custom_Category_1/
+│   │   └── 2025-10-06_150420_C01_Document.pdf
+│   └── ...
+
+Category Code System
+System Category Codes (Predefined)
+Fixed 3-Character Codes:
+CategoryCodeReference KeyLanguagesInsuranceINScategory.insuranceEN/DE/RULegalLEGcategory.legalEN/DE/RUReal EstateREScategory.real_estateEN/DE/RUBankingBNKcategory.bankingEN/DE/RUMedicalMEDcategory.medicalEN/DE/RUTaxTAXcategory.taxEN/DE/RUEmploymentEMPcategory.employmentEN/DE/RUEducationEDUcategory.educationEN/DE/RUOtherOTHcategory.otherEN/DE/RU
+Characteristics:
+
+Meaningful abbreviations
+Language-agnostic
+Globally unique
+Shared across all users
+Cannot be modified
+
+User Category Codes (Auto-Generated)
+Sequential Format: C01, C02, C03... C99
+Generation Logic:
+python# First user category
+user_category_count = 0  # No existing user categories
+category_code = f"C{str(user_category_count + 1).zfill(2)}"  # → "C01"
+
+# Second user category
+user_category_count = 1  # One existing category
+category_code = f"C{str(user_category_count + 1).zfill(2)}"  # → "C02"
+
+# 50th user category
+category_code = "C50"
+Characteristics:
+
+Always 3 characters (same length as system codes)
+Sequential per user (isolated)
+No conflicts between users
+Supports 99 custom categories per user
+Automatically assigned on creation
+Cannot be manually chosen (prevents conflicts)
+
+Database Schema
+categories table:
+sqlCREATE TABLE categories (
+    id UUID PRIMARY KEY,
+    reference_key VARCHAR(100) UNIQUE NOT NULL,
+    category_code VARCHAR(3) NOT NULL,  -- NEW FIELD
+    color_hex VARCHAR(7) NOT NULL,
+    icon_name VARCHAR(50) NOT NULL,
+    is_system BOOLEAN NOT NULL DEFAULT false,
+    user_id UUID REFERENCES users(id),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- Indexes
+CREATE INDEX idx_category_code ON categories(category_code);
+CREATE UNIQUE INDEX idx_category_user_code_unique 
+    ON categories(user_id, category_code) 
+    WHERE user_id IS NOT NULL;
+Migration Applied:
+
+Revision ID: k1l2m3n4o5p6
+Revises: f1a2b3c4d5e6
+Date: October 6, 2025
+
+API Response Format
+Updated CategoryResponse:
+json{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "reference_key": "category.insurance",
+  "category_code": "INS",
+  "name": "Insurance",
+  "description": "Insurance policies and claims",
+  "color_hex": "#3B82F6",
+  "icon_name": "shield",
+  "is_system": true,
+  "user_id": null,
+  "sort_order": 1,
+  "is_active": true,
+  "documents_count": 24,
+  "created_at": "2025-10-04T12:00:00Z",
+  "updated_at": "2025-10-04T12:00:00Z"
+}
+Frontend Display
+Recommended UI Patterns:
+Option 1: Badge Display
+┌─────────────────────────────────────────┐
+│ Insurance                         [INS] │
+│ 24 documents • 156 MB                   │
+├─────────────────────────────────────────┤
+│ Legal Documents                   [LEG] │
+│ 12 documents • 89 MB                    │
+├─────────────────────────────────────────┤
+│ My Travel Documents               [C01] │
+│ 8 documents • 45 MB                     │
+└─────────────────────────────────────────┘
+Option 2: Inline Code
+┌─────────────────────────────────────────┐
+│ [INS] Insurance                         │
+│ 24 documents • 156 MB                   │
+├─────────────────────────────────────────┤
+│ [LEG] Legal Documents                   │
+│ 12 documents • 89 MB                    │
+└─────────────────────────────────────────┘
+Implementation (React/TypeScript):
+typescriptimport { Badge } from '@/components/ui'
+
+<div className="flex items-center justify-between">
+  <h3 className="text-lg font-semibold">
+    {category.name}
+  </h3>
+  <Badge variant={category.is_system ? "default" : "success"}>
+    {category.category_code}
+  </Badge>
+</div>
+Code Generation Service
+Backend Implementation:
+python# backend/app/services/category_service.py
+
+async def create_category(self, user_id: str, ...):
+    # Generate next sequential code for user
+    user_category_count = session.execute(
+        select(func.count(Category.id)).where(
+            Category.user_id == user_id,
+            Category.is_system == False
+        )
+    ).scalar() or 0
+    
+    category_code = f"C{str(user_category_count + 1).zfill(2)}"
+    
+    # Create category with code
+    category = Category(
+        reference_key=reference_key,
+        category_code=category_code,  # Auto-generated
+        ...
+    )
+Validation Rules
+Category Code Constraints:
+
+Must be exactly 3 characters
+Must be uppercase
+System codes: Predefined set only
+User codes: C01-C99 pattern only
+Unique per user (for user categories)
+Globally unique (for system categories)
+Cannot be empty or null
+
+Validation Implementation:
+python# Schema validation
+class CategoryResponse(BaseModel):
+    category_code: str = Field(
+        ..., 
+        min_length=3, 
+        max_length=3,
+        pattern="^[A-Z0-9]{3}$",
+        description="3-character category code"
+    )
+Future Considerations
+Scalability:
+
+Current limit: 99 user categories per user (C01-C99)
+If exceeded: Could extend to C001-C999 (3-digit)
+Alternative: Use base-36 encoding (C0A, C0B... CZZ = 1,296 codes)
+
+Potential Enhancements:
+
+Allow custom codes for premium users (manual entry)
+Code aliases for frequently used categories
+Color-coded category groups
+Code-based quick search
+Keyboard shortcuts using codes
+
+
+Implementation Status
+Completed ✅
+
+ Database schema update with category_code field
+ Migration script created and tested
+ Category model updated
+ CategoryResponse schema includes codes
+ Service layer generates codes automatically
+ System categories populated with predefined codes
+ User categories generate sequential codes
+ API responses include category codes
+
+In Progress ⏳
+
+ Frontend UI to display category codes
+ Document service integration for filename generation
+ Document upload endpoint with naming logic
+ Category code search/filter functionality
+
+Planned 📋
+
+ Document listing with code-based filtering
+ Bulk rename existing documents (if any)
+ Category code quick-search feature
+ Export documents with original vs. stored names
+ Analytics: Most used categories by code
+
+
+Migration Guide for Existing Deployments
+Step 1: Run Database Migration
+bashcd backend
+alembic upgrade head
+Expected Output:
+INFO  [alembic.runtime.migration] Running upgrade f1a2b3c4d5e6 -> k1l2m3n4o5p6, add category_code
+Step 2: Verify Code Assignment
+sql-- Check system categories
+SELECT reference_key, category_code, is_system 
+FROM categories 
+WHERE is_system = true;
+
+-- Expected results:
+-- category.insurance   | INS | true
+-- category.legal       | LEG | true
+-- category.real_estate | RES | true
+-- category.banking     | BNK | true
+-- category.other       | OTH | true
+
+-- Check user categories
+SELECT user_id, category_code, is_system 
+FROM categories 
+WHERE is_system = false 
+ORDER BY user_id, category_code;
+
+-- Expected: C01, C02, C03... per user
+Step 3: Update Frontend
+bashcd frontend
+
+# Pull latest code
+git pull origin main
+
+# Install dependencies (if schema types updated)
+npm install
+
+# Rebuild
+npm run build
+Step 4: Deploy
+bashgit add -A
+git commit -m "feat: implement category code system for document naming
+
+- Add category_code field to categories table
+- Auto-generate codes for user categories (C01-C99)
+- Use predefined codes for system categories (INS, LEG, etc)
+- Update API responses to include codes
+- Prepare for document naming implementation"
+
+git push origin main
+Step 5: Verify in Production
+bash# Test category endpoint
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://bonidoc.com/api/v1/categories
+
+# Should return categories with category_code field
+
+Testing Checklist
+Backend Testing
+
+ Categories endpoint returns category_code
+ New user categories get sequential codes (C01, C02...)
+ System categories have correct predefined codes
+ No duplicate codes per user
+ Migration runs successfully
+ Database constraints enforced
+
+Frontend Testing
+
+ Category codes display in UI
+ Codes visible on category cards
+ System vs user categories distinguished
+ Multilingual: Codes consistent across languages
+ Responsive: Codes display on mobile
+
+Integration Testing
+
+ Create category → Code assigned automatically
+ Delete category → Code freed for reuse (future)
+ Switch languages → Codes remain consistent
+ API responses validated
+
+
+
+**Deploy these changes:**
+```bash
+git add DEPLOYMENT_GUIDE.md
+git commit -m "docs: update deployment guide with category code system v9.0"
+git push origin main
