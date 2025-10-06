@@ -54,8 +54,19 @@ export default function CategoriesPage() {
       }
     }
 
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        loadCategories()
+      }
+    }
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [isAuthenticated])
 
   const loadCategories = async () => {
