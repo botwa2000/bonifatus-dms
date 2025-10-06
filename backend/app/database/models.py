@@ -7,6 +7,7 @@ Core SQLAlchemy models for user management, categories, and system configuration
 import uuid
 from datetime import datetime
 from typing import Optional, List
+import sqlalchemy as sa
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
