@@ -20,12 +20,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    const savedTheme = localStorage.getItem('theme') as Theme
-    if (savedTheme) {
-      setThemeState(savedTheme)
-      applyTheme(savedTheme)
+    const initializeTheme = async () => {
+      setMounted(true)
+      const localTheme = localStorage.getItem('theme') as Theme
+      
+      if (localTheme) {
+        setThemeState(localTheme)
+        applyTheme(localTheme)
+      } else {
+        const root = document.documentElement
+        root.classList.add('light')
+      }
     }
+    
+    initializeTheme()
   }, [])
 
   const applyTheme = (newTheme: Theme) => {
