@@ -19,6 +19,24 @@ Last successful deployment: Frontend build failed (TypeScript errors)
 Migration status: Cycle detected in revision chain
 Production accessibility: Frontend showing error page
 
+## Version History & Migration Reference
+
+### Last Codespaces Commit
+- **Commit SHA:** ed3c2fe (check with `git log`)
+- **Date:** October 5, 2025
+- **Message:** "feat: add settings page and dashboard navigation"
+- **Branch:** main
+
+### First Local VS Code Commit
+- **Commit SHA:** [will be next commit]
+- **Date:** October 5, 2025
+- **Message:** "feat: add local VS development guide and env file support"
+- **Branch:** main
+
+### To Check Current Commit
+```powershell
+git log --oneline -10
+
 Completed Components
 Backend (80% Complete):
 

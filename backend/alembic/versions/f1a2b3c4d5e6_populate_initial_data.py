@@ -107,10 +107,11 @@ def upgrade() -> None:
     default_categories_config = [
         {
             'reference_key': 'category.insurance',
+            'category_code': 'INS',
             'translations': {
                 'en': {'name': 'Insurance', 'description': 'Insurance policies, claims, and related documents'},
                 'de': {'name': 'Versicherung', 'description': 'Versicherungspolicen, Ansprüche und zugehörige Dokumente'},
-                'ru': {'name': 'Страхование', 'description': 'Страховые полисы, претензии и сопутствующие документы'}
+                'ru': {'name': 'Страхование', 'description': 'Страховые полисы, претензии и связанные документы'}
             },
             'color_hex': '#3B82F6',
             'icon_name': 'shield',
@@ -118,6 +119,7 @@ def upgrade() -> None:
         },
         {
             'reference_key': 'category.legal',
+            'category_code': 'LEG',
             'translations': {
                 'en': {'name': 'Legal', 'description': 'Legal documents, contracts, and agreements'},
                 'de': {'name': 'Rechtsdokumente', 'description': 'Rechtsdokumente, Verträge und Vereinbarungen'},
@@ -129,6 +131,7 @@ def upgrade() -> None:
         },
         {
             'reference_key': 'category.real_estate',
+            'category_code': 'RES',
             'translations': {
                 'en': {'name': 'Real Estate', 'description': 'Property documents, deeds, and real estate transactions'},
                 'de': {'name': 'Immobilien', 'description': 'Immobiliendokumente, Urkunden und Immobilientransaktionen'},
@@ -140,6 +143,7 @@ def upgrade() -> None:
         },
         {
             'reference_key': 'category.banking',
+            'category_code': 'BNK',
             'translations': {
                 'en': {'name': 'Banking', 'description': 'Bank statements, financial documents, and transactions'},
                 'de': {'name': 'Banking', 'description': 'Kontoauszüge, Finanzdokumente und Transaktionen'},
@@ -151,6 +155,7 @@ def upgrade() -> None:
         },
         {
             'reference_key': 'category.other',
+            'category_code': 'OTH',
             'translations': {
                 'en': {'name': 'Other', 'description': 'Miscellaneous documents and files'},
                 'de': {'name': 'Sonstige', 'description': 'Verschiedene Dokumente und Dateien'},
@@ -183,11 +188,12 @@ def upgrade() -> None:
         category_id = str(uuid.uuid4())
         
         conn.execute(text("""
-            INSERT INTO categories (id, reference_key, color_hex, icon_name, is_system, user_id, sort_order, is_active, created_at, updated_at)
-            VALUES (:id, :reference_key, :color_hex, :icon_name, true, NULL, :sort_order, true, :created, :updated)
+            INSERT INTO categories (id, reference_key, category_code, color_hex, icon_name, is_system, user_id, sort_order, is_active, created_at, updated_at)
+            VALUES (:id, :reference_key, :category_code, :color_hex, :icon_name, true, NULL, :sort_order, true, :created, :updated)
         """), {
             'id': category_id,
             'reference_key': cat_data['reference_key'],
+            'category_code': cat_data['category_code'],
             'color_hex': cat_data['color_hex'],
             'icon_name': cat_data['icon_name'],
             'sort_order': cat_data['sort_order'],

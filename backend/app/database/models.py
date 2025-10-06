@@ -50,11 +50,12 @@ class User(Base, TimestampMixin):
 
 
 class Category(Base, TimestampMixin):
-    """Document categories with dynamic multilingual support"""
+    """Category with dynamic multilingual support"""
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     reference_key = Column(String(100), unique=True, nullable=False, index=True)
+    category_code = Column(String(3), nullable=False, index=True)
     color_hex = Column(String(7), nullable=False, default="#6B7280")
     icon_name = Column(String(50), nullable=False, default="folder")
     is_system = Column(Boolean, default=False, nullable=False)
@@ -72,6 +73,8 @@ class Category(Base, TimestampMixin):
         Index('idx_category_system', 'is_system'),
         Index('idx_category_active', 'is_active'),
         Index('idx_category_reference_key', 'reference_key'),
+        Index('idx_category_code', 'category_code'),
+        Index('idx_category_user_code_unique', 'user_id', 'category_code', unique=True, postgresql_where=sa.text('user_id IS NOT NULL')),
     )
 
 

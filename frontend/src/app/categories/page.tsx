@@ -1,4 +1,4 @@
-// src/app/categories/page.tsx
+// frontend/src/app/categories/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,6 +11,10 @@ import {
   type CategoryCreateData, 
   type CategoryUpdateData 
 } from '@/services/category.service'
+import { Button, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge } from '@/components/ui'
+import { CategoryStatsCard } from '@/components/categories/CategoryStatsCard'
+import { CategoryForm } from '@/components/categories/CategoryForm'
+import { CategoryCard } from '@/components/categories/CategoryCard'
 
 type ViewMode = 'list' | 'grid'
 type SortField = 'name' | 'documents' | 'updated' | 'created'
@@ -43,7 +47,6 @@ export default function CategoriesPage() {
     }
   }, [isAuthenticated])
 
-  // Reload categories when navigating back to the page
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isAuthenticated) {
@@ -145,6 +148,29 @@ export default function CategoriesPage() {
     return sorted
   }
 
+  const ViewModeToggle = () => (
+    <div className="flex items-center space-x-2">
+      <button
+        onClick={() => setViewMode('list')}
+        className={`p-2 rounded ${viewMode === 'list' ? 'bg-neutral-100 text-admin-primary' : 'text-neutral-400 hover:text-neutral-600'}`}
+        title="List view"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <button
+        onClick={() => setViewMode('grid')}
+        className={`p-2 rounded ${viewMode === 'grid' ? 'bg-neutral-100 text-admin-primary' : 'text-neutral-400 hover:text-neutral-600'}`}
+        title="Grid view"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+      </button>
+    </div>
+  )
+
   if (authLoading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
@@ -180,77 +206,56 @@ export default function CategoriesPage() {
               </div>
             </div>
             
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-admin-primary text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
-            >
+            <Button onClick={() => setShowCreateModal(true)}>
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               New Category
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4">
-            <div className="flex">
-              <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="ml-3">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            </div>
+          <div className="mb-6">
+            <Alert type="error" message={error} />
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-neutral-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600">Total Categories</p>
-                <p className="text-3xl font-bold text-neutral-900 mt-1">{categories.length}</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-neutral-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600">Total Documents</p>
-                <p className="text-3xl font-bold text-neutral-900 mt-1">{totalDocuments}</p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-neutral-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600">Custom Categories</p>
-                <p className="text-3xl font-bold text-neutral-900 mt-1">
-                  {categories.filter(c => !c.is_system).length}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <CategoryStatsCard
+            label="Total Categories"
+            value={categories.length}
+            color="bg-purple-100"
+            icon={
+              <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            }
+          />
+          
+          <CategoryStatsCard
+            label="Total Documents"
+            value={totalDocuments}
+            color="bg-blue-100"
+            icon={
+              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+          />
+          
+          <CategoryStatsCard
+            label="Custom Categories"
+            value={categories.filter(c => !c.is_system).length}
+            color="bg-green-100"
+            icon={
+              <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          />
         </div>
 
         <div className="bg-white rounded-lg border border-neutral-200 mb-6">
@@ -258,27 +263,7 @@ export default function CategoriesPage() {
             <h2 className="text-lg font-semibold text-neutral-900">
               {categories.length} {categories.length === 1 ? 'Category' : 'Categories'}
             </h2>
-            
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-neutral-100 text-admin-primary' : 'text-neutral-400 hover:text-neutral-600'}`}
-                title="List view"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-neutral-100 text-admin-primary' : 'text-neutral-400 hover:text-neutral-600'}`}
-                title="Grid view"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-            </div>
+            <ViewModeToggle />
           </div>
 
           {categories.length === 0 ? (
@@ -288,14 +273,22 @@ export default function CategoriesPage() {
               </svg>
               <h3 className="text-lg font-medium text-neutral-900 mb-2">No categories yet</h3>
               <p className="text-neutral-600 mb-4">Create your first category to organize documents</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-admin-primary text-white rounded-md hover:bg-blue-700 font-medium"
-              >
+              <Button onClick={() => setShowCreateModal(true)}>
                 Create Category
-              </button>
+              </Button>
             </div>
-          ) : viewMode === 'list' ? (
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+              {sortedCategories.map((category) => (
+                <CategoryCard
+                  key={category.id}
+                  category={category}
+                  onEdit={() => setEditingCategory(category)}
+                  onDelete={() => setDeletingCategory(category)}
+                />
+              ))}
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -319,26 +312,13 @@ export default function CategoriesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       Type
                     </th>
-                    <th className="px-6 py-3 text-left">
+                    <th className="px-6 py-3 text-center">
                       <button
                         onClick={() => handleSort('documents')}
                         className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900"
                       >
                         <span>Documents</span>
                         {sortField === 'documents' && (
-                          <svg className={`h-4 w-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </button>
-                    </th>
-                    <th className="px-6 py-3 text-left">
-                      <button
-                        onClick={() => handleSort('updated')}
-                        className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900"
-                      >
-                        <span>Last Updated</span>
-                        {sortField === 'updated' && (
                           <svg className={`h-4 w-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                           </svg>
@@ -364,9 +344,7 @@ export default function CategoriesPage() {
                               style={{ backgroundColor: category.color_hex }}
                             />
                           </div>
-                          <div>
-                            <div className="font-medium text-neutral-900">{category.name}</div>
-                          </div>
+                          <div className="font-medium text-neutral-900">{category.name}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -376,284 +354,85 @@ export default function CategoriesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {category.is_system ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-                            System
-                          </span>
+                          <Badge variant="default">System</Badge>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Custom
-                          </span>
+                          <Badge variant="success">Custom</Badge>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-neutral-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="text-sm font-medium text-neutral-900">
                           {category.documents_count || 0}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-neutral-600">
-                          {new Date(category.updated_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </div>
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => setEditingCategory(category)}
-                            className="p-1.5 text-neutral-400 hover:text-admin-primary transition-colors"
-                            title="Edit category"
-                          >
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => setDeletingCategory(category)}
-                            className="p-1.5 text-neutral-400 hover:text-red-600 transition-colors"
-                            title="Delete category"
-                          >
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
+                        {!category.is_system && (
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => setEditingCategory(category)}
+                              className="p-1 text-neutral-600 hover:text-admin-primary"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setDeletingCategory(category)}
+                              className="p-1 text-neutral-600 hover:text-red-600"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className="bg-white rounded-lg border border-neutral-200 p-6 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="h-10 w-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: category.color_hex + '20' }}
-                      >
-                        <div
-                          className="h-6 w-6 rounded"
-                          style={{ backgroundColor: category.color_hex }}
-                        />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-neutral-900">{category.name}</h3>
-                        {category.is_system && (
-                          <span className="text-xs text-neutral-500">System</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => setEditingCategory(category)}
-                        className="p-1 text-neutral-400 hover:text-admin-primary"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => setDeletingCategory(category)}
-                        className="p-1 text-neutral-400 hover:text-red-600"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
-                    {category.description || 'No description'}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
-                    <span className="text-sm text-neutral-600">Documents</span>
-                    <span className="font-medium text-neutral-900">{category.documents_count || 0}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
         </div>
       </main>
 
-      {showCreateModal && (
-        <CategoryModal
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleCreateCategory}
-          title="Create New Category"
-        />
-      )}
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}>
+        <ModalHeader title="Create New Category" onClose={() => setShowCreateModal(false)} />
+        <ModalContent>
+          <CategoryForm
+            onSave={handleCreateCategory}
+            onCancel={() => setShowCreateModal(false)}
+          />
+        </ModalContent>
+      </Modal>
 
-      {editingCategory && (
-        <CategoryModal
-          category={editingCategory}
-          onClose={() => setEditingCategory(null)}
-          onSave={(data) => handleUpdateCategory(editingCategory.id, data)}
-          title="Edit Category"
-        />
-      )}
+      <Modal isOpen={!!editingCategory} onClose={() => setEditingCategory(null)}>
+        <ModalHeader title="Edit Category" onClose={() => setEditingCategory(null)} />
+        <ModalContent>
+          <CategoryForm
+            category={editingCategory!}
+            onSave={(data) => handleUpdateCategory(editingCategory!.id, data)}
+            onCancel={() => setEditingCategory(null)}
+          />
+        </ModalContent>
+      </Modal>
 
-      {deletingCategory && (
-        <DeleteConfirmModal
-          category={deletingCategory}
-          onClose={() => setDeletingCategory(null)}
-          onConfirm={() => handleDeleteCategory(deletingCategory.id)}
-        />
-      )}
-    </div>
-  )
-}
-
-function CategoryModal({ 
-  category, 
-  onClose, 
-  onSave, 
-  title 
-}: { 
-  category?: Category
-  onClose: () => void
-  onSave: (data: CategoryCreateData) => void
-  title: string
-}) {
-  const [formData, setFormData] = useState({
-    name: category?.name || '',
-    description: category?.description || '',
-    color_hex: category?.color_hex || '#6366f1',
-    icon_name: category?.icon_name || 'folder'
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // For now, send translation in English only
-    // TODO: Get user's current interface language from settings
-    const userLanguage = 'en'
-    
-    const submitData = {
-      translations: {
-        [userLanguage]: {
-          name: formData.name,
-          description: formData.description || undefined
-        }
-      },
-      color_hex: formData.color_hex,
-      icon_name: formData.icon_name,
-      sort_order: category?.sort_order || 999,
-      is_active: category?.is_active !== undefined ? category.is_active : true
-    }
-    
-    onSave(submitData)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h2 className="text-xl font-bold text-neutral-900 mb-4">{title}</h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Category Name
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-admin-primary"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-admin-primary"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Color
-            </label>
-            <input
-              type="color"
-              value={formData.color_hex}
-              onChange={(e) => setFormData({ ...formData, color_hex: e.target.value })}
-              className="w-full h-10 border border-neutral-300 rounded-md cursor-pointer"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-neutral-300 rounded-md text-neutral-700 hover:bg-neutral-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-admin-primary text-white rounded-md hover:bg-blue-700"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-function DeleteConfirmModal({ 
-  category, 
-  onClose, 
-  onConfirm 
-}: { 
-  category: Category
-  onClose: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h2 className="text-xl font-bold text-neutral-900 mb-4">Delete Category</h2>
-        
-        <p className="text-neutral-600 mb-6">
-          Are you sure you want to delete <strong>{category.name}</strong>? 
-          Documents in this category will be moved to &ldquo;Other&rdquo;.
-        </p>
-
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-neutral-300 rounded-md text-neutral-700 hover:bg-neutral-50"
-          >
+      <Modal isOpen={!!deletingCategory} onClose={() => setDeletingCategory(null)}>
+        <ModalHeader title="Delete Category" onClose={() => setDeletingCategory(null)} />
+        <ModalContent>
+          <p className="text-neutral-600 mb-6">
+            Are you sure you want to delete <strong>{deletingCategory?.name}</strong>? 
+            Documents in this category will be moved to "Other".
+          </p>
+        </ModalContent>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setDeletingCategory(null)}>
             Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-          >
+          </Button>
+          <Button variant="danger" onClick={() => handleDeleteCategory(deletingCategory!.id)}>
             Delete
-          </button>
-        </div>
-      </div>
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   )
 }

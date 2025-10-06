@@ -89,6 +89,7 @@ class CategoryService:
                 category_responses.append(CategoryResponse(
                     id=str(category.id),
                     reference_key=category.reference_key,
+                    category_code=category.category_code,
                     name=translation.name,
                     description=translation.description,
                     color_hex=category.color_hex,
@@ -137,9 +138,19 @@ class CategoryService:
                 reference_key = f"{base_key}_{counter}"
                 counter += 1
             
+            # Generate next category code for user (C01, C02, etc.)
+            user_category_count = session.execute(
+                select(func.count(Category.id)).where(
+                    Category.user_id == user_id,
+                    Category.is_system == False
+                )
+            ).scalar() or 0
+            category_code = f"C{str(user_category_count + 1).zfill(2)}"
+            
             # Create category
             new_category = Category(
                 reference_key=reference_key,
+                category_code=category_code,
                 color_hex=category_data.color_hex,
                 icon_name=category_data.icon_name,
                 is_system=False,
@@ -189,6 +200,7 @@ class CategoryService:
             return CategoryResponse(
                 id=str(new_category.id),
                 reference_key=new_category.reference_key,
+                category_code=new_category.category_code,
                 name=user_translation.name,
                 description=user_translation.description,
                 color_hex=new_category.color_hex,
@@ -308,6 +320,7 @@ class CategoryService:
             return CategoryResponse(
                 id=str(category.id),
                 reference_key=category.reference_key,
+                category_code=category.category_code,
                 name=user_translation.name,
                 description=user_translation.description,
                 color_hex=category.color_hex,
@@ -479,6 +492,7 @@ class CategoryService:
 
                 new_category = Category(
                     reference_key=cat_data['reference_key'],
+                    category_code=cat_data['category_code'],
                     color_hex=cat_data['color_hex'],
                     icon_name=cat_data['icon_name'],
                     is_system=True,

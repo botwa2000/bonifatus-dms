@@ -58,6 +58,7 @@ class CategoryResponse(BaseModel):
     """Category response - returns only user's preferred language"""
     id: str = Field(..., description="Category UUID")
     reference_key: str = Field(..., description="Unique reference key")
+    category_code: str = Field(..., description="3-character category code")
     name: str = Field(..., description="Category name in user's language")
     description: Optional[str] = Field(None, description="Category description in user's language")
     color_hex: str = Field(..., description="Category color")
