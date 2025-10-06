@@ -421,7 +421,7 @@ export default function CategoriesPage() {
         <ModalContent>
           <p className="text-neutral-600 mb-6">
             Are you sure you want to delete <strong>{deletingCategory?.name}</strong>? 
-            Documents in this category will be moved to "Other".
+            Documents in this category will be moved to &quot;Other&quot;.
           </p>
         </ModalContent>
         <ModalFooter>
