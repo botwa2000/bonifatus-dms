@@ -21,8 +21,26 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme');
+                  if (theme === 'dark' || theme === 'light') {
+                    document.documentElement.classList.add(theme);
+                  } else {
+                    document.documentElement.classList.add('light');
+                  }
+                } catch (e) {
+                  document.documentElement.classList.add('light');
+                }
+              })();
+            `,
+          }}
+        />
         <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
       <body className={inter.className}>
