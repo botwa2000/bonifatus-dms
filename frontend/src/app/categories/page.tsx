@@ -69,6 +69,21 @@ export default function CategoriesPage() {
     }
   }, [isAuthenticated])
 
+  // Reload categories when user returns to page (catches language changes)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        loadCategories()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isAuthenticated])
+
   const loadCategories = async () => {
     try {
       setIsLoading(true)
@@ -376,10 +391,9 @@ export default function CategoriesPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        {!category.is_system && (
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => setEditingCategory(category)}
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => setEditingCategory(category)}
                               className="p-1 text-neutral-600 hover:text-admin-primary"
                             >
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -393,9 +407,8 @@ export default function CategoriesPage() {
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                            </button>
-                          </div>
-                        )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
