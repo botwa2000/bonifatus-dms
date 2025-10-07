@@ -125,9 +125,10 @@ class Document(Base, TimestampMixin):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
     
-    user = relationship("User", back_populates="documents")
-    category = relationship("Category", back_populates="documents")
-    languages = relationship("DocumentLanguage", back_populates="document", cascade="all, delete-orphan")
+    # Relationships
+    user = relationship("User", back_populates="categories")
+    translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
+    documents = relationship("Document", back_populates="category")
 
     __table_args__ = (
         Index('idx_document_user_id', 'user_id'),
