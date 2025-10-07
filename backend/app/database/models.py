@@ -67,6 +67,7 @@ class Category(Base, TimestampMixin):
     # Relationships
     user = relationship("User", back_populates="categories")
     translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
+    documents = relationship("Document", back_populates="category")
 
     __table_args__ = (
         Index('idx_category_user_id', 'user_id'),
