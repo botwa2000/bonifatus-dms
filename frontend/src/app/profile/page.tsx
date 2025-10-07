@@ -29,7 +29,7 @@ interface UserStatistics {
 }
 
 export default function ProfilePage() {
-  const { isAuthenticated, user, isLoading, logout } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
@@ -112,7 +112,7 @@ export default function ProfilePage() {
     }
   }
 
-  const getTierBadgeVariant = (tier: string): 'default' | 'success' | 'warning' | 'danger' => {
+  const getTierBadgeVariant = (tier: string): 'default' | 'success' | 'warning' | 'error' => {
     switch (tier?.toLowerCase()) {
       case 'premium': return 'warning'
       case 'enterprise': return 'success'
