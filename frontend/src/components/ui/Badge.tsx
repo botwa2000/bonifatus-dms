@@ -1,24 +1,22 @@
 // frontend/src/components/ui/Badge.tsx
-export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger'
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
 
-export function Badge({ 
-  children, 
-  variant = 'default' 
-}: { 
+interface BadgeProps {
   children: React.ReactNode
   variant?: BadgeVariant
-}) {
+}
+
+export function Badge({ children, variant = 'default' }: BadgeProps) {
   const variants = {
-    default: 'bg-neutral-100 text-neutral-800 border-neutral-300',
-    success: 'bg-green-100 text-green-800 border-green-300',
-    warning: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    danger: 'bg-red-100 text-red-800 border-red-300',
+    default: 'bg-neutral-100 text-neutral-700',
+    success: 'bg-green-100 text-green-700',
+    warning: 'bg-yellow-100 text-yellow-700',
     error: 'bg-red-100 text-red-700',
     info: 'bg-blue-100 text-blue-700'
   }
   
   return (
-    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${variants[variant]}`}>
+    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${variants[variant]}`}>
       {children}
     </span>
   )

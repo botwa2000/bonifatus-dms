@@ -1,12 +1,13 @@
 // frontend/src/app/documents/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { apiClient } from '@/services/api-client'
 import { Button, Alert, Badge } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
+import { useEffect, useState, useCallback } from 'react'
 
 interface Category {
   id: string
@@ -82,7 +83,7 @@ export default function DocumentsPage() {
     }
   }
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -111,7 +112,7 @@ export default function DocumentsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, searchQuery, selectedCategory, sortField, sortDirection])
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
@@ -184,13 +185,13 @@ export default function DocumentsPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      uploaded: { label: 'Uploaded', variant: 'success' as const },
-      processing: { label: 'Processing', variant: 'warning' as const },
-      completed: { label: 'Ready', variant: 'success' as const },
-      failed: { label: 'Failed', variant: 'error' as const }
+    const statusConfig: Record<string, { label: string; variant: BadgeVariant }> = {
+      uploaded: { label: 'Uploaded', variant: 'success' },
+      processing: { label: 'Processing', variant: 'warning' },
+      completed: { label: 'Ready', variant: 'success' },
+      failed: { label: 'Failed', variant: 'error' }
     }
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.uploaded
+    const config = statusConfig[status] || statusConfig.uploaded
     return <Badge variant={config.variant}>{config.label}</Badge>
   }
 
@@ -564,7 +565,7 @@ export default function DocumentsPage() {
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">Delete Document</h3>
             <p className="text-sm text-neutral-600 mb-4">
-              Are you sure you want to delete "{deletingDocument.title}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{deletingDocument.title}&quot;? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
               <Button variant="secondary" onClick={() => setDeletingDocument(null)}>
