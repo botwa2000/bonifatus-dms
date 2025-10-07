@@ -101,9 +101,10 @@ export default function ProfilePage() {
       
       setMessage({ type: 'success', text: 'Account deactivated. Signing out...' })
       
-      setTimeout(async () => {
-        await logout()
-        router.push('/')
+      setTimeout(() => {
+        logout().then(() => {
+          router.push('/')
+        })
       }, 2000)
     } catch (error) {
       console.error('Failed to delete account:', error)
