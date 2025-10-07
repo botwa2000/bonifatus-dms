@@ -65,10 +65,8 @@ class Category(Base, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relationships
-    user = relationship("User", back_populates="documents")
-    category = relationship("Category", back_populates="documents")  # Keep for backward compatibility
-    categories = relationship("DocumentCategory", back_populates="document", cascade="all, delete-orphan")
-    languages = relationship("DocumentLanguage", back_populates="document", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="categories")
+    translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_category_user_id', 'user_id'),
