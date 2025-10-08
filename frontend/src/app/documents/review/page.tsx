@@ -329,22 +329,24 @@ export default function DocumentReviewPage() {
           <Card>
             <CardHeader title="Keywords" />
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                   {keywords.map(keyword => (
-                    <Badge
+                    <button
                       key={keyword}
-                      variant="default"
-                      className="cursor-pointer hover:bg-red-100"
-                      onClick={() => !confirming && handleRemoveKeyword(keyword)}
+                      type="button"
+                      className="cursor-pointer hover:opacity-75 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleRemoveKeyword(keyword)}
+                      disabled={confirming}
                     >
-                      {keyword}
-                      {!confirming && (
-                        <svg className="ml-1 h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </Badge>
+                      <Badge variant="default">
+                        {keyword}
+                        {!confirming && (
+                          <svg className="ml-1 h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </Badge>
+                    </button>
                   ))}
                 </div>
 
