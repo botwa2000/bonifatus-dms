@@ -1,27 +1,11 @@
-// frontend/src/app/documents/upload/page.tsx
+// frontend/src/app/documents/upload/page.tsx - UPDATED FOR AI ANALYSIS FLOW
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
-import { apiClient } from '@/services/api-client'
-import { Card, CardHeader, CardContent, Button, Input, Alert } from '@/components/ui'
-
-interface Category {
-  id: string
-  name: string
-  color_hex: string
-  icon_name: string
-}
-
-interface UploadedDocument {
-  id: string
-  title: string
-  file_name: string
-  file_size: number
-  web_view_link?: string
-}
+import { Card, CardHeader, CardContent, Button, Alert } from '@/components/ui'
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 const ALLOWED_TYPES = [
@@ -32,20 +16,18 @@ const ALLOWED_TYPES = [
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain'
 ]
 
 export default function DocumentUploadPage() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  
   const [mounted, setMounted] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
@@ -58,22 +40,6 @@ export default function DocumentUploadPage() {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router])
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadCategories()
-    }
-  }, [isAuthenticated])
-
-  const loadCategories = async () => {
-    try {
-      const data = await apiClient.get<{ categories: Category[] }>('/api/v1/categories', true)
-      setCategories(data.categories)
-    } catch (error) {
-      console.error('Failed to load categories:', error)
-      setMessage({ type: 'error', text: 'Failed to load categories' })
-    }
-  }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -108,88 +74,72 @@ export default function DocumentUploadPage() {
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setMessage({ type: 'error', text: 'File type not supported' })
+      setMessage({ type: 'error', text: 'File type not supported. Allowed: PDF, Images, Word, Excel, Text' })
       return
     }
 
     setSelectedFile(file)
     setMessage(null)
-    
-    if (!title) {
-      const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
-      setTitle(nameWithoutExt)
-    }
   }
 
-  const handleCategoryToggle = (categoryId: string) => {
-    setSelectedCategories(prev => {
-      if (prev.includes(categoryId)) {
-        return prev.filter(id => id !== categoryId)
-      } else {
-        return [...prev, categoryId]
-      }
-    })
-  }
-
-  const handleUpload = async () => {
-    if (!selectedFile || selectedCategories.length === 0) {
-      setMessage({ type: 'error', text: 'Please select a file and at least one category' })
+  const handleAnalyze = async () => {
+    if (!selectedFile) {
+      setMessage({ type: 'error', text: 'Please select a file first' })
       return
     }
 
-    setUploading(true)
+    setAnalyzing(true)
     setMessage(null)
-    setUploadProgress(0)
+    setAnalysisProgress(0)
 
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
-      formData.append('title', title || selectedFile.name)
-      formData.append('description', description || '')
-      selectedCategories.forEach(catId => {
-        formData.append('category_ids', catId)
-      })
 
+      // Simulate progress
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90))
-      }, 200)
+        setAnalysisProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + 10
+        })
+      }, 300)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/upload`, {
+      const accessToken = localStorage.getItem('access_token')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/analyze`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: formData
       })
 
       clearInterval(progressInterval)
+      setAnalysisProgress(100)
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || 'Upload failed')
+        throw new Error(errorData.detail || 'Analysis failed')
       }
 
-      const uploadedDoc: UploadedDocument = await response.json()
-      setUploadProgress(100)
+      const result = await response.json()
       
-      setMessage({ 
-        type: 'success', 
-        text: `Document "${uploadedDoc.title}" uploaded successfully!` 
-      })
-
+      // Redirect to review page with temp_id
       setTimeout(() => {
-        router.push('/documents')
-      }, 2000)
+        router.push(`/documents/upload/review?temp_id=${result.temp_id}`)
+      }, 500)
 
-    } catch (error) {
-      console.error('Upload error:', error)
+    } catch (error: any) {
+      console.error('Analysis error:', error)
       setMessage({ 
         type: 'error', 
-        text: error instanceof Error ? error.message : 'Upload failed' 
+        text: error.message || 'Failed to analyze document' 
       })
-      setUploadProgress(0)
+      setAnalysisProgress(0)
     } finally {
-      setUploading(false)
+      setAnalyzing(false)
     }
   }
 
@@ -224,7 +174,7 @@ export default function DocumentUploadPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-neutral-900">Upload Document</h1>
-              <p className="text-sm text-neutral-600">Add files to your library</p>
+              <p className="text-sm text-neutral-600">AI will analyze and suggest category</p>
             </div>
           </div>
         </div>
@@ -238,6 +188,7 @@ export default function DocumentUploadPage() {
         )}
 
         <div className="space-y-6">
+          {/* File Selection */}
           <Card>
             <CardHeader title="Select File" />
             <CardContent>
@@ -258,7 +209,7 @@ export default function DocumentUploadPage() {
                   className="hidden"
                   onChange={handleFileInput}
                   accept={ALLOWED_TYPES.join(',')}
-                  disabled={uploading}
+                  disabled={analyzing}
                 />
                 
                 {selectedFile ? (
@@ -272,12 +223,14 @@ export default function DocumentUploadPage() {
                       <p className="text-sm font-medium text-neutral-900">{selectedFile.name}</p>
                       <p className="text-xs text-neutral-500">{formatFileSize(selectedFile.size)}</p>
                     </div>
-                    <label
-                      htmlFor="file-upload"
-                      className="inline-flex cursor-pointer text-sm text-admin-primary hover:text-admin-primary/80"
-                    >
-                      Change file
-                    </label>
+                    {!analyzing && (
+                      <label
+                        htmlFor="file-upload"
+                        className="inline-flex cursor-pointer text-sm text-admin-primary hover:text-admin-primary/80"
+                      >
+                        Change file
+                      </label>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -296,7 +249,7 @@ export default function DocumentUploadPage() {
                       <span className="text-sm text-neutral-500"> or drag and drop</span>
                     </div>
                     <p className="text-xs text-neutral-500">
-                      PDF, Images, Word, Excel (max 100MB)
+                      PDF, Images, Word, Excel, Text (max 100MB)
                     </p>
                   </div>
                 )}
@@ -304,106 +257,77 @@ export default function DocumentUploadPage() {
             </CardContent>
           </Card>
 
+          {/* How It Works */}
           <Card>
-            <CardHeader title="Document Details" />
+            <CardHeader title="How It Works" />
             <CardContent>
-              <Input
-                label="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Document title"
-                disabled={uploading}
-              />
-              
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Description <span className="text-neutral-500">(optional)</span>
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Document description"
-                  rows={3}
-                  disabled={uploading}
-                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary disabled:bg-neutral-100 disabled:cursor-not-allowed"
-                />
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-admin-primary text-white flex items-center justify-center text-sm font-medium">
+                    1
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900">Upload Document</p>
+                    <p className="text-sm text-neutral-600">Select your file (PDF, images, documents)</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-admin-primary text-white flex items-center justify-center text-sm font-medium">
+                    2
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900">AI Analysis</p>
+                    <p className="text-sm text-neutral-600">Extract text, keywords, and suggest category</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 h-6 w-6 rounded-full bg-admin-primary text-white flex items-center justify-center text-sm font-medium">
+                    3
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900">Review & Confirm</p>
+                    <p className="text-sm text-neutral-600">Verify or edit AI suggestions before saving</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader title="Assign Categories" />
-            <CardContent>
-              <p className="text-sm text-neutral-600 mb-4">
-                Select one or more categories for this document
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {categories.map((category) => (
-                  <label
-                    key={category.id}
-                    className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCategories.includes(category.id)
-                        ? 'border-admin-primary bg-blue-50'
-                        : 'border-neutral-300 hover:border-neutral-400'
-                    } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(category.id)}
-                      onChange={() => handleCategoryToggle(category.id)}
-                      disabled={uploading}
-                      className="h-4 w-4 text-admin-primary focus:ring-admin-primary border-neutral-300 rounded"
-                    />
-                    <div className="flex items-center space-x-2 flex-1">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: category.color_hex }}
-                      />
-                      <span className="text-sm font-medium text-neutral-900">
-                        {category.name}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {categories.length === 0 && (
-                <p className="text-sm text-neutral-500 text-center py-4">
-                  No categories available. Please create categories first.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {uploading && (
+          {/* Analysis Progress */}
+          {analyzing && (
             <Card>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-neutral-700">Uploading...</span>
-                    <span className="text-neutral-900 font-medium">{uploadProgress}%</span>
+                    <span className="text-neutral-700">Analyzing document...</span>
+                    <span className="text-neutral-900 font-medium">{analysisProgress}%</span>
                   </div>
                   <div className="w-full bg-neutral-200 rounded-full h-2">
                     <div
                       className="bg-admin-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
+                      style={{ width: `${analysisProgress}%` }}
                     />
                   </div>
+                  <p className="text-xs text-neutral-600 text-center">
+                    Extracting text, analyzing content, and detecting keywords...
+                  </p>
                 </div>
               </CardContent>
             </Card>
           )}
 
+          {/* Action Buttons */}
           <div className="flex justify-end space-x-3">
             <Link href="/documents">
-              <Button variant="secondary" disabled={uploading}>
+              <Button variant="secondary" disabled={analyzing}>
                 Cancel
               </Button>
             </Link>
             <Button
-              onClick={handleUpload}
-              disabled={!selectedFile || selectedCategories.length === 0 || uploading}
+              onClick={handleAnalyze}
+              disabled={!selectedFile || analyzing}
             >
-              {uploading ? 'Uploading...' : 'Upload Document'}
+              {analyzing ? 'Analyzing...' : 'Analyze Document'}
             </Button>
           </div>
         </div>
