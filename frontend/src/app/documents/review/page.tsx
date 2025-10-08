@@ -1,7 +1,7 @@
 // frontend/src/app/documents/upload/review/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
@@ -36,7 +36,7 @@ interface AnalysisResult {
   }
 }
 
-export default function DocumentReviewPage() {
+function DocumentReviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isAuthenticated, isLoading } = useAuth()
@@ -404,5 +404,20 @@ export default function DocumentReviewPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function DocumentReviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-sm text-neutral-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <DocumentReviewPageContent />
+    </Suspense>
   )
 }
