@@ -131,8 +131,9 @@ export default function DocumentUploadPage() {
         router.push(`/documents/upload/review?temp_id=${result.temp_id}`)
       }, 500)
 
-    } catch (error) {
-      console.error('Analysis error:', error)
+    } catch (err) {
+      console.error('Analysis error:', err)
+      const error = err as Error
       setMessage({ 
         type: 'error', 
         text: error.message || 'Failed to analyze document' 
