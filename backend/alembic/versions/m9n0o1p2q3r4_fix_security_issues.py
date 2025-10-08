@@ -2,7 +2,7 @@
 """fix security issues - rls and function search path
 
 Revision ID: m9n0o1p2q3r4
-Revises: j5e6f7g8h9i0
+Revises: l6m7n8o9p0q1
 Create Date: 2025-10-08 12:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'm9n0o1p2q3r4'
-down_revision = 'j5e6f7g8h9i0'
+down_revision = 'l6m7n8o9p0q1'
 branch_labels = None
 depends_on = None
 
