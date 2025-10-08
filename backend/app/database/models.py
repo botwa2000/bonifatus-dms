@@ -113,19 +113,19 @@ class Document(Base, TimestampMixin):
     
     # Processing status
     processing_status = Column(String(20), nullable=False, default="pending")
-    extracted_text = Column(Text, nullable=True)  # Primary language text
-    keywords = Column(Text, nullable=True)  # Primary language keywords
+    extracted_text = Column(Text, nullable=True)
+    keywords = Column(Text, nullable=True)
     confidence_score = Column(Integer, nullable=True)
     
     # Language detection
-    primary_language = Column(String(5), nullable=True, index=True)  # ISO 639-1
-    detected_languages = Column(Text, nullable=True)  # JSON array of detected languages
+    primary_language = Column(String(5), nullable=True, index=True)
+    detected_languages = Column(Text, nullable=True)
     
     # Foreign Keys
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
     
-    # Relationships
+    # Relationships - CORRECT VERSION
     user = relationship("User", back_populates="documents")
     category = relationship("Category", back_populates="documents")
     categories = relationship("DocumentCategory", back_populates="document", cascade="all, delete-orphan")

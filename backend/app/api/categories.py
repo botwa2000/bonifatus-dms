@@ -65,6 +65,10 @@ async def list_categories(
     try:
         user_language = await get_user_language(current_user, session)
         
+        # DEBUG LOGGING
+        logger.info(f"Listing categories for user: {current_user.email}")
+        logger.info(f"Detected user language: {user_language}")
+
         categories = await category_service.list_categories(
             user_id=str(current_user.id),
             user_language=user_language,
@@ -111,6 +115,11 @@ async def create_category(
         ip_address = get_client_ip(request)
         user_language = await get_user_language(current_user, session)
         
+        # DEBUG LOGGING
+        logger.info(f"Creating category for user: {current_user.email}")
+        logger.info(f"User language: {user_language}")
+        logger.info(f"Category data: {category_data.dict()}")
+
         category = await category_service.create_category(
             user_id=str(current_user.id),
             user_email=current_user.email,
