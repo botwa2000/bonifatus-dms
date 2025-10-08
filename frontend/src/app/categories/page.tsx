@@ -42,45 +42,28 @@ export default function CategoriesPage() {
   }, [isAuthenticated, authLoading, router])
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+
     if (isAuthenticated) {
+      // Initial load
       loadCategories()
-    }
-  }, [isAuthenticated])
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated) {
-        loadCategories()
+      // Only reload on visibility change if more than 5 seconds have passed
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          clearTimeout(timeoutId)
+          timeoutId = setTimeout(() => {
+            loadCategories()
+          }, 1000) // Debounce by 1 second
+        }
       }
-    }
 
-    const handleFocus = () => {
-      if (isAuthenticated) {
-        loadCategories()
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      
+      return () => {
+        clearTimeout(timeoutId)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
       }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [isAuthenticated])
-
-  // Reload categories when user returns to page (catches language changes)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated) {
-        loadCategories()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [isAuthenticated])
 

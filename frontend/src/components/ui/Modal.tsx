@@ -22,8 +22,8 @@ export function Modal({
 }
 
 export function ModalHeader({ 
-  title, 
-  onClose 
+  title,
+  onClose
 }: { 
   title: string
   onClose?: () => void
