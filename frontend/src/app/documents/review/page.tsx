@@ -71,7 +71,7 @@ export default function DocumentReviewPage() {
 
   const loadAnalysisResult = async (id: string) => {
     try {
-      const response = await apiClient.get<any>(`/api/v1/documents/analyze/${id}`, true)
+      const response = await apiClient.get<{ analysis: AnalysisResult; file_name: string; expires_at: string }>(`/api/v1/documents/analyze/${id}`, true)
       setAnalysis(response.analysis)
       
       // Pre-fill form with AI suggestions
