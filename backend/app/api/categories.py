@@ -25,7 +25,7 @@ async def get_user_language(user: User, session) -> str:
         user_setting = session.execute(
             select(UserSetting).where(
                 UserSetting.user_id == user.id,
-                UserSetting.setting_key == 'interface_language'
+                UserSetting.setting_key == 'language'
             )
         ).scalar_one_or_none()
         

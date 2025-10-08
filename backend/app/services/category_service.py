@@ -139,13 +139,26 @@ class CategoryService:
                 counter += 1
             
             # Generate next category code for user (C01, C02, etc.)
-            user_category_count = session.execute(
-                select(func.count(Category.id)).where(
+            # Find the highest existing code number and increment
+            existing_codes = session.execute(
+                select(Category.category_code).where(
                     Category.user_id == user_id,
-                    Category.is_system == False
+                    Category.is_system == False,
+                    Category.category_code.like('C%')
                 )
-            ).scalar() or 0
-            category_code = f"C{str(user_category_count + 1).zfill(2)}"
+            ).scalars().all()
+
+            # Extract numbers from codes like C01, C02, etc.
+            max_code_num = 0
+            for code in existing_codes:
+                try:
+                    num = int(code[1:])  # Extract number from C01, C02, etc.
+                    max_code_num = max(max_code_num, num)
+                except ValueError:
+                    continue
+
+            category_code = f"C{str(max_code_num + 1).zfill(2)}"
+            logger.info(f"Generated category code: {category_code} (previous max: C{str(max_code_num).zfill(2)})")
             
             # Create category
             new_category = Category(
