@@ -121,10 +121,11 @@ class Document(Base, TimestampMixin):
     primary_language = Column(String(5), nullable=True, index=True)  # ISO 639-1
     detected_languages = Column(Text, nullable=True)  # JSON array of detected languages
     
-    # Relationships
+    # Foreign Keys
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
     
+    # Relationships
     user = relationship("User", back_populates="documents")
     category = relationship("Category", back_populates="documents")
     categories = relationship("DocumentCategory", back_populates="document", cascade="all, delete-orphan")
