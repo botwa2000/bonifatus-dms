@@ -130,7 +130,7 @@ export default function DocumentReviewPage() {
     setMessage(null)
 
     try {
-      const response = await apiClient.post(
+      await apiClient.post(
         '/api/v1/documents/confirm-upload',
         {
           temp_id: tempId,
@@ -151,7 +151,7 @@ export default function DocumentReviewPage() {
         router.push('/documents')
       }, 2000)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Upload confirmation failed:', error)
       setMessage({ 
         type: 'error', 

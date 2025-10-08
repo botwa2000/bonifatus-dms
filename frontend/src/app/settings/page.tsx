@@ -24,7 +24,7 @@ interface SystemSettings {
 }
 
 export default function SettingsPage() {
-  const { isAuthenticated, user, isLoading } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)

@@ -1,12 +1,10 @@
 // frontend/src/components/ui/Modal.tsx
 export function Modal({ 
   isOpen, 
-  onClose, 
   children,
   maxWidth = 'max-w-lg'
 }: { 
   isOpen: boolean
-  onClose: () => void
   children: React.ReactNode
   maxWidth?: string
 }) {

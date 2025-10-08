@@ -72,7 +72,7 @@ export default function DocumentsPage() {
       loadCategories()
       loadDocuments()
     }
-  }, [isAuthenticated, currentPage, searchQuery, selectedCategory, sortField, sortDirection])
+  }, [isAuthenticated, currentPage, searchQuery, selectedCategory, sortField, sortDirection, loadDocuments])
 
   const loadCategories = async () => {
     try {

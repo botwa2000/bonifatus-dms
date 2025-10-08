@@ -131,7 +131,7 @@ export default function DocumentUploadPage() {
         router.push(`/documents/upload/review?temp_id=${result.temp_id}`)
       }, 500)
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Analysis error:', error)
       setMessage({ 
         type: 'error', 
