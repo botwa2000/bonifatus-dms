@@ -151,11 +151,12 @@ export default function DocumentReviewPage() {
         router.push('/documents')
       }, 2000)
 
-    } catch (error) {
-      console.error('Upload confirmation failed:', error)
+    } catch (err) {
+      console.error('Upload confirmation failed:', err)
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.detail || 'Failed to confirm upload' 
+        text: error?.response?.data?.detail || error?.message || 'Failed to confirm upload' 
       })
     } finally {
       setConfirming(false)
