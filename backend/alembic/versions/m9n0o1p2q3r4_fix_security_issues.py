@@ -174,13 +174,12 @@ def upgrade():
         CREATE POLICY document_relationships_all_policy ON document_relationships
         FOR ALL
         USING (
-            source_document_id IN (
+            parent_document_id IN (
                 SELECT id FROM documents 
                 WHERE user_id = current_setting('app.current_user_id')::uuid
             )
         );
     """)
-
 
 def downgrade():
     # Remove RLS policies
