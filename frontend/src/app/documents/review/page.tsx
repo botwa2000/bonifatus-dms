@@ -329,7 +329,8 @@ export default function DocumentReviewPage() {
           <Card>
             <CardHeader title="Keywords" />
             <CardContent>
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
                   {keywords.map(keyword => (
                     <button
                       key={keyword}
