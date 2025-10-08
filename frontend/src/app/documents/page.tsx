@@ -72,7 +72,8 @@ export default function DocumentsPage() {
       loadCategories()
       loadDocuments()
     }
-  }, [isAuthenticated, currentPage, searchQuery, selectedCategory, sortField, sortDirection, loadDocuments])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentPage, searchQuery, selectedCategory, sortField, sortDirection])
 
   const loadCategories = async () => {
     try {
