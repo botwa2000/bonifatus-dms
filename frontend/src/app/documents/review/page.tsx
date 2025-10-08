@@ -8,6 +8,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Input, Alert, Select, Badge } from '@/components/ui'
 
+export const dynamic = 'force-dynamic'
+
 interface Category {
   id: string
   name: string
