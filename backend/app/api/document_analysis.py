@@ -14,7 +14,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.models.user import User
+from app.database.models import User
 from app.services.document_analysis_service import document_analysis_service
 from app.services.auth_service import auth_service
 from app.services.category_service import category_service
