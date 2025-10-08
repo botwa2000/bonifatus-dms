@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/services/auth.service'
-import Link from 'next/dist/client/link'
+import Link from 'next/link'
 
 export default function DashboardPage() {
   const { isAuthenticated, user, isLoading, logout } = useAuth()
@@ -221,19 +221,21 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center space-x-4">
-              <div className="h-12 w-12 bg-admin-primary rounded-lg flex items-center justify-center">
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-neutral-900">Upload Documents</h3>
-                <p className="text-sm text-neutral-600">Add new files to your library</p>
+          <Link href="/documents/upload">
+            <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:border-admin-primary hover:shadow-md transition-all cursor-pointer">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 bg-admin-primary rounded-lg flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900">Upload Documents</h3>
+                  <p className="text-sm text-neutral-600">Add new files to your library</p>
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           <div className="bg-white rounded-lg border border-neutral-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center space-x-4">
@@ -284,9 +286,11 @@ export default function DashboardPage() {
                 </svg>
                 <h4 className="text-lg font-medium text-neutral-900 mb-2">No documents yet</h4>
                 <p className="text-neutral-600 mb-4">Upload your first document to get started</p>
-                <button className="bg-admin-primary text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">
-                  Upload Document
-                </button>
+                <Link href="/documents/upload">
+                  <button className="bg-admin-primary text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">
+                    Upload Document
+                  </button>
+                </Link>
               </div>
             </div>
           </div>
