@@ -121,7 +121,21 @@ export default function DocumentUploadPage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || 'Analysis failed')
+        
+        // Extract error message from various possible structures
+        let errorMessage = 'Analysis failed'
+        
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail
+        } else if (errorData.detail && typeof errorData.detail === 'object') {
+          errorMessage = JSON.stringify(errorData.detail)
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
@@ -136,7 +150,9 @@ export default function DocumentUploadPage() {
       
       let errorMessage = 'Failed to analyze document'
       
-      if (err && typeof err === 'object') {
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else if (err && typeof err === 'object') {
         const apiError = err as {
           response?: {
             data?: {
