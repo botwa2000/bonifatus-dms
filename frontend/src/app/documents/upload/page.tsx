@@ -108,7 +108,7 @@ export default function DocumentUploadPage() {
       }, 300)
 
       const accessToken = localStorage.getItem('access_token')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/analyze`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/analyze`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`

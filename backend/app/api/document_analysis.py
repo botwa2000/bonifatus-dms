@@ -21,7 +21,7 @@ from app.services.category_service import category_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/documents", tags=["document_analysis"])
+router = APIRouter(prefix="/api/v1/document-analysis", tags=["document_analysis"])
 
 
 # Allowed file types and max size
