@@ -133,10 +133,26 @@ export default function DocumentUploadPage() {
 
     } catch (err) {
       console.error('Analysis error:', err)
-      const error = err as Error
+      
+      // Extract error message from API error structure
+      let errorMessage = 'Failed to analyze document'
+      
+      if (err && typeof err === 'object') {
+        const apiError = err as any
+        
+        // Try to get error message from various possible locations
+        if (apiError.response?.data?.detail) {
+          errorMessage = apiError.response.data.detail
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        } else if (typeof apiError.detail === 'string') {
+          errorMessage = apiError.detail
+        }
+      }
+      
       setMessage({ 
         type: 'error', 
-        text: error.message || 'Failed to analyze document' 
+        text: errorMessage
       })
       setAnalysisProgress(0)
     } finally {
