@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, CardHeader, CardContent, Button, Alert, Badge, Checkbox } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Alert, Badge } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 
 interface FileAnalysis {
@@ -259,16 +259,11 @@ export default function BatchUploadPage() {
     <div className="min-h-screen bg-neutral-50 p-8">
       <div className="max-w-6xl mx-auto">
         <Card>
-          <CardHeader>
-            <h1 className="text-2xl font-bold">Upload Documents</h1>
-            <p className="text-sm text-neutral-600">Upload multiple files at once</p>
-          </CardHeader>
+          <CardHeader title="Upload Documents" />
           
-          <CardContent className="space-y-6">
+          <CardContent>
             {message && (
-              <Alert variant={message.type === 'error' ? 'destructive' : 'success'}>
-                {message.text}
-              </Alert>
+              <Alert type={message.type} message={message.text} />
             )}
 
             {uploadStates.length === 0 ? (
@@ -289,7 +284,7 @@ export default function BatchUploadPage() {
                         <p className="font-medium">{selectedFiles.length} files selected</p>
                         <div className="flex flex-wrap gap-2 justify-center">
                           {selectedFiles.map((file, i) => (
-                            <Badge key={i} variant="secondary">
+                            <Badge key={i} variant="default">
                               {file.name}
                             </Badge>
                           ))}
@@ -370,7 +365,7 @@ export default function BatchUploadPage() {
                           <label className="text-sm font-medium">
                             Categories (select 1-5)
                             {state.analysis.confidence > 0 && (
-                              <Badge variant="secondary" className="ml-2">
+                              <Badge variant="info">
                                 AI: {state.analysis.confidence}% confident
                               </Badge>
                             )}
@@ -388,12 +383,17 @@ export default function BatchUploadPage() {
                                   }`}
                                   onClick={() => toggleCategory(index, cat.id)}
                                 >
-                                  <Checkbox checked={isSelected} />
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleCategory(index, cat.id)}
+                                    className="w-4 h-4 rounded border-gray-300"
+                                  />
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2">
                                       <span className="text-sm font-medium">{cat.name}</span>
                                       {isPrimary && (
-                                        <Badge variant="default" className="text-xs">Primary</Badge>
+                                        <Badge variant="default">Primary</Badge>
                                       )}
                                     </div>
                                   </div>
@@ -423,9 +423,9 @@ export default function BatchUploadPage() {
                           <label className="text-sm font-medium">Keywords</label>
                           <div className="flex flex-wrap gap-2">
                             {state.confirmed_keywords.map((keyword, i) => (
-                              <Badge key={i} variant="secondary">
-                                {keyword}
-                              </Badge>
+                              <Badge key={i} variant="default">
+                              {keyword}
+                            </Badge>
                             ))}
                           </div>
                         </div>
@@ -443,7 +443,7 @@ export default function BatchUploadPage() {
                     Upload All {uploadStates.length} Documents
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     onClick={() => setUploadStates([])}
                   >
                     Cancel
