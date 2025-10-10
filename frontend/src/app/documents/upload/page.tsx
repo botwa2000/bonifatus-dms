@@ -99,8 +99,15 @@ export default function BatchUploadPage() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Analysis failed')
+        let errorDetail = 'Analysis failed'
+        try {
+          const errorData = await response.json()
+          errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData)
+        } catch (parseError) {
+          const errorText = await response.text()
+          errorDetail = errorText || `Server error: ${response.status}`
+        }
+        throw new Error(errorDetail)
       }
 
       const result = await response.json()
@@ -124,9 +131,17 @@ export default function BatchUploadPage() {
 
     } catch (error) {
       console.error('Batch analysis error:', error)
+      let errorMessage = 'Analysis failed. Please try again.'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = (error as any).detail || (error as any).message || JSON.stringify(error)
+      }
+      
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Analysis failed'
+        text: errorMessage
       })
     } finally {
       setAnalyzing(false)
@@ -269,7 +284,7 @@ export default function BatchUploadPage() {
             {uploadStates.length === 0 ? (
               <>
                 {/* File Selection */}
-                <div className="border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg p-8 bg-white dark:bg-neutral-800">
+                <div className="border-2 border-dashed border-admin-primary/30 hover:border-admin-primary/60 dark:border-admin-primary/40 dark:hover:border-admin-primary/70 rounded-xl p-12 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900 transition-all duration-200 hover:shadow-lg">
                   <input
                     type="file"
                     multiple
@@ -278,22 +293,47 @@ export default function BatchUploadPage() {
                     className="hidden"
                     id="files-input"
                   />
-                  <label htmlFor="files-input" className="cursor-pointer block text-center">
+                  <label htmlFor="files-input" className="cursor-pointer block">
                     {selectedFiles.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="font-medium">{selectedFiles.length} files selected</p>
-                        <div className="flex flex-wrap gap-2 justify-center">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-center mb-4">
+                          <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                            <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        </div>
+                        <p className="font-semibold text-lg text-neutral-900 dark:text-neutral-100">{selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} selected</p>
+                        <div className="flex flex-wrap gap-2 justify-center max-w-2xl mx-auto">
                           {selectedFiles.map((file, i) => (
-                            <Badge key={i} variant="default">
+                            <Badge key={i} variant="default" className="text-sm py-1.5 px-3">
                               {file.name}
                             </Badge>
                           ))}
                         </div>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-4">Click to select different files</p>
                       </div>
                     ) : (
-                      <p className="text-neutral-600 dark:text-neutral-300">
-                        Click to select files or drag and drop
-                      </p>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-center mb-4">
+                          <div className="h-20 w-20 rounded-full bg-admin-primary/10 dark:bg-admin-primary/20 flex items-center justify-center">
+                            <svg className="h-10 w-10 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+                            Drop your files here
+                          </p>
+                          <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                            or click to browse from your computer
+                          </p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-500">
+                            Supported formats: PDF, DOC, DOCX, JPG, PNG • Max 50MB per file
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </label>
                 </div>
