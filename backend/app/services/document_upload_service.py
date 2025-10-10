@@ -383,3 +383,6 @@ class DocumentUploadService:
         if len(standardized) > 200:
             # Truncate title further if needed
             max_title_length = 200 - len(timestamp) - len(extension) - 3  # 3 for underscores and dot
+
+# Global instance
+document_upload_service = DocumentUploadService()
