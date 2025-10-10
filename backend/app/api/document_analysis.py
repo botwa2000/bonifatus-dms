@@ -192,7 +192,7 @@ async def get_analysis_result(
 @router.delete("/analyze/{temp_id}")
 async def cancel_upload(
     temp_id: str,
-    current_user: User = Depends(auth_service.get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Cancel upload and remove temporary file.
@@ -258,7 +258,7 @@ async def confirm_upload(
     description: Optional[str] = None,
     category_ids: list[str] = [],
     confirmed_keywords: list[str] = [],
-    current_user: User = Depends(auth_service.get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """
