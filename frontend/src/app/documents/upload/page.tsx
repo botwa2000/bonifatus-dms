@@ -108,10 +108,28 @@ export default function BatchUploadPage() {
         let errorDetail = 'Analysis failed'
         try {
           const errorData = await response.json() as ErrorResponse
-          errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData)
-        } catch {
-          const errorText = await response.text()
-          errorDetail = errorText || `Server error: ${response.status}`
+          // Better error serialization
+          if (typeof errorData === 'object' && errorData !== null) {
+            if (errorData.detail && typeof errorData.detail === 'string') {
+              errorDetail = errorData.detail
+            } else if (errorData.message && typeof errorData.message === 'string') {
+              errorDetail = errorData.message
+            } else if (Array.isArray(errorData.detail)) {
+              // Handle validation errors from FastAPI
+              errorDetail = errorData.detail.map((err: any) => 
+                `${err.loc?.join('.')}: ${err.msg}`
+              ).join('; ')
+            } else {
+              errorDetail = `Server error (${response.status}): ${JSON.stringify(errorData)}`
+            }
+          }
+        } catch (jsonError) {
+          try {
+            const errorText = await response.text()
+            errorDetail = errorText || `HTTP ${response.status}: ${response.statusText}`
+          } catch (textError) {
+            errorDetail = `HTTP ${response.status}: Unable to read error response`
+          }
         }
         throw new Error(errorDetail)
       }

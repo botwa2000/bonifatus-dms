@@ -119,8 +119,10 @@ export function useAuth(): UseAuthReturn {
       try {
         updateAuthState({ isLoading: true })
 
+        // Call backend logout
         await authService.logout()
         
+        // Clear auth state
         updateAuthState({
           user: null,
           isAuthenticated: false,
@@ -128,10 +130,20 @@ export function useAuth(): UseAuthReturn {
           error: null
         })
 
-        router.push('/')
+        // Force a full page reload to ensure clean state
+        // This prevents the blank page issue by reloading the landing page
+        window.location.href = '/'
 
       } catch (error) {
-        handleAuthError(error, 'logout')
+        console.error('Logout error:', error)
+        // Even if logout fails, clear local state and redirect
+        updateAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null
+        })
+        window.location.href = '/'
       } finally {
         authOperationRef.current = null
       }
@@ -139,7 +151,7 @@ export function useAuth(): UseAuthReturn {
 
     authOperationRef.current = operation()
     return authOperationRef.current
-  }, [updateAuthState, handleAuthError, router])
+  }, [updateAuthState, router])
 
   const refreshTokens = useCallback(async (): Promise<boolean> => {
     try {
