@@ -75,10 +75,14 @@ async def analyze_document(
             )
         
         # Get user's categories
-        user_categories = await category_service.get_user_categories(
+        categories_response = await category_service.list_categories(
             user_id=str(current_user.id),
-            session=session
+            user_language='en',
+            include_system=True,
+            include_documents_count=False
         )
+        
+        user_categories = categories_response.categories
         
         if not user_categories:
             raise HTTPException(
@@ -89,7 +93,7 @@ async def analyze_document(
         # Convert categories to dict format for analysis
         categories_list = [
             {
-                'id': str(cat.id),
+                'id': cat.id,
                 'reference_key': cat.reference_key,
                 'name': cat.name
             }
