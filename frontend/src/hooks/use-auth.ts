@@ -128,7 +128,7 @@ export function useAuth(): UseAuthReturn {
           error: null
         })
 
-        router.push('/')
+        router.push('/login')
 
       } catch (error) {
         handleAuthError(error, 'logout')

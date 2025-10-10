@@ -142,7 +142,7 @@ export default function DocumentUploadPage() {
       
       // Redirect to review page with temp_id
       setTimeout(() => {
-        router.push(`/documents/upload/review?temp_id=${result.temp_id}`)
+        router.push(`/documents/review?temp_id=${result.temp_id}`)
       }, 500)
 
     } catch (err) {
