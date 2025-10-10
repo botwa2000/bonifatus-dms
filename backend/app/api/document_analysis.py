@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import User
 from app.services.document_analysis_service import document_analysis_service
-from app.services.auth_service import auth_service
+from app.middleware.auth_middleware import get_current_user
 from app.services.category_service import category_service
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ temp_storage = {}
 @router.post("/analyze")
 async def analyze_document(
     file: UploadFile = File(...),
-    current_user: User = Depends(auth_service.get_current_user),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """
@@ -141,7 +141,7 @@ async def analyze_document(
 @router.get("/analyze/{temp_id}")
 async def get_analysis_result(
     temp_id: str,
-    current_user: User = Depends(auth_service.get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retrieve analysis result for a temporary upload.
