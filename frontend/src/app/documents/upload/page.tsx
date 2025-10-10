@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, CardHeader, CardContent, Button, Alert, Badge } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 
 interface FileAnalysis {
@@ -57,7 +57,7 @@ export default function BatchUploadPage() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/system/settings/max_filename_length`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/max_filename_length`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       })
       if (response.ok) {
@@ -256,7 +256,7 @@ export default function BatchUploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-8">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
       <div className="max-w-6xl mx-auto">
         <Card>
           <CardHeader title="Upload Documents" />
@@ -269,7 +269,7 @@ export default function BatchUploadPage() {
             {uploadStates.length === 0 ? (
               <>
                 {/* File Selection */}
-                <div className="border-2 border-dashed rounded-lg p-8">
+                <div className="border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-lg p-8 bg-white dark:bg-neutral-800">
                   <input
                     type="file"
                     multiple
@@ -291,7 +291,7 @@ export default function BatchUploadPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-neutral-600">
+                      <p className="text-neutral-600 dark:text-neutral-300">
                         Click to select files or drag and drop
                       </p>
                     )}
@@ -316,8 +316,8 @@ export default function BatchUploadPage() {
                         {/* Header */}
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="font-semibold">{state.original_filename}</h3>
-                            <p className="text-sm text-neutral-600">
+                            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
                               {state.analysis.detected_language.toUpperCase()} • 
                               {state.analysis.keywords.length} keywords
                             </p>
@@ -333,26 +333,19 @@ export default function BatchUploadPage() {
 
                         {/* Filename Preview */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">New Filename</label>
                           <div className="flex items-start space-x-2">
                             <div className="flex-1">
-                              <input
-                                type="text"
+                              <Input
+                                label="New Filename"
                                 value={state.custom_filename}
                                 onChange={(e) => handleFilenameChange(index, e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md ${
-                                  state.filename_error ? 'border-red-500' : 'border-neutral-300'
-                                }`}
+                                error={state.filename_error || undefined}
                               />
                               <div className="flex justify-between items-center mt-1">
-                                {state.filename_error ? (
-                                  <p className="text-xs text-red-600">{state.filename_error}</p>
-                                ) : (
-                                  <p className="text-xs text-neutral-600">
-                                    Original: {state.original_filename}
-                                  </p>
-                                )}
-                                <p className="text-xs text-neutral-500">
+                                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                                  Original: {state.original_filename}
+                                </p>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">
                                   {state.custom_filename.length}/{maxFilenameLength}
                                 </p>
                               </div>
@@ -362,10 +355,10 @@ export default function BatchUploadPage() {
 
                         {/* Categories - Multiple Selection */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">
+                          <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                             Categories (select 1-5)
                             {state.analysis.confidence > 0 && (
-                              <Badge variant="info">
+                              <Badge variant="info" className="ml-2">
                                 AI: {state.analysis.confidence}% confident
                               </Badge>
                             )}
@@ -379,7 +372,9 @@ export default function BatchUploadPage() {
                                 <div
                                   key={cat.id}
                                   className={`flex items-center space-x-2 p-2 border rounded-md cursor-pointer ${
-                                    isSelected ? 'bg-blue-50 border-blue-300' : 'border-neutral-200'
+                                    isSelected 
+                                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600' 
+                                      : 'border-neutral-200 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
                                   }`}
                                   onClick={() => toggleCategory(index, cat.id)}
                                 >
@@ -391,7 +386,7 @@ export default function BatchUploadPage() {
                                   />
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2">
-                                      <span className="text-sm font-medium">{cat.name}</span>
+                                      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{cat.name}</span>
                                       {isPrimary && (
                                         <Badge variant="default">Primary</Badge>
                                       )}
@@ -414,13 +409,13 @@ export default function BatchUploadPage() {
                             })}
                           </div>
                           {state.selected_categories.length === 0 && (
-                            <p className="text-xs text-red-600">Select at least one category</p>
+                            <p className="text-xs text-red-600 dark:text-red-400">Select at least one category</p>
                           )}
                         </div>
 
                         {/* Keywords */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Keywords</label>
+                          <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Keywords</label>
                           <div className="flex flex-wrap gap-2">
                             {state.confirmed_keywords.map((keyword, i) => (
                               <Badge key={i} variant="default">
