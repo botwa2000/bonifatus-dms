@@ -277,3 +277,101 @@ class DocumentLanguage(Base, TimestampMixin):
         Index('idx_doc_lang_code', 'language_code'),
         Index('idx_doc_lang_primary', 'document_id', 'is_primary'),
     )
+
+class StopWord(Base):
+    """Stop words for keyword filtering"""
+    __tablename__ = 'stop_words'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    word = Column(String(100), nullable=False)
+    language_code = Column(String(10), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class SpellingCorrection(Base):
+    """Learned spelling corrections for OCR errors"""
+    __tablename__ = 'spelling_corrections'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incorrect_term = Column(String(200), nullable=False)
+    correct_term = Column(String(200), nullable=False)
+    language_code = Column(String(10), nullable=False)
+    confidence_score = Column(Float, default=1.0, nullable=False)
+    usage_count = Column(Integer, default=0, nullable=False)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CategoryTermWeight(Base):
+    """Learned category term weights"""
+    __tablename__ = 'category_term_weights'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='CASCADE'), nullable=False)
+    term = Column(String(200), nullable=False)
+    language_code = Column(String(10), nullable=False)
+    weight = Column(Float, nullable=False)
+    document_frequency = Column(Integer, default=1, nullable=False)
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    category = relationship('Category', back_populates='term_weights')
+
+
+class KeywordTrainingData(Base):
+    """Training data for keyword quality"""
+    __tablename__ = 'keyword_training_data'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    keyword = Column(String(200), nullable=False)
+    language_code = Column(String(10), nullable=False)
+    document_type = Column(String(100), nullable=True)
+    was_accepted = Column(Boolean, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    relevance_score = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CategoryTrainingData(Base):
+    """Training data for category prediction"""
+    __tablename__ = 'category_training_data'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), nullable=True)
+    suggested_category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
+    actual_category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='CASCADE'), nullable=False)
+    was_correct = Column(Boolean, nullable=False)
+    confidence = Column(Float, nullable=True)
+    text_sample = Column(Text, nullable=True)
+    language_code = Column(String(10), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class NgramPattern(Base):
+    """N-gram patterns for multi-word extraction"""
+    __tablename__ = 'ngram_patterns'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pattern = Column(String(500), nullable=False)
+    pattern_type = Column(String(50), nullable=False)
+    language_code = Column(String(10), nullable=False)
+    importance_score = Column(Float, default=1.0, nullable=False)
+    usage_count = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class LanguageDetectionPattern(Base):
+    """Language detection patterns for scalable multilingual support"""
+    __tablename__ = 'language_detection_patterns'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    language_code = Column(String(10), nullable=False)
+    pattern = Column(String(100), nullable=False)
+    pattern_type = Column(String(50), nullable=False)  # common_word, character_set, grammar
+    weight = Column(Float, default=1.0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
