@@ -7,6 +7,12 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 
+interface ErrorResponse {
+  detail?: string
+  message?: string
+  [key: string]: unknown
+}
+
 interface FileAnalysis {
   success: boolean
   temp_id: string
@@ -32,7 +38,7 @@ interface FileUploadState extends FileAnalysis {
 
 export default function BatchUploadPage() {
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
+  const { isLoading } = useAuth()
   
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [analyzing, setAnalyzing] = useState(false)
@@ -101,9 +107,9 @@ export default function BatchUploadPage() {
       if (!response.ok) {
         let errorDetail = 'Analysis failed'
         try {
-          const errorData = await response.json()
+          const errorData = await response.json() as ErrorResponse
           errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData)
-        } catch (parseError) {
+        } catch {
           const errorText = await response.text()
           errorDetail = errorText || `Server error: ${response.status}`
         }
@@ -136,7 +142,8 @@ export default function BatchUploadPage() {
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === 'object' && error !== null) {
-        errorMessage = (error as any).detail || (error as any).message || JSON.stringify(error)
+        const errorObj = error as ErrorResponse
+        errorMessage = errorObj.detail || errorObj.message || JSON.stringify(error)
       }
       
       setMessage({
