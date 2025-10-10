@@ -141,6 +141,7 @@ def upgrade() -> None:
         conn.execute(text("""
             INSERT INTO system_settings (id, setting_key, setting_value, data_type, description, is_public, category, created_at, updated_at)
             VALUES (:id, :key, :value, :dtype, :desc, :public, :cat, :created, :updated)
+            ON CONFLICT (setting_key) DO NOTHING
         """), {
             'id': setting['id'],
             'key': setting['key'],
@@ -168,6 +169,7 @@ def upgrade() -> None:
             conn.execute(text("""
                 INSERT INTO stop_words (id, word, language_code, is_active, created_at)
                 VALUES (:id, :word, :lang, true, :created)
+                ON CONFLICT (word, language_code) DO NOTHING
             """), {
                 'id': str(uuid.uuid4()),
                 'word': word.lower(),
@@ -207,6 +209,7 @@ def upgrade() -> None:
         conn.execute(text("""
             INSERT INTO spelling_corrections (id, incorrect_term, correct_term, language_code, confidence_score, usage_count, created_at, updated_at)
             VALUES (:id, :incorrect, :correct, :lang, :confidence, 0, :created, :updated)
+            ON CONFLICT (incorrect_term, language_code) DO NOTHING
         """), {
             'id': str(uuid.uuid4()),
             'incorrect': correction['incorrect'],
@@ -259,6 +262,7 @@ def upgrade() -> None:
                     conn.execute(text("""
                         INSERT INTO category_term_weights (id, category_id, term, language_code, weight, document_frequency, last_updated)
                         VALUES (:id, :cat_id, :term, :lang, :weight, 1, :updated)
+                        ON CONFLICT (category_id, term, language_code) DO NOTHING
                     """), {
                         'id': str(uuid.uuid4()),
                         'cat_id': cat_id,
@@ -300,6 +304,7 @@ def upgrade() -> None:
         conn.execute(text("""
             INSERT INTO ngram_patterns (id, pattern, pattern_type, language_code, importance_score, usage_count, is_active, created_at, updated_at)
             VALUES (:id, :pattern, :type, :lang, :score, 0, true, :created, :updated)
+            ON CONFLICT (pattern, language_code) DO NOTHING
         """), {
             'id': str(uuid.uuid4()),
             'pattern': pattern['pattern'],
