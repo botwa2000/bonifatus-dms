@@ -20,7 +20,7 @@ from app.database.connection import db_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
+router = APIRouter(prefix="/api/v1", tags=["settings"])
 
 
 @router.get(
@@ -138,6 +138,64 @@ async def get_localization_strings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve localization strings"
+        )
+    finally:
+        session.close()
+
+@router.get(
+    "/{setting_key}",
+    responses={
+        200: {"description": "Setting value"},
+        404: {"model": ErrorResponse, "description": "Setting not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_single_setting(setting_key: str) -> Dict[str, Any]:
+    """
+    Get a single system setting by key
+    
+    Returns the value of a specific system setting.
+    Used by frontend components that need individual settings.
+    """
+    session = db_manager.session_local()
+    try:
+        stmt = select(SystemSetting).where(SystemSetting.setting_key == setting_key)
+        setting = session.execute(stmt).scalar_one_or_none()
+        
+        if not setting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Setting '{setting_key}' not found"
+            )
+        
+        # Parse value based on data_type
+        value = setting.setting_value
+        if setting.data_type == 'json':
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                pass
+        elif setting.data_type == 'boolean':
+            value = value.lower() in ('true', '1', 'yes')
+        elif setting.data_type == 'integer':
+            try:
+                value = int(value)
+            except ValueError:
+                pass
+        
+        logger.info(f"Setting retrieved: {setting_key}")
+        return {
+            "setting_key": setting_key,
+            "value": value
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retrieve setting '{setting_key}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to retrieve setting"
         )
     finally:
         session.close()

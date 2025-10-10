@@ -346,13 +346,7 @@ export class AuthService {
 
   async logout(): Promise<void> {
     try {
-      const refreshToken = this.getStoredRefreshToken()
-      
-      if (refreshToken) {
-        await apiClient.post('/api/v1/auth/logout', {
-          refresh_token: refreshToken
-        }, true)
-      }
+      await apiClient.delete('/api/v1/auth/logout', true)
 
     } catch (error) {
       console.error('Logout request failed:', error)
