@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 revision = 'd3e4f5g6h7i8'
-down_revision = 'c1d2e3f4g5h6'
+down_revision = 'm9n0o1p2q3r4'
 branch_labels = None
 depends_on = None
 
