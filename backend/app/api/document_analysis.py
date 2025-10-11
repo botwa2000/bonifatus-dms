@@ -17,6 +17,7 @@ from app.database.models import User
 from app.services.document_analysis_service import document_analysis_service
 from app.services.document_upload_service import document_upload_service
 from app.services.auth_service import auth_service
+from app.middleware.auth_middleware import get_current_active_user
 from app.services.category_service import category_service
 from app.services.config_service import config_service
 
@@ -41,7 +42,7 @@ class ConfirmUploadRequest(BaseModel):
 @router.post("/analyze")
 async def analyze_document(
     file: UploadFile = File(...),
-    current_user: User = Depends(auth_service.get_current_user),
+    current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_db)
 ):
     """
@@ -142,8 +143,8 @@ async def analyze_document(
 
 @router.post("/confirm-upload")
 async def confirm_upload(
-    request: ConfirmUploadRequest,
-    current_user: User = Depends(auth_service.get_current_user),
+    confirm_request: ConfirmUploadRequest,
+    current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_db)
 ):
     """
@@ -234,7 +235,7 @@ def _cleanup_expired_temp_files():
 @router.post("/analyze-batch")
 async def analyze_batch(
     files: List[UploadFile] = File(...),
-    current_user: User = Depends(auth_service.get_current_user),
+    current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_db)
 ):
     """
