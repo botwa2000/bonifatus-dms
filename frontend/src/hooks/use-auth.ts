@@ -151,7 +151,7 @@ export function useAuth(): UseAuthReturn {
 
     authOperationRef.current = operation()
     return authOperationRef.current
-  }, [updateAuthState, router])
+  }, [updateAuthState])
 
   const refreshTokens = useCallback(async (): Promise<boolean> => {
     try {

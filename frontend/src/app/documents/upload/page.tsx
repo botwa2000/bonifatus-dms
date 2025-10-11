@@ -116,7 +116,7 @@ export default function BatchUploadPage() {
               errorDetail = errorData.message
             } else if (Array.isArray(errorData.detail)) {
               // Handle validation errors from FastAPI
-              errorDetail = errorData.detail.map((err: any) => 
+              errorDetail = errorData.detail.map((err: { loc?: string[]; msg: string }) => 
                 `${err.loc?.join('.')}: ${err.msg}`
               ).join('; ')
             } else {

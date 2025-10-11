@@ -347,7 +347,6 @@ export class AuthService {
   async logout(): Promise<void> {
     try {
       await apiClient.delete('/api/v1/auth/logout', true)
-
     } catch (error) {
       console.error('Logout request failed:', error)
     } finally {
