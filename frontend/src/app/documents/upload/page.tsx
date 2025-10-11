@@ -418,76 +418,91 @@ export default function BatchUploadPage() {
                           </div>
                         </div>
 
-                        {/* Categories - Multiple Selection */}
+                        {/* Categories (select 1-5) */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                             Categories (select 1-5)
-                            {state.analysis.confidence > 0 && (
-                              <Badge variant="info" className="ml-2">
-                                AI: {state.analysis.confidence}% confident
-                              </Badge>
-                            )}
                           </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {categories.map(cat => {
-                              const isSelected = state.selected_categories.includes(cat.id)
-                              const isPrimary = state.primary_category === cat.id
+                          {state.selected_categories.length === 0 && (
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                              Select at least one category
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {categories.map(category => {
+                              const isSelected = state.selected_categories.includes(category.id)
+                              const isPrimary = state.primary_category === category.id
+                              const canSelect = isSelected || state.selected_categories.length < 5
                               
                               return (
-                                <div
-                                  key={cat.id}
-                                  className={`flex items-center space-x-2 p-2 border rounded-md cursor-pointer ${
-                                    isSelected 
-                                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600' 
-                                      : 'border-neutral-200 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
-                                  }`}
-                                  onClick={() => toggleCategory(index, cat.id)}
+                                <button
+                                  key={category.id}
+                                  onClick={() => canSelect && toggleCategory(index, category.id)}
+                                  disabled={!canSelect && !isSelected}
+                                  className={`
+                                    p-3 rounded-lg border-2 text-left transition-all
+                                    ${isSelected 
+                                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
+                                      : 'border-neutral-200 dark:border-neutral-700 hover:border-primary-300'
+                                    }
+                                    ${!canSelect && !isSelected ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                    ${isPrimary ? 'ring-2 ring-primary-500' : ''}
+                                  `}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleCategory(index, cat.id)}
-                                    className="w-4 h-4 rounded border-gray-300"
-                                  />
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{cat.name}</span>
-                                      {isPrimary && (
-                                        <Badge variant="default">Primary</Badge>
-                                      )}
-                                    </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-sm">{category.name}</span>
+                                    {isPrimary && (
+                                      <Badge variant="default" className="text-xs">Primary</Badge>
+                                    )}
                                   </div>
                                   {isSelected && !isPrimary && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
+                                    <button
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        updateFileState(index, {primary_category: cat.id})
+                                        updateFileState(index, {primary_category: category.id})
                                       }}
+                                      className="text-xs text-primary-600 dark:text-primary-400 hover:underline mt-1"
                                     >
-                                      Set Primary
-                                    </Button>
+                                      Make primary
+                                    </button>
                                   )}
-                                </div>
+                                </button>
                               )
                             })}
                           </div>
-                          {state.selected_categories.length === 0 && (
-                            <p className="text-xs text-red-600 dark:text-red-400">Select at least one category</p>
-                          )}
                         </div>
 
                         {/* Keywords */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Keywords</label>
-                          <div className="flex flex-wrap gap-2">
-                            {state.confirmed_keywords.map((keyword, i) => (
-                              <Badge key={i} variant="default">
-                              {keyword}
-                            </Badge>
-                            ))}
-                          </div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                            Keywords
+                          </label>
+                          {state.confirmed_keywords.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {state.confirmed_keywords.map((keyword, kidx) => (
+                                <Badge
+                                  key={kidx}
+                                  variant="default"
+                                  className="flex items-center gap-1"
+                                >
+                                  {keyword}
+                                  <button
+                                    onClick={() => {
+                                      const newKeywords = state.confirmed_keywords.filter((_, i) => i !== kidx)
+                                      updateFileState(index, {confirmed_keywords: newKeywords})
+                                    }}
+                                    className="ml-1 hover:text-red-600"
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                              No keywords extracted
+                            </p>
+                          )}
                         </div>
                       </div>
                     </Card>

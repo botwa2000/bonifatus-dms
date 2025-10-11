@@ -20,11 +20,11 @@ from app.database.connection import db_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["settings"])
+router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 
 @router.get(
-    "/public",
+    "",
     response_model=SystemSettingsResponse,
     responses={
         200: {"model": SystemSettingsResponse, "description": "Public system settings"},
