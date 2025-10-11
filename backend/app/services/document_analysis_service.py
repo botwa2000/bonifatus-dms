@@ -95,46 +95,54 @@ class DocumentAnalysisService:
             if mime_type == 'application/pdf':
                 return self._extract_text_from_pdf(file_content)
             elif mime_type.startswith('image/'):
+                logger.warning(f"Image OCR not implemented, attempting fallback")
                 return self._extract_text_from_image(file_content)
             elif mime_type == 'text/plain':
                 return file_content.decode('utf-8', errors='ignore')
-            elif 'word' in mime_type:
+            elif 'word' in mime_type or 'document' in mime_type:
                 return self._extract_text_from_word(file_content)
             else:
+                logger.error(f"Unsupported MIME type: {mime_type}")
                 raise ValueError(f"Unsupported file type for text extraction: {mime_type}")
-                
         except Exception as e:
-            logger.error(f"Text extraction failed: {e}")
+            logger.error(f"Text extraction failed for {mime_type}: {e}")
             raise
     
     def _extract_text_from_pdf(self, file_content: bytes) -> str:
-        """Extract text from PDF"""
-        text = ""
-        
+        """Extract text from PDF with comprehensive error handling"""
         try:
             pdf_file = io.BytesIO(file_content)
             pdf_reader = PyPDF2.PdfReader(pdf_file)
             
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+            if len(pdf_reader.pages) == 0:
+                raise ValueError("PDF contains no pages")
             
-            return text.strip()
+            text_parts = []
+            for page_num, page in enumerate(pdf_reader.pages):
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                except Exception as page_error:
+                    logger.warning(f"Failed to extract text from page {page_num + 1}: {page_error}")
+                    continue
+            
+            combined_text = "\n".join(text_parts).strip()
+            
+            if not combined_text or len(combined_text) < 10:
+                raise ValueError("No meaningful text extracted from PDF (possible scanned document)")
+            
+            logger.info(f"Extracted {len(combined_text)} characters from {len(pdf_reader.pages)} PDF pages")
+            return combined_text
             
         except Exception as e:
             logger.error(f"PDF text extraction failed: {e}")
-            raise ValueError("Failed to extract text from PDF")
+            raise ValueError(f"Failed to extract text from PDF: {str(e)}")
     
     def _extract_text_from_image(self, file_content: bytes) -> str:
-        """Extract text from image using OCR"""
-        try:
-            # TODO: Implement proper OCR using Google Vision API or Tesseract
-            # For now, return placeholder
-            logger.warning("OCR not yet implemented - returning placeholder")
-            return "OCR text extraction not yet implemented"
-            
-        except Exception as e:
-            logger.error(f"Image text extraction failed: {e}")
-            raise ValueError("Failed to extract text from image")
+        """Extract text from image - OCR not yet fully implemented"""
+        logger.warning("OCR implementation pending - Google Vision API integration required")
+        raise ValueError("Image OCR not yet implemented. Please upload text-based PDFs or Word documents.")
     
     def _extract_text_from_word(self, file_content: bytes) -> str:
         """Extract text from Word document"""
