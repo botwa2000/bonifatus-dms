@@ -142,7 +142,9 @@ export default function BatchUploadPage() {
         file: selectedFiles.find(f => f.name === r.original_filename)!,
         selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
         primary_category: r.analysis.suggested_category_id,
-        confirmed_keywords: r.analysis.keywords.slice(0, 10).map(k => k.word),
+        confirmed_keywords: Array.isArray(r.analysis.keywords) 
+          ? r.analysis.keywords.slice(0, 10).map(k => k.word)
+          : [],
         custom_filename: r.standardized_filename,
         filename_error: null
       }))
@@ -434,16 +436,6 @@ export default function BatchUploadPage() {
                               Select at least one category
                             </p>
                           )}
-                          {/* Categories - Searchable List */}
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            Categories (select at least 1)
-                          </label>
-                          {state.selected_categories.length === 0 && (
-                            <p className="text-sm text-red-600 dark:text-red-400">
-                              Select at least one category
-                            </p>
-                          )}
                           
                           {/* Selected Categories */}
                           {state.selected_categories.length > 0 && (
@@ -536,7 +528,6 @@ export default function BatchUploadPage() {
                               })}
                             </div>
                           </div>
-                        </div>
                         </div>
 
                         {/* Keywords */}

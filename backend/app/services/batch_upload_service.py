@@ -160,10 +160,13 @@ class BatchUploadService:
                 if cat_match and 'category_code' in cat_match:
                     category_code = cat_match['category_code']
             
+            # Use original filename for title (cleaned), not extracted text
+            original_base = file_data['filename'].rsplit('.', 1)[0] if '.' in file_data['filename'] else file_data['filename']
+            
             # Generate standardized filename
             standardized_filename = self._generate_standardized_filename(
                 original_filename=file_data['filename'],
-                suggested_title=analysis.get('extracted_text', '')[:50].strip(),
+                suggested_title=original_base,  # Use cleaned original filename
                 category_code=category_code
             )
             
