@@ -151,10 +151,20 @@ class BatchUploadService:
                 user_categories=user_categories
             )
             
+            # Get category code for filename
+            suggested_cat_id = analysis.get('suggested_category_id')
+            category_code = "UNC"  # Uncategorized default
+            
+            if suggested_cat_id:
+                cat_match = next((c for c in user_categories if c['id'] == suggested_cat_id), None)
+                if cat_match and 'category_code' in cat_match:
+                    category_code = cat_match['category_code']
+            
             # Generate standardized filename
             standardized_filename = self._generate_standardized_filename(
                 original_filename=file_data['filename'],
-                suggested_title=analysis.get('extracted_text', '')[:50].strip()
+                suggested_title=analysis.get('extracted_text', '')[:50].strip(),
+                category_code=category_code
             )
             
             temp_id = str(uuid.uuid4())
@@ -180,11 +190,12 @@ class BatchUploadService:
     def _generate_standardized_filename(
         self,
         original_filename: str,
-        suggested_title: str
+        suggested_title: str,
+        category_code: str = "UNC"
     ) -> str:
         """
-        Generate standardized filename following naming convention
-        Max length: 200 chars (safe for Windows/Mac/Linux)
+        Generate standardized filename: YYYYMMDD_CODE_FileName.ext
+        Max length: 200 chars
         """
         import re
         from datetime import datetime
@@ -192,26 +203,31 @@ class BatchUploadService:
         # Extract file extension
         extension = original_filename.split('.')[-1] if '.' in original_filename else 'pdf'
         
-        # Clean suggested title (remove special chars, limit length)
-        clean_title = re.sub(r'[^\w\s-]', '', suggested_title)
-        clean_title = re.sub(r'\s+', '_', clean_title.strip())
+        # Use original filename base if suggested title is too short
+        if not suggested_title or len(suggested_title.strip()) < 5:
+            base_name = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+            suggested_title = base_name
         
-        # Limit title to 150 chars (leaves room for timestamp + extension)
-        if len(clean_title) > 150:
-            clean_title = clean_title[:150]
+        # Clean filename - keep only alphanumeric, spaces, hyphens, underscores
+        clean_name = re.sub(r'[^\w\s-]', '', suggested_title, flags=re.UNICODE)
+        clean_name = re.sub(r'[\s_]+', '_', clean_name.strip())
+        clean_name = clean_name.strip('_')
         
-        # Add timestamp
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        if not clean_name:
+            clean_name = "document"
         
-        # Build filename: Title_YYYYMMDD_HHMMSS.ext
-        standardized = f"{clean_title}_{timestamp}.{extension}"
+        # Date prefix: YYYYMMDD
+        date_prefix = datetime.now(timezone.utc).strftime('%Y%m%d')
         
-        # Final safety check
-        if len(standardized) > 200:
-            # Truncate title further if needed
-            max_title_length = 200 - len(timestamp) - len(extension) - 3
-            clean_title = clean_title[:max_title_length]
-            standardized = f"{clean_title}_{timestamp}.{extension}"
+        # Calculate available space: 200 - date(8) - underscores(2) - code(3) - extension
+        max_name_length = 200 - 8 - 2 - len(category_code) - len(extension) - 1
+        
+        # Truncate name if needed
+        if len(clean_name) > max_name_length:
+            clean_name = clean_name[:max_name_length].rstrip('_')
+        
+        # Build filename: YYYYMMDD_CODE_FileName.ext
+        standardized = f"{date_prefix}_{category_code}_{clean_name}.{extension}"
         
         return standardized
 

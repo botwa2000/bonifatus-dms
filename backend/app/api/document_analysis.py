@@ -291,7 +291,12 @@ async def analyze_batch(
         )
         
         categories_list = [
-            {'id': cat.id, 'reference_key': cat.reference_key, 'name': cat.name}
+            {
+                'id': cat.id, 
+                'reference_key': cat.reference_key, 
+                'name': cat.name,
+                'category_code': cat.category_code
+            }
             for cat in categories_response.categories
         ]
         

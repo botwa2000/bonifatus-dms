@@ -147,6 +147,12 @@ export default function BatchUploadPage() {
         filename_error: null
       }))
 
+      // Debug: Log keyword extraction
+      states.forEach((state, idx) => {
+        console.log(`File ${idx + 1} keywords:`, state.confirmed_keywords)
+        console.log(`File ${idx + 1} analysis:`, state.analysis)
+      })
+
       setUploadStates(states)
       setMessage({
         type: 'success',
@@ -188,7 +194,7 @@ export default function BatchUploadPage() {
       // Remove category
       newCategories = state.selected_categories.filter(id => id !== categoryId)
       
-      // If removing primary, set new primary
+      // If removing primary, set new primary to first remaining
       if (state.primary_category === categoryId && newCategories.length > 0) {
         updateFileState(fileIndex, {
           selected_categories: newCategories,
@@ -197,7 +203,7 @@ export default function BatchUploadPage() {
         return
       }
     } else {
-      // Add category
+      // Add category (no limit)
       newCategories = [...state.selected_categories, categoryId]
       
       // If first category, make it primary
@@ -418,58 +424,119 @@ export default function BatchUploadPage() {
                           </div>
                         </div>
 
-                        {/* Categories (select 1-5) */}
+                        {/* Categories multiple selection */}
                         <div className="space-y-2">
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            Categories (select 1-5)
+                            Categories (select at least 1)
                           </label>
                           {state.selected_categories.length === 0 && (
                             <p className="text-sm text-red-600 dark:text-red-400">
                               Select at least one category
                             </p>
                           )}
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {categories.map(category => {
-                              const isSelected = state.selected_categories.includes(category.id)
-                              const isPrimary = state.primary_category === category.id
-                              const canSelect = isSelected || state.selected_categories.length < 5
-                              
-                              return (
-                                <button
-                                  key={category.id}
-                                  onClick={() => canSelect && toggleCategory(index, category.id)}
-                                  disabled={!canSelect && !isSelected}
-                                  className={`
-                                    p-3 rounded-lg border-2 text-left transition-all
-                                    ${isSelected 
-                                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
-                                      : 'border-neutral-200 dark:border-neutral-700 hover:border-primary-300'
-                                    }
-                                    ${!canSelect && !isSelected ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                                    ${isPrimary ? 'ring-2 ring-primary-500' : ''}
-                                  `}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium text-sm">{category.name}</span>
-                                    {isPrimary && (
-                                      <Badge variant="default" className="text-xs">Primary</Badge>
-                                    )}
-                                  </div>
-                                  {isSelected && !isPrimary && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        updateFileState(index, {primary_category: category.id})
-                                      }}
-                                      className="text-xs text-primary-600 dark:text-primary-400 hover:underline mt-1"
+                          {/* Categories - Searchable List */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                            Categories (select at least 1)
+                          </label>
+                          {state.selected_categories.length === 0 && (
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                              Select at least one category
+                            </p>
+                          )}
+                          
+                          {/* Selected Categories */}
+                          {state.selected_categories.length > 0 && (
+                            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <p className="text-xs font-medium text-blue-900 dark:text-blue-300 mb-2">
+                                Selected ({state.selected_categories.length})
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {state.selected_categories.map(catId => {
+                                  const cat = categories.find(c => c.id === catId)
+                                  if (!cat) return null
+                                  const isPrimary = state.primary_category === catId
+                                  
+                                  return (
+                                    <Badge
+                                      key={catId}
+                                      variant={isPrimary ? "info" : "default"}
+                                      className="flex items-center gap-2 px-3 py-1"
                                     >
-                                      Make primary
-                                    </button>
-                                  )}
-                                </button>
-                              )
-                            })}
+                                      <span>{cat.name}</span>
+                                      {isPrimary && <span className="text-xs">(Primary)</span>}
+                                      <button
+                                        onClick={() => toggleCategory(index, catId)}
+                                        className="ml-1 hover:text-red-600"
+                                      >
+                                        ×
+                                      </button>
+                                    </Badge>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Category Search/List */}
+                          <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-60 overflow-y-auto">
+                            <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                              {categories.map(category => {
+                                const isSelected = state.selected_categories.includes(category.id)
+                                const isPrimary = state.primary_category === category.id
+                                
+                                return (
+                                  <div
+                                    key={category.id}
+                                    className={`
+                                      p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer
+                                      ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
+                                    `}
+                                    onClick={() => toggleCategory(index, category.id)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => {}}
+                                          className="w-4 h-4 rounded"
+                                        />
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                              {category.name}
+                                            </span>
+                                            {isPrimary && (
+                                              <Badge variant="info" className="text-xs">Primary</Badge>
+                                            )}
+                                          </div>
+                                          {category.description && (
+                                            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
+                                              {category.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {isSelected && !isPrimary && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            updateFileState(index, {primary_category: category.id})
+                                          }}
+                                          className="text-xs text-primary-600 dark:text-primary-400 hover:underline px-2"
+                                        >
+                                          Set as primary
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
+                        </div>
                         </div>
 
                         {/* Keywords */}
