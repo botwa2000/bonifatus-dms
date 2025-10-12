@@ -14,10 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.database.connection import db_manager
-from app.database.models import (
-    StopWord, SpellingCorrection, NgramPattern, 
-    KeywordTrainingData, CategoryTermWeight
-)
+from app.database.models import StopWord
 from app.services.config_service import config_service
 
 logger = logging.getLogger(__name__)
