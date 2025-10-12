@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.database.connection import db_manager
-from app.database.models import CategoryTermWeight, CategoryTrainingData, Category
+from app.database.models import CategoryKeyword, CategoryTrainingData, Category
 from app.services.config_service import config_service
 
 logger = logging.getLogger(__name__)
@@ -125,11 +125,11 @@ class MLCategoryService:
         """Load category term weights for language"""
         result = session.execute(
             select(
-                CategoryTermWeight.category_id,
-                CategoryTermWeight.term,
-                CategoryTermWeight.weight
+                    CategoryKeyword.category_id,
+                    CategoryKeyword.keyword,
+                    CategoryKeyword.weight
             ).where(
-                CategoryTermWeight.language_code == language_code
+                CategoryKeyword.language_code == language_code
             )
         )
         
@@ -238,10 +238,10 @@ class MLCategoryService:
             
             # Check if term weight exists
             existing = session.execute(
-                select(CategoryTermWeight).where(
-                    CategoryTermWeight.category_id == uuid.UUID(category_id),
-                    CategoryTermWeight.term == keyword,
-                    CategoryTermWeight.language_code == language_code
+                select(CategoryKeyword).where(
+                    CategoryKeyword.category_id == uuid.UUID(category_id),
+                    CategoryKeyword.keyword == keyword,
+                    CategoryKeyword.language_code == language_code
                 )
             ).scalar_one_or_none()
             
@@ -252,9 +252,9 @@ class MLCategoryService:
                 
                 session.execute(
                     text("""
-                        UPDATE category_term_weights
+                        UPDATE category_keywords
                         SET weight = :weight,
-                            document_frequency = document_frequency + 1,
+                            match_count = match_count + 1,
                             last_updated = :now
                         WHERE id = :id
                     """),
@@ -266,16 +266,16 @@ class MLCategoryService:
                 )
             else:
                 # Add new term weight
-                new_weight = CategoryTermWeight(
+                new_keyword = CategoryKeyword(
                     id=uuid.uuid4(),
                     category_id=uuid.UUID(category_id),
-                    term=keyword,
+                    keyword=keyword,
                     language_code=language_code,
                     weight=relevance,
-                    document_frequency=1,
+                    match_count=1,
                     last_updated=datetime.now(timezone.utc)
                 )
-                session.add(new_weight)
+                session.add(new_keyword)
         
         session.commit()
         
