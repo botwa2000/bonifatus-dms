@@ -37,11 +37,22 @@ class User(Base, TimestampMixin):
     is_admin = Column(Boolean, default=False, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)
+
+    # Security columns
+    drive_refresh_token_encrypted = Column(Text, nullable=True)
+    drive_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    google_drive_enabled = Column(Boolean, default=False, nullable=False)
+    drive_permissions_granted_at = Column(DateTime(timezone=True), nullable=True)
+    last_ip_address = Column(String(45), nullable=True)
+    last_user_agent = Column(Text, nullable=True)
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    account_locked_until = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     user_settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship('UserSession', back_populates='user', cascade='all, delete-orphan')
 
     __table_args__ = (
         Index('idx_user_google_id', 'google_id'),
@@ -49,6 +60,24 @@ class User(Base, TimestampMixin):
         Index('idx_user_tier', 'tier'),
     )
 
+
+class UserSession(Base):
+    """User authentication sessions"""
+    __tablename__ = 'user_sessions'
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    refresh_token_hash = Column(String(64), unique=True, nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_activity_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason = Column(String(100), nullable=True)
+    
+    user = relationship('User', back_populates='sessions')
 
 class Category(Base, TimestampMixin):
     """Category with dynamic multilingual support"""
@@ -68,7 +97,7 @@ class Category(Base, TimestampMixin):
     user = relationship("User", back_populates="categories")
     translations = relationship("CategoryTranslation", back_populates="category", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="category")
-    term_weights = relationship("CategoryTermWeight", back_populates="category", cascade="all, delete-orphan")
+    keywords = relationship('CategoryKeyword', back_populates='category', cascade='all, delete-orphan')
 
     __table_args__ = (
         Index('idx_category_user_id', 'user_id'),
@@ -240,6 +269,8 @@ class AuditLog(Base, TimestampMixin):
     
     # Additional context data
     extra_data = Column(Text, nullable=True)  # JSON string for extra context
+    security_level = Column(String(20), nullable=True)
+    security_flags = Column(JSONB, nullable=True)
 
     # Relationships
     user = relationship("User")
@@ -290,48 +321,23 @@ class StopWord(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class SpellingCorrection(Base):
-    """Learned spelling corrections for OCR errors"""
-    __tablename__ = 'spelling_corrections'
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    incorrect_term = Column(String(200), nullable=False)
-    correct_term = Column(String(200), nullable=False)
-    language_code = Column(String(10), nullable=False)
-    confidence_score = Column(Float, default=1.0, nullable=False)
-    usage_count = Column(Integer, default=0, nullable=False)
-    last_used_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
-class CategoryTermWeight(Base):
-    """Learned category term weights"""
-    __tablename__ = 'category_term_weights'
+class CategoryKeyword(Base):
+    """Category keywords for classification"""
+    __tablename__ = 'category_keywords'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='CASCADE'), nullable=False)
-    term = Column(String(200), nullable=False)
-    language_code = Column(String(10), nullable=False)
-    weight = Column(Float, nullable=False)
-    document_frequency = Column(Integer, default=1, nullable=False)
-    last_updated = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    category = relationship('Category', back_populates='term_weights')
-
-
-class KeywordTrainingData(Base):
-    """Training data for keyword quality"""
-    __tablename__ = 'keyword_training_data'
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     keyword = Column(String(200), nullable=False)
     language_code = Column(String(10), nullable=False)
-    document_type = Column(String(100), nullable=True)
-    was_accepted = Column(Boolean, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    relevance_score = Column(Float, nullable=True)
+    weight = Column(Float, nullable=False)
+    match_count = Column(Integer, default=1, nullable=False)
+    is_system_default = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_matched_at = Column(DateTime(timezone=True), nullable=True)
+    
+    category = relationship('Category', back_populates='keywords')
+
 
 
 class CategoryTrainingData(Base):
