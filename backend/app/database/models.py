@@ -8,8 +8,8 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Integer, Boolean, Float, DateTime, Text, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, ForeignKey, Table, UUID as SQLUUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
