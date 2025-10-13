@@ -14,6 +14,9 @@ from app.database.connection import get_db
 from app.database.models import User
 from app.schemas.auth_schemas import TokenData, UserCreate, UserResponse
 
+from app.services.session_service import session_service
+from app.services.encryption_service import encryption_service
+
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -42,9 +45,9 @@ class AuthService:
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+            expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
         
-        to_encode.update({"exp": expire, "type": "access"})
+        to_encode.update({"exp": expire, "type": "access", "iat": datetime.now(timezone.utc)})
         
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
@@ -150,14 +153,71 @@ class AuthService:
             if user:
                 user.last_login_at = datetime.now(timezone.utc)
                 user.last_login_ip = ip_address
+                user.failed_login_attempts = 0
                 db.commit()
                 
         finally:
             db.close()
 
-    async def logout_user(self, user_id: str, ip_address: str) -> None:
-        """Handle user logout operations"""
-        logger.info(f"User {user_id} logged out from IP: {ip_address}")
+    async def logout_user(self, user_id: str, session_id: Optional[str] = None, ip_address: str = "") -> None:
+        """Handle user logout - revoke session"""
+        if session_id:
+            await session_service.revoke_session(session_id, reason="user_logout")
+            logger.info(f"User {user_id} logged out from IP: {ip_address}")
+        else:
+            await session_service.revoke_user_sessions(user_id, reason="user_logout")
+            logger.info(f"All sessions revoked for user {user_id}")
+
+    async def refresh_access_token(
+        self, 
+        refresh_token: str, 
+        ip_address: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate new access token using refresh token
+        
+        Args:
+            refresh_token: Refresh token from client
+            ip_address: Client IP address
+            
+        Returns:
+            Dict with new access_token and user info, or None if invalid
+        """
+        try:
+            session_info = await session_service.validate_session(refresh_token)
+            
+            if not session_info:
+                logger.warning(f"Invalid refresh token from IP: {ip_address}")
+                return None
+            
+            user_id = session_info['user_id']
+            
+            db = next(get_db())
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                
+                if not user or not user.is_active:
+                    logger.warning(f"User {user_id} not found or inactive")
+                    await session_service.revoke_session(session_info['session_id'], reason="user_inactive")
+                    return None
+                
+                access_token = self.create_access_token(data={"sub": str(user.id)})
+                
+                return {
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "tier": user.tier,
+                    "expires_in": self.access_token_expire_minutes * 60
+                }
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Token refresh error: {e}")
+            return None
 
     def generate_tokens(self, user: User) -> Dict[str, str]:
         """Generate access and refresh tokens for user"""
@@ -262,7 +322,28 @@ class AuthService:
                     
                     db.commit()
                     db.refresh(user)
-                    
+
+                    # Create session with refresh token
+                    session_info = await session_service.create_session(
+                        user_id=str(user.id),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        session=db
+                    )
+
+                    # Generate short-lived access token
+                    access_token = self.create_access_token(data={"sub": str(user.id)})
+
+                    # Encrypt and store Google refresh token if provided
+                    google_refresh_token = tokens.get('refresh_token')
+                    if google_refresh_token:
+                        encrypted_token = encryption_service.encrypt(google_refresh_token)
+                        if encrypted_token:
+                            user.drive_refresh_token_encrypted = encrypted_token
+                            user.google_drive_enabled = True
+                            user.drive_permissions_granted_at = datetime.now(timezone.utc)
+                            db.commit()
+
                     if not user.is_active:
                         logger.warning(f"Inactive user attempted login: {email}")
                         return None
@@ -273,11 +354,13 @@ class AuthService:
                     
                     return {
                         "access_token": access_token,
-                        "refresh_token": refresh_token,
+                        "refresh_token": session_info['refresh_token'],
                         "token_type": "bearer",
                         "user_id": str(user.id),
                         "email": user.email,
-                        "tier": user.tier
+                        "tier": user.tier,
+                        "session_id": session_info['session_id'],
+                        "expires_in": self.access_token_expire_minutes * 60
                     }
                     
                 finally:

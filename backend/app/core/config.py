@@ -48,10 +48,11 @@ class SecuritySettings(BaseSettings):
     
     security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
-    access_token_expire_minutes: int = Field(default=60, description="JWT expiration")
+    access_token_expire_minutes: int = Field(default=15, description="JWT access token expiration")
     refresh_token_expire_days: int = Field(default=7, description="Refresh token expiration")
     default_user_tier: str = Field(default="free", description="Default user tier")
     admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")
+    encryption_key: str = Field(..., description="AES-256 encryption key for field-level encryption")
 
     class Config:
         case_sensitive = False

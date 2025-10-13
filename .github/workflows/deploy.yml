@@ -70,6 +70,7 @@ jobs:
             --set-env-vars "DATABASE_POOL_PRE_PING=true" \
             --set-env-vars "DATABASE_CONNECT_TIMEOUT=60" \
             --set-env-vars "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --set-env-vars "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
             --set-env-vars "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" \
             --set-env-vars "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" \
             --set-env-vars "GOOGLE_VISION_ENABLED=true" \
