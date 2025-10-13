@@ -8,8 +8,6 @@ from typing import Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.security import router as security_router
-
 
 from app.core.config import settings
 
