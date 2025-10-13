@@ -22,6 +22,7 @@ RUN apt-get update \
         gcc \
         libc6-dev \
         curl \
+        libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
