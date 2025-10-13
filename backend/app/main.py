@@ -76,6 +76,25 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+
+# Security headers middleware
+from app.middleware import SecurityHeadersMiddleware
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    frontend_url=os.getenv("FRONTEND_URL", "https://bonidoc.com")
+)
+
+# Rate limiting middleware
+from app.middleware import RateLimitMiddleware
+from app.services.rate_limit_service import rate_limit_service
+app.add_middleware(RateLimitMiddleware)
+
+# Start rate limit cleanup task
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    rate_limit_service.start_cleanup_task()
+    
 logger.info(f"CORS enabled for origins: {allowed_origins}")
 
 class ProcessTimeMiddleware(BaseHTTPMiddleware):

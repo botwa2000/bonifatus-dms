@@ -158,7 +158,10 @@ export class AuthService {
   }
   
 
-  async exchangeGoogleToken(code: string, state?: string | null): Promise<{ success: boolean; error?: string }> {
+  async exchangeGoogleToken(
+    code: string,
+    state: string | null
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       // Validate state if provided
       if (state && !this.validateOAuthState(state)) {
@@ -166,30 +169,23 @@ export class AuthService {
       }
 
       // Exchange authorization code for JWT tokens via backend
+      // Backend will set httpOnly cookies automatically
       const response = await apiClient.post<{
-        access_token: string
-        refresh_token: string
+        success: boolean
         user: User
-        expires_at: string
+        expires_in: number
       }>('/api/v1/auth/google/callback', {
         code,
         state: state || ''
       })
 
-      // Store tokens securely
+      // Store user info only (tokens are in httpOnly cookies)
       if (typeof window !== 'undefined') {
-        // Store in httpOnly cookies via backend or localStorage for development
-        localStorage.setItem('access_token', response.access_token)
-        localStorage.setItem('refresh_token', response.refresh_token)
         localStorage.setItem('user', JSON.stringify(response.user))
-        localStorage.setItem('expires_at', response.expires_at)
       }
 
       // Clear OAuth state
       this.clearStoredOAuthState()
-
-      // Initialize token refresh
-      this.initializeTokenRefresh()
 
       return { success: true }
 
@@ -203,25 +199,31 @@ export class AuthService {
   }
 
   storeTokens(tokenResponse: TokenResponse): void {
+    // Tokens are stored in httpOnly cookies by backend
+    // This method is kept for backward compatibility but does nothing
+    // Frontend only stores non-sensitive user data
     if (!this.isClientSide()) return
     
-    const { access_token, refresh_token, expires_in } = tokenResponse
-    
-    localStorage.setItem('access_token', access_token)
-    localStorage.setItem('refresh_token', refresh_token)
-    localStorage.setItem('token_expires_at', (Date.now() + expires_in * 1000).toString())
-    
-    document.cookie = `bonifatus_has_token=true; path=/; max-age=${expires_in}; SameSite=Strict; Secure`
+    // Set non-httpOnly flag for auth status check
+    document.cookie = `is_authenticated=true; path=/; max-age=${tokenResponse.expires_in}; SameSite=Lax; Secure`
   }
 
   getStoredAccessToken(): string | null {
-    if (!this.isClientSide()) return null
-    return localStorage.getItem('access_token')
+    // Tokens are in httpOnly cookies, not accessible via JS
+    // Return null - API client will send cookies automatically
+    return null
   }
 
   getStoredRefreshToken(): string | null {
-    if (!this.isClientSide()) return null
-    return localStorage.getItem('refresh_token')
+    // Tokens are in httpOnly cookies, not accessible via JS
+    // Return null - API client will send cookies automatically
+    return null
+  }
+  
+  isAuthenticated(): boolean {
+    // Check if authentication cookie exists
+    if (!this.isClientSide()) return false
+    return document.cookie.includes('is_authenticated=true')
   }
 
   isTokenExpired(token: string): boolean {
@@ -356,14 +358,13 @@ export class AuthService {
   }
 
   clearAllAuthData(): void {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('token_expires_at')
+    // Clear user data from localStorage
+    localStorage.removeItem('user')
     
-    document.cookie = 'bonifatus_has_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure'
+    // Clear authentication flag cookie
+    document.cookie = 'is_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
     
-    this.clearStoredOAuthState()
-    this.clearTokenRefresh()
+    // Backend will clear httpOnly cookies on logout endpoint
   }
 
   handleAuthError(error: unknown): AuthError {
