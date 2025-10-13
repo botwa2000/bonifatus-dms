@@ -8,6 +8,7 @@ from typing import Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from app.api.security import router as security_router
 
 
 from app.core.config import settings
@@ -203,6 +204,7 @@ routers = [
     ("app.api.categories", "Categories"),
     ("app.api.document_analysis", "DocumentAnalysis"),
     ("app.api.documents", "Documents"),
+    ("app.api.security", "Security"),
 ]
 
 for module_path, name in routers:

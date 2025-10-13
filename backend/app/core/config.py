@@ -53,6 +53,8 @@ class SecuritySettings(BaseSettings):
     default_user_tier: str = Field(default="free", description="Default user tier")
     admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")
     encryption_key: str = Field(..., description="AES-256 encryption key for field-level encryption")
+    turnstile_site_key: Optional[str] = Field(default=None, description="Cloudflare Turnstile site key (public)")
+    turnstile_secret_key: Optional[str] = Field(default=None, description="Cloudflare Turnstile secret key")
 
     class Config:
         case_sensitive = False

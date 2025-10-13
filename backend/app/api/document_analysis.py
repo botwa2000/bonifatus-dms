@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from typing import List
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Request, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -17,9 +17,13 @@ from app.database.models import User
 from app.services.document_analysis_service import document_analysis_service
 from app.services.document_upload_service import document_upload_service
 from app.services.auth_service import auth_service
-from app.middleware.auth_middleware import get_current_active_user
+from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.services.category_service import category_service
 from app.services.config_service import config_service
+
+import io
+from app.services.file_validation_service import file_validation_service
+from app.services.captcha_service import captcha_service
 
 logger = logging.getLogger(__name__)
 
@@ -234,15 +238,19 @@ def _cleanup_expired_temp_files():
 
 @router.post("/analyze-batch")
 async def analyze_batch(
+    request: Request,
     files: List[UploadFile] = File(...),
+    captcha_token: Optional[str] = Form(None),
     current_user: User = Depends(get_current_active_user),
     session: Session = Depends(get_db)
 ):
     """
-    Analyze multiple documents in batch
+    Analyze multiple documents in batch with smart security validation
     Returns analysis results for all files
     """
     try:
+        ip_address = get_client_ip(request)
+        
         # Validate batch size
         max_batch_size = await config_service.get_setting('max_batch_upload_size', 10, session)
         
@@ -251,6 +259,63 @@ async def analyze_batch(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Batch size exceeds maximum of {max_batch_size} files"
             )
+        
+        # Validate first file to check trust score and CAPTCHA requirement
+        if files:
+            first_file = files[0]
+            file_content = await first_file.read()
+            file_stream = io.BytesIO(file_content)
+            
+            validation_result = await file_validation_service.validate_upload(
+                file_content=file_stream,
+                filename=first_file.filename,
+                user_id=str(current_user.id),
+                user_tier=current_user.tier,
+                ip_address=ip_address,
+                session=session
+            )
+            
+            # Reset file for processing
+            await first_file.seek(0)
+            
+            if not validation_result.allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=validation_result.error_message
+                )
+            
+            # Check if CAPTCHA is required
+            if validation_result.captcha_required:
+                if not captcha_token:
+                    # Return special response telling frontend to show CAPTCHA
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail={
+                            "error": "captcha_required",
+                            "message": "Security verification required. Please complete the security check.",
+                            "warnings": validation_result.warnings
+                        }
+                    )
+                else:
+                    # Verify CAPTCHA token
+                    captcha_result = await captcha_service.verify_token(
+                        token=captcha_token,
+                        ip_address=ip_address
+                    )
+                    
+                    if not captcha_result.get('success'):
+                        error_message = captcha_service.format_error_message(
+                            captcha_result.get('error-codes', [])
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Security verification failed: {error_message}"
+                        )
+            
+            # Log warnings if any
+            if validation_result.warnings:
+                for warning in validation_result.warnings:
+                    logger.warning(f"Upload warning for user {current_user.id}: {warning}")
         
         # Get allowed file types and max size
         allowed_types = await config_service.get_allowed_mime_types(session)
@@ -290,43 +355,95 @@ async def analyze_batch(
             include_documents_count=False
         )
         
+        user_categories = categories_response.categories
+        
+        if not user_categories:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No categories found. Please create categories first."
+            )
+        
+        # Convert categories to dict format
         categories_list = [
             {
-                'id': cat.id, 
-                'reference_key': cat.reference_key, 
-                'name': cat.name,
-                'category_code': cat.category_code
+                'id': cat.id,
+                'reference_key': cat.reference_key,
+                'name': cat.name
             }
-            for cat in categories_response.categories
+            for cat in user_categories
         ]
         
-        # Process batch
-        from app.services.batch_upload_service import batch_upload_service
+        # Create batch ID
+        batch_id = str(uuid.uuid4())
         
-        batch_result = await batch_upload_service.analyze_batch(
-            files_data=files_data,
-            user_id=str(current_user.id),
-            user_categories=categories_list,
-            session=session
-        )
-        
-        # Store temp data for each successful analysis
-        for result in batch_result['results']:
-            if result['success']:
-                temp_storage[result['temp_id']] = {
-                    'file_content': next(f['content'] for f in files_data if f['filename'] == result['original_filename']),
-                    'file_name': result['original_filename'],
-                    'standardized_filename': result['standardized_filename'],
-                    'mime_type': next(f['mime_type'] for f in files_data if f['filename'] == result['original_filename']),
+        # Process each file
+        results = []
+        for file_data in files_data:
+            try:
+                # Analyze document
+                analysis_result = await document_analysis_service.analyze_document(
+                    file_content=file_data['content'],
+                    file_name=file_data['filename'],
+                    mime_type=file_data['mime_type'],
+                    user_categories=categories_list
+                )
+                
+                # Generate temporary ID
+                temp_id = str(uuid.uuid4())
+                
+                # Store temporarily (expires in 24 hours)
+                temp_storage[temp_id] = {
+                    'file_content': file_data['content'],
+                    'file_name': file_data['filename'],
+                    'mime_type': file_data['mime_type'],
                     'user_id': str(current_user.id),
-                    'batch_id': result['batch_id'],
                     'expires_at': datetime.utcnow() + timedelta(hours=24),
-                    'analysis_result': result['analysis']
+                    'analysis_result': analysis_result,
+                    'batch_id': batch_id
                 }
+                
+                results.append({
+                    'success': True,
+                    'temp_id': temp_id,
+                    'original_filename': file_data['filename'],
+                    'standardized_filename': analysis_result.get('standardized_filename'),
+                    'analysis': analysis_result,
+                    'batch_id': batch_id
+                })
+                
+            except Exception as e:
+                logger.error(f"Failed to analyze {file_data['filename']}: {e}")
+                results.append({
+                    'success': False,
+                    'original_filename': file_data['filename'],
+                    'error': str(e),
+                    'batch_id': batch_id
+                })
         
-        logger.info(f"Batch analyzed: {batch_result['batch_id']} - {batch_result['successful']}/{batch_result['total_files']} successful")
+        # Clean up expired files
+        _cleanup_expired_temp_files()
         
-        return batch_result
+        # Include storage info and warnings in response
+        response_data = {
+            'batch_id': batch_id,
+            'total_files': len(files_data),
+            'successful': len([r for r in results if r['success']]),
+            'failed': len([r for r in results if not r['success']]),
+            'results': results,
+            'expires_at': (datetime.utcnow() + timedelta(hours=24)).isoformat()
+        }
+        
+        # Add storage info if available
+        if validation_result.storage_info:
+            response_data['storage_info'] = validation_result.storage_info
+        
+        # Add warnings if any
+        if validation_result.warnings:
+            response_data['warnings'] = validation_result.warnings
+        
+        logger.info(f"Batch analysis completed: {batch_id} ({response_data['successful']}/{response_data['total_files']} successful)")
+        
+        return response_data
         
     except HTTPException:
         raise
