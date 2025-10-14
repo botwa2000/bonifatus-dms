@@ -81,7 +81,7 @@ export function useAuth(): UseAuthReturn {
         error: null 
       })
 
-      const response = await authService.exchangeGoogleToken(code, state)
+      const response = await authService.exchangeGoogleToken(code, state ?? null)
       
       if (response.success) {
         // Get user data from stored token after successful authentication

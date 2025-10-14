@@ -69,3 +69,6 @@ Added missing JSONB import to database models for JSON field types.
 - Keyword overlap scoring
 - Classification tables & system keywords
 - Category learning from user corrections
+
+### 2025-10-14: Phase 1 Security Foundation Completed
+**Fix:** Implemented rate limiting (3-tier), security headers middleware, httpOnly cookies, refresh token endpoint, migrated frontend from localStorage to secure cookie-based authentication.
