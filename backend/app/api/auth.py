@@ -8,7 +8,7 @@ Production-grade implementation with comprehensive security
 import logging
 import time
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -129,6 +129,7 @@ async def google_oauth_login(request: Request):
 )
 async def google_oauth_callback(
     request: Request,
+    response: Response,
     google_request: GoogleTokenRequest
 ) -> TokenResponse:
     """
@@ -153,6 +154,38 @@ async def google_oauth_callback(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Google authentication failed"
             )
+        
+        # Set tokens in httpOnly cookies
+        response.set_cookie(
+            key="access_token",
+            value=auth_result["access_token"],
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=900,  # 15 minutes
+            path="/"
+        )
+        
+        response.set_cookie(
+            key="refresh_token",
+            value=auth_result["refresh_token"],
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=604800,  # 7 days
+            path="/"
+        )
+        
+        # Set authentication flag for frontend
+        response.set_cookie(
+            key="is_authenticated",
+            value="true",
+            httponly=False,
+            secure=True,
+            samesite="lax",
+            max_age=604800,
+            path="/"
+        )
         
         logger.info(f"User {auth_result['email']} authenticated successfully from IP: {ip_address}")
         
@@ -183,6 +216,7 @@ async def google_oauth_callback(
 )
 async def refresh_token(
     request: Request,
+    response: Response,
     refresh_request: RefreshTokenRequest
 ) -> RefreshTokenResponse:
     """
@@ -191,25 +225,39 @@ async def refresh_token(
     Returns new access token with updated expiry time.
     Refresh tokens are long-lived and used to obtain new access tokens
     without requiring user to re-authenticate.
+    Sets new access token in httpOnly cookie.
     """
     try:
         ip_address = get_client_ip(request)
+        user_agent = request.headers.get("User-Agent", "unknown")
         
-        auth_result = await auth_service.refresh_access_token(
+        refresh_result = await auth_service.refresh_access_token(
             refresh_request.refresh_token,
-            ip_address
+            ip_address,
+            user_agent
         )
         
-        if not auth_result:
+        if not refresh_result:
             logger.warning(f"Token refresh failed from IP: {ip_address}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired refresh token"
             )
         
-        logger.info(f"Token refreshed for user {auth_result['email']} from IP: {ip_address}")
+        # Set new access token in httpOnly cookie
+        response.set_cookie(
+            key="access_token",
+            value=refresh_result["access_token"],
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=900,  # 15 minutes
+            path="/"
+        )
         
-        return RefreshTokenResponse(**auth_result)
+        logger.info(f"Access token refreshed for user from IP: {ip_address}")
+        
+        return RefreshTokenResponse(**refresh_result)
         
     except HTTPException:
         raise

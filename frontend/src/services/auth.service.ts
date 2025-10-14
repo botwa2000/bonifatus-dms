@@ -19,7 +19,7 @@ interface JWTPayload {
 
 export class AuthService {
   private readonly config: AuthServiceConfig
-  private tokenRefreshPromise: Promise<TokenResponse> | null = null
+  private tokenRefreshPromise: Promise<boolean> | null = null
   private refreshTimeoutId: NodeJS.Timeout | null = null
 
   constructor() {
@@ -157,7 +157,6 @@ export class AuthService {
     }
   }
   
-
   async exchangeGoogleToken(
     code: string,
     state: string | null
@@ -170,17 +169,13 @@ export class AuthService {
 
       // Exchange authorization code for JWT tokens via backend
       // Backend will set httpOnly cookies automatically
-      const response = await apiClient.post<{
-        success: boolean
-        user: User
-        expires_in: number
-      }>('/api/v1/auth/google/callback', {
+      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
         code,
         state: state || ''
       })
 
       // Store user info only (tokens are in httpOnly cookies)
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && response.user) {
         localStorage.setItem('user', JSON.stringify(response.user))
       }
 
@@ -248,25 +243,31 @@ export class AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      const token = this.getStoredAccessToken()
-      
-      if (!token) {
-        return null
-      }
-
-      if (this.isTokenExpired(token)) {
-        const refreshed = await this.refreshTokens()
-        if (!refreshed) {
-          return null
-        }
-      }
-
+      // Tokens are in httpOnly cookies, API client sends them automatically
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
+      
+      // Store user info locally
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(response))
+      }
+      
       return response
 
     } catch (error) {
       console.error('Failed to get current user:', error)
-      this.clearAllAuthData()
+      
+      // Check if user data exists in localStorage
+      if (typeof window !== 'undefined') {
+        const userData = localStorage.getItem('user')
+        if (userData) {
+          try {
+            return JSON.parse(userData)
+          } catch {
+            this.clearAllAuthData()
+          }
+        }
+      }
+      
       return null
     }
   }
@@ -274,27 +275,30 @@ export class AuthService {
   async refreshTokens(): Promise<boolean> {
     if (this.tokenRefreshPromise) {
       try {
-        await this.tokenRefreshPromise
-        return true
+        return await this.tokenRefreshPromise
       } catch {
         return false
       }
     }
 
-    const refreshToken = this.getStoredRefreshToken()
-    if (!refreshToken) {
-      this.clearAllAuthData()
-      return false
-    }
-
     try {
-      this.tokenRefreshPromise = this.performTokenRefresh(refreshToken)
-      const tokenResponse = await this.tokenRefreshPromise
+      // Create the promise that returns boolean
+      this.tokenRefreshPromise = (async () => {
+        try {
+          // Refresh token is in httpOnly cookie, sent automatically
+          await apiClient.post<{ access_token: string; expires_in: number }>(
+            '/api/v1/auth/refresh', 
+            {},
+            true
+          )
+          return true
+        } catch {
+          this.clearAllAuthData()
+          return false
+        }
+      })()
       
-      this.storeTokens(tokenResponse)
-      this.scheduleTokenRefresh(tokenResponse.access_token)
-      
-      return true
+      return await this.tokenRefreshPromise
 
     } catch (error) {
       console.error('Token refresh failed:', error)
@@ -305,31 +309,9 @@ export class AuthService {
     }
   }
 
-  private async performTokenRefresh(refreshToken: string): Promise<TokenResponse> {
-    const response = await apiClient.post<TokenResponse>('/api/v1/auth/refresh', {
-      refresh_token: refreshToken
-    })
-    
-    return response
-  }
-
   scheduleTokenRefresh(accessToken: string): void {
-    this.clearTokenRefresh()
-    
-    try {
-      const payload = this.decodeJWTPayload(accessToken)
-      const expiresIn = payload.exp * 1000 - Date.now()
-      const refreshIn = Math.max(expiresIn - this.config.tokenRefreshThreshold, 60000)
-      
-      this.refreshTimeoutId = setTimeout(() => {
-        this.refreshTokens().catch(error => {
-          console.error('Scheduled token refresh failed:', error)
-        })
-      }, refreshIn)
-      
-    } catch (error) {
-      console.error('Failed to schedule token refresh:', error)
-    }
+    // Token refresh is now handled by API client on 401 responses
+    // This method kept for backward compatibility but does nothing
   }
 
   clearTokenRefresh(): void {
@@ -340,10 +322,8 @@ export class AuthService {
   }
 
   initializeTokenRefresh(): void {
-    const token = this.getStoredAccessToken()
-    if (token && !this.isTokenExpired(token)) {
-      this.scheduleTokenRefresh(token)
-    }
+    // Token refresh is now handled automatically by backend via cookies
+    // This method kept for backward compatibility but does nothing
   }
 
   async logout(): Promise<void> {
@@ -358,13 +338,15 @@ export class AuthService {
   }
 
   clearAllAuthData(): void {
-    // Clear user data from localStorage
-    localStorage.removeItem('user')
+    // Clear user data from localStorage only
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('user')
+    }
     
     // Clear authentication flag cookie
     document.cookie = 'is_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
     
-    // Backend will clear httpOnly cookies on logout endpoint
+    // Backend clears httpOnly cookies on logout endpoint
   }
 
   handleAuthError(error: unknown): AuthError {

@@ -94,6 +94,7 @@ export class ApiClient {
         const requestConfig: RequestInit = {
           method,
           headers,
+          credentials: 'include',  // Include cookies in cross-origin requests
           signal: this.createTimeoutSignal(config.timeout)
         }
 
@@ -187,14 +188,8 @@ export class ApiClient {
       ...customHeaders
     }
 
-    if (requireAuth) {
-      const token = this.getStoredAccessToken()
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      } else {
-        throw new Error('Authentication required but no access token available')
-      }
-    }
+    // Tokens are in httpOnly cookies, no Authorization header needed
+    // Cookies are sent automatically with credentials: 'include'
 
     return headers
   }
@@ -208,8 +203,9 @@ export class ApiClient {
   }
 
   private getStoredAccessToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem('access_token')
+    // Tokens are in httpOnly cookies, not accessible via JavaScript
+    // This method is kept for compatibility but returns null
+    return null
   }
 
   private createTimeoutSignal(timeout?: number): AbortSignal {
