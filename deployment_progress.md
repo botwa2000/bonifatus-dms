@@ -72,3 +72,6 @@ Added missing JSONB import to database models for JSON field types.
 
 ### 2025-10-14: Phase 1 Security Foundation Completed
 **Fix:** Implemented rate limiting (3-tier), security headers middleware, httpOnly cookies, refresh token endpoint, migrated frontend from localStorage to secure cookie-based authentication.
+
+### 2025-10-14: Main.py Cleanup & Middleware Order
+Removed duplicate middleware registrations, fixed import order, moved startup tasks to lifespan, replaced hardcoded URLs with env variables.

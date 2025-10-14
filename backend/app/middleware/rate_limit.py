@@ -68,9 +68,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
         
         if not is_allowed:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded. Retry after {retry_after} seconds.",
+                content={
+                    "detail": f"Rate limit exceeded. Retry after {retry_after} seconds."
+                },
                 headers={"Retry-After": str(retry_after)}
             )
         
