@@ -68,47 +68,59 @@ export function useAuth(): UseAuthReturn {
     updateAuthState({ error: null })
   }, [updateAuthState])
 
+  const processedCodesRef = useRef<Set<string>>(new Set())
+
   const login = useCallback(async (code: string, state?: string): Promise<void> => {
-  if (authOperationRef.current) {
-    await authOperationRef.current
-    return
-  }
-
-  const operation = async () => {
-    try {
-      updateAuthState({ 
-        isLoading: true, 
-        error: null 
-      })
-
-      const response = await authService.exchangeGoogleToken(code, state ?? null)
-      
-      if (response.success) {
-        // Get user data from stored token after successful authentication
-        const user = await authService.getCurrentUser()
-        
-        updateAuthState({
-          user: user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        })
-      } else {
-        throw new Error(response.error || 'Authentication failed')
-      }
-
-      router.push('/dashboard')
-
-    } catch (error) {
-      handleAuthError(error, 'login')
-    } finally {
-      authOperationRef.current = null
+    // Prevent duplicate processing of the same authorization code
+    if (processedCodesRef.current.has(code)) {
+      console.log('[AUTH] Skipping duplicate code processing')
+      return
     }
-  }
 
-  authOperationRef.current = operation()
-  await authOperationRef.current
-}, [updateAuthState, handleAuthError, router])
+    if (authOperationRef.current) {
+      await authOperationRef.current
+      return
+    }
+
+    // Mark code as being processed
+    processedCodesRef.current.add(code)
+
+    const operation = async () => {
+      try {
+        updateAuthState({ 
+          isLoading: true, 
+          error: null 
+        })
+
+        const response = await authService.exchangeGoogleToken(code, state ?? null)
+        
+        if (response.success) {
+          const user = await authService.getCurrentUser()
+          
+          updateAuthState({
+            user: user,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null
+          })
+
+          router.push('/dashboard')
+        } else {
+          processedCodesRef.current.delete(code)
+          throw new Error(response.error || 'Authentication failed')
+        }
+
+      } catch (error) {
+        processedCodesRef.current.delete(code)
+        handleAuthError(error, 'login')
+      } finally {
+        authOperationRef.current = null
+      }
+    }
+
+    authOperationRef.current = operation()
+    await authOperationRef.current
+  }, [updateAuthState, handleAuthError, router])
 
   const logout = useCallback(async () => {
     if (authOperationRef.current) {
