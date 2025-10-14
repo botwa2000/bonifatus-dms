@@ -86,7 +86,7 @@ jobs:
             --set-env-vars "ADMIN_EMAILS=${{ secrets.ADMIN_EMAILS }}" \
             --set-env-vars "APP_ENVIRONMENT=production" \
             --set-env-vars "APP_DEBUG_MODE=false" \
-            --set-env-vars "APP_CORS_ORIGINS=https://bonidoc.com,https://www.bonidoc.com" \
+            --set-env-vars "APP_CORS_ORIGINS=https://bonidoc.com\,https://www.bonidoc.com" \
             --set-env-vars "APP_HOST=0.0.0.0" \
             --set-env-vars "APP_PORT=8080" \
             --set-env-vars "APP_TITLE=Bonifatus DMS" \
