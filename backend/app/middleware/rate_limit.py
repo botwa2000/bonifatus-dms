@@ -7,7 +7,7 @@ Applies rate limits to all API endpoints based on operation type
 
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 from typing import Callable
 import re
 
