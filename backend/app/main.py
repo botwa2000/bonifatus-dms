@@ -1,4 +1,5 @@
-from starlette.middleware.base import BaseHTTPMiddleware# backend/app/main.py
+# backend/app/main.py
+
 import os
 import time
 import uuid
@@ -38,6 +39,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database initialization failed (continuing without database): {e}")
     
+    # Start rate limit cleanup task
+    try:
+        from app.services.rate_limit_service import rate_limit_service
+        rate_limit_service.start_cleanup_task()
+        logger.info("Rate limit service initialized")
+    except Exception as e:
+        logger.warning(f"Rate limit service initialization failed: {e}")
+    
     logger.info("Application startup completed successfully")
     
     yield
@@ -76,61 +85,25 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Import and apply middleware in correct order
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.process_time import ProcessTimeMiddleware
 
 # Security headers middleware
-from app.middleware import SecurityHeadersMiddleware
 app.add_middleware(
     SecurityHeadersMiddleware,
-    frontend_url=os.getenv("FRONTEND_URL", "https://bonidoc.com")
+    frontend_url=os.getenv("FRONTEND_URL", os.getenv("APP_CORS_ORIGINS", "https://bonidoc.com"))
 )
 
 # Rate limiting middleware
-from app.middleware import RateLimitMiddleware
-from app.services.rate_limit_service import rate_limit_service
 app.add_middleware(RateLimitMiddleware)
 
-# Start rate limit cleanup task
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    rate_limit_service.start_cleanup_task()
-    
-logger.info(f"CORS enabled for origins: {allowed_origins}")
-
-class ProcessTimeMiddleware(BaseHTTPMiddleware):
-    """Middleware to add request ID and process time"""
-    
-    async def dispatch(self, request: Request, call_next: Callable):
-        request_id = str(uuid.uuid4())
-        request.state.request_id = request_id
-        
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        
-        response.headers["X-Process-Time"] = str(process_time)
-        response.headers["X-Request-ID"] = request_id
-        
-        return response
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Middleware to add security headers"""
-    
-    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
-        response = await call_next(request)
-        
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
-        if settings.is_production:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
-        return response
-
+# Process time and request ID middleware
 app.add_middleware(ProcessTimeMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
+
+logger.info(f"CORS enabled for origins: {allowed_origins}")
+logger.info(f"Middleware stack: SecurityHeaders -> RateLimit -> ProcessTime")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
