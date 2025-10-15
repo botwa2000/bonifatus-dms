@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Button, Alert, Badge } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'

@@ -9,7 +9,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/contexts/auth-context'
 import { authService } from '@/services/auth.service'
 import Link from 'next/link'
 

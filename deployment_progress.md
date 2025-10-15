@@ -80,3 +80,4 @@ Removed duplicate middleware registrations, fixed import order, moved startup ta
 Fix: Added domain=.bonidoc.com to cookies in callback/refresh/logout for cross-subdomain sharing, cleared cookies properly on logout with max_age=0.
 Fix: Replaced localStorage token retrieval with httpOnly cookie authentication (credentials: 'include') in batch upload and config loading endpoints.
 Fixed sameSite="none" for production cross-origin cookies (bonidoc.com ↔ api.bonidoc.com), deduplicated concurrent auth initialization preventing 10+ parallel /auth/me requests.
+Created AuthProvider context to initialize authentication once at app level, preventing 10+ concurrent /auth/me requests on homepage load. Moved auth logic from useAuth hook to centralized provider.

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/contexts/auth-context'
 import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 
