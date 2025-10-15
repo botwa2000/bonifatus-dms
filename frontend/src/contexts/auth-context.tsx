@@ -31,13 +31,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     const initialize = async () => {
       if (initPromiseRef.current) {
-        console.debug('[AuthProvider] Init already in progress')
         return initPromiseRef.current
       }
 
       initPromiseRef.current = (async () => {
         try {
-          console.debug('[AuthProvider] Starting auth initialization')
           const currentUser = await authService.getCurrentUser()
           
           if (mountedRef.current) {
@@ -46,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoading(false)
           }
         } catch (err) {
-          console.error('[AuthProvider] Initialization failed:', err)
+          // Silently handle 401 errors on public pages (expected when not logged in)
           if (mountedRef.current) {
             setUser(null)
             setIsAuthenticated(false)

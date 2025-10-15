@@ -243,11 +243,6 @@ export class AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Debug: Check if cookies are present
-      const cookies = document.cookie
-      console.log('[AUTH DEBUG] Current cookies:', cookies.split(';').map(c => c.trim().split('=')[0]))
-      console.log('[AUTH DEBUG] Is authenticated cookie:', document.cookie.includes('is_authenticated=true'))
-      
       // Tokens are in httpOnly cookies, API client sends them automatically
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
       
