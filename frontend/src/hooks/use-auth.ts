@@ -1,37 +1,33 @@
 // frontend/src/hooks/use-auth.ts
+'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/auth.service'
-import { AuthState, User } from '@/types/auth.types'
+import { User } from '@/types/auth.types'
 
-interface UseAuthReturn {
+interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
-  login: (code: string, state?: string) => Promise<void>
-  logout: () => Promise<void>
-  refreshTokens: () => Promise<boolean>
-  initializeGoogleAuth: () => Promise<void>
-  getCurrentUser: () => Promise<User | null>
-  handleGoogleCallback: () => Promise<void>
-  clearError: () => void
 }
 
-const initialAuthState: AuthState = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null
-}
-
-export function useAuth(): UseAuthReturn {
-  const [authState, setAuthState] = useState<AuthState>(initialAuthState)
+export function useAuth() {
   const router = useRouter()
-  
-  const authOperationRef = useRef<Promise<void> | null>(null)
   const mountedRef = useRef(true)
+  const authOperationRef = useRef<Promise<void> | null>(null)
+  const processedCodesRef = useRef<Set<string>>(new Set())
+  
+  // Ref for auth initialization promise to prevent parallel calls
+  const authInitPromiseRef = useRef<Promise<void> | null>(null)
+  
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null
+  })
 
   const updateAuthState = useCallback((updates: Partial<AuthState>) => {
     if (!mountedRef.current) return
@@ -42,57 +38,48 @@ export function useAuth(): UseAuthReturn {
     }))
   }, [])
 
-  const handleAuthError = useCallback((error: unknown, context: string) => {
-    console.error(`Authentication error in ${context}:`, error)
-    
-    let errorMessage = 'Authentication failed'
-    
-    if (error instanceof Error) {
-      errorMessage = error.message
-    } else if (typeof error === 'object' && error !== null) {
-      const errorObj = error as Record<string, unknown>
-      errorMessage = (errorObj.message || errorObj.details || errorMessage) as string
-    }
-    
-    updateAuthState({
-      error: errorMessage,
-      isLoading: false,
-      isAuthenticated: false,
-      user: null
-    })
-    
-    return errorMessage
-  }, [updateAuthState])
-
   const clearError = useCallback(() => {
     updateAuthState({ error: null })
   }, [updateAuthState])
 
-  const processedCodesRef = useRef<Set<string>>(new Set())
+  const handleAuthError = useCallback((error: unknown, context: string) => {
+    if (!mountedRef.current) return
 
-  const login = useCallback(async (code: string, state?: string): Promise<void> => {
-    // Prevent duplicate processing of the same authorization code
-    if (processedCodesRef.current.has(code)) {
-      console.log('[AUTH] Skipping duplicate code processing')
-      return
-    }
+    console.error(`Auth error in ${context}:`, error)
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'An authentication error occurred'
 
+    updateAuthState({
+      error: errorMessage,
+      isLoading: false
+    })
+  }, [updateAuthState])
+
+  const login = useCallback(async (code: string, state?: string) => {
     if (authOperationRef.current) {
-      await authOperationRef.current
-      return
+      return authOperationRef.current
     }
 
-    // Mark code as being processed
-    processedCodesRef.current.add(code)
+    if (processedCodesRef.current.has(code)) {
+      console.warn('Code already processed, skipping duplicate login')
+      return
+    }
 
     const operation = async () => {
       try {
+        processedCodesRef.current.add(code)
+        
         updateAuthState({ 
           isLoading: true, 
           error: null 
         })
 
-        const response = await authService.exchangeGoogleToken(code, state ?? null)
+        const response = await authService.exchangeGoogleToken(
+          code, 
+          state || null
+        )
         
         if (response.success) {
           const user = await authService.getCurrentUser()
@@ -131,10 +118,8 @@ export function useAuth(): UseAuthReturn {
       try {
         updateAuthState({ isLoading: true })
 
-        // Call backend logout
         await authService.logout()
         
-        // Clear auth state
         updateAuthState({
           user: null,
           isAuthenticated: false,
@@ -142,13 +127,10 @@ export function useAuth(): UseAuthReturn {
           error: null
         })
 
-        // Force a full page reload to ensure clean state
-        // This prevents the blank page issue by reloading the landing page
         window.location.href = '/'
 
       } catch (error) {
         console.error('Logout error:', error)
-        // Even if logout fails, clear local state and redirect
         updateAuthState({
           user: null,
           isAuthenticated: false,
@@ -225,17 +207,14 @@ export function useAuth(): UseAuthReturn {
     }
   }, [updateAuthState, handleAuthError])
 
-  // Singleton promise for auth initialization
-  let authInitPromise: Promise<void> | null = null
-
   const initializeAuth = useCallback(async () => {
     // Return existing promise if initialization already in progress
-    if (authInitPromise) {
+    if (authInitPromiseRef.current) {
       console.debug('[Auth] Initialization already in progress, waiting...')
-      return authInitPromise
+      return authInitPromiseRef.current
     }
 
-    authInitPromise = (async () => {
+    authInitPromiseRef.current = (async () => {
       try {
         updateAuthState({ isLoading: true })
 
@@ -258,11 +237,11 @@ export function useAuth(): UseAuthReturn {
         })
       } finally {
         // Clear promise after completion
-        authInitPromise = null
+        authInitPromiseRef.current = null
       }
     })()
 
-    return authInitPromise
+    return authInitPromiseRef.current
   }, [updateAuthState])
 
   const handleGoogleCallback = useCallback(async () => {
