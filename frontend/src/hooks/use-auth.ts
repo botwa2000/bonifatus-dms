@@ -214,7 +214,8 @@ export function useAuth() {
       return authInitPromiseRef.current
     }
 
-    authInitPromiseRef.current = (async () => {
+    // Create and store the promise BEFORE starting async work
+    const initPromise = (async () => {
       try {
         updateAuthState({ isLoading: true })
 
@@ -236,11 +237,14 @@ export function useAuth() {
           error: null
         })
       } finally {
-        // Clear promise after completion
-        authInitPromiseRef.current = null
+        // Small delay before clearing to prevent immediate re-initialization
+        setTimeout(() => {
+          authInitPromiseRef.current = null
+        }, 100)
       }
     })()
 
+    authInitPromiseRef.current = initPromise
     return authInitPromiseRef.current
   }, [updateAuthState])
 

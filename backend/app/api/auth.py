@@ -164,8 +164,8 @@ async def google_oauth_callback(
             domain=cookie_domain,
             httponly=True,
             secure=settings.is_production,
-            samesite="lax",
-            max_age=900,  # 15 minutes
+            samesite="none" if settings.is_production else "lax",
+            max_age=900,
             path="/"
         )
         
@@ -175,7 +175,7 @@ async def google_oauth_callback(
             domain=cookie_domain,
             httponly=True,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=604800,  # 7 days
             path="/"
         )
@@ -187,7 +187,7 @@ async def google_oauth_callback(
             domain=cookie_domain,
             httponly=False,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=604800,
             path="/"
         )
@@ -258,7 +258,7 @@ async def refresh_token(
             domain=cookie_domain,
             httponly=True,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=900,  # 15 minutes
             path="/"
         )
@@ -352,7 +352,7 @@ async def logout(
             domain=cookie_domain,
             httponly=True,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=0,
             path="/"
         )
@@ -363,7 +363,7 @@ async def logout(
             domain=cookie_domain,
             httponly=True,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=0,
             path="/"
         )
@@ -374,7 +374,7 @@ async def logout(
             domain=cookie_domain,
             httponly=False,
             secure=settings.is_production,
-            samesite="lax",
+            samesite="none" if settings.is_production else "lax",
             max_age=0,
             path="/"
         )
