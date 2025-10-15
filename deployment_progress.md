@@ -75,3 +75,7 @@ Added missing JSONB import to database models for JSON field types.
 
 ### 2025-10-14: Main.py Cleanup & Middleware Order
 Removed duplicate middleware registrations, fixed import order, moved startup tasks to lifespan, replaced hardcoded URLs with env variables.
+
+### 2025-10-15: Cross-Domain httpOnly Cookie Authentication Fixed
+Fix: Added domain=.bonidoc.com to cookies in callback/refresh/logout for cross-subdomain sharing, cleared cookies properly on logout with max_age=0.
+Fix: Replaced localStorage token retrieval with httpOnly cookie authentication (credentials: 'include') in batch upload and config loading endpoints.

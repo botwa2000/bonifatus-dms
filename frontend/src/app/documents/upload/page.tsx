@@ -64,7 +64,7 @@ export default function BatchUploadPage() {
   const loadConfig = async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/max_filename_length`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        credentials: 'include'  // Send httpOnly cookies
       })
       if (response.ok) {
         const data = await response.json()
@@ -98,9 +98,7 @@ export default function BatchUploadPage() {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/analyze-batch`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
+        credentials: 'include',  // Send httpOnly cookies
         body: formData
       })
 
