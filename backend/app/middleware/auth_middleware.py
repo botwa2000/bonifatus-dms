@@ -1,7 +1,7 @@
 # backend/app/middleware/auth_middleware.py
 """
 Bonifatus DMS - Authentication Middleware
-JWT token validation for protected routes
+JWT token validation from httpOnly cookies (Phase 1 security implementation)
 """
 
 import logging
@@ -22,17 +22,23 @@ async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
-    """Get current authenticated user from JWT token"""
+    """Get current authenticated user from JWT token in httpOnly cookie or Authorization header"""
     
-    if not credentials:
-        logger.warning(f"Missing authorization header for {request.url.path}")
+    # Priority 1: Check httpOnly cookie (Phase 1 security implementation)
+    token = request.cookies.get("access_token")
+    
+    # Priority 2: Fallback to Authorization header for backwards compatibility
+    if not token and credentials:
+        token = credentials.credentials
+    
+    if not token:
+        logger.warning(f"No authentication token found for {request.url.path}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header",
+            detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
     user = await auth_service.get_current_user(token)
     
     if not user:
@@ -111,11 +117,17 @@ async def optional_current_user(
 ) -> Optional[User]:
     """Get current user if token is provided, but don't require authentication"""
     
-    if not credentials:
+    # Check httpOnly cookie first
+    token = request.cookies.get("access_token")
+    
+    # Fallback to Authorization header
+    if not token and credentials:
+        token = credentials.credentials
+    
+    if not token:
         return None
 
     try:
-        token = credentials.credentials
         user = await auth_service.get_current_user(token)
         
         if user and user.is_active:
