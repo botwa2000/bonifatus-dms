@@ -155,12 +155,15 @@ async def google_oauth_callback(
                 detail="Google authentication failed"
             )
         
-        # Set tokens in httpOnly cookies
+        # Set tokens in httpOnly cookies with cross-subdomain support
+        cookie_domain = ".bonidoc.com" if settings.is_production else None
+        
         response.set_cookie(
             key="access_token",
             value=auth_result["access_token"],
+            domain=cookie_domain,
             httponly=True,
-            secure=True,
+            secure=settings.is_production,
             samesite="lax",
             max_age=900,  # 15 minutes
             path="/"
@@ -169,8 +172,9 @@ async def google_oauth_callback(
         response.set_cookie(
             key="refresh_token",
             value=auth_result["refresh_token"],
+            domain=cookie_domain,
             httponly=True,
-            secure=True,
+            secure=settings.is_production,
             samesite="lax",
             max_age=604800,  # 7 days
             path="/"
@@ -180,8 +184,9 @@ async def google_oauth_callback(
         response.set_cookie(
             key="is_authenticated",
             value="true",
+            domain=cookie_domain,
             httponly=False,
-            secure=True,
+            secure=settings.is_production,
             samesite="lax",
             max_age=604800,
             path="/"
@@ -244,12 +249,15 @@ async def refresh_token(
                 detail="Invalid or expired refresh token"
             )
         
-        # Set new access token in httpOnly cookie
+        # Set new access token in httpOnly cookie with cross-subdomain support
+        cookie_domain = ".bonidoc.com" if settings.is_production else None
+        
         response.set_cookie(
             key="access_token",
             value=refresh_result["access_token"],
+            domain=cookie_domain,
             httponly=True,
-            secure=True,
+            secure=settings.is_production,
             samesite="lax",
             max_age=900,  # 15 minutes
             path="/"
@@ -324,6 +332,7 @@ async def get_current_user(
 )
 async def logout(
     request: Request,
+    response: Response,
     current_user: User = Depends(get_current_active_user)
 ) -> JSONResponse:
     """
@@ -334,6 +343,41 @@ async def logout(
     """
     try:
         ip_address = get_client_ip(request)
+        cookie_domain = ".bonidoc.com" if settings.is_production else None
+        
+        # Clear all authentication cookies
+        response.set_cookie(
+            key="access_token",
+            value="",
+            domain=cookie_domain,
+            httponly=True,
+            secure=settings.is_production,
+            samesite="lax",
+            max_age=0,
+            path="/"
+        )
+        
+        response.set_cookie(
+            key="refresh_token",
+            value="",
+            domain=cookie_domain,
+            httponly=True,
+            secure=settings.is_production,
+            samesite="lax",
+            max_age=0,
+            path="/"
+        )
+        
+        response.set_cookie(
+            key="is_authenticated",
+            value="",
+            domain=cookie_domain,
+            httponly=False,
+            secure=settings.is_production,
+            samesite="lax",
+            max_age=0,
+            path="/"
+        )
         
         await auth_service.logout_user(str(current_user.id), ip_address)
         
