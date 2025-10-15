@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Select, Alert } from '@/components/ui'
 
