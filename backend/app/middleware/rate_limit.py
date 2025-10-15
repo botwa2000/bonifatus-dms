@@ -1,17 +1,19 @@
-# backend/app/middleware/rate_limit.py
-
+# backend/app/middleware/rate_limit.py (lines 1-14)
 """
 Rate limiting middleware for FastAPI
 Applies rate limits to all API endpoints based on operation type
 """
 
+import logging
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response, JSONResponse
+from starlette.responses import Response
 from typing import Callable
 import re
 
 from app.services.rate_limit_service import rate_limit_service
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -61,6 +63,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Get identifier (user_id or IP)
         identifier = self._get_identifier(request)
         
+        # Determine if user is authenticated
+        user_id = getattr(request.state, "user_id", None)
+        is_authenticated = bool(user_id)
+
         # Check rate limit
         is_allowed, retry_after = rate_limit_service.check_rate_limit(
             identifier, 
@@ -68,11 +74,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
         
         if not is_allowed:
-            return JSONResponse(
+            logger.warning(f"Rate limit exceeded: {identifier} on tier '{tier}' (method: {method}, path: {path})")
+            raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content={
-                    "detail": f"Rate limit exceeded. Retry after {retry_after} seconds."
-                },
+                detail=f"Rate limit exceeded. Retry after {retry_after} seconds.",
                 headers={"Retry-After": str(retry_after)}
             )
         

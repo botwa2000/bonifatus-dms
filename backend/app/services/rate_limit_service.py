@@ -13,9 +13,9 @@ import asyncio
 
 class RateLimitTier:
     """Rate limit configuration for different operation types"""
-    AUTH = {"requests": 5, "window": 60}      # 5 requests per minute
-    WRITE = {"requests": 20, "window": 60}    # 20 requests per minute
-    READ = {"requests": 100, "window": 60}    # 100 requests per minute
+    AUTH = {"requests": 50, "window": 60}      # 50 requests per minute (10x increase for cold starts)
+    WRITE = {"requests": 60, "window": 60}     # 60 requests per minute (3x increase)
+    READ = {"requests": 200, "window": 60}     # 200 requests per minute (2x increase)
 
 
 class RateLimitService:

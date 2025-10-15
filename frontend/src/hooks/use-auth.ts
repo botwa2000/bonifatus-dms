@@ -225,28 +225,44 @@ export function useAuth(): UseAuthReturn {
     }
   }, [updateAuthState, handleAuthError])
 
+  // Singleton promise for auth initialization
+  let authInitPromise: Promise<void> | null = null
+
   const initializeAuth = useCallback(async () => {
-    try {
-      updateAuthState({ isLoading: true })
-
-      const user = await authService.getCurrentUser()
-      
-      updateAuthState({
-        user,
-        isAuthenticated: !!user,
-        isLoading: false,
-        error: null
-      })
-
-    } catch (error) {
-      console.error('Auth initialization failed:', error)
-      updateAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null
-      })
+    // Return existing promise if initialization already in progress
+    if (authInitPromise) {
+      console.debug('[Auth] Initialization already in progress, waiting...')
+      return authInitPromise
     }
+
+    authInitPromise = (async () => {
+      try {
+        updateAuthState({ isLoading: true })
+
+        const user = await authService.getCurrentUser()
+        
+        updateAuthState({
+          user,
+          isAuthenticated: !!user,
+          isLoading: false,
+          error: null
+        })
+
+      } catch (error) {
+        console.error('Auth initialization failed:', error)
+        updateAuthState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null
+        })
+      } finally {
+        // Clear promise after completion
+        authInitPromise = null
+      }
+    })()
+
+    return authInitPromise
   }, [updateAuthState])
 
   const handleGoogleCallback = useCallback(async () => {

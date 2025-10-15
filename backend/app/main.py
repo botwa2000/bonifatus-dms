@@ -73,8 +73,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration
-allowed_origins = ["*"] if settings.app.app_cors_origins == "*" else settings.app.app_cors_origins.split(",")
+# CORS configuration - include both main domain and API subdomain
+cors_origins = settings.app.app_cors_origins
+if cors_origins == "*":
+    allowed_origins = ["*"]
+else:
+    base_origins = [origin.strip() for origin in cors_origins.split(",")]
+    allowed_origins = []
+    
+    for origin in base_origins:
+        allowed_origins.append(origin)
+        # Add api subdomain variant if not already present
+        if "://" in origin and "api." not in origin:
+            parts = origin.split("://")
+            allowed_origins.append(f"{parts[0]}://api.{parts[1]}")
 
 app.add_middleware(
     CORSMiddleware,
