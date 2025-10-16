@@ -117,17 +117,22 @@ export class ApiClient {
         }
 
         const duration = Date.now() - startTime
-        console.log(`[API ${currentRequestId}] Response ${response.status} in ${duration}ms`)
+
+        // Only log non-401 responses or 401s on protected routes
+        const isExpected401 = response.status === 401 && (endpoint.includes('/auth/me') || endpoint.includes('/auth/refresh'))
+        if (!isExpected401) {
+          console.log(`[API ${currentRequestId}] Response ${response.status} in ${duration}ms`)
+        }
 
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
-          
+
           if (this.shouldRetry(response.status, attempt, maxRetries)) {
             lastError = error
             await this.delay(this.config.retryDelay * Math.pow(2, attempt))
             continue
           }
-          
+
           throw error
         }
 

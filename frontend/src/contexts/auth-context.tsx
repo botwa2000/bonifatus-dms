@@ -2,8 +2,10 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { authService } from '@/services/auth.service'
 import { User } from '@/types/auth.types'
+import { isProtectedRoute } from '@/lib/route-config'
 
 interface AuthContextType {
   user: User | null
@@ -24,12 +26,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const initPromiseRef = useRef<Promise<void> | null>(null)
   const mountedRef = useRef(true)
+  const pathname = usePathname()
 
-  // Initialize auth ONCE on mount
+  // Initialize auth ONCE on mount (skip for public routes)
   useEffect(() => {
     mountedRef.current = true
-    
+
     const initialize = async () => {
+      // Skip auth check on public routes to avoid unnecessary API calls
+      if (!isProtectedRoute(pathname || '/')) {
+        if (mountedRef.current) {
+          setIsLoading(false)
+        }
+        return
+      }
+
       if (initPromiseRef.current) {
         return initPromiseRef.current
       }
@@ -37,14 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initPromiseRef.current = (async () => {
         try {
           const currentUser = await authService.getCurrentUser()
-          
+
           if (mountedRef.current) {
             setUser(currentUser)
             setIsAuthenticated(!!currentUser)
             setIsLoading(false)
           }
         } catch (err) {
-          // Silently handle 401 errors on public pages (expected when not logged in)
+          // Silently handle 401 errors (expected when not logged in)
           if (mountedRef.current) {
             setUser(null)
             setIsAuthenticated(false)
@@ -61,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, []) // Run ONCE on mount
+  }, [pathname]) // Re-run when pathname changes to handle navigation
 
   const initializeGoogleAuth = useCallback(async () => {
     try {

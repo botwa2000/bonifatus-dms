@@ -155,40 +155,38 @@ async def google_oauth_callback(
                 detail="Google authentication failed"
             )
         
-        # Set tokens in httpOnly cookies with cross-subdomain support
-        cookie_domain = ".bonidoc.com" if settings.is_production else None
-        
+        # Set tokens in httpOnly cookies
+        # Note: Domain is NOT set to allow cookies to work across api.bonidoc.com and bonidoc.com
+        # Using SameSite=None with Secure=True for cross-origin requests
+
         response.set_cookie(
             key="access_token",
             value=auth_result["access_token"],
-            domain=cookie_domain,
             httponly=True,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
-            max_age=900,
+            secure=True,  # Always use Secure in production
+            samesite="none",  # Required for cross-origin (api.bonidoc.com -> bonidoc.com)
+            max_age=900,  # 15 minutes
             path="/"
         )
-        
+
         response.set_cookie(
             key="refresh_token",
             value=auth_result["refresh_token"],
-            domain=cookie_domain,
             httponly=True,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
+            secure=True,
+            samesite="none",
             max_age=604800,  # 7 days
             path="/"
         )
-        
-        # Set authentication flag for frontend
+
+        # Set authentication flag for frontend (non-httpOnly for JS access)
         response.set_cookie(
             key="is_authenticated",
             value="true",
-            domain=cookie_domain,
             httponly=False,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
-            max_age=604800,
+            secure=True,
+            samesite="none",
+            max_age=604800,  # 7 days
             path="/"
         )
         
@@ -249,16 +247,13 @@ async def refresh_token(
                 detail="Invalid or expired refresh token"
             )
         
-        # Set new access token in httpOnly cookie with cross-subdomain support
-        cookie_domain = ".bonidoc.com" if settings.is_production else None
-        
+        # Set new access token in httpOnly cookie
         response.set_cookie(
             key="access_token",
             value=refresh_result["access_token"],
-            domain=cookie_domain,
             httponly=True,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
+            secure=True,
+            samesite="none",
             max_age=900,  # 15 minutes
             path="/"
         )
@@ -343,38 +338,34 @@ async def logout(
     """
     try:
         ip_address = get_client_ip(request)
-        cookie_domain = ".bonidoc.com" if settings.is_production else None
-        
+
         # Clear all authentication cookies
         response.set_cookie(
             key="access_token",
             value="",
-            domain=cookie_domain,
             httponly=True,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
+            secure=True,
+            samesite="none",
             max_age=0,
             path="/"
         )
-        
+
         response.set_cookie(
             key="refresh_token",
             value="",
-            domain=cookie_domain,
             httponly=True,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
+            secure=True,
+            samesite="none",
             max_age=0,
             path="/"
         )
-        
+
         response.set_cookie(
             key="is_authenticated",
             value="",
-            domain=cookie_domain,
             httponly=False,
-            secure=settings.is_production,
-            samesite="none" if settings.is_production else "lax",
+            secure=True,
+            samesite="none",
             max_age=0,
             path="/"
         )
