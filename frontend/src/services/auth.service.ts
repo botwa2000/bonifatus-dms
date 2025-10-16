@@ -255,23 +255,24 @@ export class AuthService {
 
     } catch (error) {
         // Silent fail for 401 on public pages (expected behavior)
-        if ((error as any)?.status !== 401) {
+        const apiError = error as { status?: number; message?: string }
+        if (apiError?.status !== 401) {
             console.error('Failed to get current user:', error)
         }
-      
-      // Check if user data exists in localStorage
-      if (typeof window !== 'undefined') {
-        const userData = localStorage.getItem('user')
-        if (userData) {
-          try {
-            return JSON.parse(userData)
-          } catch {
-            this.clearAllAuthData()
-          }
+        
+        // Check if user data exists in localStorage
+        if (typeof window !== 'undefined') {
+            const userData = localStorage.getItem('user')
+            if (userData) {
+                try {
+                    return JSON.parse(userData)
+                } catch {
+                    this.clearAllAuthData()
+                }
+            }
         }
-      }
-      
-      return null
+        
+        return null
     }
   }
 
@@ -312,9 +313,10 @@ export class AuthService {
     }
   }
 
-  scheduleTokenRefresh(accessToken: string): void {
-    // Token refresh is now handled by API client on 401 responses
-    // This method kept for backward compatibility but does nothing
+  scheduleTokenRefresh(_accessToken?: string): void {
+      // Token refresh is now handled by API client on 401 responses
+      // This method kept for backward compatibility but does nothing
+      // Parameter prefixed with _ to indicate intentionally unused
   }
 
   clearTokenRefresh(): void {
