@@ -2,6 +2,58 @@
 
 ## Chronological Log (Latest First)
 
+### 2025-10-16: Authentication State Race Condition Fix
+**Issue:** After successful OAuth login, users would briefly land on dashboard then immediately get redirected back to login page. OAuth callback succeeded (200), cookies were set correctly, but authentication state wasn't persisting across navigation.
+**Root Cause:** Race condition in AuthContext where:
+1. Login completes → User stored in localStorage → Navigate to /dashboard
+2. Dashboard AuthContext runs → Makes /auth/me API call (doesn't check localStorage first)
+3. API call completes but timing causes authentication check to fail
+4. Dashboard redirect effect triggers before auth state updates → Back to login
+
+**Additional Issue:** AuthContext was re-initializing on every route change due to pathname dependency, causing authentication to be checked repeatedly and potentially clearing auth state during navigation.
+
+**Fix:**
+- Updated AuthContext to check localStorage FIRST before making API calls
+- If user data exists in localStorage, immediately set authenticated state (no blocking)
+- API verification happens in background without blocking UI
+- Added `initializedRef` to ensure auth only initializes ONCE per session, not on every route change
+- Prevents race condition where navigation happens before API call completes
+
+**Files Modified:** frontend/src/contexts/auth-context.tsx
+**Impact:**
+- Users remain authenticated after successful login
+- Dashboard loads instantly with cached user data
+- Background API verification ensures data freshness
+- No authentication re-checks during navigation between protected routes
+- Smooth user experience without unexpected logouts
+
+### 2025-10-16: Critical OAuth Cookie Domain Fix
+**Issue:** OAuth callback succeeded (200 OK) but cookies weren't accessible on subsequent requests, causing authentication to fail after Google redirect.
+**Root Cause:** Cookies set with `domain=.bonidoc.com` don't work properly for cross-subdomain authentication between `api.bonidoc.com` (backend) and `bonidoc.com` (frontend).
+**Fix:**
+- Removed domain attribute from all cookies in auth.py (login, refresh, logout endpoints)
+- Set `SameSite=None` with `Secure=True` for cross-origin cookie sharing
+- Cookies now work correctly across subdomains without explicit domain specification
+**Files Modified:** backend/app/api/auth.py
+**Impact:** Google OAuth login flow now works end-to-end - users successfully authenticate and land on dashboard.
+
+### 2025-10-16: Frontend Route Configuration System
+**Issue:** Landing page made unnecessary `/auth/me` API calls on every load, causing duplicate requests and console error noise.
+**Root Cause:** AuthContext attempted to verify authentication on all routes, including public pages where users aren't logged in.
+**Solution:** Created centralized route configuration system with pattern-based detection.
+**Implementation:**
+- Created `frontend/src/lib/route-config.ts` with public/protected route definitions
+- Added `isProtectedRoute()` function with pattern matching for flexibility
+- Updated AuthContext to skip auth checks on public routes
+- Suppressed expected 401 error logging in api-client.ts for auth endpoints
+**Files Created:** frontend/src/lib/route-config.ts
+**Files Modified:** frontend/src/contexts/auth-context.tsx, frontend/src/services/api-client.ts
+**Impact:**
+- Landing page loads without auth API calls
+- Cleaner console (no noise from expected 401s)
+- No hardcoded routes in components
+- Easy to add new public routes
+
 ### 2025-10-13: Missing System Library - libmagic1
 Added libmagic1 to Dockerfile system dependencies for python-magic file validation.
 **Fix:** Updated apt-get install to include libmagic1 package.
