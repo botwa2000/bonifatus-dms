@@ -32,7 +32,9 @@ async def get_current_user(
         token = credentials.credentials
     
     if not token:
-        logger.warning(f"No authentication token found for {request.url.path}")
+        # Don't log for /auth/me endpoint - too noisy for public page checks
+        if request.url.path != "/api/v1/auth/me":
+            logger.warning(f"No authentication token found for {request.url.path}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",

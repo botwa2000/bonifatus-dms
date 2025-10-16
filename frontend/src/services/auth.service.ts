@@ -254,7 +254,10 @@ export class AuthService {
       return response
 
     } catch (error) {
-      console.error('Failed to get current user:', error)
+        // Silent fail for 401 on public pages (expected behavior)
+        if ((error as any)?.status !== 401) {
+            console.error('Failed to get current user:', error)
+        }
       
       // Check if user data exists in localStorage
       if (typeof window !== 'undefined') {
