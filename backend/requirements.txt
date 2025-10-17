@@ -29,3 +29,4 @@ pytesseract==0.3.10
 pdf2image==1.16.3
 opencv-python-headless==4.8.1.78
 langdetect==1.0.9
+clamd==1.0.2

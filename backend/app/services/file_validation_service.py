@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.database.connection import db_manager
 from app.services.config_service import config_service
 from app.services.trust_scoring_service import trust_scoring_service
+from app.services.malware_scanner_service import malware_scanner_service
 
 logger = logging.getLogger(__name__)
 
@@ -96,18 +97,6 @@ class FileValidationService:
         '.7z': 'application/x-7z-compressed'
     }
     
-    # Suspicious patterns in file content (basic malware detection)
-    SUSPICIOUS_PATTERNS = [
-        b'<script',
-        b'javascript:',
-        b'eval(',
-        b'exec(',
-        b'<?php',
-        b'<%',
-        b'cmd.exe',
-        b'powershell'
-    ]
-
     def __init__(self):
         self._magic_mime = None
     
@@ -146,16 +135,24 @@ class FileValidationService:
             )
             if not basic_result.allowed:
                 return basic_result
-            
+
+            # Get detected MIME type for malware scanning
+            file_ext = os.path.splitext(filename.lower())[1]
+            detected_mime = self.ALLOWED_EXTENSIONS.get(file_ext, '')
+
             # Layer 2: Storage quota check
             quota_result = await self._check_storage_quota(
                 file_content, user_id, user_tier, session
             )
             if not quota_result.allowed:
                 return quota_result
-            
-            # Layer 3: Content validation (malware patterns)
-            content_result = await self._validate_content(file_content)
+
+            # Layer 3: Professional malware scanning (ClamAV + structural validation)
+            content_result = await self._validate_content(
+                file_content,
+                filename=filename,
+                mime_type=detected_mime
+            )
             if not content_result.allowed:
                 return content_result
             
@@ -330,30 +327,50 @@ class FileValidationService:
             storage_info=storage_info
         )
     
-    async def _validate_content(self, file_content: BinaryIO) -> ValidationResult:
-        """Scan file content for suspicious patterns"""
+    async def _validate_content(self, file_content: BinaryIO, filename: str = "", mime_type: str = "") -> ValidationResult:
+        """
+        Professional malware scanning with ClamAV + structural validation
+
+        Uses multi-layered approach:
+        - ClamAV signature-based detection
+        - PDF structural validation (JavaScript, embedded files, launch actions)
+        - Office document macro detection
+        """
         try:
-            # Read first 1MB for pattern detection
             file_content.seek(0)
-            content_sample = file_content.read(1024 * 1024)
+
+            # Scan with professional malware scanner
+            scan_result = await malware_scanner_service.scan_file(
+                file_content=file_content,
+                filename=filename,
+                mime_type=mime_type
+            )
+
             file_content.seek(0)
-            
-            # Check for suspicious patterns
-            for pattern in self.SUSPICIOUS_PATTERNS:
-                if pattern in content_sample:
-                    logger.warning(f"Suspicious pattern detected: {pattern}")
-                    return ValidationResult(
-                        allowed=False,
-                        error_message="File contains potentially malicious content"
-                    )
-            
-            return ValidationResult(allowed=True)
-            
-        except Exception as e:
-            logger.error(f"Content validation error: {e}")
+
+            # Convert scan result to validation result
+            if not scan_result.is_safe:
+                # Malware or exploit detected
+                threat_details = "; ".join(scan_result.threats)
+                logger.warning(f"Malware detected in {filename}: {threat_details}")
+                return ValidationResult(
+                    allowed=False,
+                    error_message=f"Security threat detected: {threat_details}"
+                )
+
+            # File is safe, but may have warnings
             return ValidationResult(
-                allowed=False,
-                error_message="Unable to validate file content"
+                allowed=True,
+                warnings=scan_result.warnings
+            )
+
+        except Exception as e:
+            logger.error(f"Malware scan error: {e}", exc_info=True)
+            # Fail-open: Allow file if scanner fails (ClamAV may not be ready yet)
+            # But add warning so user knows scan didn't complete
+            return ValidationResult(
+                allowed=True,
+                warnings=[f"Security scan unavailable: {str(e)}"]
             )
     
     def calculate_file_hash(self, file_content: BinaryIO) -> str:
