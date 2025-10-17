@@ -176,14 +176,11 @@ export class AuthService {
         state: state || ''
       })
 
-      console.log('[AUTH DEBUG] Token exchange successful, user:', response.user?.email)
+      console.log('[AUTH DEBUG] Token exchange successful')
+      console.log('[AUTH DEBUG] Response:', JSON.stringify(response))
 
-      // Store user info only (tokens are in httpOnly cookies)
-      if (typeof window !== 'undefined' && response.user) {
-        localStorage.setItem('user', JSON.stringify(response.user))
-        console.log('[AUTH DEBUG] User stored in localStorage')
-
-        // Set authentication flag cookie for middleware detection
+      // Set authentication flag cookie IMMEDIATELY (before fetching user)
+      if (typeof window !== 'undefined') {
         const maxAge = response.expires_in || 604800 // Default 7 days
         const isSecure = window.location.protocol === 'https:'
         const cookieString = `bonifatus_has_token=true; path=/; max-age=${maxAge}; SameSite=Lax${isSecure ? '; Secure' : ''}`
@@ -202,6 +199,17 @@ export class AuthService {
           cookieSet: document.cookie.includes('bonifatus_has_token'),
           allCookies: document.cookie
         }))
+
+        // Now fetch and store full user info
+        try {
+          const fullUser = await this.getCurrentUser()
+          if (fullUser) {
+            localStorage.setItem('user', JSON.stringify(fullUser))
+            console.log('[AUTH DEBUG] User stored in localStorage:', fullUser.email)
+          }
+        } catch (e) {
+          console.error('[AUTH DEBUG] Failed to fetch user after token exchange:', e)
+        }
       }
 
       // Clear OAuth state
