@@ -17,7 +17,9 @@ export default function LoginPageContent() {
         const code = searchParams.get('code')
         const state = searchParams.get('state')
         const error = searchParams.get('error')
-        
+
+        console.log('[LOGIN DEBUG] OAuth callback started', { code: !!code, state: !!state, error })
+
         if (error) {
           setStatus('error')
           setError(`OAuth error: ${error}`)
@@ -26,24 +28,36 @@ export default function LoginPageContent() {
 
         if (!code) {
           // No code means user came directly to login page
+          console.log('[LOGIN DEBUG] No code, showing login page')
           setStatus('login')
           return
         }
 
         // Exchange authorization code for JWT tokens
+        console.log('[LOGIN DEBUG] Starting token exchange')
         const result = await authService.exchangeGoogleToken(code, state)
-        
+
         if (result.success) {
+          console.log('[LOGIN DEBUG] Token exchange successful')
+          console.log('[LOGIN DEBUG] Current cookies:', document.cookie)
+          console.log('[LOGIN DEBUG] LocalStorage user:', localStorage.getItem('user'))
+
           setStatus('success')
+
+          // Wait a bit to ensure cookies are set
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+          console.log('[LOGIN DEBUG] About to redirect to dashboard')
           // Redirect to dashboard or redirect URL from state
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           router.push(redirectUrl)
         } else {
+          console.error('[LOGIN DEBUG] Token exchange failed:', result.error)
           setStatus('error')
           setError('Authentication failed. Please try again.')
         }
       } catch (error) {
-        console.error('OAuth callback error:', error)
+        console.error('[LOGIN DEBUG] OAuth callback error:', error)
         setStatus('error')
         setError(error instanceof Error ? error.message : 'Authentication failed')
       }

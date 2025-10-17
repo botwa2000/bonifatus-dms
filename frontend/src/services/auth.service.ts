@@ -162,6 +162,8 @@ export class AuthService {
     state: string | null
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('[AUTH DEBUG] Starting token exchange')
+
       // Validate state if provided
       if (state && !this.validateOAuthState(state)) {
         throw new Error('Invalid OAuth state - possible security issue')
@@ -174,13 +176,32 @@ export class AuthService {
         state: state || ''
       })
 
+      console.log('[AUTH DEBUG] Token exchange successful, user:', response.user?.email)
+
       // Store user info only (tokens are in httpOnly cookies)
       if (typeof window !== 'undefined' && response.user) {
         localStorage.setItem('user', JSON.stringify(response.user))
+        console.log('[AUTH DEBUG] User stored in localStorage')
 
         // Set authentication flag cookie for middleware detection
         const maxAge = response.expires_in || 604800 // Default 7 days
-        document.cookie = `bonifatus_has_token=true; path=/; max-age=${maxAge}; SameSite=Lax; Secure`
+        const isSecure = window.location.protocol === 'https:'
+        const cookieString = `bonifatus_has_token=true; path=/; max-age=${maxAge}; SameSite=Lax${isSecure ? '; Secure' : ''}`
+        document.cookie = cookieString
+
+        console.log('[AUTH DEBUG] Setting cookie:', cookieString)
+        console.log('[AUTH DEBUG] Protocol:', window.location.protocol)
+        console.log('[AUTH DEBUG] Is secure:', isSecure)
+        console.log('[AUTH DEBUG] All cookies after setting:', document.cookie)
+        console.log('[AUTH DEBUG] Cookie includes bonifatus_has_token:', document.cookie.includes('bonifatus_has_token'))
+
+        // Store in sessionStorage for debugging
+        sessionStorage.setItem('auth_debug', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          action: 'token_exchange',
+          cookieSet: document.cookie.includes('bonifatus_has_token'),
+          allCookies: document.cookie
+        }))
       }
 
       // Clear OAuth state
@@ -190,6 +211,11 @@ export class AuthService {
 
     } catch (error) {
       console.error('Token exchange failed:', error)
+      sessionStorage.setItem('auth_debug', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        action: 'token_exchange_failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }))
       this.clearStoredOAuthState()
 
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
@@ -255,7 +281,8 @@ export class AuthService {
         localStorage.setItem('user', JSON.stringify(response))
 
         // Set authentication flag cookie for middleware detection
-        document.cookie = `bonifatus_has_token=true; path=/; max-age=604800; SameSite=Lax; Secure`
+        const isSecure = window.location.protocol === 'https:'
+        document.cookie = `bonifatus_has_token=true; path=/; max-age=604800; SameSite=Lax${isSecure ? '; Secure' : ''}`
       }
 
       return response

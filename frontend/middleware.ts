@@ -25,7 +25,19 @@ function isAuthenticated(request: NextRequest): boolean {
   const hasAccessToken = request.cookies.get('access_token')?.value
   const hasAuthHeader = request.headers.get('authorization')
   const hasTokenCookie = request.cookies.get('bonifatus_has_token')?.value === 'true'
-  
+
+  // Debug logging
+  const allCookies = request.cookies.getAll()
+  console.log('[Middleware DEBUG] Auth check:', {
+    path: request.nextUrl.pathname,
+    hasAccessToken: !!hasAccessToken,
+    hasAuthHeader: !!hasAuthHeader,
+    hasTokenCookie,
+    tokenCookieValue: request.cookies.get('bonifatus_has_token')?.value,
+    allCookies: allCookies.map(c => `${c.name}=${c.value}`),
+    isAuthenticated: !!(hasAccessToken || hasAuthHeader || hasTokenCookie)
+  })
+
   return !!(hasAccessToken || hasAuthHeader || hasTokenCookie)
 }
 
