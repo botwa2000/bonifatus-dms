@@ -177,6 +177,10 @@ export class AuthService {
       // Store user info only (tokens are in httpOnly cookies)
       if (typeof window !== 'undefined' && response.user) {
         localStorage.setItem('user', JSON.stringify(response.user))
+
+        // Set authentication flag cookie for middleware detection
+        const maxAge = response.expires_in || 604800 // Default 7 days
+        document.cookie = `bonifatus_has_token=true; path=/; max-age=${maxAge}; SameSite=Lax; Secure`
       }
 
       // Clear OAuth state
@@ -187,7 +191,7 @@ export class AuthService {
     } catch (error) {
       console.error('Token exchange failed:', error)
       this.clearStoredOAuthState()
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
       return { success: false, error: errorMessage }
     }
@@ -245,12 +249,15 @@ export class AuthService {
     try {
       // Tokens are in httpOnly cookies, API client sends them automatically
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
-      
+
       // Store user info locally
       if (typeof window !== 'undefined') {
         localStorage.setItem('user', JSON.stringify(response))
+
+        // Set authentication flag cookie for middleware detection
+        document.cookie = `bonifatus_has_token=true; path=/; max-age=604800; SameSite=Lax; Secure`
       }
-      
+
       return response
 
     } catch (error) {
@@ -259,7 +266,7 @@ export class AuthService {
         if (apiError?.status !== 401) {
             console.error('Failed to get current user:', error)
         }
-        
+
         // Check if user data exists in localStorage
         if (typeof window !== 'undefined') {
             const userData = localStorage.getItem('user')
@@ -271,7 +278,7 @@ export class AuthService {
                 }
             }
         }
-        
+
         return null
     }
   }
@@ -347,10 +354,11 @@ export class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('user')
     }
-    
-    // Clear authentication flag cookie
+
+    // Clear authentication flag cookies
     document.cookie = 'is_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
-    
+    document.cookie = 'bonifatus_has_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
+
     // Backend clears httpOnly cookies on logout endpoint
   }
 
