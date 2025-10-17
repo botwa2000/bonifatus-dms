@@ -140,26 +140,32 @@ class Document(Base, TimestampMixin):
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
     google_drive_file_id = Column(String(100), nullable=False, unique=True)
-    
+
     # Processing status
     processing_status = Column(String(20), nullable=False, default="pending")
     extracted_text = Column(Text, nullable=True)
     keywords = Column(Text, nullable=True)
     confidence_score = Column(Integer, nullable=True)
-    
+
     # Language detection
     primary_language = Column(String(5), nullable=True, index=True)
     detected_languages = Column(Text, nullable=True)
-    
+
+    # Date extraction
+    document_date = Column(sa.Date, nullable=True)
+    document_date_confidence = Column(Float, nullable=True)
+    document_date_type = Column(String(50), nullable=True)
+
     # Foreign Keys
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
-    
-    # Relationships - CORRECT VERSION
+
+    # Relationships
     user = relationship("User", back_populates="documents")
     category = relationship("Category", back_populates="documents")
     categories = relationship("DocumentCategory", back_populates="document", cascade="all, delete-orphan")
     languages = relationship("DocumentLanguage", back_populates="document", cascade="all, delete-orphan")
+    dates = relationship("DocumentDate", back_populates="document", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_document_user_id', 'user_id'),
@@ -167,6 +173,7 @@ class Document(Base, TimestampMixin):
         Index('idx_document_status', 'processing_status'),
         Index('idx_document_google_drive', 'google_drive_file_id'),
         Index('idx_document_primary_lang', 'primary_language'),
+        Index('idx_document_date', 'document_date'),
     )
 
 class DocumentCategory(Base):
@@ -373,7 +380,7 @@ class NgramPattern(Base):
 class LanguageDetectionPattern(Base):
     """Language detection patterns for scalable multilingual support"""
     __tablename__ = 'language_detection_patterns'
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     language_code = Column(String(10), nullable=False)
     pattern = Column(String(100), nullable=False)
@@ -382,3 +389,24 @@ class LanguageDetectionPattern(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class DocumentDate(Base, TimestampMixin):
+    """Secondary dates extracted from documents"""
+    __tablename__ = "document_dates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    date_type = Column(String(50), nullable=False)
+    date_value = Column(sa.Date, nullable=False)
+    confidence = Column(Float, nullable=True)
+    extracted_text = Column(String(200), nullable=True)
+
+    # Relationships
+    document = relationship("Document", back_populates="dates")
+
+    __table_args__ = (
+        Index('idx_document_dates_document_id', 'document_id'),
+        Index('idx_document_dates_date_type', 'date_type'),
+        Index('idx_document_dates_date_value', 'date_value'),
+    )

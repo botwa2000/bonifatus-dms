@@ -1,7 +1,7 @@
 # BoniDoc - Development & Deployment Guide
-Version: 11.1
+Version: 12.0
 Last Updated: October 17, 2025
-Status: Phase 1 Complete - Authentication Flow Fixed | Production Deployment Active
+Status: Phase 1 Complete - Authentication Flow Fixed | Production Deployment Active | Phase 2 Design Complete
 Domain: https://bonidoc.com
 
 ## Table of Contents
@@ -57,7 +57,8 @@ BoniDoc is a professional document management system that combines secure storag
 ### 1.3 User Experience Goals
 - One-click batch upload with automatic analysis
 - Clear visual feedback on categorization confidence
-- Multi-category assignment (1-5 categories per document)
+- Multi-category assignment (unlimited categories per document)
+- System suggests ONE primary category, user can approve/change and add more
 - Learning system that improves with use
 - Mobile-responsive interface with dark mode
 - Accessible via mouse, keyboard, and touch
@@ -106,10 +107,11 @@ BoniDoc is a professional document management system that combines secure storag
 - category_translations: Multi-language names/descriptions
 - category_keywords: Learned keyword associations for ML
 
-**Documents (3 tables)**
-- documents: Main document metadata and Drive links
-- document_categories: Many-to-many (supports 1-5 categories per document)
+**Documents (4 tables)**
+- documents: Main document metadata, Drive links, and document dates
+- document_categories: Many-to-many (unlimited categories per document, one marked as primary)
 - document_languages: Multi-language detection per document
+- document_dates: Additional extracted dates (expiry, due dates, tax years)
 
 **Keywords & Search (3 tables)**
 - keywords: Normalized keyword dictionary
@@ -138,23 +140,44 @@ BoniDoc is a professional document management system that combines secure storag
 1. Transport Security: HTTPS with HSTS headers
 2. Authentication: Google OAuth + JWT (15-minute access, 7-day refresh)
 3. Session Management: Track and revoke active sessions
-4. Field-Level Encryption: Sensitive data encrypted at rest
+4. Field-Level Encryption: OAuth tokens only (pragmatic approach)
 5. Rate Limiting: Three-tier limits (auth/write/read operations)
 6. Input Validation: Pydantic models for all API inputs
 7. Audit Logging: All security events logged with context
 
+**Encryption Strategy**
+- Documents: NOT encrypted (stored in user's Google Drive, already protected)
+- OAuth Tokens: Encrypted with Fernet AES-256
+- Keywords: NOT encrypted (semantic descriptors, not sensitive data)
+- Metadata: NOT encrypted (filenames, categories, timestamps - needed for queries)
+- Audit Logs: Log standardized filenames only, not original filenames
+
 **Data Flow**
 ```
-User Upload → File Validation → Temporary Storage → Text Extraction (OCR if needed)
-→ Language Detection → Keyword Extraction → Category Classification
-→ User Review & Correction → Permanent Storage (Google Drive)
-→ Database Metadata → ML Learning Update
+User Upload → File Validation → Temporary In-Memory Storage → Text Extraction (OCR if needed)
+→ Language Detection → Keyword Extraction (semantic only, no entities) → Date Extraction
+→ Category Classification (suggest ONE primary) → User Review & Correction (change primary, add more)
+→ Permanent Storage (Google Drive in category folder) → Database Metadata (encrypted where needed)
+→ ML Learning Update (adjust keyword weights per language) → Temp File Cleanup
 ```
 
 **Learning Cycle**
 ```
-System Suggests Category → User Confirms or Corrects
-→ Adjust Keyword Weights → Improved Future Suggestions
+System Suggests Primary Category → User Confirms/Changes Primary + Adds Secondary Categories
+→ Log Decision → Adjust Keyword Weights (+10% correct, -5% incorrect)
+→ Calculate Daily Accuracy Metrics → Improved Future Suggestions
+```
+
+**Document Naming Convention**
+```
+Format: YYYYMMDD_HHMMSS_CategoryCode_OriginalName.ext
+Example: 20251017_143022_TAX_invoice_2024.pdf
+
+Immutable Filename Strategy:
+- Filename preserves original primary category (audit trail)
+- On reclassification: Document moves to new folder, filename stays same
+- Current primary category always available in UI and database
+- Prevents broken links, simpler implementation, clear history
 ```
 
 ---
@@ -281,66 +304,136 @@ System Suggests Category → User Confirms or Corrects
 
 ### Phase 2: Document Processing & Classification
 
-**Objective:** Enable intelligent document categorization with OCR support
+**Objective:** Enable intelligent document categorization with OCR support and date extraction
 
-**OCR & Text Extraction**
+**2A: OCR & Text Extraction**
 - Integrate Tesseract for scanned document processing
 - Implement image preprocessing (grayscale, binarization, deskew)
 - Update document analysis to detect scanned vs native text PDFs
 - Extract text from images (JPEG, PNG, TIFF)
+- Process documents in-memory (files <10MB), encrypted temp dir for larger files
+- Immediate cleanup of temporary files after processing
 
-**Classification Engine**
-- Implement keyword overlap scoring algorithm
+**2B: Keyword Extraction (Language-Aware)**
+- Extract semantic keywords only (nouns, verbs), not entities (names, numbers)
+- Filter stop words per language (ru/en/de, scalable to more)
+- Frequency-based keyword scoring
+- Limit keyword length (max 50 chars to prevent full sentences)
+- Store keywords unencrypted (semantic descriptors, not sensitive data)
+
+**2C: Classification Engine**
+- Implement keyword overlap scoring algorithm per language
 - Apply confidence thresholds (60% minimum, 20% gap requirement)
-- Populate system keywords (150+ keywords in en/de/ru)
-- Handle ambiguous cases (assign to "Other" category)
+- Suggest ONE primary category (highest confidence)
+- Populate system keywords database (150+ keywords in en/de/ru)
+- Handle ambiguous cases (suggest "Other" category)
+- Language-scalable architecture (easy to add new languages)
 
-**Category Learning**
-- Record all classification decisions in database
-- Reinforce correct suggestions (10% weight boost)
-- Penalize incorrect suggestions (5% weight reduction)
-- Calculate daily accuracy metrics per category
-- Display learning progress to users
+**2D: Date Extraction**
+- Extract ONE primary document date per document (invoice date, tax year, signature date, etc.)
+- Store in documents.document_date with confidence score
+- Multi-language date pattern recognition (DD.MM.YYYY, MM/DD/YYYY, etc.)
+- Store as ISO format (YYYY-MM-DD) internally, display per user locale
+- Optional: Extract secondary dates (expiry, due date) in document_dates table
+
+**2E: Category Learning & ML Feedback Loop**
+- Record all classification decisions in document_classification_log
+- Track user's final choice (confirmed, changed primary, added secondary)
+- Reinforce correct suggestions (+10% keyword weight for that language)
+- Penalize incorrect suggestions (-5% keyword weight for that language)
+- Calculate daily accuracy metrics per category per language
+- Display learning progress and "why this category?" explanations to users
+
+**Multi-Category Assignment Logic**
+- System suggests ONE primary category
+- User can: approve, change primary, add unlimited secondary categories
+- document_categories table tracks is_primary flag
+- ML learns from both primary and secondary assignments
+- All user decisions feed back into keyword weight adjustments
 
 **Milestone Criteria:**
 - OCR successfully extracts text from scanned documents
-- Classification suggests correct category ≥70% of the time
-- System learns from user corrections
-- Daily metrics show accuracy trends
-- Users can view "why this category?" explanation
+- Classification suggests correct primary category ≥70% of the time
+- System learns from user corrections (weights adjust per language)
+- Date extraction works with ≥80% accuracy
+- Daily metrics show accuracy improvement trends
+- Users can view "why this category?" explanation with keyword matches
+- Architecture supports easy addition of new languages (not hardcoded to ru/en/de)
 
 ---
 
 ### Phase 3: Google Drive Integration
 
-**Objective:** Store documents securely in user's personal Google Drive
+**Objective:** Store documents securely in user's personal Google Drive with proper folder organization
 
-**Drive Schema**
-- Create google_drive_folders table (category folder mappings)
-- Create google_drive_sync_status table (quota tracking)
-- Add Drive columns to documents table (drive_file_id, web_view_link)
-- Add Drive permissions to users table
+**Drive Schema (Already in Place)**
+- google_drive_folders: Category folder mappings (user_id, category_id, folder_id)
+- google_drive_sync_status: Quota tracking and sync state
+- documents.drive_file_id: Google's unique file ID
+- documents.drive_folder_id: Category folder reference
+- users.google_drive_connected: Connection status flag
 
-**Drive Service**
-- Initialize Drive connection with OAuth scope
-- Create folder structure (/BoniDoc/CategoryName/)
-- Upload files to appropriate category folders
-- Generate temporary download links (1-hour expiry)
-- Track storage quotas and warn users
-- Handle Drive API errors gracefully
+**Drive Folder Structure**
+```
+/BoniDoc/
+├── Tax Documents/
+├── Insurance/
+├── Contracts/
+├── Legal/
+├── Medical/
+├── Receipts/
+├── Certificates/
+├── Real Estate/
+└── Other/
+```
+
+**Drive Service Implementation**
+- Initialize Drive connection with OAuth scope (drive.file for security)
+- Create folder structure on first upload (lazy initialization)
+- Upload files with standardized names to appropriate category folders
+- Generate temporary download links (1-hour expiry for security)
+- Track storage quotas and warn users at 80% capacity
+- Handle Drive API errors gracefully (rate limits, quota exceeded, network failures)
+- Move files between folders on category reclassification (filename stays same)
+
+**Upload Flow with Drive Integration**
+1. User uploads document → Temporary backend storage
+2. OCR/text extraction → Classification → User review
+3. User confirms categories → Upload to Drive in primary category folder
+4. Store drive_file_id and metadata in database
+5. Delete temporary file from backend
+6. Return success with Drive link to user
+
+**Reclassification Flow**
+- User changes primary category → Move file to new folder in Drive
+- Filename remains unchanged (immutable naming strategy)
+- Update documents.primary_category_id and documents.drive_folder_id
+- Log reclassification in audit_logs
+- No broken links (drive_file_id stays same even after move)
 
 **Frontend Updates**
-- Drive connection UI in settings
+- Drive connection UI in settings page
 - Storage quota display with progress bar
-- Document detail page with "View in Drive" link
+- Document detail page with "View in Drive" button
 - Download functionality via temporary links
+- Warning messages when quota approaching limit
+
+**Security Considerations**
+- OAuth scope limited to drive.file (only access BoniDoc-created files)
+- All Drive API calls over HTTPS
+- Temporary download links expire after 1 hour
+- No document content logged or stored in backend
+- User can revoke Drive access anytime
 
 **Milestone Criteria:**
-- Users can connect their Google Drive
-- Documents upload to Drive successfully
-- Folder structure created automatically
+- Users can connect their Google Drive via OAuth
+- Folder structure created automatically on first upload
+- Documents upload to correct category folders
+- Standardized filenames preserved across reclassifications
+- Move operation works correctly (file moves, filename stays same)
 - Download links work reliably
-- Quota tracking accurate
+- Quota tracking accurate and warnings displayed
+- Drive connection can be revoked from settings
 
 ---
 
@@ -407,7 +500,7 @@ System Suggests Category → User Confirms or Corrects
 - Dark mode theme
 - Settings & localization API
 - Comprehensive audit logging
-- Multi-category assignment architecture (1-5 categories per document)
+- Multi-category assignment architecture (unlimited categories, one primary)
 
 **Document Processing** (Partial)
 - Batch upload analysis endpoint
@@ -429,29 +522,227 @@ System Suggests Category → User Confirms or Corrects
 
 **Start Phase 2: Document Processing & Classification**
 
-1. **OCR Integration**
-   - Add Tesseract dependencies to Dockerfile
-   - Implement image preprocessing
-   - Create OCR service for scanned PDFs and images
-   - Update document analysis service to use OCR when needed
+**Step 1: Database Schema Updates**
+- Add document_date, document_date_confidence to documents table
+- Create document_dates table for secondary dates (optional, can be Phase 2B)
+- Verify document_categories has is_primary flag
+- Verify category_keywords has language column and weight column
 
-2. **Classification Engine**
-   - Implement keyword overlap scoring
-   - Apply confidence thresholds and decision rules
-   - Populate system keywords (150+ in en/de/ru)
-   - Test classification accuracy on sample documents
+**Step 2: OCR & Text Extraction (Phase 2A)**
+- Add Tesseract dependencies to backend Dockerfile
+- Create OCR service for scanned PDFs and images
+- Implement image preprocessing (grayscale, binarization, deskew)
+- Update document analysis to detect scanned vs native text PDFs
+- In-memory processing for files <10MB
+- Immediate temp file cleanup after processing
 
-3. **Learning Mechanism**
-   - Record all classification decisions
-   - Implement weight adjustment (10% boost, 5% penalty)
-   - Create daily metrics calculation job
-   - Display category performance metrics to users
+**Step 3: Keyword Extraction (Phase 2B)**
+- Create keyword extraction service (language-aware)
+- Implement stop word filtering per language
+- Extract semantic keywords only (no entities, no numbers)
+- Frequency-based scoring with 50-char length limit
+- Store in keywords and document_keywords tables
+
+**Step 4: Date Extraction (Phase 2D)**
+- Create date extraction service with multi-language patterns
+- Extract ONE primary document date per document
+- Store as ISO format with confidence score
+- Pattern matching for ru/en/de date formats
+
+**Step 5: Classification Engine (Phase 2C)**
+- Implement keyword overlap scoring per language
+- Apply confidence thresholds (60% min, 20% gap)
+- Suggest ONE primary category (highest score)
+- Populate system keywords database (150+ in en/de/ru)
+- Handle ambiguous cases ("Other" category)
+
+**Step 6: ML Learning Loop (Phase 2E)**
+- Record classification decisions in document_classification_log
+- Implement weight adjustment logic (+10% correct, -5% incorrect)
+- Track both primary and secondary category assignments
+- Create daily metrics calculation
+- Build "why this category?" explanation UI
+
+**Step 7: Testing**
+- Test with sample documents in all three languages
+- Verify ≥70% primary category accuracy
+- Verify ≥80% date extraction accuracy
+- Confirm ML weight adjustments working
+- Test multi-category assignment flow
 
 ---
 
-## 6. Quality Control & Deployment Process
+## 6. Design Decisions & Rationale
 
-### 6.1 Pre-Commit Checklist
+### 6.1 Classification & Categorization
+
+**Multi-Category Assignment**
+- Decision: Unlimited categories per document, one marked as primary
+- Rationale: Real-world documents often belong to multiple categories (e.g., "Tax" + "Real Estate")
+- Implementation: document_categories table with is_primary boolean flag
+- User Flow: System suggests ONE primary → user can approve/change/add more
+- ML Impact: All assignments (primary + secondary) feed into learning algorithm
+
+**Primary Category Selection**
+- Decision: System suggests ONE primary based on highest confidence score
+- Rationale: Reduces cognitive load, provides clear recommendation, user maintains control
+- Fallback: If confidence <60% or top two within 20%, suggest "Other" category
+- User Override: User can always change suggested primary to any category
+
+**Category Learning Strategy**
+- Decision: Keyword weight adjustment per language (+10% correct, -5% incorrect)
+- Rationale: Asymmetric learning (faster reinforcement, slower penalty) prevents over-correction
+- Granularity: Weights tracked per category per keyword per language
+- Scalability: Architecture supports unlimited languages without code changes
+
+### 6.2 Keyword Extraction Philosophy
+
+**Semantic Keywords Only**
+- Decision: Extract nouns/verbs, NOT entities (names, numbers, IDs)
+- Rationale: "invoice" helps classification, "123-45-6789" does not
+- Security Benefit: No PII accidentally stored as keywords
+- Example: Extract "passport application" not "John Smith passport A1234567"
+
+**No Keyword Encryption**
+- Decision: Store keywords in plaintext (unencrypted)
+- Rationale: Keywords are content descriptors, not sensitive data
+- Performance: Enables fast searches, efficient indexing, no decryption overhead
+- User Benefit: Fast classification, instant search results
+
+**Language-Specific Processing**
+- Decision: Stop words, patterns, and weights tracked per language
+- Rationale: Word importance varies by language ("the" irrelevant in English, meaningful in other contexts)
+- Scalability: New languages added via database configuration, not code changes
+- Storage: language column in keywords, category_keywords, and stop_words tables
+
+### 6.3 Document Naming & File Management
+
+**Immutable Filename Strategy**
+- Decision: Filenames never change after creation
+- Format: YYYYMMDD_HHMMSS_CategoryCode_OriginalName.ext
+- Rationale: Preserves audit trail, prevents broken links, simpler implementation
+- On Reclassification: File moves to new folder, filename stays same
+- Trade-off Accepted: Filename shows original category, not current (current always in UI)
+
+**Upload Timestamp vs Document Date**
+- Decision: Both stored separately, different purposes
+- Upload Timestamp: In filename, immutable, system-generated
+- Document Date: Extracted from content, editable, user-meaningful
+- Display: Show both in UI ("Uploaded Oct 17, 2025 • Document Date: Mar 15, 2024")
+- Search: Users search by document date, not upload timestamp
+
+**Google Drive Folder Structure**
+- Decision: Flat folder structure by category (/BoniDoc/CategoryName/)
+- Rationale: Simple, mirrors category system, easy to navigate
+- On Reclassification: Move file between folders using Drive API
+- User Benefit: Clear organization, manual Drive access makes sense
+
+### 6.4 Security & Encryption Strategy
+
+**Pragmatic Encryption Approach**
+- Decision: Encrypt only OAuth tokens, not keywords/metadata
+- Rationale: Balance security, performance, maintenance cost, user experience
+- Documents: NOT encrypted (stored in user's Google Drive, already protected)
+- Keywords: NOT encrypted (semantic descriptors, not sensitive)
+- Tokens: Encrypted with Fernet AES-256 (highest risk attack vector)
+
+**No PII Detection/Extraction**
+- Decision: Skip automatic PII detection
+- Rationale: High complexity, constant maintenance, low value-add, false positives
+- Alternative: Extract semantic keywords only (ignore entities by design)
+- Benefit: Simpler codebase, no language-specific regex patterns needed
+
+**Audit Logging Approach**
+- Decision: Log standardized filenames, not original filenames
+- Rationale: Balance traceability with privacy
+- Example Logged: "20251017_143022_TAX_invoice.pdf" ✓
+- Example NOT Logged: "john_smith_secret_tax_return.pdf" ✗
+- User Benefit: Can identify their documents in audit logs without exposing sensitive names
+
+### 6.5 Date Extraction Design
+
+**Primary Document Date**
+- Decision: Extract ONE main date per document
+- Storage: documents.document_date (DATE) + document_date_confidence (FLOAT)
+- Rationale: Most documents have one meaningful date (invoice date, contract date, tax year)
+- Display: Show with context ("Invoice Date: Mar 15, 2024")
+
+**Secondary Dates (Optional)**
+- Decision: Extract additional dates only if useful for search/organization
+- Storage: document_dates table (future enhancement)
+- Examples: Expiry dates, due dates, tax years, contract periods
+- Implementation: Phase 2D (optional), can defer to later phase
+
+**Date Format Strategy**
+- Storage: ISO format (YYYY-MM-DD) in database (universal, sortable)
+- Display: User's locale preference (MM/DD/YYYY for US, DD.MM.YYYY for EU/RU)
+- Extraction: Multi-language pattern matching (handle all common formats)
+
+### 6.6 Language Scalability
+
+**Database-Driven Language Support**
+- Decision: All language-specific data in database tables, not code
+- Tables: stop_words, category_keywords, localization_strings all have language column
+- Rationale: Adding new language = data migration, not code deployment
+- Process: Admin adds new language via database, no code changes needed
+
+**Initial Language Set**
+- Start: Russian, English, German (ru, en, de)
+- Why: User base primary languages, sufficient to prove scalability
+- Future: Any language supported by adding data (stop words, translations, system keywords)
+
+**Language Detection**
+- Decision: Detect document language during text extraction
+- Storage: document_languages table (supports multi-language documents)
+- Impact: Classification uses language-specific keyword weights
+- Fallback: If detection fails, use user's preferred language from settings
+
+### 6.7 Machine Learning Approach
+
+**Keyword Overlap Scoring**
+- Algorithm: Count matching keywords between document and category
+- Formula: score = (matching_keywords * avg_weight) / total_document_keywords
+- Thresholds: 60% minimum confidence, 20% gap between top two
+- Rationale: Simple, explainable, language-agnostic, fast
+
+**Weight Adjustment Rules**
+- Correct Prediction: +10% to all matching keywords
+- Incorrect Prediction: -5% to all matching keywords that led to wrong choice
+- Rationale: Asymmetric learning prevents over-correction from single mistakes
+- Bounds: Weights bounded [0.1, 10.0] to prevent extreme values
+
+**Transparency & Explainability**
+- Decision: Show users WHY a category was suggested
+- Display: "Matched keywords: invoice, payment, tax (85% confidence)"
+- Benefit: Users trust system, understand decisions, provide better corrections
+- ML Impact: Explicit feedback improves learning quality
+
+### 6.8 User Experience Principles
+
+**Batch Upload Flow**
+1. User uploads multiple files → System analyzes in parallel
+2. Show progress per file with extracted info preview
+3. User reviews all suggestions at once (approve/modify/add categories)
+4. Confirm → Upload to Drive + Store metadata + Learn from decisions
+5. Show success with links to Drive files
+
+**Confidence Visualization**
+- High Confidence (≥80%): Green indicator, "Recommended"
+- Medium Confidence (60-80%): Yellow indicator, "Suggested"
+- Low Confidence (<60%): Gray indicator, "Uncertain - Please Review"
+- Rationale: Clear visual feedback builds trust, prompts user attention where needed
+
+**Mobile-First Design**
+- All interactions work with touch (no hover-only features)
+- Large touch targets (min 44x44px)
+- Swipe gestures for common actions
+- Responsive tables/lists collapse to cards on mobile
+
+---
+
+## 7. Quality Control & Deployment Process
+
+### 7.1 Pre-Commit Checklist
 
 **Code Quality**
 - Run linter (flake8 for Python, eslint for TypeScript)
@@ -474,7 +765,7 @@ System Suggests Category → User Confirms or Corrects
 - Rate limiting present on new endpoints
 - Audit logging added for sensitive operations
 
-### 6.2 Deployment Process
+### 7.2 Deployment Process
 
 **Automated Deployment**
 ```
@@ -493,7 +784,7 @@ System Suggests Category → User Confirms or Corrects
 4. Smoke test: Login → Create category → Upload document → Logout
 ```
 
-### 6.3 Performance Benchmarks
+### 7.3 Performance Benchmarks
 
 **Target Metrics**
 - API response time (p95): <200ms
@@ -505,7 +796,7 @@ System Suggests Category → User Confirms or Corrects
 
 ---
 
-## 7. Project Instructions Summary
+## 8. Project Instructions Summary
 
 ### Principles to Follow
 
@@ -530,7 +821,7 @@ System Suggests Category → User Confirms or Corrects
 
 ---
 
-## 8. Environment Variables
+## 9. Environment Variables
 
 ### Backend (Required)
 ```
@@ -550,7 +841,7 @@ NEXT_PUBLIC_API_URL=https://api.bonidoc.com
 
 ---
 
-## 9. Database Migrations
+## 10. Database Migrations
 
 ### Current Migration Status
 - Total migrations: 10

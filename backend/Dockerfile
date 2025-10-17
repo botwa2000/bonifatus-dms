@@ -16,13 +16,19 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r bonifatus && useradd -r -g bonifatus bonifatus
 
-# Install system dependencies
+# Install system dependencies including Tesseract OCR
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
         libc6-dev \
         curl \
         libmagic1 \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-deu \
+        tesseract-ocr-rus \
+        libtesseract-dev \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
