@@ -50,7 +50,7 @@ class User(Base, TimestampMixin):
     
     # Relationships
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
-    documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
+    documents = relationship("Document", foreign_keys="[Document.user_id]", back_populates="user", cascade="all, delete-orphan")
     user_settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship('UserSession', back_populates='user', cascade='all, delete-orphan')
 
