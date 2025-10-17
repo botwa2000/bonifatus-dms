@@ -20,6 +20,7 @@ RUN groupadd -r bonifatus && useradd -r -g bonifatus bonifatus
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
+        g++ \
         libc6-dev \
         curl \
         libmagic1 \
@@ -29,6 +30,12 @@ RUN apt-get update \
         tesseract-ocr-rus \
         libtesseract-dev \
         poppler-utils \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
