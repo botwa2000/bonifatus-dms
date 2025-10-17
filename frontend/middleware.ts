@@ -1,11 +1,22 @@
 // frontend/middleware.ts
+/**
+ * Next.js Middleware for security headers and performance optimization
+ *
+ * AUTHENTICATION ARCHITECTURE:
+ * - Authentication is enforced at the API level with httpOnly cookies
+ * - Frontend pages check auth by calling /auth/me API
+ * - Middleware does NOT redirect based on auth status because:
+ *   1. Backend cookies are on api.bonidoc.com domain
+ *   2. Frontend runs on bonidoc.com domain
+ *   3. Cross-domain cookie access is blocked by browsers (security feature)
+ *   4. Client-side auth checks would be manipulable
+ *
+ * This is the correct architecture for cross-domain SPA + API setups.
+ * Security is enforced where it matters: at the API boundary with httpOnly cookies.
+ */
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-
-const PROTECTED_ROUTES = ['/dashboard', '/admin', '/profile', '/settings']
-const AUTH_ROUTES = ['/login', '/auth', '/signup']
-const PUBLIC_ROUTES = ['/', '/about', '/features', '/pricing', '/contact', '/health']
 
 interface SecurityConfig {
   enableCSP: boolean
@@ -19,38 +30,6 @@ const SECURITY_CONFIG: SecurityConfig = {
   enableHSTS: true,
   enableReferrerPolicy: true,
   maxAge: 31536000
-}
-
-function isAuthenticated(request: NextRequest): boolean {
-  const hasAccessToken = request.cookies.get('access_token')?.value
-  const hasAuthHeader = request.headers.get('authorization')
-  const hasTokenCookie = request.cookies.get('bonifatus_has_token')?.value === 'true'
-
-  // Debug logging
-  const allCookies = request.cookies.getAll()
-  console.log('[Middleware DEBUG] Auth check:', {
-    path: request.nextUrl.pathname,
-    hasAccessToken: !!hasAccessToken,
-    hasAuthHeader: !!hasAuthHeader,
-    hasTokenCookie,
-    tokenCookieValue: request.cookies.get('bonifatus_has_token')?.value,
-    allCookies: allCookies.map(c => `${c.name}=${c.value}`),
-    isAuthenticated: !!(hasAccessToken || hasAuthHeader || hasTokenCookie)
-  })
-
-  return !!(hasAccessToken || hasAuthHeader || hasTokenCookie)
-}
-
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(route => pathname.startsWith(route))
-}
-
-function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some(route => pathname.startsWith(route))
-}
-
-function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(route => pathname === route)
 }
 
 function addSecurityHeaders(response: NextResponse, request: NextRequest): NextResponse {
@@ -93,61 +72,8 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): NextR
   return response
 }
 
-function handleAuthRedirect(request: NextRequest, isAuth: boolean): NextResponse | null {
-  const { pathname, searchParams } = request.nextUrl
-  
-  if (isProtectedRoute(pathname) && !isAuth) {
-    console.info(`[Middleware] Redirecting unauthenticated user from ${pathname} to /login`)
-    
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    
-    searchParams.forEach((value, key) => {
-      if (key !== 'redirect') {
-        loginUrl.searchParams.set(key, value)
-      }
-    })
-    
-    return NextResponse.redirect(loginUrl)
-  }
-
-  if (isAuthRoute(pathname) && isAuth) {
-    console.info(`[Middleware] Redirecting authenticated user from ${pathname} to /dashboard`)
-    
-    const redirectTo = searchParams.get('redirect')
-    const dashboardUrl = new URL(redirectTo || '/dashboard', request.url)
-    
-    return NextResponse.redirect(dashboardUrl)
-  }
-
-  return null
-}
-
-function handleApiRoute(request: NextRequest): NextResponse | null {
-  const { pathname } = request.nextUrl
-  
-  const publicApiRoutes = ['/api/health', '/api/status', '/api/auth']
-  const isPublicApi = publicApiRoutes.some(route => pathname.startsWith(route))
-  
-  if (isPublicApi) {
-    return null
-  }
-
-  if (pathname.startsWith('/api/') && !isAuthenticated(request)) {
-    console.warn(`[Middleware] Blocking unauthenticated API request to ${pathname}`)
-    
-    return NextResponse.json(
-      { 
-        error: 'authentication_required',
-        message: 'Authentication required for this endpoint',
-        timestamp: new Date().toISOString()
-      }, 
-      { status: 401 }
-    )
-  }
-
-  return null
-}
+// No auth redirects in middleware - handled by page components
+// This is the correct pattern for cross-domain authentication
 
 function addPerformanceHeaders(response: NextResponse, request: NextRequest): NextResponse {
   const requestId = crypto.randomUUID()
@@ -162,48 +88,21 @@ function addPerformanceHeaders(response: NextResponse, request: NextRequest): Ne
 }
 
 export function middleware(request: NextRequest) {
-  const startTime = Date.now()
   const { pathname } = request.nextUrl
-  
-  console.debug(`[Middleware] Processing ${request.method} ${pathname}`)
 
-  try {
-    const apiResponse = handleApiRoute(request)
-    if (apiResponse) {
-      return addSecurityHeaders(apiResponse, request)
-    }
-
-    if (
-      pathname.startsWith('/_next/') ||
-      pathname.startsWith('/favicon.ico') ||
-      pathname.includes('/api/') ||
-      pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2)$/)
-    ) {
-      const response = NextResponse.next()
-      return addPerformanceHeaders(addSecurityHeaders(response, request), request)
-    }
-
-    const isAuth = isAuthenticated(request)
-    
-    const redirectResponse = handleAuthRedirect(request, isAuth)
-    if (redirectResponse) {
-      return addSecurityHeaders(redirectResponse, request)
-    }
-
+  // Skip processing for Next.js internals and static assets
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2)$/)
+  ) {
     const response = NextResponse.next()
-    const finalResponse = addPerformanceHeaders(addSecurityHeaders(response, request), request)
-    
-    const processingTime = Date.now() - startTime
-    console.debug(`[Middleware] Processed ${pathname} in ${processingTime}ms`)
-    
-    return finalResponse
-
-  } catch (error) {
-    console.error('[Middleware] Unexpected error:', error)
-    
-    const errorResponse = NextResponse.redirect(new URL('/', request.url))
-    return addSecurityHeaders(errorResponse, request)
+    return addPerformanceHeaders(addSecurityHeaders(response, request), request)
   }
+
+  // All other requests: apply security headers
+  const response = NextResponse.next()
+  return addPerformanceHeaders(addSecurityHeaders(response, request), request)
 }
 
 export const config = {

@@ -177,38 +177,22 @@ export class AuthService {
       })
 
       console.log('[AUTH DEBUG] Token exchange successful')
-      console.log('[AUTH DEBUG] Response:', JSON.stringify(response))
 
-      // Set authentication flag cookie IMMEDIATELY (before fetching user)
+      // Backend sets secure httpOnly cookies (access_token, refresh_token)
+      // These are automatically sent with subsequent API requests
+      // No need to manipulate cookies on client side
+
+      // Fetch and store user info for UI display (non-sensitive data only)
       if (typeof window !== 'undefined') {
-        const maxAge = response.expires_in || 604800 // Default 7 days
-        const isSecure = window.location.protocol === 'https:'
-        const cookieString = `bonifatus_has_token=true; path=/; max-age=${maxAge}; SameSite=Lax${isSecure ? '; Secure' : ''}`
-        document.cookie = cookieString
-
-        console.log('[AUTH DEBUG] Setting cookie:', cookieString)
-        console.log('[AUTH DEBUG] Protocol:', window.location.protocol)
-        console.log('[AUTH DEBUG] Is secure:', isSecure)
-        console.log('[AUTH DEBUG] All cookies after setting:', document.cookie)
-        console.log('[AUTH DEBUG] Cookie includes bonifatus_has_token:', document.cookie.includes('bonifatus_has_token'))
-
-        // Store in sessionStorage for debugging
-        sessionStorage.setItem('auth_debug', JSON.stringify({
-          timestamp: new Date().toISOString(),
-          action: 'token_exchange',
-          cookieSet: document.cookie.includes('bonifatus_has_token'),
-          allCookies: document.cookie
-        }))
-
-        // Now fetch and store full user info
         try {
-          const fullUser = await this.getCurrentUser()
-          if (fullUser) {
-            localStorage.setItem('user', JSON.stringify(fullUser))
-            console.log('[AUTH DEBUG] User stored in localStorage:', fullUser.email)
+          const user = await this.getCurrentUser()
+          if (user) {
+            localStorage.setItem('user', JSON.stringify(user))
+            console.log('[AUTH DEBUG] User info cached:', user.email)
           }
         } catch (e) {
-          console.error('[AUTH DEBUG] Failed to fetch user after token exchange:', e)
+          console.error('[AUTH DEBUG] Failed to fetch user info:', e)
+          // Don't fail auth if user fetch fails - cookies are already set
         }
       }
 
@@ -219,11 +203,6 @@ export class AuthService {
 
     } catch (error) {
       console.error('Token exchange failed:', error)
-      sessionStorage.setItem('auth_debug', JSON.stringify({
-        timestamp: new Date().toISOString(),
-        action: 'token_exchange_failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }))
       this.clearStoredOAuthState()
 
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
@@ -231,33 +210,9 @@ export class AuthService {
     }
   }
 
-  storeTokens(tokenResponse: TokenResponse): void {
-    // Tokens are stored in httpOnly cookies by backend
-    // This method is kept for backward compatibility but does nothing
-    // Frontend only stores non-sensitive user data
-    if (!this.isClientSide()) return
-    
-    // Set non-httpOnly flag for auth status check
-    document.cookie = `is_authenticated=true; path=/; max-age=${tokenResponse.expires_in}; SameSite=Lax; Secure`
-  }
-
-  getStoredAccessToken(): string | null {
-    // Tokens are in httpOnly cookies, not accessible via JS
-    // Return null - API client will send cookies automatically
-    return null
-  }
-
-  getStoredRefreshToken(): string | null {
-    // Tokens are in httpOnly cookies, not accessible via JS
-    // Return null - API client will send cookies automatically
-    return null
-  }
-  
-  isAuthenticated(): boolean {
-    // Check if authentication cookie exists
-    if (!this.isClientSide()) return false
-    return document.cookie.includes('is_authenticated=true')
-  }
+  // Tokens are stored in secure httpOnly cookies by backend
+  // Frontend cannot and should not access them directly
+  // This is a security feature, not a limitation
 
   isTokenExpired(token: string): boolean {
     try {
@@ -281,16 +236,12 @@ export class AuthService {
 
   async getCurrentUser(): Promise<User | null> {
     try {
-      // Tokens are in httpOnly cookies, API client sends them automatically
+      // httpOnly cookies are sent automatically with this request
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
-      // Store user info locally
+      // Cache user info in localStorage for UI display (non-sensitive data only)
       if (typeof window !== 'undefined') {
         localStorage.setItem('user', JSON.stringify(response))
-
-        // Set authentication flag cookie for middleware detection
-        const isSecure = window.location.protocol === 'https:'
-        document.cookie = `bonifatus_has_token=true; path=/; max-age=604800; SameSite=Lax${isSecure ? '; Secure' : ''}`
       }
 
       return response
@@ -302,16 +253,9 @@ export class AuthService {
             console.error('Failed to get current user:', error)
         }
 
-        // Check if user data exists in localStorage
-        if (typeof window !== 'undefined') {
-            const userData = localStorage.getItem('user')
-            if (userData) {
-                try {
-                    return JSON.parse(userData)
-                } catch {
-                    this.clearAllAuthData()
-                }
-            }
+        // Clear stale data on auth failure
+        if (apiError?.status === 401) {
+          this.clearAllAuthData()
         }
 
         return null
@@ -385,16 +329,13 @@ export class AuthService {
   }
 
   clearAllAuthData(): void {
-    // Clear user data from localStorage only
+    // Clear cached user data from localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem('user')
     }
 
-    // Clear authentication flag cookies
-    document.cookie = 'is_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
-    document.cookie = 'bonifatus_has_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;'
-
-    // Backend clears httpOnly cookies on logout endpoint
+    // httpOnly cookies are cleared by backend /logout endpoint
+    // Frontend cannot access or clear httpOnly cookies (by design for security)
   }
 
   handleAuthError(error: unknown): AuthError {
