@@ -16,8 +16,7 @@ from sqlalchemy import text
 from app.database.connection import db_manager
 from app.database.models import Document, DocumentCategory, Category, User
 from app.services.google_drive_service import google_drive_service
-from app.services.ml_keyword_service import ml_keyword_service
-from app.services.ml_category_service import ml_category_service
+from app.services.ml_learning_service import ml_learning_service
 from app.services.config_service import config_service
 
 logger = logging.getLogger(__name__)
@@ -230,39 +229,22 @@ class DocumentUploadService:
             # Record ML feedback for category prediction learning
             suggested_category_id = analysis_result.get('suggested_category_id')
             actual_category_id = category_ids_ordered[0]  # Primary category
-            
-            logger.info(f"Recording ML category feedback: suggested={suggested_category_id}, actual={actual_category_id}")
-            await ml_category_service.record_category_feedback(
-                suggested_category_id=suggested_category_id,
-                actual_category_id=actual_category_id,
-                confidence=analysis_result.get('confidence', 0) / 100.0,
-                text_sample=analysis_result.get('extracted_text', '')[:1000],
-                language_code=language_code,
-                user_id=user_id,
-                document_id=str(document_id),
-                session=session
+            matched_keywords = analysis_result.get('matched_keywords', [])
+            document_keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
+
+            logger.info(f"Recording ML feedback: suggested={suggested_category_id}, actual={actual_category_id}")
+
+            # Use new ML learning service
+            ml_learning_service.learn_from_decision(
+                db=session,
+                document_id=document_id,
+                suggested_category_id=uuid.UUID(suggested_category_id) if suggested_category_id else None,
+                actual_category_id=uuid.UUID(actual_category_id),
+                matched_keywords=matched_keywords,
+                document_keywords=document_keywords,
+                language=language_code,
+                confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None
             )
-            
-            # Record keyword feedback for learning
-            suggested_keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
-            
-            logger.info(f"Recording keyword feedback: {len(suggested_keywords)} suggested, {len(confirmed_keywords)} confirmed")
-            for keyword in suggested_keywords:
-                was_accepted = keyword in confirmed_keywords
-                relevance = next(
-                    (kw['relevance'] for kw in analysis_result['keywords'] if kw['word'] == keyword), 
-                    None
-                )
-                
-                await ml_keyword_service.record_keyword_feedback(
-                    keyword=keyword,
-                    language_code=language_code,
-                    was_accepted=was_accepted,
-                    relevance_score=relevance,
-                    user_id=user_id,
-                    document_type=mime_type,
-                    session=session
-                )
             
             # Create audit log entry
             session.execute(
