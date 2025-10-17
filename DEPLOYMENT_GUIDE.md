@@ -1,7 +1,7 @@
 # BoniDoc - Development & Deployment Guide
-Version: 11.0
-Last Updated: October 16, 2025
-Status: Phase 1 Complete | Production Deployment Active
+Version: 11.1
+Last Updated: October 17, 2025
+Status: Phase 1 Complete - Authentication Flow Fixed | Production Deployment Active
 Domain: https://bonidoc.com
 
 ## Table of Contents
@@ -254,12 +254,28 @@ System Suggests Category → User Confirms or Corrects
 - Input sanitization with Pydantic
 - Comprehensive audit logging
 
+**Cross-Domain Authentication Architecture**
+- Backend (api.bonidoc.com) sets httpOnly cookies with SameSite=None
+- Frontend (bonidoc.com) automatically sends cookies with API requests
+- Authentication enforced at API level, not middleware
+- Protected pages check auth via /auth/me API endpoint
+- Full page reload after OAuth login for proper context initialization
+- No client-side token manipulation (security by design)
+
+**OAuth Login Flow** (October 17, 2025)
+- Issue: After Google OAuth login, users were redirected back to blank login page
+- Root cause: Client-side navigation (router.push) didn't re-initialize AuthContext
+- Solution: Changed to window.location.href for full page reload after login
+- Result: OAuth flow now works correctly end-to-end
+- Security: All authentication tokens remain in httpOnly cookies only
+
 **Milestone Criteria:**
-- All tokens stored in httpOnly cookies
-- Session revocation working
-- Rate limiting active on all endpoints
-- Security headers present on all responses
-- Audit logs capturing all security events
+- All tokens stored in httpOnly cookies ✅
+- Session revocation working ✅
+- Rate limiting active on all endpoints ✅
+- Security headers present on all responses ✅
+- Audit logs capturing all security events ✅
+- OAuth login flow working correctly ✅
 
 ---
 
@@ -363,15 +379,18 @@ System Suggests Category → User Confirms or Corrects
 
 ### 5.1 Completed Features ✅
 
-**Phase 1: Security Foundation** (Complete)
+**Phase 1: Security Foundation** (Complete - October 17, 2025)
 - httpOnly cookie authentication (replaced localStorage)
+- Cross-domain authentication architecture (api.bonidoc.com ↔ bonidoc.com)
+- OAuth 2.0 login flow with Google (fully working)
 - Session management with 7-day refresh tokens
 - Rate limiting (3-tier: auth/write/read)
-- Security headers middleware (HSTS, CSP, etc.)
+- Security headers middleware (HSTS, CSP, X-Frame-Options)
 - Field-level encryption service (AES-256)
 - Behavioral trust scoring
 - CAPTCHA service integration
 - File validation (multi-layer security)
+- AuthContext with localStorage caching for performance
 
 **Infrastructure** (Production)
 - Google Cloud Run deployment (backend + frontend)
