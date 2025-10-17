@@ -39,18 +39,15 @@ export default function LoginPageContent() {
 
         if (result.success) {
           console.log('[LOGIN DEBUG] Token exchange successful')
-          console.log('[LOGIN DEBUG] Current cookies:', document.cookie)
-          console.log('[LOGIN DEBUG] LocalStorage user:', localStorage.getItem('user'))
+          console.log('[LOGIN DEBUG] User data cached in localStorage')
 
           setStatus('success')
 
-          // Wait a bit to ensure cookies are set
-          await new Promise(resolve => setTimeout(resolve, 100))
-
-          console.log('[LOGIN DEBUG] About to redirect to dashboard')
-          // Redirect to dashboard or redirect URL from state
+          // Use window.location.href for full page reload
+          // This ensures the auth context initializes fresh with the new auth state
+          // router.push() does client-side navigation which may not refresh context
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
-          router.push(redirectUrl)
+          window.location.href = redirectUrl
         } else {
           console.error('[LOGIN DEBUG] Token exchange failed:', result.error)
           setStatus('error')
