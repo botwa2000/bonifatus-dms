@@ -156,6 +156,11 @@ class Document(Base, TimestampMixin):
     document_date_confidence = Column(Float, nullable=True)
     document_date_type = Column(String(50), nullable=True)
 
+    # Soft delete support
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     # Foreign Keys
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
