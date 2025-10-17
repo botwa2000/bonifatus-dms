@@ -33,9 +33,9 @@ RUN apt-get update \
         libglib2.0-0 \
         libsm6 \
         libxext6 \
-        libxrender-dev \
+        libxrender1 \
         libgomp1 \
-        libgl1-mesa-glx \
+        libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
