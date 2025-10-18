@@ -93,22 +93,13 @@ async def analyze_document(
                 detail="No categories found. Please create categories first."
             )
         
-        # Convert categories to dict format
-        categories_list = [
-            {
-                'id': cat.id,
-                'reference_key': cat.reference_key,
-                'name': cat.name
-            }
-            for cat in user_categories
-        ]
-        
-        # Analyze document with ML
-        analysis_result = await document_analysis_service.analyze_document(
+        # Analyze document with ML (synchronous call)
+        analysis_result = document_analysis_service.analyze_document(
             file_content=file_content,
             file_name=file.filename,
             mime_type=file.content_type,
-            user_categories=categories_list
+            db=session,
+            user_id=str(current_user.id)
         )
         
         # Generate temporary ID
@@ -347,45 +338,34 @@ async def analyze_batch(
                 'mime_type': file.content_type
             })
         
-        # Get user categories
+        # Verify user has categories before processing
         categories_response = await category_service.list_categories(
             user_id=str(current_user.id),
             user_language='en',
             include_system=True,
             include_documents_count=False
         )
-        
-        user_categories = categories_response.categories
-        
-        if not user_categories:
+
+        if not categories_response.categories:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No categories found. Please create categories first."
             )
-        
-        # Convert categories to dict format
-        categories_list = [
-            {
-                'id': cat.id,
-                'reference_key': cat.reference_key,
-                'name': cat.name
-            }
-            for cat in user_categories
-        ]
-        
+
         # Create batch ID
         batch_id = str(uuid.uuid4())
-        
+
         # Process each file
         results = []
         for file_data in files_data:
             try:
-                # Analyze document
-                analysis_result = await document_analysis_service.analyze_document(
+                # Analyze document (synchronous call)
+                analysis_result = document_analysis_service.analyze_document(
                     file_content=file_data['content'],
                     file_name=file_data['filename'],
                     mime_type=file_data['mime_type'],
-                    user_categories=categories_list
+                    db=session,
+                    user_id=str(current_user.id)
                 )
                 
                 # Generate temporary ID
