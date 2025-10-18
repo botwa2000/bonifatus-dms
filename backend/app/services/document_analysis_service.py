@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class DocumentAnalysisService:
     """Analyzes documents with ML-based keyword extraction and categorization"""
 
-    def analyze_document(
+    async def analyze_document(
         self,
         file_content: bytes,
         file_name: str,
@@ -53,7 +53,7 @@ class DocumentAnalysisService:
             if not extracted_text or len(extracted_text.strip()) < 10:
                 raise ValueError("Unable to extract meaningful text from document")
 
-            detected_language = language_detection_service.detect_language(extracted_text)
+            detected_language = await language_detection_service.detect_language(extracted_text, db)
 
             keywords = keyword_extraction_service.extract_keywords(
                 text=extracted_text,

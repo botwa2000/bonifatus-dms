@@ -93,8 +93,8 @@ async def analyze_document(
                 detail="No categories found. Please create categories first."
             )
         
-        # Analyze document with ML (synchronous call)
-        analysis_result = document_analysis_service.analyze_document(
+        # Analyze document with ML
+        analysis_result = await document_analysis_service.analyze_document(
             file_content=file_content,
             file_name=file.filename,
             mime_type=file.content_type,
@@ -359,8 +359,8 @@ async def analyze_batch(
         results = []
         for file_data in files_data:
             try:
-                # Analyze document (synchronous call)
-                analysis_result = document_analysis_service.analyze_document(
+                # Analyze document
+                analysis_result = await document_analysis_service.analyze_document(
                     file_content=file_data['content'],
                     file_name=file_data['filename'],
                     mime_type=file_data['mime_type'],
