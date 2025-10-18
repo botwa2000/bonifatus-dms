@@ -13,8 +13,8 @@ interface ErrorResponse {
   [key: string]: unknown
 }
 
-interface FileAnalysis {
-  success: boolean
+interface FileAnalysisSuccess {
+  success: true
   temp_id: string
   original_filename: string
   standardized_filename: string
@@ -27,7 +27,16 @@ interface FileAnalysis {
   batch_id: string
 }
 
-interface FileUploadState extends FileAnalysis {
+interface FileAnalysisFailure {
+  success: false
+  original_filename: string
+  error: string
+  batch_id: string
+}
+
+type FileAnalysisResult = FileAnalysisSuccess | FileAnalysisFailure
+
+interface FileUploadState extends FileAnalysisSuccess {
   file: File
   selected_categories: string[]
   primary_category: string | null
@@ -38,7 +47,7 @@ interface FileUploadState extends FileAnalysis {
 
 export default function BatchUploadPage() {
   const router = useRouter()
-  const { isLoading } = useAuth()
+  useAuth() // Ensure user is authenticated
   
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [analyzing, setAnalyzing] = useState(false)
@@ -121,11 +130,11 @@ export default function BatchUploadPage() {
               errorDetail = `Server error (${response.status}): ${JSON.stringify(errorData)}`
             }
           }
-        } catch (jsonError) {
+        } catch {
           try {
             const errorText = await response.text()
             errorDetail = errorText || `HTTP ${response.status}: ${response.statusText}`
-          } catch (textError) {
+          } catch {
             errorDetail = `HTTP ${response.status}: Unable to read error response`
           }
         }
@@ -135,10 +144,10 @@ export default function BatchUploadPage() {
       const result = await response.json()
 
       // Filter out failed analyses and show errors
-      const failedFiles = result.results.filter((r: any) => !r.success)
+      const failedFiles = result.results.filter((r: FileAnalysisResult): r is FileAnalysisFailure => !r.success)
       if (failedFiles.length > 0) {
-        const errorMessages = failedFiles.map((f: any) => `${f.original_filename}: ${f.error}`).join('; ')
-        logger.error('Some files failed analysis:', errorMessages)
+        const errorMessages = failedFiles.map((f: FileAnalysisFailure) => `${f.original_filename}: ${f.error}`).join('; ')
+        console.error('Some files failed analysis:', errorMessages)
         setMessage({
           type: 'error',
           text: `${failedFiles.length} file(s) failed analysis: ${errorMessages}`
@@ -147,8 +156,8 @@ export default function BatchUploadPage() {
 
       // Build upload states only for successful analyses
       const states: FileUploadState[] = result.results
-        .filter((r: any) => r.success)
-        .map((r: FileAnalysis) => ({
+        .filter((r: FileAnalysisResult): r is FileAnalysisSuccess => r.success)
+        .map((r: FileAnalysisSuccess) => ({
           ...r,
           file: selectedFiles.find(f => f.name === r.original_filename)!,
           selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],

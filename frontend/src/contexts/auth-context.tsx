@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
 
               return
-            } catch (e) {
+            } catch {
               // Invalid localStorage data, fall through to API call
               localStorage.removeItem('user')
             }
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(!!currentUser)
             setIsLoading(false)
           }
-        } catch (err) {
+        } catch {
           // Silently handle 401 errors (expected when not logged in)
           if (mountedRef.current) {
             setUser(null)

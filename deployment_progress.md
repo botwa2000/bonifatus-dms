@@ -2,14 +2,53 @@
 
 ## Chronological Log (Latest First)
 
-### 2025-10-18: Production-Grade ClamAV Memory Optimization - SUSTAINABLE SOLUTION
-**Status:** ✅ READY FOR DEPLOYMENT
+### 2025-10-18: Batch Upload Error Handling Fix
+**Status:** ✅ DEPLOYED
 
-**Issue:** ClamAV consuming 1041 MiB during startup, exceeding 1Gi Cloud Run memory limit, causing deployment failures.
+**Issue:** Frontend crashed with error: `Cannot read properties of undefined (reading 'suggested_category_id')`
 
-**Previous Quick Fix:** Increased memory to 2Gi ($6.48/mo vs $3.24/mo) - **This was a workaround, not sustainable.**
+**Root Cause:** Backend returns different response structures for successful vs failed file analyses:
+- **Success:** `{success: true, analysis: {...}, temp_id: "..."}`
+- **Failure:** `{success: false, error: "...", original_filename: "..."}`  (NO `analysis` field)
 
-**Production Solution Implemented:**
+Frontend code assumed ALL results had an `analysis` field, causing crash when accessing `r.analysis.suggested_category_id` on failed results.
+
+**Solution:**
+- Filter failed analyses before processing: `results.filter(r => r.success)`
+- Show error messages to user for failed files
+- Only process successful analyses
+- Display accurate success/failure counts
+- **This is a proper fix that surfaces errors instead of masking them**
+
+**Files Modified:**
+- `frontend/src/app/documents/upload/page.tsx` (lines 137-179)
+
+**Commit:** effb53f - "fix: Handle failed file analyses in batch upload gracefully"
+
+**Impact:**
+- ✅ No more frontend crashes
+- ✅ Users see why files failed analysis
+- ✅ Only successful files proceed to upload
+- ✅ Clear error messages guide users
+
+---
+
+### 2025-10-18: Cloud Run Memory Optimization - Final Solution
+**Status:** ✅ DEPLOYED (1.5Gi)
+
+**Issue:** ClamAV consuming 1034-1041 MiB during startup, exceeding 1Gi Cloud Run memory limit.
+
+**Attempted Solution:** Memory optimizations (lazy-loading, optimized configs) reduced usage slightly but **1Gi still insufficient**.
+
+**Final Production Solution: 1.5Gi (1536 MiB)**
+
+**Why 1.5Gi:**
+- Actual usage with optimizations: 1034 MiB
+- Safety margin: 502 MiB (healthy buffer for spikes)
+- Middle ground between 1Gi (fails) and 2Gi (excessive)
+- Cost: $4.86/mo (25% reduction vs 2Gi)
+
+**Optimizations Implemented (Still Active):**
 
 **1. Memory-Optimized ClamAV Configuration** (clamd.conf, freshclam.conf)
 - MaxThreads: 1 (sequential scanning saves memory)

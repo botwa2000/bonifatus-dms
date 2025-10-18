@@ -184,7 +184,7 @@ export class ApiClient {
   }
 
   private async buildHeaders(
-    requireAuth = false, 
+    _requireAuth = false,
     customHeaders: Record<string, string> = {}
   ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
@@ -195,6 +195,7 @@ export class ApiClient {
 
     // Tokens are in httpOnly cookies, no Authorization header needed
     // Cookies are sent automatically with credentials: 'include'
+    // _requireAuth parameter kept for API compatibility but not used
 
     return headers
   }
