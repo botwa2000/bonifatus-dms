@@ -19,10 +19,10 @@ interface FileAnalysisSuccess {
   original_filename: string
   standardized_filename: string
   analysis: {
-    keywords: Array<{word: string, count: number, relevance: number}>
+    keywords?: Array<{word: string, count: number, relevance: number}>
     suggested_category_id: string | null
     confidence: number
-    detected_language: string
+    detected_language?: string
   }
   batch_id: string
 }
@@ -417,8 +417,8 @@ export default function BatchUploadPage() {
                           <div className="flex-1">
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
                             <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                              {state.analysis.detected_language.toUpperCase()} • 
-                              {state.analysis.keywords.length} keywords
+                              {state.analysis.detected_language?.toUpperCase() || 'Unknown'} •
+                              {state.analysis.keywords?.length || 0} keywords
                             </p>
                           </div>
                           <Button
