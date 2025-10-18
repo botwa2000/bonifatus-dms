@@ -33,9 +33,9 @@ config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode (SQL script generation)"""
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=database_url,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -53,18 +53,16 @@ def do_run_migrations(connection):
 
 
 def run_migrations_online() -> None:
-    # Use the same connection parameters as the application (from app.database.connection)
-    # This ensures SSL and other settings match production environment
-    from sqlalchemy import create_engine
+    # Get configuration section and add connect_args for SSL
+    # This matches the application's database configuration in app.database.connection
+    configuration = config.get_section(config.config_ini_section)
 
-    connectable = create_engine(
-        database_url,
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
         poolclass=pool.NullPool,
         connect_args={
-            "connect_timeout": 60,
-            "options": "-c timezone=UTC",
-            "sslmode": "require",  # Required for Supabase/PostgreSQL
-            "application_name": "bonifatus-dms-migrations",
+            "sslmode": "require",  # Required for Supabase PostgreSQL
         },
     )
 
