@@ -40,13 +40,21 @@ def upgrade():
     ]
 
     for table_name in tables_with_rls:
-        # Drop existing policies
-        op.execute(f'DROP POLICY IF EXISTS {table_name}_all_policy ON {table_name}')
-        op.execute(f'DROP POLICY IF EXISTS {table_name}_select_policy ON {table_name}')
-        op.execute(f'DROP POLICY IF EXISTS {table_name}_insert_policy ON {table_name}')
+        # Check if table exists before trying to drop policies
+        op.execute(sa.text(f"""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = '{table_name}') THEN
+                    -- Drop existing policies
+                    DROP POLICY IF EXISTS {table_name}_all_policy ON {table_name};
+                    DROP POLICY IF EXISTS {table_name}_select_policy ON {table_name};
+                    DROP POLICY IF EXISTS {table_name}_insert_policy ON {table_name};
 
-        # Disable RLS
-        op.execute(f'ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY')
+                    -- Disable RLS
+                    ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY;
+                END IF;
+            END $$;
+        """))
 
 
 def downgrade():
