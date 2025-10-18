@@ -2,7 +2,7 @@
 """Add language detection patterns table for scalable multilingual support
 
 Revision ID: d3e4f5g6h7i8
-Revises: c1d2e3f4g5h6
+Revises: r2s3t4u5v6w7
 Create Date: 2025-10-10 16:00:00.000000
 
 """
@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 
 revision = 'd3e4f5g6h7i8'
-down_revision = 'm9n0o1p2q3r4'
+down_revision = 'r2s3t4u5v6w7'
 branch_labels = None
 depends_on = None
 
