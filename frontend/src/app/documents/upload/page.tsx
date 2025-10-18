@@ -163,7 +163,7 @@ export default function BatchUploadPage() {
           selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
           primary_category: r.analysis.suggested_category_id,
           confirmed_keywords: Array.isArray(r.analysis.keywords)
-            ? r.analysis.keywords.slice(0, 10).map(k => k.word)
+            ? r.analysis.keywords.slice(0, 10).map(k => k?.word).filter((w): w is string => !!w)
             : [],
           custom_filename: r.standardized_filename,
           filename_error: null
