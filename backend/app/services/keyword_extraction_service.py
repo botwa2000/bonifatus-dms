@@ -32,25 +32,34 @@ class KeywordExtractionService:
             Set of stop words for the language
         """
         if language in self._stop_words_cache:
+            logger.debug(f"Using cached stop words for language: {language} ({len(self._stop_words_cache[language])} words)")
             return self._stop_words_cache[language]
 
         try:
             from app.database.models import StopWord
+
+            logger.debug(f"Querying database for stop words, language: {language}")
 
             stop_words = db.query(StopWord).filter(
                 StopWord.language_code == language,
                 StopWord.is_active == True
             ).all()
 
+            logger.debug(f"Query returned {len(stop_words)} stop word records for language: {language}")
+
             stop_word_set = {sw.word.lower() for sw in stop_words}
 
             self._stop_words_cache[language] = stop_word_set
-            logger.info(f"Loaded {len(stop_word_set)} stop words for language: {language}")
+
+            if len(stop_word_set) == 0:
+                logger.warning(f"No stop words found in database for language: {language}. Keywords will not be filtered!")
+            else:
+                logger.info(f"Loaded {len(stop_word_set)} stop words for language: {language}")
 
             return stop_word_set
 
         except Exception as e:
-            logger.error(f"Failed to load stop words from database: {e}")
+            logger.error(f"Failed to load stop words from database for language '{language}': {e}", exc_info=True)
             return set()
 
     def clear_stop_words_cache(self):
