@@ -129,24 +129,28 @@ class LanguageDetectionService:
                     LanguageDetectionPattern.weight.desc()
                 )
             )
-            
+
             # Group patterns by language
             for row in result:
                 lang_code = row[0]
                 if lang_code not in self._patterns_cache:
                     self._patterns_cache[lang_code] = []
-                
+
                 self._patterns_cache[lang_code].append({
                     'pattern': row[1],
                     'pattern_type': row[2],
                     'weight': row[3]
                 })
-            
+
             self._cache_loaded = True
             logger.info(f"Loaded language detection patterns for: {list(self._patterns_cache.keys())}")
-            
+
         except Exception as e:
-            logger.error(f"Failed to load language detection patterns: {e}")
+            logger.error(f"Failed to load language detection patterns: {e}", exc_info=True)
+            # Roll back the transaction to prevent "InFailedSqlTransaction" errors
+            # on subsequent queries in the same session
+            session.rollback()
+            logger.info("Transaction rolled back after pattern loading failure")
     
     async def get_supported_languages(self, session: Optional[Session] = None) -> list:
         """Get list of supported languages"""
