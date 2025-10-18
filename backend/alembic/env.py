@@ -29,11 +29,12 @@ database_url = os.getenv("DATABASE_URL")
 if not database_url:
     raise ValueError("DATABASE_URL environment variable is required for migrations")
 
-# Ensure sslmode=require is in the URL for Supabase connections
-# This is necessary because connect_args may not work with engine_from_config()
-if "sslmode" not in database_url.lower():
-    separator = "&" if "?" in database_url else "?"
-    database_url = f"{database_url}{separator}sslmode=require"
+# Remove any existing sslmode from URL as it will be set in connect_args
+if "sslmode" in database_url.lower():
+    import re
+    database_url = re.sub(r'[?&]sslmode=[^&]*', '', database_url)
+    # Clean up any trailing ? or &
+    database_url = database_url.rstrip('?&')
 
 config.set_main_option("sqlalchemy.url", database_url)
 
@@ -59,11 +60,16 @@ def do_run_migrations(connection):
 
 
 def run_migrations_online() -> None:
-    # sslmode=require is added to the URL above, so engine_from_config will use it
+    # Create engine with proper SSL configuration for Supabase
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={
+            "sslmode": "require",
+            "connect_timeout": 60,
+            "options": "-c timezone=UTC"
+        }
     )
 
     with connectable.connect() as connection:

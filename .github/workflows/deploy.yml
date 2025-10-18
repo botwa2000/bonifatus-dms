@@ -106,18 +106,6 @@ jobs:
           cd backend
           export DATABASE_URL="${{ secrets.DATABASE_URL }}"
 
-          # Debug: Check if DATABASE_URL has sslmode parameter
-          if [[ "$DATABASE_URL" == *"sslmode"* ]]; then
-            echo "✓ DATABASE_URL contains sslmode parameter"
-          else
-            echo "⚠ DATABASE_URL missing sslmode parameter, adding it"
-            if [[ "$DATABASE_URL" == *"?"* ]]; then
-              export DATABASE_URL="${DATABASE_URL}&sslmode=require"
-            else
-              export DATABASE_URL="${DATABASE_URL}?sslmode=require"
-            fi
-          fi
-
           echo "Available migrations:"
           ls -la alembic/versions/
 
