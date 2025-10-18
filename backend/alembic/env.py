@@ -53,10 +53,21 @@ def do_run_migrations(connection):
 
 
 def run_migrations_online() -> None:
+    """Run migrations in online mode with proper SSL configuration for Supabase"""
+
+    # Parse connection args from DATABASE_URL if present
+    # Supabase requires SSL with specific settings
+    connect_args = {
+        "sslmode": "require",
+        "connect_timeout": 60,
+        "application_name": "alembic_migrations"
+    }
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args
     )
 
     with connectable.connect() as connection:
