@@ -171,7 +171,7 @@ export class AuthService {
 
       // Exchange authorization code for JWT tokens via backend
       // Backend will set httpOnly cookies automatically
-      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
+      await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
         code,
         state: state || ''
       })
@@ -299,10 +299,9 @@ export class AuthService {
     }
   }
 
-  scheduleTokenRefresh(_accessToken?: string): void {
+  scheduleTokenRefresh(): void {
       // Token refresh is now handled by API client on 401 responses
       // This method kept for backward compatibility but does nothing
-      // Parameter prefixed with _ to indicate intentionally unused
   }
 
   clearTokenRefresh(): void {
