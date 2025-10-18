@@ -53,12 +53,11 @@ def do_run_migrations(connection):
 
 
 def run_migrations_online() -> None:
-    """Run migrations in online mode with proper SSL configuration for Supabase"""
+    """Run migrations in online mode with Supabase pooler compatibility"""
 
-    # Parse connection args from DATABASE_URL if present
-    # Supabase requires SSL with specific settings
+    # For Supabase pooler connections, we need to be careful with SSL settings
+    # The pooler (port 6543) has different SSL requirements than direct connections
     connect_args = {
-        "sslmode": "require",
         "connect_timeout": 60,
         "application_name": "alembic_migrations"
     }
