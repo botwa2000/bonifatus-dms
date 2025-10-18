@@ -133,19 +133,32 @@ export default function BatchUploadPage() {
       }
 
       const result = await response.json()
-      
-      // Build upload states
-      const states: FileUploadState[] = result.results.map((r: FileAnalysis) => ({
-        ...r,
-        file: selectedFiles.find(f => f.name === r.original_filename)!,
-        selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
-        primary_category: r.analysis.suggested_category_id,
-        confirmed_keywords: Array.isArray(r.analysis.keywords) 
-          ? r.analysis.keywords.slice(0, 10).map(k => k.word)
-          : [],
-        custom_filename: r.standardized_filename,
-        filename_error: null
-      }))
+
+      // Filter out failed analyses and show errors
+      const failedFiles = result.results.filter((r: any) => !r.success)
+      if (failedFiles.length > 0) {
+        const errorMessages = failedFiles.map((f: any) => `${f.original_filename}: ${f.error}`).join('; ')
+        logger.error('Some files failed analysis:', errorMessages)
+        setMessage({
+          type: 'error',
+          text: `${failedFiles.length} file(s) failed analysis: ${errorMessages}`
+        })
+      }
+
+      // Build upload states only for successful analyses
+      const states: FileUploadState[] = result.results
+        .filter((r: any) => r.success)
+        .map((r: FileAnalysis) => ({
+          ...r,
+          file: selectedFiles.find(f => f.name === r.original_filename)!,
+          selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
+          primary_category: r.analysis.suggested_category_id,
+          confirmed_keywords: Array.isArray(r.analysis.keywords)
+            ? r.analysis.keywords.slice(0, 10).map(k => k.word)
+            : [],
+          custom_filename: r.standardized_filename,
+          filename_error: null
+        }))
 
       // Debug: Log keyword extraction
       states.forEach((state, idx) => {
@@ -154,10 +167,16 @@ export default function BatchUploadPage() {
       })
 
       setUploadStates(states)
-      setMessage({
-        type: 'success',
-        text: `Analyzed ${result.successful}/${result.total_files} files successfully`
-      })
+
+      // Only show success message if there are successful analyses
+      if (states.length > 0) {
+        setMessage({
+          type: failedFiles.length > 0 ? 'error' : 'success',
+          text: failedFiles.length > 0
+            ? `Analyzed ${result.successful}/${result.total_files} files successfully. ${failedFiles.length} failed.`
+            : `Analyzed ${result.successful}/${result.total_files} files successfully`
+        })
+      }
 
     } catch (error) {
       console.error('Batch analysis error:', error)
