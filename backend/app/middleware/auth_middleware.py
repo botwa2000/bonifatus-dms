@@ -12,7 +12,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import settings
 from app.database.models import User
 from app.services.auth_service import auth_service
-from app.database.connection import current_user_id_context
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ async def get_current_user(
         )
 
     user = await auth_service.get_current_user(token)
-
+    
     if not user:
         logger.warning(f"Invalid token for {request.url.path}")
         raise HTTPException(
@@ -51,9 +50,6 @@ async def get_current_user(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    # Set user ID in context for RLS (Row Level Security)
-    current_user_id_context.set(str(user.id))
 
     logger.info(f"Authenticated user {user.email} for {request.url.path}")
     return user
