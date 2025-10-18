@@ -6,13 +6,17 @@ Production-ready connection pooling and health monitoring
 """
 
 import logging
-from typing import Generator
-from sqlalchemy import create_engine, text
+from typing import Generator, Optional
+from contextvars import ContextVar
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Context variable to store current user ID for RLS
+current_user_id_context: ContextVar[Optional[str]] = ContextVar('current_user_id', default=None)
 
 
 class DatabaseManager:
@@ -50,7 +54,21 @@ class DatabaseManager:
             self._session_local = sessionmaker(
                 autocommit=False, autoflush=False, bind=self.engine
             )
-            logger.info("Database session factory created")
+
+            # Register event listener to set RLS user context
+            @event.listens_for(self._session_local, "after_begin")
+            def receive_after_begin(session, transaction, connection):
+                """Set app.current_user_id for Row Level Security policies"""
+                user_id = current_user_id_context.get()
+                if user_id:
+                    # Set the session variable for RLS policies
+                    connection.execute(
+                        text("SELECT set_config('app.current_user_id', :user_id, false)"),
+                        {"user_id": str(user_id)}
+                    )
+                    logger.debug(f"Set RLS context for user: {user_id}")
+
+            logger.info("Database session factory created with RLS support")
         return self._session_local
 
     async def init_database(self) -> bool:
@@ -84,13 +102,26 @@ class DatabaseManager:
             logger.warning(f"Database health check failed: {e}")
             return False
 
-    def get_db_session(self) -> Generator[Session, None, None]:
-        """Database dependency for FastAPI"""
+    def get_db_session(self, user_id: Optional[str] = None) -> Generator[Session, None, None]:
+        """
+        Database dependency for FastAPI
+
+        Args:
+            user_id: Optional user ID to set for RLS context
+        """
+        # Set user ID in context for RLS
+        token = None
+        if user_id:
+            token = current_user_id_context.set(user_id)
+
         session = self.session_local()
         try:
             yield session
         finally:
             session.close()
+            # Reset context
+            if token:
+                current_user_id_context.reset(token)
 
     async def close(self):
         """Close database connections"""
@@ -105,6 +136,46 @@ db_manager = DatabaseManager()
 # Convenience exports for backward compatibility
 engine = db_manager.engine
 SessionLocal = db_manager.session_local
-get_db = db_manager.get_db_session
 init_database = db_manager.init_database
 close_database = db_manager.close
+
+
+def get_db(user_id: Optional[str] = None) -> Generator[Session, None, None]:
+    """
+    Database session dependency for FastAPI endpoints
+
+    Args:
+        user_id: Optional user ID to set RLS context
+
+    Usage:
+        # Without user context (for public endpoints)
+        def endpoint(db: Session = Depends(get_db)):
+            ...
+
+        # With user context (for authenticated endpoints) - use get_db_with_user instead
+    """
+    yield from db_manager.get_db_session(user_id=user_id)
+
+
+class GetDBWithUser:
+    """
+    Callable dependency class that creates a database session with user context for RLS
+
+    Usage in FastAPI endpoints:
+        @router.post("/endpoint")
+        async def endpoint(
+            current_user: User = Depends(get_current_active_user),
+            db: Session = Depends(GetDBWithUser())
+        ):
+            # The database session will automatically have RLS context set
+            ...
+    """
+
+    def __call__(self) -> Generator[Session, None, None]:
+        """Create database session with user context from ContextVar"""
+        user_id = current_user_id_context.get()
+        yield from db_manager.get_db_session(user_id=user_id)
+
+
+# Create singleton instance for dependency injection
+get_db_with_user = GetDBWithUser()
