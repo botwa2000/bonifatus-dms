@@ -41,13 +41,17 @@ RUN apt-get update \
         clamav-freshclam \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure ClamAV
+# Configure ClamAV with memory-optimized settings
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
-    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav \
-    && sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/clamd.conf \
-    && sed -i 's/^Foreground .*$/Foreground true/g' /etc/clamav/freshclam.conf \
-    && echo "TCPSocket 3310" >> /etc/clamav/clamd.conf \
-    && echo "TCPAddr 127.0.0.1" >> /etc/clamav/clamd.conf
+    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav
+
+# Copy optimized ClamAV configurations
+COPY clamd.conf /etc/clamav/clamd.conf
+COPY freshclam.conf /etc/clamav/freshclam.conf
+
+# Set proper permissions for ClamAV configs
+RUN chown clamav:clamav /etc/clamav/clamd.conf /etc/clamav/freshclam.conf \
+    && chmod 644 /etc/clamav/clamd.conf /etc/clamav/freshclam.conf
 
 # Install Python dependencies
 COPY requirements.txt .

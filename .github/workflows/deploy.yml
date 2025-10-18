@@ -96,6 +96,7 @@ jobs:
             --max-instances=100 \
             --timeout=900 \
             --concurrency=1000 \
+            --startup-cpu-boost \
             --env-vars-file=env.yaml \
             --set-secrets="/secrets/google-drive-key=bonifatus-drive-service-key:latest"
       

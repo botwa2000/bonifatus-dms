@@ -174,7 +174,20 @@ async def health_check():
         except Exception as e:
             logger.warning(f"Google services health check failed: {e}")
             health_info["google_drive"] = "error"
-        
+
+        # ClamAV malware scanner status
+        try:
+            from app.services.malware_scanner_service import malware_scanner_service
+            scanner_status = await malware_scanner_service.get_scanner_status()
+            health_info["malware_scanner"] = {
+                "clamav": "available" if scanner_status["clamav"]["available"] else "unavailable",
+                "clamav_version": scanner_status["clamav"].get("version", "unknown"),
+                "pdf_validator": "available" if scanner_status["pdf_validator"]["available"] else "unavailable"
+            }
+        except Exception as e:
+            logger.warning(f"Malware scanner health check failed: {e}")
+            health_info["malware_scanner"] = "error"
+
         return health_info
         
     except Exception as e:
