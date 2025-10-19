@@ -24,14 +24,16 @@ let globalAuthInitialized = false
 let globalInitPromise: Promise<User | null> | null = null
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
+  // Only show loading state for protected routes
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(isProtectedRoute(pathname || '/'))
   const [error, setError] = useState<string | null>(null)
   const initPromiseRef = useRef<Promise<void> | null>(null)
   const initializedRef = useRef(false)
   const mountedRef = useRef(true)
-  const pathname = usePathname()
 
   // Initialize auth ONCE globally (survives prefetch renders)
   useEffect(() => {

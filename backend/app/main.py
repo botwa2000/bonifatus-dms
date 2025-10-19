@@ -103,10 +103,7 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.process_time import ProcessTimeMiddleware
 
 # Security headers middleware
-app.add_middleware(
-    SecurityHeadersMiddleware,
-    frontend_url=os.getenv("FRONTEND_URL", os.getenv("APP_CORS_ORIGINS", "https://bonidoc.com"))
-)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)

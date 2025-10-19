@@ -22,16 +22,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     Protects against common web vulnerabilities
     """
     
-    def __init__(self, app, frontend_url: str = None):
+    def __init__(self, app):
         super().__init__(app)
-        self.frontend_url = frontend_url or os.getenv(
-            "FRONTEND_URL", 
-            "https://bonidoc.com"
-        )
-        self.api_url = os.getenv(
-            "API_URL",
-            "https://bonifatus-dms-mmdbxdflfa-uc.a.run.app"
-        )
     
     async def dispatch(
         self, 
@@ -46,7 +38,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # Content Security Policy
             csp_directives = [
                 "default-src 'self'",
-                f"connect-src 'self' {self.api_url} https://accounts.google.com https://www.googleapis.com",
+                "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
                 "script-src 'self' 'unsafe-inline' https://accounts.google.com",
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                 "font-src 'self' https://fonts.gstatic.com",

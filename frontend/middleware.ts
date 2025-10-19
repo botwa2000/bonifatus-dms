@@ -36,8 +36,8 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): NextR
   const headers = response.headers
 
   if (SECURITY_CONFIG.enableCSP) {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://bonifatus-dms-mmdbxdflfa-uc.a.run.app'
-    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+
     const cspDirectives = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com",

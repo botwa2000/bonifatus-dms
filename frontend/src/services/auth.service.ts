@@ -27,7 +27,7 @@ export class AuthService {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
     if (!apiUrl) {
-      throw new Error('NEXT_PUBLIC_API_URL environment variable is required. Create frontend/.env.local with NEXT_PUBLIC_API_URL=https://bonifatus-dms-vpm3xabjwq-uc.a.run.app')
+      throw new Error('NEXT_PUBLIC_API_URL environment variable is required')
     }
 
     this.config = {
