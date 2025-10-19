@@ -19,6 +19,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Global singleton to prevent multiple auth initializations across page prefetches
+let globalAuthInitialized = false
+let globalInitPromise: Promise<User | null> | null = null
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -29,14 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const mountedRef = useRef(true)
   const pathname = usePathname()
 
-  // Initialize auth ONCE on mount
+  // Initialize auth ONCE globally (survives prefetch renders)
   useEffect(() => {
-    if (initializedRef.current) {
+    if (initializedRef.current || globalAuthInitialized) {
       return
     }
 
     mountedRef.current = true
     initializedRef.current = true
+    globalAuthInitialized = true
 
     const initialize = async () => {
       const currentPath = pathname || '/'
@@ -48,11 +53,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      if (initPromiseRef.current) {
-        return initPromiseRef.current
+      if (globalInitPromise) {
+        try {
+          const cachedUser = await globalInitPromise
+          if (mountedRef.current) {
+            setUser(cachedUser)
+            setIsAuthenticated(!!cachedUser)
+            setIsLoading(false)
+          }
+        } catch {
+          if (mountedRef.current) {
+            setIsLoading(false)
+          }
+        }
+        return
       }
 
-      initPromiseRef.current = (async () => {
+      globalInitPromise = (async () => {
         try {
           const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
 
@@ -72,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
               })
 
-              return
+              return userData
             } catch {
               localStorage.removeItem('user')
             }
@@ -85,16 +102,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(!!currentUser)
             setIsLoading(false)
           }
+
+          return currentUser
         } catch {
           if (mountedRef.current) {
             setUser(null)
             setIsAuthenticated(false)
             setIsLoading(false)
           }
+          return null
         }
       })()
 
-      return initPromiseRef.current
+      await globalInitPromise
     }
 
     initialize()
@@ -102,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, []) // Empty deps - run ONCE on mount only
+  }, [])
 
   const initializeGoogleAuth = useCallback(async () => {
     try {
