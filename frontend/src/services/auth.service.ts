@@ -21,14 +21,15 @@ export class AuthService {
   private readonly config: AuthServiceConfig
   private tokenRefreshPromise: Promise<boolean> | null = null
   private refreshTimeoutId: NodeJS.Timeout | null = null
+  private oauthConfigCache: GoogleOAuthConfig | null = null
 
   constructor() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    
+
     if (!apiUrl) {
       throw new Error('NEXT_PUBLIC_API_URL environment variable is required. Create frontend/.env.local with NEXT_PUBLIC_API_URL=https://bonifatus-dms-vpm3xabjwq-uc.a.run.app')
     }
-    
+
     this.config = {
       apiUrl,
       tokenRefreshThreshold: 5 * 60 * 1000,
@@ -58,14 +59,20 @@ export class AuthService {
   }
 
   async getOAuthConfig(): Promise<GoogleOAuthConfig> {
+    if (this.oauthConfigCache) {
+      return this.oauthConfigCache
+    }
+
     try {
       const response = await apiClient.get<{ google_client_id: string; redirect_uri: string }>('/api/v1/auth/google/config')
-      
-      return {
+
+      this.oauthConfigCache = {
         google_client_id: response.google_client_id,
         redirect_uri: response.redirect_uri,
         scope: 'openid email profile'
       }
+
+      return this.oauthConfigCache
     } catch (error) {
       console.error('Failed to fetch OAuth config:', error)
       throw new Error('Unable to initialize authentication')
@@ -180,21 +187,6 @@ export class AuthService {
 
       // Backend sets secure httpOnly cookies (access_token, refresh_token)
       // These are automatically sent with subsequent API requests
-      // No need to manipulate cookies on client side
-
-      // Fetch and store user info for UI display (non-sensitive data only)
-      if (typeof window !== 'undefined') {
-        try {
-          const user = await this.getCurrentUser()
-          if (user) {
-            localStorage.setItem('user', JSON.stringify(user))
-            console.log('[AUTH DEBUG] User info cached:', user.email)
-          }
-        } catch (e) {
-          console.error('[AUTH DEBUG] Failed to fetch user info:', e)
-          // Don't fail auth if user fetch fails - cookies are already set
-        }
-      }
 
       // Clear OAuth state
       this.clearStoredOAuthState()

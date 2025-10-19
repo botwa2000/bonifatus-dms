@@ -27,28 +27,17 @@ export default function LoginPageContent() {
         }
 
         if (!code) {
-          // No code means user came directly to login page
-          console.log('[LOGIN DEBUG] No code, showing login page')
           setStatus('login')
           return
         }
 
-        // Exchange authorization code for JWT tokens
-        console.log('[LOGIN DEBUG] Starting token exchange')
+        // Exchange authorization code for JWT tokens and redirect immediately
         const result = await authService.exchangeGoogleToken(code, state)
 
         if (result.success) {
-          console.log('[LOGIN DEBUG] Token exchange successful')
-          console.log('[LOGIN DEBUG] User data cached in localStorage')
-
-          // Redirect immediately - don't change status to avoid unnecessary re-render
-          // Use window.location.href for full page reload
-          // This ensures the auth context initializes fresh with the new auth state
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[LOGIN DEBUG] Redirecting to:', redirectUrl)
           window.location.href = redirectUrl
-
-          // Note: Code after this point may not execute as browser starts navigation
           return
         } else {
           console.error('[LOGIN DEBUG] Token exchange failed:', result.error)
