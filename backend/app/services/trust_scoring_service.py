@@ -5,7 +5,7 @@ Calculates user trust based on account age, activity patterns, and behavior
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -51,7 +51,7 @@ class TrustScoringService:
             cache_key = f"{user_id}:{ip_address}"
             if cache_key in self._cache:
                 cached_score, cached_time = self._cache[cache_key]
-                if datetime.utcnow() - cached_time < self._cache_ttl:
+                if datetime.now(timezone.utc) - cached_time < self._cache_ttl:
                     return cached_score
             
             # Start with neutral baseline
@@ -95,7 +95,7 @@ class TrustScoringService:
             final_score = max(0.0, min(1.0, score))
             
             # Cache result
-            self._cache[cache_key] = (final_score, datetime.utcnow())
+            self._cache[cache_key] = (final_score, datetime.now(timezone.utc))
             
             # Log low trust scores
             if final_score < self.LOW_TRUST:
@@ -144,8 +144,8 @@ class TrustScoringService:
         created_at = user_info.get('created_at')
         if not created_at:
             return 0.0
-        
-        account_age = datetime.utcnow() - created_at
+
+        account_age = datetime.now(timezone.utc) - created_at
         
         if account_age.days >= 90:
             return 0.15  # 3+ months: high trust

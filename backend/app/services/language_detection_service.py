@@ -67,7 +67,9 @@ class LanguageDetectionService:
                 return 'en'
             else:
                 # Long text: Use FastText for speed
-                result = fasttext_detect(text)
+                # FastText requires single-line input (no newlines)
+                text_sanitized = ' '.join(text.split())
+                result = fasttext_detect(text_sanitized)
                 lang_code = result['lang']
                 confidence = result['score']
 
@@ -80,7 +82,7 @@ class LanguageDetectionService:
                     lingua_result = self.lingua.detect_language_of(text)
                     if lingua_result:
                         return lingua_result.iso_code_639_1.name.lower()
-                    return lang_code  # Use FastText result despite low confidence
+                    return lang_code
 
         except Exception as e:
             logger.error(f"Language detection failed: {e}")
