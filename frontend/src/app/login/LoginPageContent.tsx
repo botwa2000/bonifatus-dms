@@ -14,6 +14,13 @@ export default function LoginPageContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       try {
+        // Ensure searchParams is available
+        if (!searchParams) {
+          console.error('[LOGIN DEBUG] searchParams not available')
+          setStatus('login')
+          return
+        }
+
         const code = searchParams.get('code')
         const state = searchParams.get('state')
         const error = searchParams.get('error')
