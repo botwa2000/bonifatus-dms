@@ -29,9 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const mountedRef = useRef(true)
   const pathname = usePathname()
 
-  // Initialize auth ONCE on mount (skip for public routes)
+  // Initialize auth ONCE on mount
   useEffect(() => {
-    // Only initialize once per session
     if (initializedRef.current) {
       return
     }
@@ -40,8 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializedRef.current = true
 
     const initialize = async () => {
-      // Skip auth check on public routes to avoid unnecessary API calls
-      if (!isProtectedRoute(pathname || '/')) {
+      const currentPath = pathname || '/'
+
+      if (!isProtectedRoute(currentPath)) {
         if (mountedRef.current) {
           setIsLoading(false)
         }
@@ -54,7 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       initPromiseRef.current = (async () => {
         try {
-          // Check localStorage first to avoid race condition after login redirect
           const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
 
           if (storedUser) {
@@ -66,9 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setIsLoading(false)
               }
 
-              // Verify with API in background (don't block UI)
               authService.getCurrentUser().catch(() => {
-                // If API call fails, clear state
                 if (mountedRef.current) {
                   setUser(null)
                   setIsAuthenticated(false)
@@ -77,12 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               return
             } catch {
-              // Invalid localStorage data, fall through to API call
               localStorage.removeItem('user')
             }
           }
 
-          // No cached user, fetch from API
           const currentUser = await authService.getCurrentUser()
 
           if (mountedRef.current) {
@@ -91,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoading(false)
           }
         } catch {
-          // Silently handle 401 errors (expected when not logged in)
           if (mountedRef.current) {
             setUser(null)
             setIsAuthenticated(false)
@@ -108,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, [pathname]) // pathname dependency needed for initial route detection
+  }, []) // Empty deps - run ONCE on mount only
 
   const initializeGoogleAuth = useCallback(async () => {
     try {
