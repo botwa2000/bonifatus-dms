@@ -59,7 +59,8 @@ def run_migrations_online() -> None:
     # The pooler (port 6543) has different SSL requirements than direct connections
     connect_args = {
         "connect_timeout": 60,
-        "application_name": "alembic_migrations"
+        "application_name": "alembic_migrations",
+        "sslmode": "require"
     }
 
     connectable = engine_from_config(
