@@ -163,7 +163,7 @@ export default function BatchUploadPage() {
           selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
           primary_category: r.analysis.suggested_category_id,
           confirmed_keywords: Array.isArray(r.analysis.keywords)
-            ? r.analysis.keywords.slice(0, 10).map(k => k?.word).filter((w): w is string => !!w)
+            ? r.analysis.keywords.slice(0, 10).map(k => k?.word).filter((w): w is string => typeof w === 'string' && w.length > 0)
             : [],
           custom_filename: r.standardized_filename,
           filename_error: null
@@ -418,7 +418,7 @@ export default function BatchUploadPage() {
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
                             <p className="text-sm text-neutral-600 dark:text-neutral-400">
                               {state.analysis.detected_language?.toUpperCase() || 'Unknown'} •
-                              {state.analysis.keywords?.length || 0} keywords
+                              {(Array.isArray(state.analysis.keywords) && state.analysis.keywords !== null) ? state.analysis.keywords.length : 0} keywords
                             </p>
                           </div>
                           <Button

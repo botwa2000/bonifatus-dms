@@ -382,19 +382,6 @@ class NgramPattern(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-class LanguageDetectionPattern(Base):
-    """Language detection patterns for scalable multilingual support"""
-    __tablename__ = 'language_detection_patterns'
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    language_code = Column(String(10), nullable=False)
-    pattern = Column(String(100), nullable=False)
-    pattern_type = Column(String(50), nullable=False)  # common_word, character_set, grammar
-    weight = Column(Float, default=1.0, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
 
 class DocumentDate(Base, TimestampMixin):
     """Secondary dates extracted from documents"""
