@@ -165,7 +165,7 @@ export default function BatchUploadPage() {
           confirmed_keywords: Array.isArray(r.analysis.keywords)
             ? r.analysis.keywords
                 .slice(0, 10)
-                .filter(k => k && typeof k === 'object' && typeof k.word === 'string' && k.word.length > 0)
+                .filter(k => k && typeof k === 'object' && k.word && typeof k.word === 'string' && k.word.length > 0)
                 .map(k => k.word)
             : [],
           custom_filename: r.standardized_filename,
