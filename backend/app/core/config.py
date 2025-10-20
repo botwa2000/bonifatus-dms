@@ -14,7 +14,7 @@ class DatabaseSettings(BaseSettings):
     
     database_url: str = Field(..., description="Database connection URL")
     database_pool_size: int = Field(default=10, description="Connection pool size")
-    database_pool_recycle: int = Field(default=3600, description="Pool recycle time")
+    database_pool_recycle: int = Field(default=60, description="Pool recycle time (60s for Supabase transaction pooler)")
     database_echo: bool = Field(default=False, description="Enable SQL query logging")
     database_pool_pre_ping: bool = Field(default=True, description="Enable connection health checks")
     database_connect_timeout: int = Field(default=60, description="Connection timeout")
