@@ -6,17 +6,23 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
 
+// Global singleton to prevent duplicate OAuth processing across component re-renders
+let globalOAuthProcessing = false
+
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(true) // Start as true to show loading
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Prevent duplicate calls from React StrictMode double-render
-      if (isProcessing) return
-      setIsProcessing(true)
+      // Global singleton pattern - prevents duplicate processing in React StrictMode
+      if (globalOAuthProcessing) {
+        console.log('[OAuth] Already processing, skipping duplicate')
+        return
+      }
+      globalOAuthProcessing = true
 
       try {
         const code = searchParams.get('code')
@@ -25,31 +31,42 @@ export default function LoginPageContent() {
 
         // No OAuth code - redirect to homepage
         if (!code) {
+          console.log('[OAuth] No code present, redirecting to homepage')
           router.push('/')
           return
         }
 
         // OAuth error from Google
         if (errorParam) {
+          console.error('[OAuth] Error from Google:', errorParam)
           setError(`Authentication error: ${errorParam}`)
+          setIsProcessing(false)
           return
         }
+
+        console.log('[OAuth] Processing authorization code...')
 
         // Exchange authorization code for JWT tokens
         // Backend returns user data, avoiding a second API call
         const result = await authService.exchangeGoogleToken(code, state)
 
+        console.log('[OAuth] Exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
+
         if (result.success && result.user) {
           // Use Next.js router for instant client-side navigation
           // User data is already cached in localStorage
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
+          console.log('[OAuth] Success! Redirecting to:', redirectUrl)
           router.push(redirectUrl)
         } else {
-          setError('Authentication failed. Please try again.')
+          console.error('[OAuth] Exchange failed:', result.error)
+          setError(result.error || 'Authentication failed. Please try again.')
+          setIsProcessing(false)
         }
       } catch (err) {
         console.error('[OAuth] Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
+        setIsProcessing(false)
       }
     }
 
@@ -88,7 +105,20 @@ export default function LoginPageContent() {
     )
   }
 
-  // Show blank screen during redirect - no loading UI needed
-  // The faster we process, the less the user sees this page
-  return null
+  // Show loading indicator during OAuth processing
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-primary mx-auto"></div>
+          <h2 className="mt-6 text-2xl font-bold text-neutral-900">
+            Completing sign in...
+          </h2>
+          <p className="mt-2 text-sm text-neutral-600">
+            Please wait while we verify your account
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
