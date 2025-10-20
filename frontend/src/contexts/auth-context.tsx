@@ -26,10 +26,24 @@ let globalInitPromise: Promise<User | null> | null = null
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // Only show loading state for protected routes
-  const [user, setUser] = useState<User | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(isProtectedRoute(pathname || '/'))
+  // Initialize state from localStorage synchronously to prevent race conditions
+  // This ensures dashboard doesn't redirect before auth context loads
+  const getInitialUser = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = localStorage.getItem('user')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  }
+
+  const initialUser = getInitialUser()
+
+  // Only show loading state for protected routes without cached user data
+  const [user, setUser] = useState<User | null>(initialUser)
+  const [isAuthenticated, setIsAuthenticated] = useState(!!initialUser)
+  const [isLoading, setIsLoading] = useState(isProtectedRoute(pathname || '/') && !initialUser)
   const [error, setError] = useState<string | null>(null)
   const initPromiseRef = useRef<Promise<void> | null>(null)
   const initializedRef = useRef(false)
