@@ -167,7 +167,7 @@ export class AuthService {
   async exchangeGoogleToken(
     code: string,
     state: string | null
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
       console.log('[AUTH DEBUG] Starting token exchange')
 
@@ -177,21 +177,35 @@ export class AuthService {
       }
 
       // Exchange authorization code for JWT tokens via backend
-      // Backend will set httpOnly cookies automatically
-      await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
+      // Backend returns user data AND sets httpOnly cookies
+      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
         code,
         state: state || ''
       })
 
       console.log('[AUTH DEBUG] Token exchange successful')
 
-      // Backend sets secure httpOnly cookies (access_token, refresh_token)
-      // These are automatically sent with subsequent API requests
+      // Convert TokenResponse to User object (all data from backend)
+      const user: User = {
+        id: response.user_id,
+        email: response.email,
+        full_name: response.full_name,
+        profile_picture: response.profile_picture,
+        tier: response.tier,
+        is_active: response.is_active,
+        created_at: new Date().toISOString(), // Not returned by backend, use current time
+        updated_at: new Date().toISOString()  // Not returned by backend, use current time
+      }
+
+      // Cache user data for immediate use - NO EXTRA API CALL NEEDED!
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(user))
+      }
 
       // Clear OAuth state
       this.clearStoredOAuthState()
 
-      return { success: true }
+      return { success: true, user }
 
     } catch (error) {
       console.error('Token exchange failed:', error)

@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setIsLoading(false)
               }
 
+              // Background refresh - don't wait for it
               authService.getCurrentUser().catch(() => {
                 if (mountedRef.current) {
                   setUser(null)
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          // Fetch current user from API
           const currentUser = await authService.getCurrentUser()
 
           if (mountedRef.current) {

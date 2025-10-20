@@ -358,7 +358,10 @@ class AuthService:
                         "token_type": "bearer",
                         "user_id": str(user.id),
                         "email": user.email,
+                        "full_name": user.full_name,
+                        "profile_picture": user.profile_picture,
                         "tier": user.tier,
+                        "is_active": user.is_active,
                         "session_id": session_info['session_id'],
                         "expires_in": self.access_token_expire_minutes * 60
                     }

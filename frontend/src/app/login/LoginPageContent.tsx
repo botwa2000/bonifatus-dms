@@ -2,16 +2,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
 
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      // Prevent duplicate calls from React StrictMode double-render
+      if (isProcessing) return
+      setIsProcessing(true)
+
       try {
         const code = searchParams.get('code')
         const state = searchParams.get('state')
@@ -19,7 +25,7 @@ export default function LoginPageContent() {
 
         // No OAuth code - redirect to homepage
         if (!code) {
-          window.location.href = '/'
+          router.push('/')
           return
         }
 
@@ -29,13 +35,15 @@ export default function LoginPageContent() {
           return
         }
 
-        // Exchange authorization code for JWT tokens and redirect immediately
+        // Exchange authorization code for JWT tokens
+        // Backend returns user data, avoiding a second API call
         const result = await authService.exchangeGoogleToken(code, state)
 
-        if (result.success) {
-          // Immediate redirect to dashboard - no interim success page
+        if (result.success && result.user) {
+          // Use Next.js router for instant client-side navigation
+          // User data is already cached in localStorage
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
-          window.location.href = redirectUrl
+          router.push(redirectUrl)
         } else {
           setError('Authentication failed. Please try again.')
         }
@@ -46,7 +54,8 @@ export default function LoginPageContent() {
     }
 
     handleOAuthCallback()
-  }, [searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run only once on mount - searchParams doesn't change
 
   // Show error page
   if (error) {
@@ -79,17 +88,7 @@ export default function LoginPageContent() {
     )
   }
 
-  // Show minimal spinner while processing - no interim success page
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-primary mx-auto"></div>
-          <h2 className="mt-6 text-3xl font-extrabold text-neutral-900">
-            Signing you in...
-          </h2>
-        </div>
-      </div>
-    </div>
-  )
+  // Show blank screen during redirect - no loading UI needed
+  // The faster we process, the less the user sees this page
+  return null
 }

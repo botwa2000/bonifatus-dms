@@ -82,7 +82,7 @@ export class ApiClient {
   ): Promise<T> {
     const currentRequestId = ++this.requestCounter
     const startTime = Date.now()
-    
+
     const maxRetries = config.retries ?? this.config.maxRetries
     let lastError: Error | null = null
 
@@ -90,12 +90,12 @@ export class ApiClient {
       try {
         const url = this.buildUrl(endpoint, config.params)
         const headers = await this.buildHeaders(requireAuth, config.headers)
-        
+
         const requestConfig: RequestInit = {
           method,
           headers,
-          credentials: 'include',  // Include cookies in cross-origin requests
-          signal: this.createTimeoutSignal(config.timeout)
+          credentials: 'include'  // Include cookies in cross-origin requests
+          // Removed AbortSignal - it was causing premature aborts on slow connections
         }
 
         if (data && method !== 'GET' && method !== 'DELETE') {
