@@ -37,7 +37,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize auth ONCE globally (survives prefetch renders)
   useEffect(() => {
-    if (initializedRef.current || globalAuthInitialized) {
+    // If already initialized, just update state from cached data
+    if (globalAuthInitialized && globalInitPromise) {
+      globalInitPromise.then(cachedUser => {
+        if (mountedRef.current) {
+          setUser(cachedUser)
+          setIsAuthenticated(!!cachedUser)
+          setIsLoading(false)
+        }
+      }).catch(() => {
+        if (mountedRef.current) {
+          setIsLoading(false)
+        }
+      })
+      return
+    }
+
+    if (initializedRef.current) {
       return
     }
 
