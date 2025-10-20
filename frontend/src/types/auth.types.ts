@@ -3,10 +3,8 @@
 export interface User {
   id: string
   email: string
-  full_name?: string
-  name?: string
-  picture?: string
-  google_id: string
+  full_name: string
+  profile_picture?: string
   tier: string
   created_at: string
   updated_at: string
