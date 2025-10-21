@@ -77,15 +77,24 @@ class DocumentAnalysisService:
                 user_id=user_id
             )
 
+            # Filter and validate keywords before creating response
+            validated_keywords = []
+            for kw in keywords[:20]:
+                if not kw or len(kw) != 3:
+                    logger.warning(f"Skipping invalid keyword tuple: {kw}")
+                    continue
+                if not kw[0] or not isinstance(kw[0], str) or len(kw[0].strip()) == 0:
+                    logger.warning(f"Skipping keyword with invalid word: {kw}")
+                    continue
+                validated_keywords.append({'word': kw[0], 'count': kw[1], 'relevance': kw[2]})
+
+            logger.info(f"Validated {len(validated_keywords)}/20 keywords for response")
+
             analysis_result = {
                 'extracted_text': extracted_text[:2000],
                 'full_text_length': len(extracted_text),
                 'ocr_confidence': round(ocr_confidence * 100, 1) if ocr_confidence < 1.0 else None,
-                'keywords': [
-                    {'word': kw[0], 'count': kw[1], 'relevance': kw[2]}
-                    for kw in keywords[:20]
-                    if kw and len(kw) == 3 and kw[0] and isinstance(kw[0], str) and len(kw[0].strip()) > 0
-                ],
+                'keywords': validated_keywords,
                 'detected_language': detected_language,
                 'document_date': None,
                 'document_date_type': None,
