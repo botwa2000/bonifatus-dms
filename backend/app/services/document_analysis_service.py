@@ -81,7 +81,11 @@ class DocumentAnalysisService:
                 'extracted_text': extracted_text[:2000],
                 'full_text_length': len(extracted_text),
                 'ocr_confidence': round(ocr_confidence * 100, 1) if ocr_confidence < 1.0 else None,
-                'keywords': [{'word': kw[0], 'count': kw[1], 'relevance': kw[2]} for kw in keywords[:20]],
+                'keywords': [
+                    {'word': kw[0], 'count': kw[1], 'relevance': kw[2]}
+                    for kw in keywords[:20]
+                    if kw and len(kw) == 3 and kw[0] and isinstance(kw[0], str) and len(kw[0].strip()) > 0
+                ],
                 'detected_language': detected_language,
                 'document_date': None,
                 'document_date_type': None,

@@ -162,11 +162,19 @@ export default function BatchUploadPage() {
           file: selectedFiles.find(f => f.name === r.original_filename)!,
           selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
           primary_category: r.analysis.suggested_category_id,
-          confirmed_keywords: Array.isArray(r.analysis.keywords)
+          confirmed_keywords: (r.analysis?.keywords && Array.isArray(r.analysis.keywords))
             ? r.analysis.keywords
                 .slice(0, 10)
-                .filter(k => k && typeof k === 'object' && k.word && typeof k.word === 'string' && k.word.length > 0)
-                .map(k => k.word)
+                .filter(k => {
+                  return k !== null &&
+                         k !== undefined &&
+                         typeof k === 'object' &&
+                         k.word !== null &&
+                         k.word !== undefined &&
+                         typeof k.word === 'string' &&
+                         k.word.trim().length > 0
+                })
+                .map(k => k.word.trim())
             : [],
           custom_filename: r.standardized_filename,
           filename_error: null
@@ -421,7 +429,7 @@ export default function BatchUploadPage() {
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
                             <p className="text-sm text-neutral-600 dark:text-neutral-400">
                               {state.analysis.detected_language?.toUpperCase() || 'Unknown'} •
-                              {(Array.isArray(state.analysis.keywords) && state.analysis.keywords !== null) ? state.analysis.keywords.length : 0} keywords
+                              {(state.analysis?.keywords && Array.isArray(state.analysis.keywords)) ? state.analysis.keywords.length : 0} keywords
                             </p>
                           </div>
                           <Button
@@ -564,26 +572,28 @@ export default function BatchUploadPage() {
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                             Keywords
                           </label>
-                          {state.confirmed_keywords.length > 0 ? (
+                          {(state.confirmed_keywords && Array.isArray(state.confirmed_keywords) && state.confirmed_keywords.length > 0) ? (
                             <div className="flex flex-wrap gap-2">
-                              {state.confirmed_keywords.map((keyword, kidx) => (
-                                <Badge
-                                  key={kidx}
-                                  variant="default"
-                                  className="flex items-center gap-1"
-                                >
-                                  {keyword}
-                                  <button
-                                    onClick={() => {
-                                      const newKeywords = state.confirmed_keywords.filter((_, i) => i !== kidx)
-                                      updateFileState(index, {confirmed_keywords: newKeywords})
-                                    }}
-                                    className="ml-1 hover:text-red-600"
+                              {state.confirmed_keywords
+                                .filter(keyword => keyword && typeof keyword === 'string' && keyword.trim().length > 0)
+                                .map((keyword, kidx) => (
+                                  <Badge
+                                    key={kidx}
+                                    variant="default"
+                                    className="flex items-center gap-1"
                                   >
-                                    ×
-                                  </button>
-                                </Badge>
-                              ))}
+                                    {keyword}
+                                    <button
+                                      onClick={() => {
+                                        const newKeywords = state.confirmed_keywords.filter((_, i) => i !== kidx)
+                                        updateFileState(index, {confirmed_keywords: newKeywords})
+                                      }}
+                                      className="ml-1 hover:text-red-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                ))}
                             </div>
                           ) : (
                             <p className="text-sm text-neutral-500 dark:text-neutral-400">
