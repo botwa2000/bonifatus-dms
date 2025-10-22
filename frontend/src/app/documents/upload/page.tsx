@@ -176,7 +176,7 @@ export default function BatchUploadPage() {
                 })
                 .map(k => k.word.trim())
             : [],
-          custom_filename: r.standardized_filename,
+          custom_filename: r.standardized_filename || r.original_filename || 'untitled',
           filename_error: null
         }))
 
@@ -185,8 +185,14 @@ export default function BatchUploadPage() {
         console.log(`File ${idx + 1} keywords:`, state.confirmed_keywords)
         console.log(`File ${idx + 1} keywords type:`, typeof state.confirmed_keywords, Array.isArray(state.confirmed_keywords))
         console.log(`File ${idx + 1} analysis:`, state.analysis)
+        console.log(`File ${idx + 1} standardized_filename:`, state.standardized_filename)
+        console.log(`File ${idx + 1} custom_filename:`, state.custom_filename)
+        console.log(`File ${idx + 1} custom_filename type:`, typeof state.custom_filename)
         if (state.confirmed_keywords === null) {
           console.error(`File ${idx + 1} ERROR: confirmed_keywords is null!`)
+        }
+        if (state.custom_filename === null || state.custom_filename === undefined) {
+          console.error(`File ${idx + 1} ERROR: custom_filename is ${state.custom_filename}!`)
         }
       })
 
@@ -472,7 +478,7 @@ export default function BatchUploadPage() {
                                   Original: {state.original_filename}
                                 </p>
                                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                  {state.custom_filename.length}/{maxFilenameLength}
+                                  {(state.custom_filename || '').length}/{maxFilenameLength}
                                 </p>
                               </div>
                             </div>
