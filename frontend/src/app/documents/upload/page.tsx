@@ -180,10 +180,14 @@ export default function BatchUploadPage() {
           filename_error: null
         }))
 
-      // Debug: Log keyword extraction
+      // Debug: Log keyword extraction and null safety
       states.forEach((state, idx) => {
         console.log(`File ${idx + 1} keywords:`, state.confirmed_keywords)
+        console.log(`File ${idx + 1} keywords type:`, typeof state.confirmed_keywords, Array.isArray(state.confirmed_keywords))
         console.log(`File ${idx + 1} analysis:`, state.analysis)
+        if (state.confirmed_keywords === null) {
+          console.error(`File ${idx + 1} ERROR: confirmed_keywords is null!`)
+        }
       })
 
       setUploadStates(states)
@@ -420,7 +424,15 @@ export default function BatchUploadPage() {
               <>
                 {/* File Review Cards */}
                 <div className="space-y-4">
-                  {uploadStates.map((state, index) => (
+                  {uploadStates.map((state, index) => {
+                    // Debug render-time state
+                    console.log(`[Render] File ${index + 1} state.analysis:`, state.analysis)
+                    console.log(`[Render] File ${index + 1} state.analysis type:`, typeof state.analysis)
+                    console.log(`[Render] File ${index + 1} state.analysis?.keywords:`, state.analysis?.keywords)
+                    console.log(`[Render] File ${index + 1} state.confirmed_keywords:`, state.confirmed_keywords)
+                    console.log(`[Render] File ${index + 1} confirmed_keywords type:`, typeof state.confirmed_keywords, Array.isArray(state.confirmed_keywords))
+
+                    return (
                     <Card key={index} className="p-4">
                       <div className="space-y-4">
                         {/* Header */}
@@ -428,7 +440,7 @@ export default function BatchUploadPage() {
                           <div className="flex-1">
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
                             <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                              {state.analysis.detected_language?.toUpperCase() || 'Unknown'} •
+                              {state.analysis?.detected_language?.toUpperCase() || 'Unknown'} •
                               {(state.analysis?.keywords && Array.isArray(state.analysis.keywords)) ? state.analysis.keywords.length : 0} keywords
                             </p>
                           </div>
@@ -585,7 +597,7 @@ export default function BatchUploadPage() {
                                     {keyword}
                                     <button
                                       onClick={() => {
-                                        const newKeywords = state.confirmed_keywords.filter((_, i) => i !== kidx)
+                                        const newKeywords = (state.confirmed_keywords || []).filter((_, i) => i !== kidx)
                                         updateFileState(index, {confirmed_keywords: newKeywords})
                                       }}
                                       className="ml-1 hover:text-red-600"
@@ -603,7 +615,8 @@ export default function BatchUploadPage() {
                         </div>
                       </div>
                     </Card>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {/* Batch Actions */}
