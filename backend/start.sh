@@ -14,29 +14,41 @@ export PYTHONMALLOC=malloc  # Use system malloc for better memory control
 start_clamav_lazy() {
     echo "[ClamAV] Initializing in background (lazy mode)..."
 
-    # Update database in background if needed
-    if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
-        echo "[ClamAV] No database found. Downloading in background..."
-        (
+    # Always start in a single background process
+    echo "[ClamAV] Starting initialization in background..."
+    (
+        # Update database if needed
+        if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
+            echo "[ClamAV] No database found. Downloading..."
             freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log
-            if [ $? -eq 0 ]; then
-                echo "[ClamAV] Database download complete. Starting daemon..."
-                clamd --config-file=/etc/clamav/clamd.conf 2>&1 | tee -a /var/log/clamav/clamav.log
-            else
+            if [ $? -ne 0 ]; then
                 echo "[ClamAV] Database download failed. ClamAV will not be available."
+                exit 1
             fi
-        ) &
-    else
-        echo "[ClamAV] Database exists. Starting daemon in background..."
-        (
-            # Start daemon first for faster availability
-            clamd --config-file=/etc/clamav/clamd.conf 2>&1 | tee -a /var/log/clamav/clamav.log &
+            echo "[ClamAV] Database download complete."
+        else
+            echo "[ClamAV] Database exists."
+        fi
 
-            # Update database in background (non-blocking)
-            sleep 5  # Give daemon time to start
-            freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || true
-        ) &
-    fi
+        # Start daemon (always, after database is ready)
+        echo "[ClamAV] Starting daemon..."
+        clamd --config-file=/etc/clamav/clamd.conf 2>&1 | tee -a /var/log/clamav/clamav.log &
+        CLAMD_PID=$!
+
+        # Give daemon time to start
+        sleep 2
+
+        # Check if daemon started successfully
+        if kill -0 $CLAMD_PID 2>/dev/null; then
+            echo "[ClamAV] Daemon started successfully (PID: $CLAMD_PID)"
+        else
+            echo "[ClamAV] Daemon failed to start"
+        fi
+
+        # Update database in background (non-blocking)
+        sleep 3
+        freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || true
+    ) &
 
     echo "[ClamAV] Background initialization started (non-blocking)"
 }
