@@ -235,7 +235,7 @@ class CategoryService:
             session.close()
 
     async def update_category(
-        self, 
+        self,
         category_id: str,
         user_id: str,
         user_email: str,
@@ -245,6 +245,7 @@ class CategoryService:
     ) -> Optional[CategoryResponse]:
         """
         Update category and/or translations
+        Note: OTHER category (category.other) cannot have its reference_key changed
         """
         session = db_manager.session_local()
         try:
@@ -253,12 +254,19 @@ class CategoryService:
                 .options(joinedload(Category.translations))
                 .where(Category.id == category_id)
             ).unique().scalar_one_or_none()
-            
+
             if not category:
                 return None
 
             if category.user_id and str(category.user_id) != user_id:
                 raise PermissionError("Cannot modify another user's category")
+
+            # Protect OTHER category from being renamed
+            if category.reference_key == 'category.other':
+                if category_data.translations:
+                    # Allow updating translations (colors, icons, descriptions) but prevent renaming
+                    logger.warning(f"Attempted to modify OTHER category, allowing limited updates only")
+                # Continue with limited updates (color, icon, sort_order, is_active)
 
             old_values = {
                 "reference_key": category.reference_key,
@@ -355,7 +363,7 @@ class CategoryService:
             session.close()
 
     async def delete_category(
-        self, 
+        self,
         category_id: str,
         user_id: str,
         user_email: str,
@@ -365,12 +373,17 @@ class CategoryService:
         """
         Delete category - works for both system and user categories
         Handles document reassignment or deletion
+        Note: OTHER category (category.other) cannot be deleted
         """
         session = db_manager.session_local()
         try:
             category = session.get(Category, category_id)
             if not category:
                 return None
+
+            # Protect OTHER category from deletion
+            if category.reference_key == 'category.other':
+                raise PermissionError("Cannot delete the OTHER category - it is required as a fallback category")
 
             if category.user_id and str(category.user_id) != user_id:
                 raise PermissionError("Cannot delete another user's category")

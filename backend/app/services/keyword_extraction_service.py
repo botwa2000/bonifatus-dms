@@ -113,7 +113,7 @@ class KeywordExtractionService:
         Tokenize text into words
         - Split on whitespace and punctuation
         - Keep words with letters
-        - Min length 2 characters
+        - Min length 3 characters (reduced noise from OCR errors)
 
         Args:
             text: Text to tokenize
@@ -121,7 +121,7 @@ class KeywordExtractionService:
         Returns:
             List of tokens
         """
-        tokens = re.findall(r'\b[a-zа-яäöüß]{2,}\b', text, re.IGNORECASE)
+        tokens = re.findall(r'\b[a-zа-яäöüß]{3,}\b', text, re.IGNORECASE)
         return tokens
 
     def filter_tokens(
@@ -132,6 +132,7 @@ class KeywordExtractionService:
     ) -> List[str]:
         """
         Filter tokens to remove stop words and apply length limit
+        Also filters likely OCR errors and low-quality tokens
 
         Args:
             tokens: List of tokens to filter
@@ -146,13 +147,24 @@ class KeywordExtractionService:
         for token in tokens:
             token_lower = token.lower()
 
+            # Skip stop words
             if token_lower in stop_words:
                 continue
 
+            # Skip too long (likely full sentences/OCR errors)
             if len(token) > max_length:
                 continue
 
+            # Skip pure numbers
             if re.match(r'^\d+$', token):
+                continue
+
+            # Skip tokens with excessive repeated characters (OCR noise: 'mmm', 'aaa')
+            if re.search(r'(.)\1{2,}', token_lower):
+                continue
+
+            # Skip tokens that are too short after validation (edge case safety)
+            if len(token) < 3:
                 continue
 
             filtered.append(token_lower)

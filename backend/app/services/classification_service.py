@@ -248,24 +248,69 @@ class ClassificationService:
 
         return top_category
 
+    def get_other_category(
+        self,
+        db: Session,
+        language: str = 'en'
+    ) -> Optional[Tuple[UUID, str, float, List[str]]]:
+        """
+        Get the OTHER category as a fallback
+
+        Args:
+            db: Database session
+            language: Language for category name
+
+        Returns:
+            Tuple of (category_id, category_name, 0.0, []) or None if OTHER category doesn't exist
+        """
+        try:
+            from app.database.models import Category, CategoryTranslation
+
+            other_category = db.query(Category).filter(
+                Category.reference_key == 'category.other'
+            ).first()
+
+            if not other_category:
+                logger.error("OTHER category not found in database")
+                return None
+
+            translation = db.query(CategoryTranslation).filter(
+                CategoryTranslation.category_id == other_category.id,
+                CategoryTranslation.language_code == language
+            ).first()
+
+            category_name = translation.name if translation else "Other"
+
+            logger.info(f"Falling back to OTHER category: {category_name}")
+            return (other_category.id, category_name, 0.0, [])
+
+        except Exception as e:
+            logger.error(f"Failed to get OTHER category: {e}")
+            return None
+
     def suggest_category(
         self,
         document_keywords: List[str],
         db: Session,
         language: str = 'en',
-        user_id: Optional[UUID] = None
+        user_id: Optional[UUID] = None,
+        fallback_to_other: bool = True
     ) -> Optional[Tuple[UUID, str, float, List[str]]]:
         """
         Suggest a primary category for a document
+        Falls back to OTHER category if no confident match is found (default behavior)
 
         Args:
             document_keywords: List of keywords from document
             db: Database session
             language: Document language
             user_id: User ID for custom categories
+            fallback_to_other: If True, return OTHER category when no confident match found
 
         Returns:
-            Tuple of (category_id, category_name, confidence, matched_keywords) or None
+            Tuple of (category_id, category_name, confidence, matched_keywords)
+            Returns OTHER category if no confident match and fallback_to_other=True
+            Returns None only if fallback_to_other=False or OTHER category doesn't exist
         """
         classification_results = self.classify_document(
             document_keywords,
@@ -278,10 +323,15 @@ class ClassificationService:
 
         if primary_category:
             logger.info(f"Suggested category: {primary_category[1]} ({primary_category[2]:.1%} confidence)")
-        else:
-            logger.info("No category suggestion (low confidence or ambiguous)")
+            return primary_category
 
-        return primary_category
+        # No confident match found
+        logger.info("No confident category match found")
+
+        if fallback_to_other:
+            return self.get_other_category(db, language)
+
+        return None
 
 
 classification_service = ClassificationService()
