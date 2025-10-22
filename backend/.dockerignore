@@ -1,0 +1,46 @@
+# Python cache
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+test_*.py
+tmp/
+temp/
+
+# Documentation
+README.md
+docs/
+
+# Git
+.git
+.gitignore

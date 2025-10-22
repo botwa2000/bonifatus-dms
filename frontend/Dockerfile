@@ -16,9 +16,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Accept build argument for API URL
+# Accept build arguments
 ARG NEXT_PUBLIC_API_URL
+ARG BUILD_ID=unknown
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_BUILD_ID=$BUILD_ID
 
 # Debug: Verify the value is set
 RUN echo "Building with NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}"
