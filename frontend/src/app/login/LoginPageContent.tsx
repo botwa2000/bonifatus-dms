@@ -6,24 +6,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
 
-// Global singleton to prevent duplicate OAuth processing across component re-renders
-let globalOAuthProcessing = false
-
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [isProcessing, setIsProcessing] = useState(true) // Start as true to show loading
+  const [isProcessing, setIsProcessing] = useState(true)
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Global singleton pattern - prevents duplicate processing in React StrictMode
-      if (globalOAuthProcessing) {
-        console.log('[OAuth] Already processing, skipping duplicate')
-        return
-      }
-      globalOAuthProcessing = true
-
       try {
         const code = searchParams.get('code')
         const state = searchParams.get('state')
@@ -47,14 +37,12 @@ export default function LoginPageContent() {
         console.log('[OAuth] Processing authorization code...')
 
         // Exchange authorization code for JWT tokens
-        // Backend returns user data, avoiding a second API call
         const result = await authService.exchangeGoogleToken(code, state)
 
         console.log('[OAuth] Exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
 
         if (result.success && result.user) {
-          // Use Next.js router for instant client-side navigation
-          // User data is already cached in localStorage
+          // Redirect to dashboard
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[OAuth] Success! Redirecting to:', redirectUrl)
           router.push(redirectUrl)
@@ -71,8 +59,7 @@ export default function LoginPageContent() {
     }
 
     handleOAuthCallback()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Run only once on mount - searchParams doesn't change
+  }, [searchParams, router])
 
   // Show error page
   if (error) {

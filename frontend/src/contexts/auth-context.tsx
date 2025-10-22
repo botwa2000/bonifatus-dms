@@ -19,15 +19,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Global singleton to prevent multiple auth initializations across page prefetches
-let globalAuthInitialized = false
-let globalInitPromise: Promise<User | null> | null = null
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // Initialize state from localStorage synchronously to prevent race conditions
-  // This ensures dashboard doesn't redirect before auth context loads
+  // Initialize state from localStorage synchronously
   const getInitialUser = () => {
     if (typeof window === 'undefined') return null
     try {
@@ -40,115 +35,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const initialUser = getInitialUser()
 
-  // Only show loading state for protected routes without cached user data
   const [user, setUser] = useState<User | null>(initialUser)
   const [isAuthenticated, setIsAuthenticated] = useState(!!initialUser)
   const [isLoading, setIsLoading] = useState(isProtectedRoute(pathname || '/') && !initialUser)
   const [error, setError] = useState<string | null>(null)
-  const initPromiseRef = useRef<Promise<void> | null>(null)
   const initializedRef = useRef(false)
   const mountedRef = useRef(true)
 
-  // Initialize auth ONCE globally (survives prefetch renders)
   useEffect(() => {
-    // If already initialized, just update state from cached data
-    if (globalAuthInitialized && globalInitPromise) {
-      globalInitPromise.then(cachedUser => {
-        if (mountedRef.current) {
-          setUser(cachedUser)
-          setIsAuthenticated(!!cachedUser)
-          setIsLoading(false)
-        }
-      }).catch(() => {
-        if (mountedRef.current) {
-          setIsLoading(false)
-        }
-      })
-      return
-    }
-
     if (initializedRef.current) {
       return
     }
-
-    mountedRef.current = true
     initializedRef.current = true
-    globalAuthInitialized = true
 
     const initialize = async () => {
       const currentPath = pathname || '/'
 
       if (!isProtectedRoute(currentPath)) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
+
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser)
+            setUser(userData)
+            setIsAuthenticated(true)
+            setIsLoading(false)
+
+            // Background refresh
+            authService.getCurrentUser().catch(() => {
+              if (mountedRef.current) {
+                setUser(null)
+                setIsAuthenticated(false)
+              }
+            })
+            return
+          } catch {
+            localStorage.removeItem('user')
+          }
+        }
+
+        // Fetch current user from API
+        const currentUser = await authService.getCurrentUser()
+
         if (mountedRef.current) {
+          setUser(currentUser)
+          setIsAuthenticated(!!currentUser)
           setIsLoading(false)
         }
-        return
-      }
-
-      if (globalInitPromise) {
-        try {
-          const cachedUser = await globalInitPromise
-          if (mountedRef.current) {
-            setUser(cachedUser)
-            setIsAuthenticated(!!cachedUser)
-            setIsLoading(false)
-          }
-        } catch {
-          if (mountedRef.current) {
-            setIsLoading(false)
-          }
+      } catch {
+        if (mountedRef.current) {
+          setUser(null)
+          setIsAuthenticated(false)
+          setIsLoading(false)
         }
-        return
       }
-
-      globalInitPromise = (async () => {
-        try {
-          const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
-
-          if (storedUser) {
-            try {
-              const userData = JSON.parse(storedUser)
-              if (mountedRef.current) {
-                setUser(userData)
-                setIsAuthenticated(true)
-                setIsLoading(false)
-              }
-
-              // Background refresh - don't wait for it
-              authService.getCurrentUser().catch(() => {
-                if (mountedRef.current) {
-                  setUser(null)
-                  setIsAuthenticated(false)
-                }
-              })
-
-              return userData
-            } catch {
-              localStorage.removeItem('user')
-            }
-          }
-
-          // Fetch current user from API
-          const currentUser = await authService.getCurrentUser()
-
-          if (mountedRef.current) {
-            setUser(currentUser)
-            setIsAuthenticated(!!currentUser)
-            setIsLoading(false)
-          }
-
-          return currentUser
-        } catch {
-          if (mountedRef.current) {
-            setUser(null)
-            setIsAuthenticated(false)
-            setIsLoading(false)
-          }
-          return null
-        }
-      })()
-
-      await globalInitPromise
     }
 
     initialize()
@@ -156,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, [])
+  }, [pathname])
 
   const initializeGoogleAuth = useCallback(async () => {
     try {
