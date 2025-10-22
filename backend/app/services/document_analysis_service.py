@@ -79,14 +79,26 @@ class DocumentAnalysisService:
 
             # Filter and validate keywords before creating response
             validated_keywords = []
-            for kw in keywords[:20]:
+            for idx, kw in enumerate(keywords[:20]):
                 if not kw or len(kw) != 3:
-                    logger.warning(f"Skipping invalid keyword tuple: {kw}")
+                    logger.warning(f"Skipping invalid keyword tuple at index {idx}: kw={repr(kw)}, type={type(kw).__name__}, len={len(kw) if kw else 'N/A'}")
                     continue
-                if not kw[0] or not isinstance(kw[0], str) or len(kw[0].strip()) == 0:
-                    logger.warning(f"Skipping keyword with invalid word: {kw}")
+
+                word, count, relevance = kw[0], kw[1], kw[2]
+
+                if not word or not isinstance(word, str) or len(word.strip()) == 0:
+                    logger.warning(f"Skipping keyword at index {idx} with invalid word: word={repr(word)}, type={type(word).__name__ if word is not None else 'NoneType'}, count={count}, relevance={relevance}")
                     continue
-                validated_keywords.append({'word': kw[0], 'count': kw[1], 'relevance': kw[2]})
+
+                if count is None or not isinstance(count, int) or count < 1:
+                    logger.warning(f"Skipping keyword at index {idx} '{word}' with invalid count: count={repr(count)}, type={type(count).__name__ if count is not None else 'NoneType'}, relevance={relevance}")
+                    continue
+
+                if relevance is None or not isinstance(relevance, (int, float)):
+                    logger.warning(f"Skipping keyword at index {idx} '{word}' with invalid relevance: relevance={repr(relevance)}, type={type(relevance).__name__ if relevance is not None else 'NoneType'}, count={count}")
+                    continue
+
+                validated_keywords.append({'word': word, 'count': count, 'relevance': relevance})
 
             logger.info(f"Validated {len(validated_keywords)}/20 keywords for response")
 

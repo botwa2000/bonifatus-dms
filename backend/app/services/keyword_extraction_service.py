@@ -205,10 +205,21 @@ class KeywordExtractionService:
 
             keywords = []
             for word, count in frequency.most_common(max_keywords):
-                if count < min_frequency:
+                # Defensive validation with detailed logging
+                if not word or not isinstance(word, str):
+                    logger.warning(f"Skipping keyword with invalid word: word={repr(word)}, type={type(word).__name__}, count={count}")
+                    continue
+
+                if count is None or not isinstance(count, int) or count < min_frequency:
+                    logger.warning(f"Skipping keyword '{word}' with invalid count: count={repr(count)}, type={type(count).__name__ if count is not None else 'NoneType'}, min_required={min_frequency}")
                     continue
 
                 relevance = (count / max_freq) * 100
+
+                # Defensive check: ensure relevance calculation succeeded
+                if relevance is None or not isinstance(relevance, (int, float)):
+                    logger.warning(f"Skipping keyword '{word}' with invalid relevance: relevance={repr(relevance)}, type={type(relevance).__name__ if relevance is not None else 'NoneType'}, count={count}, max_freq={max_freq}")
+                    continue
 
                 keywords.append((word, count, relevance))
 
