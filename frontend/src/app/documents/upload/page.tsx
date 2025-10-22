@@ -534,6 +534,9 @@ export default function BatchUploadPage() {
                           <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-60 overflow-y-auto">
                             <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
                               {categories.map((category, catIdx) => {
+                                // Log each category being rendered
+                                console.log(`[Render] Category ${catIdx}:`, category)
+
                                 // Defensive validation
                                 if (!category || typeof category !== 'object') {
                                   console.error(`[Render] Invalid category at index ${catIdx}:`, category, typeof category)
@@ -548,8 +551,11 @@ export default function BatchUploadPage() {
                                   return null
                                 }
 
+                                console.log(`[Render] Category ${catIdx} passed validation, isSelected check starting`)
                                 const isSelected = state.selected_categories.includes(category.id)
+                                console.log(`[Render] Category ${catIdx} isSelected=${isSelected}, checking isPrimary`)
                                 const isPrimary = state.primary_category === category.id
+                                console.log(`[Render] Category ${catIdx} isPrimary=${isPrimary}, about to return JSX`)
 
                                 return (
                                   <div
