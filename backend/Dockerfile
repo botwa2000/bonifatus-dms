@@ -43,7 +43,8 @@ RUN apt-get update \
 
 # Configure ClamAV with memory-optimized settings
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
-    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav
+    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav \
+    && chmod 755 /var/run/clamav /var/lib/clamav /var/log/clamav
 
 # Copy optimized ClamAV configurations
 COPY clamd.conf /etc/clamav/clamd.conf
