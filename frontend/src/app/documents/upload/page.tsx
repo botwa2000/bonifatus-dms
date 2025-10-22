@@ -431,6 +431,10 @@ export default function BatchUploadPage() {
                     console.log(`[Render] File ${index + 1} state.analysis?.keywords:`, state.analysis?.keywords)
                     console.log(`[Render] File ${index + 1} state.confirmed_keywords:`, state.confirmed_keywords)
                     console.log(`[Render] File ${index + 1} confirmed_keywords type:`, typeof state.confirmed_keywords, Array.isArray(state.confirmed_keywords))
+                    console.log(`[Render] File ${index + 1} state.selected_categories:`, state.selected_categories)
+                    console.log(`[Render] File ${index + 1} selected_categories type:`, typeof state.selected_categories, Array.isArray(state.selected_categories))
+                    console.log(`[Render] Categories array length:`, categories.length)
+                    console.log(`[Render] Categories array:`, categories)
 
                     return (
                     <Card key={index} className="p-4">
@@ -529,10 +533,24 @@ export default function BatchUploadPage() {
                           {/* Category Search/List */}
                           <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-60 overflow-y-auto">
                             <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
-                              {categories.map(category => {
+                              {categories.map((category, catIdx) => {
+                                // Defensive validation
+                                if (!category || typeof category !== 'object') {
+                                  console.error(`[Render] Invalid category at index ${catIdx}:`, category, typeof category)
+                                  return null
+                                }
+                                if (!category.id || typeof category.id !== 'string') {
+                                  console.error(`[Render] Invalid category.id at index ${catIdx}:`, category.id, typeof category.id)
+                                  return null
+                                }
+                                if (!category.name || typeof category.name !== 'string') {
+                                  console.error(`[Render] Invalid category.name at index ${catIdx}:`, category.name, typeof category.name)
+                                  return null
+                                }
+
                                 const isSelected = state.selected_categories.includes(category.id)
                                 const isPrimary = state.primary_category === category.id
-                                
+
                                 return (
                                   <div
                                     key={category.id}
