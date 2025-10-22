@@ -60,7 +60,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy application code
 COPY app/ ./app/
-COPY test_config.py ./
 
 # Copy startup script
 COPY start.sh /app/start.sh
@@ -69,7 +68,6 @@ COPY start.sh /app/start.sh
 RUN mkdir -p /app/logs /app/temp \
     && chown -R bonifatus:bonifatus /app \
     && chmod -R 755 /app \
-    && chmod +x test_config.py \
     && chmod +x /app/start.sh
 
 # Health check
