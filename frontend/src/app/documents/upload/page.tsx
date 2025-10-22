@@ -495,9 +495,16 @@ export default function BatchUploadPage() {
                               <div className="flex flex-wrap gap-2">
                                 {state.selected_categories.map(catId => {
                                   const cat = categories.find(c => c.id === catId)
-                                  if (!cat) return null
+                                  if (!cat) {
+                                    console.warn(`[Render] Category not found for ID: ${catId}`)
+                                    return null
+                                  }
+                                  if (!cat.name || typeof cat.name !== 'string') {
+                                    console.error(`[Render] Invalid category name for ID ${catId}:`, cat.name, typeof cat.name)
+                                    return null
+                                  }
                                   const isPrimary = state.primary_category === catId
-                                  
+
                                   return (
                                     <Badge
                                       key={catId}
@@ -588,7 +595,12 @@ export default function BatchUploadPage() {
                             <div className="flex flex-wrap gap-2">
                               {state.confirmed_keywords
                                 .filter(keyword => keyword && typeof keyword === 'string' && keyword.trim().length > 0)
-                                .map((keyword, kidx) => (
+                                .map((keyword, kidx) => {
+                                  // Debug: Log each keyword during render
+                                  if (!keyword || typeof keyword !== 'string') {
+                                    console.error(`[Render] Invalid keyword at filtered index ${kidx}:`, keyword, typeof keyword)
+                                  }
+                                  return (
                                   <Badge
                                     key={kidx}
                                     variant="default"
@@ -597,7 +609,8 @@ export default function BatchUploadPage() {
                                     {keyword}
                                     <button
                                       onClick={() => {
-                                        const newKeywords = (state.confirmed_keywords || []).filter((_, i) => i !== kidx)
+                                        // Use keyword value for removal, not index, to avoid mismatch after filtering
+                                        const newKeywords = (state.confirmed_keywords || []).filter(kw => kw !== keyword)
                                         updateFileState(index, {confirmed_keywords: newKeywords})
                                       }}
                                       className="ml-1 hover:text-red-600"
@@ -605,7 +618,8 @@ export default function BatchUploadPage() {
                                       ×
                                     </button>
                                   </Badge>
-                                ))}
+                                  )
+                                })}
                             </div>
                           ) : (
                             <p className="text-sm text-neutral-500 dark:text-neutral-400">
