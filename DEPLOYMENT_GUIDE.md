@@ -1,8 +1,9 @@
 # BoniDoc - Development & Deployment Guide
-Version: 13.0
-Last Updated: October 22, 2025
-Status: Phase 1 Complete | Phase 2A Complete (OCR) | Production Deployment Active
+Version: 14.0 - HETZNER MIGRATION
+Last Updated: October 23, 2025
+Status: Phase 1 Complete | Phase 2A Complete (OCR) | MIGRATED TO HETZNER VPS
 Domain: https://bonidoc.com
+Hosting: Hetzner VPS (Migrated from Google Cloud Run)
 
 ## Table of Contents
 
@@ -77,7 +78,7 @@ BoniDoc is a professional document management system that combines secure storag
 - OCR: PyMuPDF (native text) + Tesseract (scanned docs) with intelligent quality detection
 - Encryption: Fernet (AES-256) for field-level encryption
 - Migrations: Alembic
-- Deployment: Google Cloud Run (serverless)
+- Deployment: Docker containers on Hetzner VPS
 
 **Frontend**
 - Framework: Next.js 15 (React 18)
@@ -86,12 +87,15 @@ BoniDoc is a professional document management system that combines secure storag
 - State Management: React Context API
 - Authentication: JWT in httpOnly cookies
 
-**Infrastructure**
-- Platform: Google Cloud Run (Backend + Frontend containers)
-- CI/CD: GitHub Actions (automated deployment on push to main)
-- Region: us-central1
-- Domain: bonidoc.com with SSL/TLS
-- Monitoring: Google Cloud Logging + Monitoring
+**Infrastructure (MIGRATED TO HETZNER - October 23, 2025)**
+- Platform: **Hetzner VPS** running Ubuntu 24.04 LTS
+- Previous: Google Cloud Run (cost reduction: $25-50/mo → $5-10/mo = 60-80% savings)
+- Deployment: Docker Compose + Nginx reverse proxy
+- CI/CD: GitHub Actions → SSH deployment
+- Region: US or EU (configurable)
+- Domain: bonidoc.com with Let's Encrypt SSL/TLS
+- Monitoring: Docker logs + Dozzle web interface
+- Server: 2-4 vCPU, 2-4GB RAM, 40-80GB SSD
 
 ### 2.2 Database Architecture
 
@@ -829,14 +833,34 @@ Immutable Filename Strategy:
 
 ### 7.2 Deployment Process
 
-**Automated Deployment**
+**🔄 HETZNER VPS DEPLOYMENT (October 23, 2025)**
+
+For complete migration guide, see: **`HETZNER_MIGRATION_GUIDE.md`**
+
+**Automated Deployment (GitHub Actions → Hetzner)**
 ```
 1. Push code to main branch
 2. GitHub Actions triggers CI/CD pipeline
-3. Backend: Run tests → Build Docker image → Deploy to Cloud Run
-4. Frontend: Run tests → Build Next.js → Deploy to Cloud Run
-5. Completes in 3-5 minutes
+3. Backend: Run tests → Build Docker image
+4. Frontend: Run tests → Build Next.js
+5. SSH to Hetzner VPS
+6. Execute deployment script: ~/deploy.sh
+7. Script: Pull code → Rebuild containers → Restart services
+8. Completes in 5-8 minutes
 ```
+
+**Manual Deployment (on Hetzner server)**
+```bash
+ssh deploy@YOUR_SERVER_IP
+~/deploy.sh
+```
+
+The deploy script:
+- Pulls latest code from GitHub
+- Rebuilds Docker images
+- Stops containers
+- Starts containers with new code
+- Verifies health checks
 
 **Post-Deployment Verification**
 ```
@@ -844,6 +868,8 @@ Immutable Filename Strategy:
 2. Frontend health check: curl https://bonidoc.com
 3. Database check: Verify tables exist and migrations applied
 4. Smoke test: Login → Create category → Upload document → Logout
+5. Check logs: docker-compose logs -f
+6. Monitor resources: htop, docker stats
 ```
 
 ### 7.3 Performance Benchmarks
