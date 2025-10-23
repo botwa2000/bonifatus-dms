@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 drive-service-key.json
-drive-service-key.json
-.env
-__pycache__/
-*.pyc
+
+# Hetzner setup files with actual credentials (keep local only)
+HETZNER_SETUP_ACTUAL.md
+HETZNER_MIGRATION_GUIDE.md
