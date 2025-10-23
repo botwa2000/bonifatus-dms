@@ -34,10 +34,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
-# Fix: Ensure auth_service is properly initialized
-if not hasattr(auth_service, 'authenticate_with_google'):
-    logger.error("Auth service not properly initialized")
-    
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
 

@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
+    # CORS origins will be logged after middleware is configured
     # Startup
     logger.info(f"Starting {settings.app.app_title} v{settings.app.app_version}")
     logger.info(f"Environment: {settings.app.app_environment}")
     logger.info(f"Debug mode: {settings.app.app_debug_mode}")
     logger.info(f"Port: {os.getenv('PORT', 'not set')}")
-    logger.info(f"CORS origins: {settings.cors_origins_list}")
     
     try:
         from app.database.connection import init_database
@@ -74,19 +74,24 @@ app = FastAPI(
 )
 
 # CORS configuration - include both main domain and API subdomain
-cors_origins = settings.app.app_cors_origins
-if cors_origins == "*":
-    allowed_origins = ["*"]
-else:
-    base_origins = [origin.strip() for origin in cors_origins.split(",")]
+def build_allowed_origins(cors_config: str) -> list[str]:
+    """Build CORS allowed origins including API subdomain variants"""
+    if cors_config == "*":
+        return ["*"]
+
+    base_origins = [origin.strip() for origin in cors_config.split(",")]
     allowed_origins = []
-    
+
     for origin in base_origins:
         allowed_origins.append(origin)
         # Add api subdomain variant if not already present
         if "://" in origin and "api." not in origin:
             parts = origin.split("://")
             allowed_origins.append(f"{parts[0]}://api.{parts[1]}")
+
+    return allowed_origins
+
+allowed_origins = build_allowed_origins(settings.app.app_cors_origins)
 
 app.add_middleware(
     CORSMiddleware,

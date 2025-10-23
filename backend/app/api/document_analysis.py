@@ -147,13 +147,13 @@ async def confirm_upload(
     """
     try:
         # Check if temp file exists
-        if request.temp_id not in temp_storage:
+        if confirm_request.temp_id not in temp_storage:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Analysis result not found or expired"
             )
-        
-        temp_data = temp_storage[request.temp_id]
+
+        temp_data = temp_storage[confirm_request.temp_id]
         
         # Verify ownership
         if temp_data['user_id'] != str(current_user.id):
@@ -182,20 +182,20 @@ async def confirm_upload(
         
         # Complete upload with Google Drive storage
         result = await document_upload_service.confirm_upload(
-            temp_id=request.temp_id,
+            temp_id=confirm_request.temp_id,
             temp_data=temp_data,
-            title=request.title,
-            category_ids=request.category_ids,
-            confirmed_keywords=request.confirmed_keywords,
-            description=request.description,
+            title=confirm_request.title,
+            category_ids=confirm_request.category_ids,
+            confirmed_keywords=confirm_request.confirmed_keywords,
+            description=confirm_request.description,
             user_id=str(current_user.id),
             user_email=current_user.email,
             language_code=user_language,
             session=session
         )
-        
+
         # Remove from temporary storage
-        del temp_storage[request.temp_id]
+        del temp_storage[confirm_request.temp_id]
         
         logger.info(f"Document uploaded: {result['document_id']}")
         

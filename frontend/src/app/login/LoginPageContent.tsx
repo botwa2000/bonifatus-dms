@@ -1,7 +1,7 @@
 // frontend/src/app/login/LoginPageContent.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
@@ -11,9 +11,17 @@ export default function LoginPageContent() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(true)
+  const processingRef = useRef(false)
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      // Prevent duplicate calls (React 18 Strict Mode runs effects twice in dev)
+      if (processingRef.current) {
+        console.log('[OAuth] Already processing, skipping duplicate call')
+        return
+      }
+
+      processingRef.current = true
       try {
         const code = searchParams.get('code')
         const state = searchParams.get('state')
@@ -31,6 +39,7 @@ export default function LoginPageContent() {
           console.error('[OAuth] Error from Google:', errorParam)
           setError(`Authentication error: ${errorParam}`)
           setIsProcessing(false)
+          processingRef.current = false
           return
         }
 
@@ -46,15 +55,18 @@ export default function LoginPageContent() {
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[OAuth] Success! Redirecting to:', redirectUrl)
           router.push(redirectUrl)
+          // Don't reset processingRef on success - component will unmount during redirect
         } else {
           console.error('[OAuth] Exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
+          processingRef.current = false
         }
       } catch (err) {
         console.error('[OAuth] Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
+        processingRef.current = false
       }
     }
 
