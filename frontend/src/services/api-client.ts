@@ -102,14 +102,17 @@ export class ApiClient {
           requestConfig.body = JSON.stringify(data)
         }
 
-        console.log(`[API ${currentRequestId}] ${method} ${url} (attempt ${attempt + 1}/${maxRetries + 1})`)
+        // Only log first attempt to avoid spam
+        if (attempt === 0) {
+          console.log(`[API ${currentRequestId}] ${method} ${url} (attempt ${attempt + 1}/${maxRetries + 1})`)
+        }
 
         const response = await fetch(url, requestConfig)
         const responseHeaders = this.parseHeaders(response.headers)
-        
+
         let responseData: unknown
         const contentType = response.headers.get('content-type')
-        
+
         if (contentType?.includes('application/json')) {
           responseData = await response.json()
         } else {
@@ -118,9 +121,9 @@ export class ApiClient {
 
         const duration = Date.now() - startTime
 
-        // Only log non-401 responses or 401s on protected routes
+        // Only log errors and successful non-auth requests
         const isExpected401 = response.status === 401 && (endpoint.includes('/auth/me') || endpoint.includes('/auth/refresh'))
-        if (!isExpected401) {
+        if (!response.ok && !isExpected401) {
           console.log(`[API ${currentRequestId}] Response ${response.status} in ${duration}ms`)
         }
 
@@ -147,14 +150,20 @@ export class ApiClient {
 
       } catch (error) {
         lastError = error as Error
-        
+
         if (this.isRetriableError(error as Error) && attempt < maxRetries) {
-          console.warn(`[API ${currentRequestId}] Attempt ${attempt + 1} failed, retrying:`, (error as Error).message)
+          // Only log retries, not every attempt
+          if (attempt > 0) {
+            console.warn(`[API ${currentRequestId}] Retry ${attempt} failed, retrying:`, (error as Error).message)
+          }
           await this.delay(this.config.retryDelay * Math.pow(2, attempt))
           continue
         }
-        
-        console.error(`[API ${currentRequestId}] Request failed after ${attempt + 1} attempts:`, error)
+
+        // Only log final failure, not intermediate attempts
+        if (attempt === maxRetries) {
+          console.error(`[API ${currentRequestId}] Request failed after ${attempt + 1} attempts:`, error)
+        }
         throw this.normalizeError(error as Error)
       }
     }

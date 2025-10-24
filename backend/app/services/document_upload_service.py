@@ -73,17 +73,36 @@ class DocumentUploadService:
             original_filename = temp_data['file_name']
             mime_type = temp_data['mime_type']
             analysis_result = temp_data['analysis_result']
-            
+
+            # Determine primary category first to get category code for filename
+            if primary_category_id:
+                if primary_category_id not in category_ids:
+                    raise ValueError("Primary category must be in selected categories")
+                category_ids_ordered = [primary_category_id] + [
+                    cid for cid in category_ids if cid != primary_category_id
+                ]
+            else:
+                category_ids_ordered = category_ids
+
+            # Get category code for standardized filename
+            primary_cat_id = category_ids_ordered[0]
+            category_code_result = session.execute(
+                text("SELECT category_code FROM categories WHERE id = :cat_id"),
+                {'cat_id': primary_cat_id}
+            ).scalar()
+            category_code = category_code_result or 'OTH'
+
+            # Get document date for filename (or None to use current timestamp)
+            document_date = analysis_result.get('document_date')
+
             # Get standardized filename (user may have edited it)
             if custom_filename:
                 standardized_filename = custom_filename
-            elif 'standardized_filename' in temp_data:
-                standardized_filename = temp_data['standardized_filename']
             else:
                 standardized_filename = self._generate_standardized_filename(
                     original_filename=original_filename,
-                    title=title,
-                    language_code=language_code
+                    category_code=category_code,
+                    document_date=document_date
                 )
             
             # Validate filename length
@@ -120,18 +139,6 @@ class DocumentUploadService:
             if len(category_ids) > max_categories:
                 raise ValueError(f"Maximum {max_categories} categories allowed per document")
             
-            # Determine primary category
-            if primary_category_id:
-                if primary_category_id not in category_ids:
-                    raise ValueError("Primary category must be in selected categories")
-                # Reorder to put primary first
-                category_ids_ordered = [primary_category_id] + [
-                    cid for cid in category_ids if cid != primary_category_id
-                ]
-            else:
-                # First category is primary by default
-                category_ids_ordered = category_ids
-            
             # Validate categories exist and user has access
             for cat_id in category_ids_ordered:
                 cat_exists = session.execute(
@@ -163,6 +170,20 @@ class DocumentUploadService:
             # Create document record
             document_id = uuid.uuid4()
             
+            # Extract document date information
+            doc_date = analysis_result.get('document_date')  # ISO string
+            doc_date_type = analysis_result.get('document_date_type')
+            doc_date_confidence = analysis_result.get('document_date_confidence')
+
+            # Convert document_date from ISO string to date if available
+            doc_date_value = None
+            if doc_date:
+                try:
+                    from dateutil.parser import parse
+                    doc_date_value = parse(doc_date).date()
+                except:
+                    logger.warning(f"Failed to parse document_date: {doc_date}")
+
             logger.info(f"Creating document record: {document_id}")
             session.execute(
                 text("""
@@ -170,12 +191,14 @@ class DocumentUploadService:
                         id, user_id, title, description, filename, original_filename,
                         file_size, mime_type, file_hash, google_drive_file_id,
                         web_view_link, primary_language, processing_status,
+                        document_date, document_date_type, document_date_confidence,
                         is_duplicate, duplicate_of_document_id, batch_id,
                         created_at, updated_at
                     ) VALUES (
                         :id, :user_id, :title, :description, :filename, :original_filename,
                         :file_size, :mime_type, :file_hash, :google_drive_file_id,
                         :web_view_link, :primary_language, :processing_status,
+                        :document_date, :document_date_type, :document_date_confidence,
                         :is_duplicate, :duplicate_of, :batch_id,
                         :created_at, :updated_at
                     )
@@ -194,6 +217,9 @@ class DocumentUploadService:
                     'web_view_link': drive_result.get('web_view_link'),
                     'primary_language': language_code,
                     'processing_status': 'completed',
+                    'document_date': doc_date_value,
+                    'document_date_type': doc_date_type,
+                    'document_date_confidence': doc_date_confidence / 100.0 if doc_date_confidence else None,
                     'is_duplicate': duplicate is not None,
                     'duplicate_of': str(duplicate[0]) if duplicate else None,
                     'batch_id': batch_id,
@@ -336,37 +362,56 @@ class DocumentUploadService:
     def _generate_standardized_filename(
         self,
         original_filename: str,
-        title: str,
-        language_code: str
+        category_code: str,
+        document_date: Optional[str] = None
     ) -> str:
         """
         Generate standardized filename following naming convention
-        Pattern: {title}_{timestamp}.{ext}
-        Max length: 200 chars (safe for Windows/Mac/Linux)
+        Pattern: YYYYMMDD_HHMMSS_CategoryCode_OriginalName.ext
+        Example: 20251017_143022_TAX_invoice_2024.pdf
+
+        Args:
+            original_filename: Original uploaded filename
+            category_code: 3-letter category code (e.g. 'BNK', 'TAX', 'INS')
+            document_date: Extracted document date (ISO format) or None for current timestamp
+
+        Returns:
+            Standardized filename (max 200 chars)
         """
         # Extract file extension
         extension = original_filename.split('.')[-1] if '.' in original_filename else 'pdf'
-        
-        # Clean title (remove special chars, limit length)
-        clean_title = re.sub(r'[^\w\s-]', '', title)
-        clean_title = re.sub(r'\s+', '_', clean_title.strip())
-        
-        # Limit title to 150 chars (leaves room for timestamp + extension)
-        if len(clean_title) > 150:
-            clean_title = clean_title[:150]
-        
-        # Add timestamp
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-        
-        # Build filename: Title_YYYYMMDD_HHMMSS.ext
-        standardized = f"{clean_title}_{timestamp}.{extension}"
 
-        # Final safety check
-        if len(standardized) > 200:
-            # Truncate title further if needed
-            max_title_length = 200 - len(timestamp) - len(extension) - 3  # 3 for underscores and dot
-            clean_title = clean_title[:max_title_length]
-            standardized = f"{clean_title}_{timestamp}.{extension}"
+        # Clean original filename (remove extension and special chars)
+        clean_name = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+        clean_name = re.sub(r'[^\w\s-]', '', clean_name)
+        clean_name = re.sub(r'\s+', '_', clean_name.strip())
+
+        # Use document date if available, otherwise current timestamp
+        if document_date:
+            try:
+                from dateutil.parser import parse
+                doc_dt = parse(document_date)
+                date_prefix = doc_dt.strftime('%Y%m%d')
+                time_prefix = datetime.now(timezone.utc).strftime('%H%M%S')
+            except:
+                date_prefix = datetime.now(timezone.utc).strftime('%Y%m%d')
+                time_prefix = datetime.now(timezone.utc).strftime('%H%M%S')
+        else:
+            now = datetime.now(timezone.utc)
+            date_prefix = now.strftime('%Y%m%d')
+            time_prefix = now.strftime('%H%M%S')
+
+        # Calculate max length for original name component
+        # Format: YYYYMMDD_HHMMSS_CAT_name.ext
+        #         8 + 1 + 6 + 1 + 3 + 1 + name + 1 + ext = 21 + name + ext
+        fixed_length = len(date_prefix) + 1 + len(time_prefix) + 1 + len(category_code) + 1 + 1 + len(extension)
+        max_name_length = 200 - fixed_length
+
+        if len(clean_name) > max_name_length:
+            clean_name = clean_name[:max_name_length]
+
+        # Build filename: YYYYMMDD_HHMMSS_CategoryCode_OriginalName.ext
+        standardized = f"{date_prefix}_{time_prefix}_{category_code}_{clean_name}.{extension}"
 
         return standardized
 

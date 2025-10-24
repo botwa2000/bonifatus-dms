@@ -52,14 +52,14 @@ export default function SettingsPage() {
     try {
       const [prefsData, sysData] = await Promise.all([
         apiClient.get<UserPreferences>('/api/v1/users/preferences', true),
-        apiClient.get<{ settings: SystemSettings }>('/api/v1/settings/public', false)
+        apiClient.get<{ settings: SystemSettings }>('/api/v1/settings', false)
       ])
-      
+
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
     } catch (error) {
-      console.error('Failed to load settings:', error)
-      setMessage({ type: 'error', text: 'Failed to load settings' })
+      // Error already logged by API client, just show user message
+      setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
     }
   }
 
@@ -82,8 +82,8 @@ export default function SettingsPage() {
         }, 1500)
       }
     } catch (error) {
-      console.error('Failed to save settings:', error)
-      setMessage({ type: 'error', text: 'Failed to save settings' })
+      // Error already logged by API client
+      setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
     } finally {
       setSaving(false)
     }
