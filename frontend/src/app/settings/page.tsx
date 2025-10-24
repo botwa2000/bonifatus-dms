@@ -23,13 +23,22 @@ interface SystemSettings {
   default_language: string
 }
 
+interface DriveStatus {
+  connected: boolean
+  email: string | null
+  connected_at: string | null
+  token_expires_at: string | null
+}
+
 export default function SettingsPage() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
+  const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null)
   const [saving, setSaving] = useState(false)
+  const [driveLoading, setDriveLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   useEffect(() => {
@@ -50,13 +59,15 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const [prefsData, sysData] = await Promise.all([
+      const [prefsData, sysData, driveData] = await Promise.all([
         apiClient.get<UserPreferences>('/api/v1/users/preferences', true),
-        apiClient.get<{ settings: SystemSettings }>('/api/v1/settings', false)
+        apiClient.get<{ settings: SystemSettings }>('/api/v1/settings', false),
+        apiClient.get<DriveStatus>('/api/v1/users/drive/status', true)
       ])
 
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
+      setDriveStatus(driveData)
     } catch (error) {
       // Error already logged by API client, just show user message
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
@@ -99,6 +110,39 @@ export default function SettingsPage() {
     }
   }
 
+  const handleConnectDrive = async () => {
+    setDriveLoading(true)
+    try {
+      // Redirect to backend OAuth endpoint
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/users/drive/connect`
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to initiate Drive connection' })
+      setDriveLoading(false)
+    }
+  }
+
+  const handleDisconnectDrive = async () => {
+    if (!confirm('Are you sure you want to disconnect Google Drive? Your documents will remain in Drive.')) {
+      return
+    }
+
+    setDriveLoading(true)
+    setMessage(null)
+
+    try {
+      await apiClient.post('/api/v1/users/drive/disconnect', {}, true)
+      setMessage({ type: 'success', text: 'Google Drive disconnected successfully' })
+
+      // Reload Drive status
+      const driveData = await apiClient.get<DriveStatus>('/api/v1/users/drive/status', true)
+      setDriveStatus(driveData)
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to disconnect Drive. Please try again.' })
+    } finally {
+      setDriveLoading(false)
+    }
+  }
+
   const ToggleSwitch = ({ enabled, onChange, label, description }: {
     enabled: boolean
     onChange: () => void
@@ -126,7 +170,7 @@ export default function SettingsPage() {
     </div>
   )
 
-  if (isLoading || !preferences || !systemSettings) {
+  if (isLoading || !preferences || !systemSettings || !driveStatus) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
         <div className="text-center">
@@ -234,6 +278,70 @@ export default function SettingsPage() {
                 label="AI Auto-Categorization"
                 description="Automatically suggest categories for uploaded documents"
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Cloud Storage" />
+            <CardContent>
+              {driveStatus.connected ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        <svg className="h-10 w-10 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">Google Drive Connected</p>
+                        <p className="text-xs text-neutral-500">{driveStatus.email}</p>
+                        {driveStatus.connected_at && (
+                          <p className="text-xs text-neutral-400">
+                            Connected {new Date(driveStatus.connected_at).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleDisconnectDrive}
+                      disabled={driveLoading}
+                    >
+                      {driveLoading ? 'Disconnecting...' : 'Disconnect'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-neutral-500">
+                    Your documents are automatically saved to Google Drive with full version history and sharing capabilities.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        <svg className="h-10 w-10 text-neutral-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-neutral-900">Connect Google Drive</p>
+                        <p className="text-xs text-neutral-500">Store your documents securely in the cloud</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={handleConnectDrive}
+                      disabled={driveLoading}
+                    >
+                      {driveLoading ? 'Connecting...' : 'Connect'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-neutral-500">
+                    Connect your Google Drive to automatically sync and backup your documents with version control and easy sharing.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

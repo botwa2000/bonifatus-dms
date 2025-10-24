@@ -5,10 +5,11 @@ REST API for user profile operations and settings management
 """
 
 import logging
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Dict
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from urllib.parse import urlencode
 
 from app.schemas.user_schemas import (
     UserProfileUpdate, UserProfileResponse, UserStatistics,
@@ -18,6 +19,7 @@ from app.schemas.user_schemas import (
 from app.services.user_service import user_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -351,6 +353,213 @@ async def deactivate_user_account(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to deactivate user account"
+        )
+
+
+@router.get(
+    "/drive/status",
+    responses={
+        200: {"description": "Drive connection status"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_drive_status(
+    current_user: User = Depends(get_current_active_user)
+) -> Dict:
+    """
+    Get Google Drive connection status for current user
+
+    Returns connection status, connected email, and permissions info
+    """
+    try:
+        status_data = {
+            "connected": current_user.google_drive_enabled,
+            "email": current_user.email if current_user.google_drive_enabled else None,
+            "connected_at": current_user.drive_permissions_granted_at.isoformat() if current_user.drive_permissions_granted_at else None,
+            "token_expires_at": current_user.drive_token_expires_at.isoformat() if current_user.drive_token_expires_at else None
+        }
+
+        logger.info(f"Drive status retrieved for user: {current_user.email}")
+        return status_data
+
+    except Exception as e:
+        logger.error(f"Get drive status error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to retrieve Drive status"
+        )
+
+
+@router.get(
+    "/drive/connect",
+    responses={
+        302: {"description": "Redirect to Google OAuth for Drive permissions"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "OAuth initialization failed"}
+    }
+)
+async def connect_google_drive(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Initiate Google OAuth flow for Drive permissions
+
+    Redirects user to Google OAuth with Drive API scope
+    """
+    try:
+        # Build Google OAuth URL with Drive scope
+        oauth_params = {
+            "client_id": settings.google.google_client_id,
+            "redirect_uri": f"{settings.app.frontend_url}/settings/drive/callback",
+            "response_type": "code",
+            "scope": "https://www.googleapis.com/auth/drive.file",  # Drive file scope
+            "access_type": "offline",  # Get refresh token
+            "prompt": "consent",  # Force consent to get refresh token
+            "state": str(current_user.id),  # User ID for callback
+            "login_hint": current_user.email  # Pre-fill email
+        }
+
+        oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(oauth_params)}"
+
+        logger.info(f"Redirecting to Google Drive OAuth for user: {current_user.email}")
+        return RedirectResponse(url=oauth_url, status_code=status.HTTP_302_FOUND)
+
+    except Exception as e:
+        logger.error(f"Drive OAuth initialization failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OAuth initialization failed"
+        )
+
+
+@router.post(
+    "/drive/callback",
+    responses={
+        200: {"description": "Drive connection successful"},
+        400: {"model": ErrorResponse, "description": "Invalid OAuth code"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def drive_oauth_callback(
+    code: str,
+    state: str,
+    request: Request,
+    current_user: User = Depends(get_current_active_user)
+) -> Dict:
+    """
+    Complete Google Drive OAuth flow and store refresh token
+
+    Exchanges OAuth code for tokens and saves refresh token for Drive API access
+    """
+    try:
+        # Verify state matches user ID
+        if state != str(current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OAuth state"
+            )
+
+        # Exchange code for tokens
+        from google.oauth2.credentials import Credentials
+        from google_auth_oauthlib.flow import Flow
+
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": settings.google.google_client_id,
+                    "client_secret": settings.google.google_client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [f"{settings.app.frontend_url}/settings/drive/callback"]
+                }
+            },
+            scopes=["https://www.googleapis.com/auth/drive.file"]
+        )
+
+        flow.redirect_uri = f"{settings.app.frontend_url}/settings/drive/callback"
+        flow.fetch_token(code=code)
+
+        credentials = flow.credentials
+
+        # Store encrypted refresh token
+        from app.core.security import encrypt_token
+        encrypted_token = encrypt_token(credentials.refresh_token)
+
+        # Update user record
+        from app.database.connection import db_manager
+        session = db_manager.session_local()
+        try:
+            user = session.query(User).filter(User.id == current_user.id).first()
+            user.drive_refresh_token_encrypted = encrypted_token
+            user.drive_token_expires_at = credentials.expiry
+            user.google_drive_enabled = True
+            user.drive_permissions_granted_at = datetime.now(timezone.utc)
+            session.commit()
+
+            logger.info(f"Drive connected successfully for user: {current_user.email}")
+
+            return {
+                "success": True,
+                "message": "Google Drive connected successfully",
+                "connected_at": user.drive_permissions_granted_at.isoformat()
+            }
+        finally:
+            session.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Drive OAuth callback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to connect Google Drive"
+        )
+
+
+@router.post(
+    "/drive/disconnect",
+    responses={
+        200: {"description": "Drive disconnected successfully"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def disconnect_google_drive(
+    request: Request,
+    current_user: User = Depends(get_current_active_user)
+) -> Dict:
+    """
+    Disconnect Google Drive and revoke access
+
+    Clears stored refresh token and disables Drive integration
+    """
+    try:
+        from app.database.connection import db_manager
+        session = db_manager.session_local()
+        try:
+            user = session.query(User).filter(User.id == current_user.id).first()
+            user.drive_refresh_token_encrypted = None
+            user.drive_token_expires_at = None
+            user.google_drive_enabled = False
+            user.drive_permissions_granted_at = None
+            session.commit()
+
+            logger.info(f"Drive disconnected for user: {current_user.email}")
+
+            return {
+                "success": True,
+                "message": "Google Drive disconnected successfully"
+            }
+        finally:
+            session.close()
+
+    except Exception as e:
+        logger.error(f"Drive disconnect error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to disconnect Google Drive"
         )
 
 
