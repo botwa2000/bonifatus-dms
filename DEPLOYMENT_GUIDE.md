@@ -837,7 +837,95 @@ Immutable Filename Strategy:
 
 For complete migration guide, see: **`HETZNER_MIGRATION_GUIDE.md`**
 
-**Automated Deployment (GitHub Actions → Hetzner)**
+#### Claude Code Remote Server Access
+
+When working with Claude Code, it can execute commands directly on the remote Hetzner server via SSH. This requires proper SSH key configuration on your local machine.
+
+**Prerequisites:**
+1. SSH keys must be configured between your local machine and the Hetzner server
+2. The local machine where Claude Code runs must have SSH access to `deploy@YOUR_SERVER_IP`
+3. Server credentials stored in `HETZNER_SETUP_ACTUAL.md` (not committed to Git)
+
+**How Claude Code Accesses the Server:**
+
+Claude Code uses the Bash tool to execute SSH commands from your local machine:
+
+```bash
+# Example: Claude Code can run commands like this
+ssh deploy@YOUR_SERVER_IP "command_to_execute"
+
+# Check server status
+ssh deploy@YOUR_SERVER_IP "docker ps"
+
+# View logs
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && docker compose logs -f backend --tail=50"
+
+# Deploy updates
+ssh deploy@YOUR_SERVER_IP "~/deploy.sh"
+```
+
+**Setup SSH Access for Claude Code:**
+
+1. **Verify SSH Key Exists on Local Machine:**
+   ```bash
+   ls ~/.ssh/id_rsa
+   ls ~/.ssh/id_rsa.pub
+   ```
+
+2. **Test SSH Connection:**
+   ```bash
+   ssh deploy@YOUR_SERVER_IP "whoami"
+   # Should output: deploy
+   ```
+
+3. **If Connection Fails:**
+   - Ensure your SSH public key is in `/home/deploy/.ssh/authorized_keys` on server
+   - Check SSH config: `~/.ssh/config` (optional host alias)
+   - Verify firewall allows SSH (port 22)
+   - Check `HETZNER_SETUP_ACTUAL.md` for server IP and credentials
+
+**Common Claude Code Server Operations:**
+
+```bash
+# Check deployment status
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && docker compose ps"
+
+# View recent logs
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && docker compose logs --tail=100"
+
+# Check server resources
+ssh deploy@YOUR_SERVER_IP "free -h && df -h"
+
+# Restart services
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && docker compose restart"
+
+# Pull latest code
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && git pull"
+
+# Check environment variables (redacted)
+ssh deploy@YOUR_SERVER_IP "cd /opt/bonifatus-dms && cat .env | grep -E 'GOOGLE|DATABASE' | sed 's/=.*/=***REDACTED***/'"
+```
+
+**Security Notes:**
+- Never commit server credentials to Git
+- Store credentials in `HETZNER_SETUP_ACTUAL.md` (gitignored)
+- Use SSH keys instead of passwords
+- Limit SSH access to `deploy` user (non-root)
+- Claude Code only executes commands you approve
+
+**Workflow Example:**
+
+1. User: "Check if the backend is running on the server"
+2. Claude Code: Executes `ssh deploy@SERVER_IP "docker ps"`
+3. User: Approves or rejects the command
+4. Claude Code: Shows results and interprets status
+
+This allows Claude Code to help debug, deploy, and maintain the production server without requiring manual terminal work.
+
+---
+
+#### Automated Deployment (GitHub Actions → Hetzner)
+
 ```
 1. Push code to main branch
 2. GitHub Actions triggers CI/CD pipeline
@@ -849,13 +937,21 @@ For complete migration guide, see: **`HETZNER_MIGRATION_GUIDE.md`**
 8. Completes in 5-8 minutes
 ```
 
-**Manual Deployment (on Hetzner server)**
+#### Manual Deployment (on Hetzner server)
+
+**Method 1: Direct SSH**
 ```bash
 ssh deploy@YOUR_SERVER_IP
 ~/deploy.sh
 ```
 
-The deploy script:
+**Method 2: Via Claude Code**
+```bash
+# Claude Code can execute this from your local machine
+ssh deploy@YOUR_SERVER_IP "~/deploy.sh"
+```
+
+**The deploy script does:**
 - Pulls latest code from GitHub
 - Rebuilds Docker images
 - Stops containers

@@ -591,6 +591,76 @@ curl http://localhost:3000
 
 ## 6. SSL Certificate Setup
 
+**Note:** This guide provides two options for SSL setup:
+- **Option A**: Cloudflare Origin Certificate (Recommended - Used in production)
+- **Option B**: Let's Encrypt with Certbot (Alternative)
+
+### Option A: Cloudflare Origin Certificate (RECOMMENDED - PRODUCTION METHOD)
+
+This is the method used in the actual production deployment. Cloudflare handles public SSL/TLS, and an origin certificate secures traffic between Cloudflare and your server.
+
+**Benefits:**
+- Free unlimited SSL certificates
+- DDoS protection
+- CDN caching
+- Automatic renewals
+- No need to open port 80 for verification
+
+**Setup Steps:**
+
+1. **Get Cloudflare Origin Certificate**
+   - Log in to Cloudflare dashboard
+   - Select your domain (bonidoc.com)
+   - Go to SSL/TLS → Origin Server
+   - Click "Create Certificate"
+   - Leave defaults (15 year validity, RSA 2048, all hostnames)
+   - Click "Create"
+   - Copy the certificate and private key
+
+2. **Install Certificate on Server**
+   ```bash
+   # Create SSL directory
+   sudo mkdir -p /etc/ssl/cloudflare
+
+   # Create certificate file
+   sudo nano /etc/ssl/cloudflare/bonidoc.com.pem
+   # Paste the origin certificate, save and exit
+
+   # Create private key file
+   sudo nano /etc/ssl/cloudflare/bonidoc.com.key
+   # Paste the private key, save and exit
+
+   # Secure the files
+   sudo chmod 644 /etc/ssl/cloudflare/bonidoc.com.pem
+   sudo chmod 600 /etc/ssl/cloudflare/bonidoc.com.key
+   sudo chown root:root /etc/ssl/cloudflare/bonidoc.com.*
+   ```
+
+3. **Configure Cloudflare SSL Mode**
+   - In Cloudflare dashboard: SSL/TLS → Overview
+   - Set encryption mode to **"Full (strict)"**
+   - This ensures end-to-end encryption
+
+4. **Configure DNS** (must be done before Nginx)
+   - In Cloudflare dashboard: DNS → Records
+   - Add A records with proxy enabled (orange cloud):
+     - `@` → Your server IP (91.99.212.17)
+     - `www` → Your server IP
+     - `api` → Your server IP
+
+5. **Configure Nginx with Cloudflare Certificate**
+
+See section 6.1 below for Nginx configuration (use Cloudflare certificate paths).
+
+### Option B: Let's Encrypt with Certbot (ALTERNATIVE)
+
+If you prefer Let's Encrypt certificates instead of Cloudflare:
+- Follow the original guide in sections 6.1-6.4 below
+- Use Let's Encrypt certificate paths in Nginx config
+- Disable Cloudflare proxy (gray cloud) in DNS settings
+
+---
+
 ### 6.1 Configure Nginx as Reverse Proxy
 
 ```bash
