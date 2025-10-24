@@ -360,11 +360,25 @@ class DocumentUploadService:
         
         # Build filename: Title_YYYYMMDD_HHMMSS.ext
         standardized = f"{clean_title}_{timestamp}.{extension}"
-        
+
         # Final safety check
         if len(standardized) > 200:
             # Truncate title further if needed
             max_title_length = 200 - len(timestamp) - len(extension) - 3  # 3 for underscores and dot
+            clean_title = clean_title[:max_title_length]
+            standardized = f"{clean_title}_{timestamp}.{extension}"
+
+        return standardized
+
+    def _validate_filename(self, filename: str) -> bool:
+        """
+        Validate filename contains only safe characters
+        Allows: alphanumeric, underscore, hyphen, dot
+        """
+        import string
+        allowed_chars = string.ascii_letters + string.digits + '_-.'
+        return all(c in allowed_chars for c in filename)
+
 
 # Global instance
 document_upload_service = DocumentUploadService()
