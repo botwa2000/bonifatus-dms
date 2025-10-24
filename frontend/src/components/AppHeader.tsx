@@ -165,6 +165,7 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Mobile Navigation */}
