@@ -65,12 +65,8 @@ class TrustScoringService:
             # Factor 1: Account age (0 to +0.15)
             account_age_score = await self._score_account_age(user_info)
             score += account_age_score
-            
-            # Factor 2: Email verification (+0.1)
-            if user_info.get('email_verified'):
-                score += 0.1
-            
-            # Factor 3: Upload history (0 to +0.2)
+
+            # Factor 2: Upload history (0 to +0.2)
             upload_history_score = await self._score_upload_history(user_id, session)
             score += upload_history_score
             
@@ -116,10 +112,9 @@ class TrustScoringService:
         """Get basic user information"""
         result = session.execute(
             text("""
-                SELECT 
+                SELECT
                     email,
                     created_at,
-                    email_verified,
                     tier,
                     is_active
                 FROM users
@@ -127,16 +122,15 @@ class TrustScoringService:
             """),
             {'user_id': user_id}
         ).first()
-        
+
         if not result:
             return None
-        
+
         return {
             'email': result[0],
             'created_at': result[1],
-            'email_verified': result[2],
-            'tier': result[3],
-            'is_active': result[4]
+            'tier': result[2],
+            'is_active': result[3]
         }
     
     async def _score_account_age(self, user_info: Dict) -> float:
