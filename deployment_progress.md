@@ -2,6 +2,100 @@
 
 ## Chronological Log (Latest First)
 
+### 2025-10-24: Complete Migration to Hetzner - All Cloud Dependencies Removed
+**Status:** ✅ COMPLETED
+
+**Summary:** Completed full infrastructure migration from Google Cloud Run + Supabase to Hetzner VPS with local PostgreSQL 16. All cloud dependencies eliminated, documentation updated, GitHub Actions workflow disabled.
+
+**Migration Highlights:**
+
+**Database Migration:**
+- ✅ Migrated from Supabase to local PostgreSQL 16 on Hetzner
+- ✅ SSL encryption enabled with self-signed certificates
+- ✅ All 30 application tables created with clean migrations
+- ✅ Default system data populated (5 categories, 75 keywords, 15 translations)
+- ✅ Database size: ~5MB (efficient schema design)
+- ✅ Connection: host.docker.internal:5432 from Docker containers
+
+**Infrastructure Changes:**
+- ✅ Disabled Google Cloud Run deployment workflow (.github/workflows/deploy.yml.disabled)
+- ✅ Docker Compose deployment on Hetzner VPS
+- ✅ Nginx reverse proxy with Cloudflare Origin Certificate
+- ✅ Cloudflare DNS with Full (Strict) SSL mode
+- ✅ Backend: https://api.bonidoc.com (running on port 8080)
+- ✅ Frontend: https://bonidoc.com (running on port 3000)
+
+**Documentation Updates:**
+- ✅ README.md: Updated architecture diagram, infrastructure section, deployment instructions
+- ✅ DEPLOYMENT_GUIDE.md: Removed all Supabase references, updated to PostgreSQL 16
+- ✅ deployment_progress.md: Added complete migration summary (this entry)
+- ✅ HETZNER_SETUP_ACTUAL.md: Already up-to-date with database statistics
+- ✅ HETZNER_MIGRATION_GUIDE.md: Complete migration documentation exists
+
+**Cost Savings:**
+- Previous: Google Cloud Run (~$15-25/mo) + Supabase (~$25/mo) = **~$40-50/month**
+- Current: Hetzner CPX22 (~$7-8/mo) = **~$8/month**
+- **Savings: $32-42/month (80% reduction)**
+
+**Migration Files:**
+- ✅ backend/alembic/versions/001_initial_schema.py (creates all 30 tables)
+- ✅ backend/alembic/versions/002_populate_default_data.py (system defaults)
+- ✅ backend/alembic/versions_backup/ (19 old migrations preserved)
+- ✅ backend/app/database/models.py (all 30 tables defined)
+
+**Database Statistics:**
+```
+Tables: 30 (all application tables)
+Categories: 5 (Insurance, Legal, Real Estate, Banking, Other)
+Category Keywords: 75 (for ML classification)
+Translations: 15 (EN, DE, RU)
+Stop Words: 59 (for keyword filtering)
+N-gram Patterns: 10 (for phrase extraction)
+System Settings: 6 (theme, language, upload configs)
+```
+
+**Production Verification:**
+- ✅ Backend health check: https://api.bonidoc.com/health (200 OK)
+- ✅ Frontend accessible: https://bonidoc.com (200 OK)
+- ✅ Database connected with SSL encryption
+- ✅ OAuth login working correctly
+- ✅ Document classification ready (keywords populated)
+
+**Technical Implementation:**
+- PostgreSQL 16 with self-signed SSL certificate (sslmode=require)
+- Docker networking: host.docker.internal with extra_hosts configuration
+- Clean migration strategy: Drop and recreate database from scratch
+- No data loss: Started fresh with proper schema from day 1
+- No Supabase dependencies remaining in codebase
+
+**Files Modified:**
+- .github/workflows/deploy.yml → deploy.yml.disabled
+- README.md (architecture, infrastructure, deployment sections)
+- DEPLOYMENT_GUIDE.md (version 15.0, removed Supabase references)
+- deployment_progress.md (this entry)
+- backend/Dockerfile (Alembic files included)
+- backend/alembic/env.py (updated comments)
+- backend/app/database/connection.py (updated comments)
+
+**Commits:**
+- 06958a9: "feat: Complete database migration to local PostgreSQL with clean migrations"
+- 8895415: "chore: Remove old broken migration files and update database configs"
+- (pending): "docs: Complete Hetzner migration - remove all GCP/Supabase references"
+
+**Impact:**
+- ✅ 80% cost reduction (~$40/mo → ~$8/mo)
+- ✅ Full infrastructure control (no vendor lock-in)
+- ✅ Better performance (local database, no network latency)
+- ✅ Simplified architecture (single server, easier maintenance)
+- ✅ SSL encryption maintained (database + HTTPS)
+- ✅ Production-ready and scalable
+- ✅ Clean migration history for future deployments
+
+**Status:** Production system fully operational on Hetzner with local PostgreSQL 16. All cloud dependencies eliminated. Ready for testing and further development.
+
+---
+
+
 ### 2025-10-22: Intelligent OCR with Quality Detection & Category Protection
 **Status:** ✅ COMPLETED & DEPLOYED
 

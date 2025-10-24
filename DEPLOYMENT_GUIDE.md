@@ -1,9 +1,9 @@
 # BoniDoc - Development & Deployment Guide
-Version: 14.0 - HETZNER MIGRATION
-Last Updated: October 23, 2025
-Status: Phase 1 Complete | Phase 2A Complete (OCR) | MIGRATED TO HETZNER VPS
+Version: 15.0 - HETZNER PRODUCTION
+Last Updated: October 24, 2025
+Status: Phase 1 Complete | Phase 2A Complete (OCR) | PRODUCTION ON HETZNER VPS
 Domain: https://bonidoc.com
-Hosting: Hetzner VPS (Migrated from Google Cloud Run)
+Hosting: Hetzner VPS + Local PostgreSQL 16
 
 ## Table of Contents
 
@@ -72,7 +72,7 @@ BoniDoc is a professional document management system that combines secure storag
 
 **Backend**
 - Framework: FastAPI (Python 3.11+)
-- Database: PostgreSQL 15.x (Supabase hosted)
+- Database: PostgreSQL 16 (Local Hetzner with SSL)
 - Authentication: Google OAuth 2.0 + JWT with httpOnly cookies
 - Storage: Google Drive API (user-owned storage)
 - OCR: PyMuPDF (native text) + Tesseract (scanned docs) with intelligent quality detection
@@ -87,19 +87,22 @@ BoniDoc is a professional document management system that combines secure storag
 - State Management: React Context API
 - Authentication: JWT in httpOnly cookies
 
-**Infrastructure (MIGRATED TO HETZNER - October 23, 2025)**
+**Infrastructure (PRODUCTION ON HETZNER - October 24, 2025)**
 - Platform: **Hetzner VPS** running Ubuntu 24.04 LTS
-- Previous: Google Cloud Run (cost reduction: $25-50/mo → $5-10/mo = 60-80% savings)
+- Previous: Google Cloud Run + Supabase (cost reduction: ~$40/mo → ~$8/mo = 80% savings)
+- Database: PostgreSQL 16 (local installation with SSL encryption)
 - Deployment: Docker Compose + Nginx reverse proxy
-- CI/CD: GitHub Actions → SSH deployment
-- Region: US or EU (configurable)
-- Domain: bonidoc.com with Let's Encrypt SSL/TLS
-- Monitoring: Docker logs + Dozzle web interface
-- Server: 2-4 vCPU, 2-4GB RAM, 40-80GB SSD
+- CI/CD: Manual deployment (GitHub Actions disabled)
+- Region: Europe (Germany)
+- Domain: bonidoc.com with Cloudflare Origin Certificate (Full Strict SSL)
+- Monitoring: Docker logs + direct server access
+- Server: CPX22 (2 vCPU, 4GB RAM, 80GB SSD)
 
 ### 2.2 Database Architecture
 
-26 active tables organized in functional groups:
+**PostgreSQL 16 - Local Hetzner Installation with SSL**
+
+30 active tables organized in functional groups:
 
 **Authentication & Users (3 tables)**
 - users: User accounts with Google OAuth integration
@@ -490,10 +493,10 @@ Immutable Filename Strategy:
 - AuthContext with localStorage caching for performance
 
 **Infrastructure** (Production)
-- Google Cloud Run deployment (backend + frontend)
-- Supabase PostgreSQL database (26 tables)
-- GitHub Actions CI/CD pipeline
-- Alembic migrations (10 migrations, clean chain)
+- Hetzner VPS deployment (Docker + Nginx)
+- Local PostgreSQL 16 database (30 tables + SSL)
+- Manual deployment workflow
+- Alembic migrations (2 clean migrations: schema + data)
 - Google OAuth authentication
 - JWT-based session management
 

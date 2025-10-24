@@ -1,9 +1,9 @@
 # Bonifatus DMS - Production Document Management System
 
-[![Deploy to Cloud Run](https://github.com/botwa2000/bonifatus-dms/actions/workflows/deploy.yml/badge.svg)](https://github.com/botwa2000/bonifatus-dms/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-blue)](https://www.postgresql.org/)
 
 **Production URL:** [https://bonidoc.com](https://bonidoc.com)  
 **API Documentation:** [https://bonidoc.com/docs](https://bonidoc.com/docs)  
@@ -51,9 +51,9 @@ Bonifatus DMS is a **production-grade, AI-powered document management system** b
 ```
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
 │   Frontend       │    │   Backend API    │    │   Database       │
-│   Next.js 15.5   │◄──►│   FastAPI 0.104  │◄──►│   PostgreSQL 15  │
-│   React 18       │    │   Python 3.11    │    │   Supabase       │
-│   TypeScript     │    │   SQLAlchemy 2.0 │    │                  │
+│   Next.js 15.5   │◄──►│   FastAPI 0.104  │◄──►│  PostgreSQL 16   │
+│   React 18       │    │   Python 3.11    │    │  Local (Hetzner) │
+│   TypeScript     │    │   SQLAlchemy 2.0 │    │   SSL Encrypted  │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
@@ -91,17 +91,17 @@ Bonifatus DMS is a **production-grade, AI-powered document management system** b
 ```
 
 #### **Infrastructure**
-- **Hosting:** Google Cloud Run (us-central1)
-- **Database:** Supabase PostgreSQL (managed)
-- **CI/CD:** GitHub Actions
-- **DNS:** Google Cloud DNS  
-- **SSL:** Automatic via Cloud Run
+- **Hosting:** Hetzner VPS (Ubuntu 24.04 LTS)
+- **Database:** PostgreSQL 16 (Local with SSL)
+- **CI/CD:** GitHub Actions → SSH Deployment
+- **DNS:** Cloudflare (with proxy)
+- **SSL:** Cloudflare Origin Certificate (Full Strict)
 
 #### **Development Tools**
 - **IDE:** Visual Studio Code
 - **Version Control:** Git + GitHub
 - **API Testing:** Swagger UI (auto-generated)
-- **Database Client:** Supabase Dashboard
+- **Database Client:** psql / pgAdmin
 
 ---
 
@@ -113,14 +113,14 @@ Bonifatus DMS is a **production-grade, AI-powered document management system** b
 - Python 3.13.7 or higher
 - Node.js 22.14.0 or higher
 - Git 2.49.0 or higher
-- PostgreSQL access (Supabase account)
+- PostgreSQL 16+ (local installation)
 - Google Cloud project with OAuth credentials
 
 **For Production Deployment:**
 - GitHub account
-- Google Cloud Platform account
-- Supabase account
-- Domain name (optional)
+- Hetzner VPS account (or any Ubuntu 24.04 server)
+- Domain name with Cloudflare DNS
+- SSH access to deployment server
 
 ### **Local Development Setup**
 
@@ -157,8 +157,8 @@ cp .env.example .env
 
 **Backend .env Configuration:**
 ```bash
-# Database (Supabase)
-DATABASE_URL=postgresql+psycopg://user:pass@host:5432/db
+# Database (Local PostgreSQL or Remote)
+DATABASE_URL=postgresql://user:pass@host:5432/db
 
 # Security
 SECURITY_SECRET_KEY=generate-with-python-secrets
@@ -221,56 +221,45 @@ npm run dev
 
 ### **Production Deployment**
 
-#### **1. Setup Google Cloud**
+See **[HETZNER_MIGRATION_GUIDE.md](HETZNER_MIGRATION_GUIDE.md)** for complete deployment instructions.
 
+#### **Quick Deployment Overview**
+
+**1. Server Setup:**
+- Provision Hetzner VPS (2-4 vCPU, 4GB RAM, 80GB SSD)
+- Install Docker, Nginx, PostgreSQL 16
+- Configure Cloudflare DNS and SSL
+
+**2. Database Setup:**
+- Create PostgreSQL database with SSL
+- Run Alembic migrations
+- Populate default data
+
+**3. Application Deployment:**
 ```bash
-# Enable required APIs
-gcloud services enable run.googleapis.com \
-  cloudbuild.googleapis.com \
-  drive.googleapis.com
+# SSH to server
+ssh deploy@YOUR_SERVER_IP
 
-# Create service account
-gcloud iam service-accounts create bonifatus-deploy \
-  --description="Bonifatus DMS Deployment" \
-  --display-name="Bonifatus Deploy"
+# Clone repository
+cd /opt
+git clone https://github.com/YOUR_USERNAME/bonifatus-dms.git
 
-# Grant permissions
-gcloud projects add-iam-policy-binding YOUR-PROJECT-ID \
-  --member="serviceAccount:bonifatus-deploy@YOUR-PROJECT-ID.iam.gserviceaccount.com" \
-  --role="roles/run.admin"
+# Configure environment
+cp .env.example .env
+# Edit .env with production credentials
 
-# Generate service account key
-gcloud iam service-accounts keys create key.json \
-  --iam-account=bonifatus-deploy@YOUR-PROJECT-ID.iam.gserviceaccount.com
+# Build and deploy
+docker compose build
+docker compose up -d
 ```
 
-#### **2. Configure GitHub Secrets**
-
-Navigate to: `Repository Settings → Secrets and Variables → Actions`
-
-**Required Secrets:**
-
-| Secret Name | Description | How to Obtain |
-|-------------|-------------|---------------|
-| `DATABASE_URL` | PostgreSQL connection string | Supabase Dashboard → Settings → Database |
-| `SECURITY_SECRET_KEY` | JWT signing key | Generate with Python secrets module |
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID | Google Cloud Console → Credentials |
-| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 secret | Google Cloud Console → Credentials |
-| `GCP_SA_KEY` | Service account JSON key | Created in step 1 above |
-| `GCP_PROJECT` | Google Cloud project ID | Google Cloud Console |
-
-#### **3. Deploy**
-
+**4. Verify Deployment:**
 ```bash
-# Push to main branch triggers automatic deployment
-git push origin main
-
-# Monitor deployment
-# Visit: https://github.com/your-repo/actions
-
-# Verify deployment
-curl https://your-domain.com/health
+curl https://bonidoc.com/health
+curl https://api.bonidoc.com/health
 ```
+
+**Cost Savings:** ~$20-40/month vs Google Cloud Run + Supabase
 
 ---
 
@@ -330,7 +319,7 @@ GET    /api/v1/documents/{id}/download - Download document
 
 ## 🗄️ Database Schema
 
-### **Core Tables (20 Total)**
+### **Core Tables (30 Total - PostgreSQL 16)**
 
 #### **Authentication & Users**
 - `users` - User accounts and profiles
