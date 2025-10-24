@@ -446,17 +446,6 @@ export default function BatchUploadPage() {
                 {/* File Review Cards */}
                 <div className="space-y-4">
                   {uploadStates.map((state, index) => {
-                    // Debug render-time state
-                    console.log(`[Render] File ${index + 1} state.analysis:`, state.analysis)
-                    console.log(`[Render] File ${index + 1} state.analysis type:`, typeof state.analysis)
-                    console.log(`[Render] File ${index + 1} state.analysis?.keywords:`, state.analysis?.keywords)
-                    console.log(`[Render] File ${index + 1} state.confirmed_keywords:`, state.confirmed_keywords)
-                    console.log(`[Render] File ${index + 1} confirmed_keywords type:`, typeof state.confirmed_keywords, Array.isArray(state.confirmed_keywords))
-                    console.log(`[Render] File ${index + 1} state.selected_categories:`, state.selected_categories)
-                    console.log(`[Render] File ${index + 1} selected_categories type:`, typeof state.selected_categories, Array.isArray(state.selected_categories))
-                    console.log(`[Render] Categories array length:`, categories.length)
-                    console.log(`[Render] Categories array:`, categories)
-
                     return (
                     <Card key={index} className="p-4">
                       <div className="space-y-4">
@@ -520,12 +509,7 @@ export default function BatchUploadPage() {
                               <div className="flex flex-wrap gap-2">
                                 {state.selected_categories.map(catId => {
                                   const cat = categories.find(c => c.id === catId)
-                                  if (!cat) {
-                                    console.warn(`[Render] Category not found for ID: ${catId}`)
-                                    return null
-                                  }
-                                  if (!cat.name || typeof cat.name !== 'string') {
-                                    console.error(`[Render] Invalid category name for ID ${catId}:`, cat.name, typeof cat.name)
+                                  if (!cat || !cat.name || typeof cat.name !== 'string') {
                                     return null
                                   }
                                   const isPrimary = state.primary_category === catId
@@ -555,28 +539,13 @@ export default function BatchUploadPage() {
                           <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg max-h-60 overflow-y-auto">
                             <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
                               {categories.map((category, catIdx) => {
-                                // Log each category being rendered
-                                console.log(`[Render] Category ${catIdx}:`, category)
-
-                                // Defensive validation
-                                if (!category || typeof category !== 'object') {
-                                  console.error(`[Render] Invalid category at index ${catIdx}:`, category, typeof category)
-                                  return null
-                                }
-                                if (!category.id || typeof category.id !== 'string') {
-                                  console.error(`[Render] Invalid category.id at index ${catIdx}:`, category.id, typeof category.id)
-                                  return null
-                                }
-                                if (!category.name || typeof category.name !== 'string') {
-                                  console.error(`[Render] Invalid category.name at index ${catIdx}:`, category.name, typeof category.name)
+                                // Validate category data
+                                if (!category || typeof category !== 'object' || !category.id || typeof category.id !== 'string' || !category.name || typeof category.name !== 'string') {
                                   return null
                                 }
 
-                                console.log(`[Render] Category ${catIdx} passed validation, isSelected check starting`)
                                 const isSelected = state.selected_categories.includes(category.id)
-                                console.log(`[Render] Category ${catIdx} isSelected=${isSelected}, checking isPrimary`)
                                 const isPrimary = state.primary_category === category.id
-                                console.log(`[Render] Category ${catIdx} isPrimary=${isPrimary}, about to return JSX`)
 
                                 return (
                                   <div
@@ -640,12 +609,7 @@ export default function BatchUploadPage() {
                             <div className="flex flex-wrap gap-2">
                               {state.confirmed_keywords
                                 .filter(keyword => keyword && typeof keyword === 'string' && keyword.trim().length > 0)
-                                .map((keyword, kidx) => {
-                                  // Debug: Log each keyword during render
-                                  if (!keyword || typeof keyword !== 'string') {
-                                    console.error(`[Render] Invalid keyword at filtered index ${kidx}:`, keyword, typeof keyword)
-                                  }
-                                  return (
+                                .map((keyword, kidx) => (
                                   <Badge
                                     key={kidx}
                                     variant="default"
@@ -654,7 +618,6 @@ export default function BatchUploadPage() {
                                     {keyword}
                                     <button
                                       onClick={() => {
-                                        // Use keyword value for removal, not index, to avoid mismatch after filtering
                                         const newKeywords = (state.confirmed_keywords || []).filter(kw => kw !== keyword)
                                         updateFileState(index, {confirmed_keywords: newKeywords})
                                       }}
@@ -663,8 +626,7 @@ export default function BatchUploadPage() {
                                       ×
                                     </button>
                                   </Badge>
-                                  )
-                                })}
+                                ))}
                             </div>
                           ) : (
                             <p className="text-sm text-neutral-500 dark:text-neutral-400">

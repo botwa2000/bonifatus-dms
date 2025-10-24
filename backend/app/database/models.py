@@ -139,6 +139,7 @@ class Document(Base, TimestampMixin):
     file_name = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
+    file_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash for deduplication
     google_drive_file_id = Column(String(100), nullable=False, unique=True)
 
     # Processing status
