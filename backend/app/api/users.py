@@ -411,7 +411,7 @@ async def connect_google_drive(
         # Build Google OAuth URL with Drive scope
         oauth_params = {
             "client_id": settings.google.google_client_id,
-            "redirect_uri": f"{settings.app.frontend_url}/settings/drive/callback",
+            "redirect_uri": f"{settings.app.app_frontend_url}/settings/drive/callback",
             "response_type": "code",
             "scope": "https://www.googleapis.com/auth/drive.file",  # Drive file scope
             "access_type": "offline",  # Get refresh token
@@ -472,13 +472,13 @@ async def drive_oauth_callback(
                     "client_secret": settings.google.google_client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [f"{settings.app.frontend_url}/settings/drive/callback"]
+                    "redirect_uris": [f"{settings.app.app_frontend_url}/settings/drive/callback"]
                 }
             },
             scopes=["https://www.googleapis.com/auth/drive.file"]
         )
 
-        flow.redirect_uri = f"{settings.app.frontend_url}/settings/drive/callback"
+        flow.redirect_uri = f"{settings.app.app_frontend_url}/settings/drive/callback"
         flow.fetch_token(code=code)
 
         credentials = flow.credentials
