@@ -7,8 +7,10 @@ Updated to use new OCR, keyword extraction, and classification services
 
 import logging
 import io
+import re
 from typing import Optional, Dict, List
 from uuid import UUID
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.services.ocr_service import ocr_service
@@ -106,6 +108,15 @@ class DocumentAnalysisService:
 
             logger.info(f"Validated {len(validated_keywords)}/20 keywords for response")
 
+            # Generate standardized filename from original filename
+            extension = file_name.split('.')[-1] if '.' in file_name else 'pdf'
+            clean_name = re.sub(r'[^\w\s-]', '', file_name.rsplit('.', 1)[0] if '.' in file_name else file_name)
+            clean_name = re.sub(r'\s+', '_', clean_name.strip())
+            if len(clean_name) > 150:
+                clean_name = clean_name[:150]
+            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+            standardized_filename = f"{clean_name}_{timestamp}.{extension}"
+
             analysis_result = {
                 'extracted_text': extracted_text[:2000],
                 'full_text_length': len(extracted_text),
@@ -119,6 +130,8 @@ class DocumentAnalysisService:
                 'suggested_category_name': None,
                 'classification_confidence': None,
                 'matched_keywords': [],
+                'standardized_filename': standardized_filename,
+                'original_filename': file_name,
                 'file_info': {
                     'name': file_name,
                     'size': len(file_content),
