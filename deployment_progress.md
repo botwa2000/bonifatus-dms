@@ -2,6 +2,87 @@
 
 ## Chronological Log (Latest First)
 
+### 2025-10-24: Google Drive Integration with OAuth 2.0
+**Status:** ✅ COMPLETED & DEPLOYED
+
+**Summary:** Implemented complete Google Drive OAuth connection flow allowing users to connect their Drive storage from Settings page. Includes secure token encryption, connection management, and proper OAuth callback handling with Next.js 15 Suspense boundaries.
+
+**Features Implemented:**
+
+**Backend OAuth Endpoints:**
+- GET `/api/v1/users/drive/status` - Check Drive connection status with email and timestamp
+- GET `/api/v1/users/drive/connect` - Initiate OAuth flow with Drive permissions
+- POST `/api/v1/users/drive/callback` - Complete OAuth and store encrypted refresh tokens
+- POST `/api/v1/users/drive/disconnect` - Revoke access and clear stored tokens
+
+**Frontend Components:**
+- Cloud Storage section in Settings page with connection status display
+- OAuth callback handler with success/error states and auto-redirect
+- Connect/Disconnect buttons with loading states
+- Connection info display (email, connected date)
+
+**Security Implementation:**
+- Created `backend/app/core/security.py` with Fernet encryption utilities
+- Refresh tokens encrypted using PBKDF2-derived keys from JWT secret
+- Tokens stored in `drive_refresh_token_encrypted` database field
+- OAuth state validation prevents CSRF attacks
+- Proper scope isolation (`drive.file` only, not full Drive access)
+
+**Technical Details:**
+- Uses google-auth-oauthlib for OAuth flow
+- Offline access with `access_type=offline` for refresh tokens
+- Prompt consent ensures refresh token is always returned
+- State parameter contains user ID for callback validation
+- Next.js 15 Suspense boundary wraps useSearchParams hook
+- TypeScript lint-compliant error handling
+
+**Files Created:**
+- `backend/app/core/security.py` - Token encryption/decryption
+- `frontend/src/app/settings/drive/callback/page.tsx` - OAuth callback handler
+
+**Files Modified:**
+- `backend/app/api/users.py` - Added 4 Drive OAuth endpoints
+- `frontend/src/app/settings/page.tsx` - Added Cloud Storage section with UI
+
+**Migration:**
+- No database changes required (Drive fields already exist in User model)
+- Uses existing: `drive_refresh_token_encrypted`, `drive_token_expires_at`, `google_drive_enabled`, `drive_permissions_granted_at`
+
+**Commits:**
+- 71bd178: "feat: Add Google Drive connection in Settings"
+- 314ebd5: "fix: Resolve TypeScript lint errors in Drive integration"
+- c63e32b: "fix: Wrap useSearchParams in Suspense boundary"
+
+**User Experience:**
+1. User navigates to Settings page
+2. Clicks "Connect" button in Cloud Storage card
+3. Redirected to Google OAuth consent screen
+4. Grants Drive permissions
+5. Redirected back to callback page with success message
+6. Auto-redirected to Settings showing connected status
+7. Can disconnect anytime with confirmation dialog
+
+**Security Validation:**
+- ✅ Refresh tokens encrypted with industry-standard Fernet (AES-128)
+- ✅ OAuth state validates user identity
+- ✅ Tokens never exposed to frontend
+- ✅ Proper error handling prevents token leakage
+- ✅ HTTPS enforced for all OAuth redirects
+
+**Production Status:**
+- ✅ Deployed to Hetzner VPS
+- ✅ Backend: https://api.bonidoc.com
+- ✅ Frontend: https://bonidoc.com/settings
+- ✅ OAuth flow: Tested and working
+- ✅ All containers healthy
+
+**Next Steps:**
+- Add navigation menu to upload/category/settings pages
+- Implement user profile dropdown for logout/settings
+- Update file upload to use connected Drive storage
+
+---
+
 ### 2025-10-24: Complete Migration to Hetzner - All Cloud Dependencies Removed
 **Status:** ✅ COMPLETED
 

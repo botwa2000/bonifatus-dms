@@ -3,18 +3,18 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
-import { 
-  categoryService, 
-  type Category, 
-  type CategoryCreateData, 
-  type CategoryUpdateData 
+import {
+  categoryService,
+  type Category,
+  type CategoryCreateData,
+  type CategoryUpdateData
 } from '@/services/category.service'
 import { Button, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge } from '@/components/ui'
 import { CategoryStatsCard } from '@/components/categories/CategoryStatsCard'
 import { CategoryForm } from '@/components/categories/CategoryForm'
 import { CategoryCard } from '@/components/categories/CategoryCard'
+import AppHeader from '@/components/AppHeader'
 
 type ViewMode = 'list' | 'grid'
 type SortField = 'name' | 'documents' | 'updated' | 'created'
@@ -200,30 +200,18 @@ export default function CategoriesPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="bg-white shadow-sm border-b border-neutral-200">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-neutral-600 hover:text-neutral-900">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Categories</h1>
-                <p className="text-sm text-neutral-600">Organize your documents</p>
-              </div>
-            </div>
-            
-            <Button onClick={() => setShowCreateModal(true)}>
-              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Category
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        title="Categories"
+        subtitle="Organize your documents"
+        action={
+          <Button onClick={() => setShowCreateModal(true)}>
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Category
+          </Button>
+        }
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {error && (

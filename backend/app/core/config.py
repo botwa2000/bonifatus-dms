@@ -73,6 +73,7 @@ class AppSettings(BaseSettings):
     app_title: str = Field(..., description="Application title")
     app_description: str = Field(..., description="Application description")
     app_version: str = Field(..., description="Application version")
+    app_frontend_url: str = Field(..., alias="NEXTAUTH_URL", description="Frontend URL for OAuth redirects")
 
     class Config:
         case_sensitive = False

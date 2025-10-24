@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Select, Alert } from '@/components/ui'
+import AppHeader from '@/components/AppHeader'
 
 interface UserPreferences {
   language: string
@@ -202,18 +202,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="bg-white shadow-sm border-b border-neutral-200">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-4">
-            <Link href="/dashboard" className="text-neutral-600 hover:text-neutral-900">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <h1 className="text-2xl font-bold text-neutral-900">Settings</h1>
-          </div>
-        </div>
-      </header>
+      <AppHeader title="Settings" />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         {message && (

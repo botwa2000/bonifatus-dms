@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
+import AppHeader from '@/components/AppHeader'
 
 interface ErrorResponse {
   detail?: string
@@ -344,10 +345,12 @@ export default function BatchUploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+      <AppHeader title="Upload Documents" subtitle="Add new documents to your collection" />
+
+      <div className="max-w-6xl mx-auto p-8">
         <Card>
-          <CardHeader title="Upload Documents" />
+          <CardHeader title="Document Upload" />
           
           <CardContent>
             {message && (
