@@ -49,9 +49,10 @@ export default function DriveCallbackPage() {
           setMessage(result.message || 'Failed to connect Drive')
           setTimeout(() => router.push('/settings'), 3000)
         }
-      } catch (error: any) {
+      } catch (error) {
         setStatus('error')
-        setMessage(error?.message || 'An unexpected error occurred')
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+        setMessage(errorMessage)
         setTimeout(() => router.push('/settings'), 3000)
       }
     }

@@ -68,7 +68,7 @@ export default function SettingsPage() {
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
       setDriveStatus(driveData)
-    } catch (error) {
+    } catch {
       // Error already logged by API client, just show user message
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
     }
@@ -92,7 +92,7 @@ export default function SettingsPage() {
           window.location.href = '/dashboard'
         }, 1500)
       }
-    } catch (error) {
+    } catch {
       // Error already logged by API client
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
     } finally {
@@ -115,7 +115,7 @@ export default function SettingsPage() {
     try {
       // Redirect to backend OAuth endpoint
       window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/users/drive/connect`
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to initiate Drive connection' })
       setDriveLoading(false)
     }
@@ -136,7 +136,7 @@ export default function SettingsPage() {
       // Reload Drive status
       const driveData = await apiClient.get<DriveStatus>('/api/v1/users/drive/status', true)
       setDriveStatus(driveData)
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to disconnect Drive. Please try again.' })
     } finally {
       setDriveLoading(false)
