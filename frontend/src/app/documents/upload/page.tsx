@@ -52,6 +52,7 @@ export default function BatchUploadPage() {
   
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [analyzing, setAnalyzing] = useState(false)
+  const [analysisComplete, setAnalysisComplete] = useState(false)
   const [uploadStates, setUploadStates] = useState<FileUploadState[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
@@ -98,6 +99,7 @@ export default function BatchUploadPage() {
     }
 
     setAnalyzing(true)
+    setAnalysisComplete(false)
     setMessage(null)
 
     try {
@@ -212,20 +214,26 @@ export default function BatchUploadPage() {
     } catch (error) {
       console.error('Batch analysis error:', error)
       let errorMessage = 'Analysis failed. Please try again.'
-      
+
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === 'object' && error !== null) {
         const errorObj = error as ErrorResponse
         errorMessage = errorObj.detail || errorObj.message || JSON.stringify(error)
       }
-      
+
       setMessage({
         type: 'error',
         text: errorMessage
       })
     } finally {
-      setAnalyzing(false)
+      // Signal completion before hiding the progress indicator
+      setAnalysisComplete(true)
+
+      // Small delay to show 100% completion before transitioning
+      setTimeout(() => {
+        setAnalyzing(false)
+      }, 500)
     }
   }
 
@@ -364,7 +372,10 @@ export default function BatchUploadPage() {
 
             {/* Show progress indicator while analyzing */}
             {analyzing ? (
-              <DocumentAnalysisProgress fileCount={selectedFiles.length} />
+              <DocumentAnalysisProgress
+                fileCount={selectedFiles.length}
+                onComplete={analysisComplete}
+              />
             ) : uploadStates.length === 0 ? (
               <>
                 {/* File Selection */}

@@ -6,13 +6,14 @@ import { designTokens } from '@/design/themes/tokens'
 
 interface DocumentAnalysisProgressProps {
   fileCount: number
+  onComplete?: boolean  // Signal from parent when API call actually completes
 }
 
 type Phase = 'security' | 'analysis' | 'complete'
 
 const PHASE_DURATIONS = {
   security: 3000,    // 3 seconds for AV scan (estimated)
-  analysis: 5000,    // 5 seconds for OCR + classification (estimated)
+  analysis: 6000,    // 6 seconds for OCR + classification (estimated)
 }
 
 const PHASES = [
@@ -32,7 +33,7 @@ const PHASES = [
   },
 ]
 
-export function DocumentAnalysisProgress({ fileCount }: DocumentAnalysisProgressProps) {
+export function DocumentAnalysisProgress({ fileCount, onComplete }: DocumentAnalysisProgressProps) {
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0)
   const [phaseProgress, setPhaseProgress] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
@@ -41,21 +42,31 @@ export function DocumentAnalysisProgress({ fileCount }: DocumentAnalysisProgress
   const totalPhases = PHASES.length
 
   useEffect(() => {
+    // If parent signals completion, jump to 100%
+    if (onComplete) {
+      setCurrentPhaseIndex(PHASES.length - 1)
+      setPhaseProgress(100)
+      return
+    }
+
     // Progress bar animation within each phase
     const progressInterval = setInterval(() => {
       setPhaseProgress((prev) => {
-        if (prev >= 100) {
-          // Move to next phase
-          if (currentPhaseIndex < PHASES.length - 1) {
+        // Cap at 95% on the last phase until parent signals completion
+        const maxProgress = currentPhaseIndex === PHASES.length - 1 ? 95 : 100
+
+        if (prev >= maxProgress) {
+          // Move to next phase (only if not on last phase)
+          if (currentPhaseIndex < PHASES.length - 1 && prev >= 100) {
             setCurrentPhaseIndex((idx) => idx + 1)
             return 0
           }
-          return 100
+          return maxProgress
         }
         // Smooth progress increment based on phase duration
         const phaseDuration = PHASE_DURATIONS[currentPhase.id as keyof typeof PHASE_DURATIONS] || 5000
         const increment = (100 / phaseDuration) * 100 // 100ms interval
-        return Math.min(prev + increment, 100)
+        return Math.min(prev + increment, maxProgress)
       })
     }, 100)
 
@@ -68,7 +79,7 @@ export function DocumentAnalysisProgress({ fileCount }: DocumentAnalysisProgress
       clearInterval(progressInterval)
       clearInterval(timeInterval)
     }
-  }, [currentPhaseIndex, currentPhase.id])
+  }, [currentPhaseIndex, currentPhase.id, onComplete])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)

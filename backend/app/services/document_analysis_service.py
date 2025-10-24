@@ -8,6 +8,7 @@ Updated to use new OCR, keyword extraction, and classification services
 import logging
 import io
 from typing import Optional, Dict, List
+from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.services.ocr_service import ocr_service
@@ -70,11 +71,14 @@ class DocumentAnalysisService:
                 language=detected_language
             )
 
+            # Convert user_id string to UUID for classification service
+            user_uuid = UUID(user_id) if user_id else None
+
             suggested_category = classification_service.suggest_category(
                 document_keywords=keyword_strings,
                 db=db,
                 language=detected_language,
-                user_id=user_id
+                user_id=user_uuid
             )
 
             # Filter and validate keywords before creating response
