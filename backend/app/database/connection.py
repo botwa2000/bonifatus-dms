@@ -25,8 +25,10 @@ class DatabaseManager:
 
     @property
     def engine(self):
-        """Get or create database engine"""
+        """Get or create database engine with mandatory SSL encryption"""
         if self._engine is None:
+            # Always require SSL for security, even for local connections
+            # All database connections are encrypted end-to-end
             self._engine = create_engine(
                 settings.database.database_url,
                 pool_size=settings.database.database_pool_size,
@@ -40,7 +42,7 @@ class DatabaseManager:
                     "application_name": "bonifatus-dms",
                 },
             )
-            logger.info("Database engine created successfully")
+            logger.info("Database engine created successfully with SSL encryption")
         return self._engine
 
     @property

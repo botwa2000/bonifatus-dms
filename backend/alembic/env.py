@@ -53,10 +53,11 @@ def do_run_migrations(connection):
 
 
 def run_migrations_online() -> None:
-    """Run migrations in online mode with Supabase pooler compatibility"""
+    """Run migrations in online mode with mandatory SSL encryption"""
 
-    # For Supabase pooler connections, we need to be careful with SSL settings
-    # The pooler (port 6543) has different SSL requirements than direct connections
+    # Always require SSL for security, even for local connections
+    # Local PostgreSQL: SSL enabled with self-signed certificate
+    # Supabase/Cloud: SSL with CA-signed certificate
     connect_args = {
         "connect_timeout": 60,
         "application_name": "alembic_migrations",
