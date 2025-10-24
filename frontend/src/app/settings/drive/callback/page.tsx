@@ -1,11 +1,11 @@
 // frontend/src/app/settings/drive/callback/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { apiClient } from '@/services/api-client'
 
-export default function DriveCallbackPage() {
+function DriveCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
@@ -110,5 +110,20 @@ export default function DriveCallbackPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function DriveCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+        <div className="text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-neutral-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <DriveCallbackContent />
+    </Suspense>
   )
 }
