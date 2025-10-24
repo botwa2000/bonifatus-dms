@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
+import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
 
 interface ErrorResponse {
   detail?: string
@@ -361,7 +362,10 @@ export default function BatchUploadPage() {
               <Alert type={message.type} message={message.text} />
             )}
 
-            {uploadStates.length === 0 ? (
+            {/* Show progress indicator while analyzing */}
+            {analyzing ? (
+              <DocumentAnalysisProgress fileCount={selectedFiles.length} />
+            ) : uploadStates.length === 0 ? (
               <>
                 {/* File Selection */}
                 <div className="border-2 border-dashed border-admin-primary/30 hover:border-admin-primary/60 dark:border-admin-primary/40 dark:hover:border-admin-primary/70 rounded-xl p-12 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900 transition-all duration-200 hover:shadow-lg">
