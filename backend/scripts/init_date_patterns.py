@@ -290,19 +290,25 @@ def populate_date_patterns():
                 'key': 'date_patterns_en',
                 'value': json.dumps(DATE_PATTERNS_EN),
                 'description': 'Date regex patterns for English (format: [pattern, format_type])',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'month_names_en',
                 'value': json.dumps(MONTH_NAMES_EN),
                 'description': 'English month name to number mapping',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'date_type_keywords_en',
                 'value': json.dumps(DATE_TYPE_KEYWORDS_EN),
                 'description': 'English keywords for date type identification',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
 
             # German patterns
@@ -310,19 +316,25 @@ def populate_date_patterns():
                 'key': 'date_patterns_de',
                 'value': json.dumps(DATE_PATTERNS_DE),
                 'description': 'Date regex patterns for German (format: [pattern, format_type])',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'month_names_de',
                 'value': json.dumps(MONTH_NAMES_DE),
                 'description': 'German month name to number mapping',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'date_type_keywords_de',
                 'value': json.dumps(DATE_TYPE_KEYWORDS_DE),
                 'description': 'German keywords for date type identification',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
 
             # Russian patterns
@@ -330,19 +342,25 @@ def populate_date_patterns():
                 'key': 'date_patterns_ru',
                 'value': json.dumps(DATE_PATTERNS_RU),
                 'description': 'Date regex patterns for Russian (format: [pattern, format_type])',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'month_names_ru',
                 'value': json.dumps(MONTH_NAMES_RU),
                 'description': 'Russian month name to number mapping',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
             {
                 'key': 'date_type_keywords_ru',
                 'value': json.dumps(DATE_TYPE_KEYWORDS_RU),
                 'description': 'Russian keywords for date type identification',
-                'category': 'date_extraction'
+                'category': 'date_extraction',
+                'data_type': 'json',
+                'is_public': False
             },
         ]
 
@@ -364,6 +382,8 @@ def populate_date_patterns():
                         SET setting_value = :value,
                             description = :description,
                             category = :category,
+                            data_type = :data_type,
+                            is_public = :is_public,
                             updated_at = NOW()
                         WHERE setting_key = :key
                     """),
@@ -371,7 +391,9 @@ def populate_date_patterns():
                         'key': config['key'],
                         'value': config['value'],
                         'description': config['description'],
-                        'category': config['category']
+                        'category': config['category'],
+                        'data_type': config['data_type'],
+                        'is_public': config['is_public']
                     }
                 )
                 updated += 1
@@ -382,16 +404,18 @@ def populate_date_patterns():
                 session.execute(
                     text("""
                         INSERT INTO system_settings
-                        (id, setting_key, setting_value, description, category, created_at, updated_at)
+                        (id, setting_key, setting_value, description, category, data_type, is_public, created_at, updated_at)
                         VALUES
-                        (:id, :key, :value, :description, :category, NOW(), NOW())
+                        (:id, :key, :value, :description, :category, :data_type, :is_public, NOW(), NOW())
                     """),
                     {
                         'id': str(uuid.uuid4()),
                         'key': config['key'],
                         'value': config['value'],
                         'description': config['description'],
-                        'category': config['category']
+                        'category': config['category'],
+                        'data_type': config['data_type'],
+                        'is_public': config['is_public']
                     }
                 )
                 inserted += 1
