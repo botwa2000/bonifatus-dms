@@ -15,29 +15,36 @@ export default function LoginPageContent() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Prevent duplicate calls (React 18 Strict Mode runs effects twice in dev)
-      if (processingRef.current) {
+      const code = searchParams.get('code')
+      const state = searchParams.get('state')
+      const errorParam = searchParams.get('error')
+
+      // No OAuth code - redirect to homepage
+      if (!code) {
+        router.push('/')
         return
       }
 
+      // Create unique key for this OAuth attempt
+      const attemptKey = `oauth_processing_${state || code}`
+
+      // Check if already processed (prevents duplicate processing)
+      if (processingRef.current || sessionStorage.getItem(attemptKey)) {
+        return
+      }
+
+      // Mark as processing immediately
       processingRef.current = true
+      sessionStorage.setItem(attemptKey, 'true')
+
       try {
-        const code = searchParams.get('code')
-        const state = searchParams.get('state')
-        const errorParam = searchParams.get('error')
-
-        // No OAuth code - redirect to homepage
-        if (!code) {
-          router.push('/')
-          return
-        }
-
         // OAuth error from Google
         if (errorParam) {
           console.error('OAuth error from Google:', errorParam)
           setError(`Authentication error: ${errorParam}`)
           setIsProcessing(false)
           processingRef.current = false
+          sessionStorage.removeItem(attemptKey)
           return
         }
 
@@ -48,18 +55,20 @@ export default function LoginPageContent() {
           // Redirect to dashboard
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           router.push(redirectUrl)
-          // Don't reset processingRef on success - component will unmount during redirect
+          // Don't reset processingRef or remove attemptKey - component will unmount during redirect
         } else {
           console.error('OAuth exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
           processingRef.current = false
+          sessionStorage.removeItem(attemptKey)
         }
       } catch (err) {
         console.error('OAuth callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
         processingRef.current = false
+        sessionStorage.removeItem(attemptKey)
       }
     }
 
