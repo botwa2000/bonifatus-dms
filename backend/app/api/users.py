@@ -487,8 +487,10 @@ async def drive_oauth_callback(
         from app.core.security import encrypt_token
         encrypted_token = encrypt_token(credentials.refresh_token)
 
-        # Update user record
+        # Update user record and initialize folder structure
         from app.database.connection import db_manager
+        from app.services.drive_service import drive_service
+
         session = db_manager.session_local()
         try:
             user = session.query(User).filter(User.id == current_user.id).first()
@@ -499,6 +501,18 @@ async def drive_oauth_callback(
             session.commit()
 
             logger.info(f"Drive connected successfully for user: {current_user.email}")
+
+            # Initialize folder structure in Google Drive
+            try:
+                folder_map = drive_service.initialize_folder_structure(
+                    refresh_token_encrypted=encrypted_token,
+                    session=session
+                )
+                logger.info(f"Initialized {len(folder_map)} folders in Drive for user: {current_user.email}")
+            except Exception as folder_error:
+                logger.error(f"Failed to initialize Drive folders: {folder_error}")
+                # Don't fail the connection if folder creation fails
+                # User can manually create folders or we can retry later
 
             return {
                 "success": True,

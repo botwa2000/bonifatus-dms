@@ -334,15 +334,9 @@ class AuthService:
                     # Generate short-lived access token
                     access_token = self.create_access_token(data={"sub": str(user.id)})
 
-                    # Encrypt and store Google refresh token if provided
-                    google_refresh_token = tokens.get('refresh_token')
-                    if google_refresh_token:
-                        encrypted_token = encryption_service.encrypt(google_refresh_token)
-                        if encrypted_token:
-                            user.drive_refresh_token_encrypted = encrypted_token
-                            user.google_drive_enabled = True
-                            user.drive_permissions_granted_at = datetime.now(timezone.utc)
-                            db.commit()
+                    # Note: Google Drive connection is separate from authentication
+                    # Users must explicitly connect Drive from Settings page
+                    # Authentication OAuth only grants openid+email+profile scopes
 
                     if not user.is_active:
                         logger.warning(f"Inactive user attempted login: {email}")
