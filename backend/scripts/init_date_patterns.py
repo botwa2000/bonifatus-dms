@@ -31,6 +31,9 @@ from app.core.config import settings
 # format_type: dmy, mdy, ymd, named_month
 
 DATE_PATTERNS_EN = [
+    # Compact format: YYYYMMDD (common in headers, file names, bank statements)
+    [r'(\d{4})(\d{2})(\d{2})', 'ymd'],
+
     # ISO format: YYYY-MM-DD
     [r'(\d{4})-(\d{1,2})-(\d{1,2})', 'ymd'],
 
@@ -38,7 +41,7 @@ DATE_PATTERNS_EN = [
     [r'(\d{1,2})/(\d{1,2})/(\d{4})', 'mdy'],
 
     # Named months: January 15, 2024 | Jan 15, 2024
-    [r'(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[\s,]+(\d{1,2})[\s,]+(\d{4})', 'named_month'],
+    [r'(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[\s,]+(\d{1,2})[\s,]+(\d{4})', 'mdy_named'],
 
     # Named months: 15 January 2024 | 15 Jan 2024
     [r'(\d{1,2})[\s]+of[\s]+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[\s,]+(\d{4})', 'dmy_named'],
@@ -46,11 +49,14 @@ DATE_PATTERNS_EN = [
     # UK format: DD/MM/YYYY
     [r'(\d{1,2})/(\d{1,2})/(\d{4})', 'dmy'],
 
-    # Dot separator: DD.MM.YYYY
+    # Dot separator: DD.MM.YYYY (European/German style in English docs)
     [r'(\d{1,2})\.(\d{1,2})\.(\d{4})', 'dmy'],
 ]
 
 DATE_PATTERNS_DE = [
+    # Compact format: YYYYMMDD
+    [r'(\d{4})(\d{2})(\d{2})', 'ymd'],
+
     # German standard: DD.MM.YYYY
     [r'(\d{1,2})\.(\d{1,2})\.(\d{4})', 'dmy'],
 
@@ -65,6 +71,9 @@ DATE_PATTERNS_DE = [
 ]
 
 DATE_PATTERNS_RU = [
+    # Compact format: YYYYMMDD
+    [r'(\d{4})(\d{2})(\d{2})', 'ymd'],
+
     # Russian standard: DD.MM.YYYY
     [r'(\d{1,2})\.(\d{1,2})\.(\d{4})', 'dmy'],
 
@@ -133,6 +142,12 @@ MONTH_NAMES_RU = {
 # Date type keywords - keywords that appear near dates to identify their type
 
 DATE_TYPE_KEYWORDS_EN = {
+    "statement_date": [
+        "statement date", "account statement", "as of", "as at",
+        "statement period", "closing balance", "balance as of",
+        "account summary", "statement ending", "period ending",
+        "kontoauszug", "saldo vom", "выписка"
+    ],
     "invoice_date": [
         "invoice date", "bill date", "invoiced", "billed on",
         "date of invoice", "invoice issued", "billing date",
@@ -181,6 +196,11 @@ DATE_TYPE_KEYWORDS_EN = {
 }
 
 DATE_TYPE_KEYWORDS_DE = {
+    "statement_date": [
+        "kontoauszug", "abrechnungsdatum", "stand", "saldo vom",
+        "per", "kontostand", "auszug vom", "stichtag",
+        "statement date", "as of", "выписка"
+    ],
     "invoice_date": [
         "rechnungsdatum", "rechnung vom", "datum der rechnung",
         "ausgestellt am", "rechnungsdatum", "fakturadatum",
@@ -226,6 +246,11 @@ DATE_TYPE_KEYWORDS_DE = {
 }
 
 DATE_TYPE_KEYWORDS_RU = {
+    "statement_date": [
+        "выписка по счету", "дата выписки", "сальдо на",
+        "остаток на", "баланс на", "по состоянию на",
+        "statement date", "kontoauszug", "as of"
+    ],
     "invoice_date": [
         "дата счета", "дата выставления", "счет от",
         "выставлен", "дата счета-фактуры",

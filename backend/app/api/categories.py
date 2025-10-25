@@ -11,9 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from app.schemas.category_schemas import (
     CategoryCreate, CategoryUpdate, CategoryResponse, CategoryListResponse,
     CategoryDeleteRequest, CategoryDeleteResponse, RestoreDefaultsResponse,
+    KeywordResponse, KeywordListResponse, KeywordCreateRequest,
+    KeywordUpdateRequest, KeywordOverlapResponse,
     ErrorResponse
 )
 from app.services.category_service import category_service
+from app.services.keyword_management_service import keyword_management_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User, UserSetting
 from sqlalchemy import select
@@ -346,4 +349,261 @@ async def get_category_documents_count(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve document count"
+        )
+
+
+# ==================== KEYWORD MANAGEMENT ENDPOINTS ====================
+
+@router.get(
+    "/{category_id}/keywords",
+    response_model=KeywordListResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        404: {"model": ErrorResponse, "description": "Category not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def list_category_keywords(
+    category_id: str,
+    language_code: str = 'en',
+    current_user: User = Depends(get_current_active_user)
+) -> KeywordListResponse:
+    """
+    Get all keywords for a category in specified language
+
+    Returns list of keywords with weights, match statistics, and system flag.
+    """
+    try:
+        session = db_manager.session_local()
+
+        keywords = keyword_management_service.list_keywords(
+            category_id=category_id,
+            language_code=language_code,
+            session=session
+        )
+
+        session.close()
+
+        return KeywordListResponse(keywords=keywords)
+
+    except Exception as e:
+        logger.error(f"List keywords error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/{category_id}/keywords",
+    response_model=KeywordResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Category not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def add_category_keyword(
+    category_id: str,
+    request: KeywordCreateRequest,
+    current_user: User = Depends(get_current_active_user)
+) -> KeywordResponse:
+    """
+    Add new keyword to a category
+
+    Creates a new keyword with specified weight for document classification.
+    Duplicate keywords (case-insensitive) are rejected.
+    """
+    try:
+        session = db_manager.session_local()
+
+        keyword = keyword_management_service.add_keyword(
+            category_id=category_id,
+            keyword=request.keyword,
+            language_code=request.language_code,
+            weight=request.weight,
+            user_id=str(current_user.id),
+            session=session
+        )
+
+        session.close()
+
+        return KeywordResponse(**keyword)
+
+    except ValueError as e:
+        logger.warning(f"Keyword validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        logger.warning(f"Keyword permission denied: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Add keyword error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to add keyword"
+        )
+
+
+@router.put(
+    "/{category_id}/keywords/{keyword_id}",
+    response_model=KeywordResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Keyword not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_category_keyword(
+    category_id: str,
+    keyword_id: str,
+    request: KeywordUpdateRequest,
+    current_user: User = Depends(get_current_active_user)
+) -> KeywordResponse:
+    """
+    Update keyword weight
+
+    Adjusts the weight of a keyword to increase or decrease its importance
+    in document classification. Both system and custom keywords can be adjusted.
+    """
+    try:
+        session = db_manager.session_local()
+
+        keyword = keyword_management_service.update_keyword_weight(
+            keyword_id=keyword_id,
+            weight=request.weight,
+            user_id=str(current_user.id),
+            session=session
+        )
+
+        session.close()
+
+        return KeywordResponse(**keyword)
+
+    except ValueError as e:
+        logger.warning(f"Keyword update validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        logger.warning(f"Keyword update permission denied: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Update keyword error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to update keyword"
+        )
+
+
+@router.delete(
+    "/{category_id}/keywords/{keyword_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        400: {"model": ErrorResponse, "description": "Cannot delete system keyword"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Keyword not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def delete_category_keyword(
+    category_id: str,
+    keyword_id: str,
+    current_user: User = Depends(get_current_active_user)
+) -> None:
+    """
+    Delete a custom keyword
+
+    Removes a user-created keyword from the category. System default keywords
+    are protected and cannot be deleted.
+    """
+    try:
+        session = db_manager.session_local()
+
+        keyword_management_service.delete_keyword(
+            keyword_id=keyword_id,
+            user_id=str(current_user.id),
+            session=session
+        )
+
+        session.close()
+
+    except ValueError as e:
+        logger.warning(f"Keyword delete validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        logger.warning(f"Keyword delete permission denied: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Delete keyword error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to delete keyword"
+        )
+
+
+@router.get(
+    "/keywords/overlaps",
+    response_model=KeywordOverlapResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_keyword_overlaps(
+    language_code: str = 'en',
+    current_user: User = Depends(get_current_active_user)
+) -> KeywordOverlapResponse:
+    """
+    Detect keyword overlaps across user's categories
+
+    Returns all keywords that appear in multiple categories with severity
+    assessment (low/medium/high) based on weight differences.
+
+    - High severity: Nearly identical weights (ambiguous classification)
+    - Medium severity: Similar weights (potential confusion)
+    - Low severity: Very different weights (clear winner)
+    """
+    try:
+        session = db_manager.session_local()
+
+        overlaps = keyword_management_service.detect_overlaps(
+            user_id=str(current_user.id),
+            language_code=language_code,
+            session=session
+        )
+
+        session.close()
+
+        return KeywordOverlapResponse(
+            overlaps=overlaps,
+            total_overlaps=len(overlaps)
+        )
+
+    except Exception as e:
+        logger.error(f"Detect overlaps error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to detect keyword overlaps"
         )

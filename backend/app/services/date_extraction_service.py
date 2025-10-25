@@ -267,7 +267,7 @@ class DateExtractionService:
     ) -> Optional[Tuple[date, str, float]]:
         """
         Select the primary document date from extracted dates
-        Priority: invoice_date > signature_date > effective_date > highest confidence
+        Priority: statement_date > invoice_date > signature_date > effective_date > tax_year > highest confidence
 
         Args:
             dates: List of extracted dates
@@ -278,14 +278,16 @@ class DateExtractionService:
         if not dates:
             return None
 
-        priority_order = ['invoice_date', 'signature_date', 'effective_date', 'tax_year']
+        priority_order = ['statement_date', 'invoice_date', 'signature_date', 'effective_date', 'tax_year']
 
         for priority_type in priority_order:
             for date_val, date_type, confidence, _ in dates:
                 if date_type == priority_type:
                     return (date_val, date_type, confidence)
 
-        return (dates[0][0], dates[0][1], dates[0][2])
+        # If no priority type found, return the most recent date (bank statements usually use latest date)
+        dates_sorted = sorted(dates, key=lambda x: x[0], reverse=True)
+        return (dates_sorted[0][0], dates_sorted[0][1], dates_sorted[0][2])
 
     def extract_primary_date(
         self,

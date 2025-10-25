@@ -111,3 +111,60 @@ class RestoreDefaultsResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Error response model"""
     detail: str = Field(..., description="Error message")
+
+
+# Keyword Management Schemas
+
+class KeywordResponse(BaseModel):
+    """Keyword response model"""
+    id: str = Field(..., description="Keyword UUID")
+    keyword: str = Field(..., description="Keyword text")
+    language_code: str = Field(..., description="Language code (e.g., 'en', 'de', 'ru')")
+    weight: float = Field(..., description="Keyword weight (0.1-10.0)")
+    match_count: int = Field(..., description="Number of times keyword helped classify documents")
+    last_matched_at: Optional[str] = Field(None, description="Last match timestamp (ISO format)")
+    is_system_default: bool = Field(..., description="System default keyword flag")
+    created_at: Optional[str] = Field(None, description="Creation timestamp (ISO format)")
+
+    class Config:
+        from_attributes = True
+
+
+class KeywordListResponse(BaseModel):
+    """List of keywords response"""
+    keywords: List[KeywordResponse] = Field(..., description="List of keywords")
+
+
+class KeywordCreateRequest(BaseModel):
+    """Create new keyword request"""
+    keyword: str = Field(..., min_length=2, max_length=200, description="Keyword text")
+    language_code: str = Field(..., pattern="^[a-z]{2}$", description="Language code (e.g., 'en', 'de', 'ru')")
+    weight: float = Field(1.0, ge=0.1, le=10.0, description="Keyword weight (default: 1.0)")
+
+
+class KeywordUpdateRequest(BaseModel):
+    """Update keyword weight request"""
+    weight: float = Field(..., ge=0.1, le=10.0, description="New keyword weight")
+
+
+class KeywordOverlapCategory(BaseModel):
+    """Category information in overlap detection"""
+    category_id: str = Field(..., description="Category UUID")
+    reference_key: str = Field(..., description="Category reference key")
+    weight: float = Field(..., description="Keyword weight in this category")
+    match_count: int = Field(..., description="Match count in this category")
+    is_system_default: bool = Field(..., description="System default flag")
+
+
+class KeywordOverlap(BaseModel):
+    """Keyword overlap detection result"""
+    keyword: str = Field(..., description="Overlapping keyword")
+    categories: List[KeywordOverlapCategory] = Field(..., description="Categories using this keyword")
+    severity: str = Field(..., description="Overlap severity: 'low', 'medium', 'high'")
+    category_count: int = Field(..., description="Number of categories using this keyword")
+
+
+class KeywordOverlapResponse(BaseModel):
+    """Keyword overlaps response"""
+    overlaps: List[KeywordOverlap] = Field(..., description="List of keyword overlaps")
+    total_overlaps: int = Field(..., description="Total number of overlapping keywords")

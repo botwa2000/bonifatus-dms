@@ -43,6 +43,51 @@ export interface CategoryUpdateData {
   is_active?: boolean
 }
 
+export interface CategoryKeyword {
+  id: string
+  keyword: string
+  language_code: string
+  weight: number
+  match_count: number
+  last_matched_at: string | null
+  is_system_default: boolean
+  created_at: string | null
+}
+
+export interface KeywordListResponse {
+  keywords: CategoryKeyword[]
+}
+
+export interface KeywordCreateRequest {
+  keyword: string
+  language_code: string
+  weight: number
+}
+
+export interface KeywordUpdateRequest {
+  weight: number
+}
+
+export interface KeywordOverlapCategory {
+  category_id: string
+  reference_key: string
+  weight: number
+  match_count: number
+  is_system_default: boolean
+}
+
+export interface KeywordOverlap {
+  keyword: string
+  categories: KeywordOverlapCategory[]
+  severity: 'low' | 'medium' | 'high'
+  category_count: number
+}
+
+export interface KeywordOverlapResponse {
+  overlaps: KeywordOverlap[]
+  total_overlaps: number
+}
+
 class CategoryService {
   async listCategories(
     includeSystem: boolean = true,
@@ -102,6 +147,62 @@ class CategoryService {
       '/api/v1/categories/restore-defaults',
       {},
       true
+    )
+  }
+
+  // Keyword Management Methods
+
+  async getKeywords(
+    categoryId: string,
+    languageCode: string = 'en'
+  ): Promise<KeywordListResponse> {
+    return await apiClient.get<KeywordListResponse>(
+      `/api/v1/categories/${categoryId}/keywords`,
+      true,
+      { params: { language_code: languageCode } }
+    )
+  }
+
+  async addKeyword(
+    categoryId: string,
+    data: KeywordCreateRequest
+  ): Promise<CategoryKeyword> {
+    return await apiClient.post<CategoryKeyword>(
+      `/api/v1/categories/${categoryId}/keywords`,
+      data,
+      true
+    )
+  }
+
+  async updateKeywordWeight(
+    categoryId: string,
+    keywordId: string,
+    weight: number
+  ): Promise<CategoryKeyword> {
+    return await apiClient.put<CategoryKeyword>(
+      `/api/v1/categories/${categoryId}/keywords/${keywordId}`,
+      { weight },
+      true
+    )
+  }
+
+  async deleteKeyword(
+    categoryId: string,
+    keywordId: string
+  ): Promise<void> {
+    await apiClient.delete(
+      `/api/v1/categories/${categoryId}/keywords/${keywordId}`,
+      true
+    )
+  }
+
+  async getKeywordOverlaps(
+    languageCode: string = 'en'
+  ): Promise<KeywordOverlapResponse> {
+    return await apiClient.get<KeywordOverlapResponse>(
+      '/api/v1/categories/keywords/overlaps',
+      true,
+      { params: { language_code: languageCode } }
     )
   }
 }

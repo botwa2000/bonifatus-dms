@@ -20,6 +20,7 @@ from app.services.auth_service import auth_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.services.category_service import category_service
 from app.services.config_service import config_service
+from app.services.user_service import user_service
 
 import io
 from app.services.file_validation_service import file_validation_service
@@ -177,8 +178,9 @@ async def confirm_upload(
                 detail="At least one category must be selected"
             )
         
-        # Get user language
-        user_language = current_user.preferred_language or 'en'
+        # Get user language from user preferences
+        user_preferences = await user_service.get_user_preferences(str(current_user.id))
+        user_language = user_preferences.language or 'en'
         
         # Complete upload with Google Drive storage
         result = await document_upload_service.confirm_upload(

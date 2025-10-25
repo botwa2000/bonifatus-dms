@@ -8,6 +8,8 @@ import { authService } from '@/services/auth.service'
 
 let renderCount = 0
 let effectCount = 0
+// Module-level flag that persists across component remounts
+let isProcessingOAuth = false
 
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
@@ -21,19 +23,19 @@ export default function LoginPageContent() {
 
   useEffect(() => {
     effectCount++
-    console.log(`[DEBUG] useEffect execution #${effectCount}, processingRef.current = ${processingRef.current}`)
+    console.log(`[DEBUG] useEffect execution #${effectCount}, isProcessingOAuth = ${isProcessingOAuth}`)
 
     const handleOAuthCallback = async () => {
       // Block ALL re-executions immediately (synchronous check + set)
-      console.log(`[DEBUG] handleOAuthCallback called (effect #${effectCount}), checking processingRef = ${processingRef.current}`)
+      console.log(`[DEBUG] handleOAuthCallback called (effect #${effectCount}), checking isProcessingOAuth = ${isProcessingOAuth}`)
 
-      if (processingRef.current) {
-        console.log(`[DEBUG] BLOCKED - processingRef already true, exiting`)
+      if (isProcessingOAuth) {
+        console.log(`[DEBUG] BLOCKED - isProcessingOAuth already true, exiting`)
         return
       }
 
-      console.log(`[DEBUG] Setting processingRef = true`)
-      processingRef.current = true // Set BEFORE any async operations
+      console.log(`[DEBUG] Setting isProcessingOAuth = true`)
+      isProcessingOAuth = true // Set BEFORE any async operations (module-level, persists across remounts)
 
       const code = searchParams.get('code')
       const state = searchParams.get('state')
@@ -71,19 +73,19 @@ export default function LoginPageContent() {
           console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
           console.log(`[DEBUG] About to call router.replace('${redirectUrl}')`)
           router.replace(redirectUrl)
-          console.log(`[DEBUG] router.replace called, processingRef = ${processingRef.current}`)
-          // Don't reset processingRef - it stays true, blocking any future renders
+          console.log(`[DEBUG] router.replace called, isProcessingOAuth = ${isProcessingOAuth}`)
+          // Don't reset isProcessingOAuth - it stays true, blocking any future renders
         } else {
           console.error('[OAuth] Exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
-          processingRef.current = false
+          isProcessingOAuth = false
         }
       } catch (err) {
         console.error('[OAuth] Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
-        processingRef.current = false
+        isProcessingOAuth = false
       }
 
       console.log(`[DEBUG] handleOAuthCallback completed (effect #${effectCount})`)
