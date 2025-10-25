@@ -378,14 +378,16 @@ def populate_date_patterns():
                 print(f"✅ Updated: {config['key']}")
             else:
                 # Insert new
+                import uuid
                 session.execute(
                     text("""
                         INSERT INTO system_settings
-                        (setting_key, setting_value, description, category, created_at, updated_at)
+                        (id, setting_key, setting_value, description, category, created_at, updated_at)
                         VALUES
-                        (:key, :value, :description, :category, NOW(), NOW())
+                        (:id, :key, :value, :description, :category, NOW(), NOW())
                     """),
                     {
+                        'id': str(uuid.uuid4()),
                         'key': config['key'],
                         'value': config['value'],
                         'description': config['description'],
