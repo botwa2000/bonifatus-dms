@@ -151,13 +151,14 @@ class DriveService:
             folder_map['main'] = main_folder_id
             logger.info(f"Main folder '{self.app_folder_name}' ready: {main_folder_id}")
 
-            # 2. Fetch all categories from database
+            # 2. Fetch all categories from database with English translations
             categories_result = session.execute(
                 text("""
-                    SELECT c.id, c.name, c.category_code
+                    SELECT c.id, COALESCE(ct.name, c.reference_key) as name, c.category_code
                     FROM categories c
+                    LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.language_code = 'en'
                     WHERE c.is_system = true
-                    ORDER BY c.name
+                    ORDER BY name
                 """)
             )
             categories = categories_result.fetchall()

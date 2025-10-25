@@ -1,7 +1,7 @@
 // frontend/src/app/settings/drive/callback/page.tsx
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { apiClient } from '@/services/api-client'
 
@@ -10,28 +10,41 @@ function DriveCallbackContent() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [message, setMessage] = useState<string>('Connecting to Google Drive...')
+  const processingRef = useRef(false)
 
   useEffect(() => {
     const handleCallback = async () => {
+      const code = searchParams.get('code')
+      const state = searchParams.get('state')
+      const error = searchParams.get('error')
+
+      if (error) {
+        setStatus('error')
+        setMessage(`Authentication failed: ${error}`)
+        setTimeout(() => router.push('/settings'), 3000)
+        return
+      }
+
+      if (!code || !state) {
+        setStatus('error')
+        setMessage('Missing authentication parameters')
+        setTimeout(() => router.push('/settings'), 3000)
+        return
+      }
+
+      // Create unique key for this Drive OAuth attempt
+      const attemptKey = `drive_oauth_processing_${state}`
+
+      // Check if already processed (prevents duplicate processing)
+      if (processingRef.current || sessionStorage.getItem(attemptKey)) {
+        return
+      }
+
+      // Mark as processing immediately
+      processingRef.current = true
+      sessionStorage.setItem(attemptKey, 'true')
+
       try {
-        const code = searchParams.get('code')
-        const state = searchParams.get('state')
-        const error = searchParams.get('error')
-
-        if (error) {
-          setStatus('error')
-          setMessage(`Authentication failed: ${error}`)
-          setTimeout(() => router.push('/settings'), 3000)
-          return
-        }
-
-        if (!code || !state) {
-          setStatus('error')
-          setMessage('Missing authentication parameters')
-          setTimeout(() => router.push('/settings'), 3000)
-          return
-        }
-
         // Complete OAuth flow by calling backend
         const result = await apiClient.post<{ success: boolean; message: string }>(
           '/api/v1/users/drive/callback',
@@ -44,21 +57,24 @@ function DriveCallbackContent() {
           setStatus('success')
           setMessage('Google Drive connected successfully!')
           setTimeout(() => router.push('/settings'), 2000)
+          // Don't remove attemptKey - component will unmount during redirect
         } else {
           setStatus('error')
           setMessage(result.message || 'Failed to connect Drive')
+          sessionStorage.removeItem(attemptKey)
           setTimeout(() => router.push('/settings'), 3000)
         }
       } catch (error) {
         setStatus('error')
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
         setMessage(errorMessage)
+        sessionStorage.removeItem(attemptKey)
         setTimeout(() => router.push('/settings'), 3000)
       }
     }
 
     handleCallback()
-  }, [searchParams, router])
+  }, [searchParams, router, processingRef])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50">
