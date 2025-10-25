@@ -164,14 +164,14 @@ async def confirm_upload(
         
         # Check expiration
         if datetime.utcnow() > temp_data['expires_at']:
-            del temp_storage[request.temp_id]
+            del temp_storage[confirm_request.temp_id]
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="Analysis result has expired"
             )
-        
+
         # Validate category IDs
-        if not request.category_ids:
+        if not confirm_request.category_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one category must be selected"
@@ -188,6 +188,7 @@ async def confirm_upload(
             category_ids=confirm_request.category_ids,
             confirmed_keywords=confirm_request.confirmed_keywords,
             description=confirm_request.description,
+            primary_category_id=confirm_request.primary_category_id,
             user_id=str(current_user.id),
             user_email=current_user.email,
             language_code=user_language,
