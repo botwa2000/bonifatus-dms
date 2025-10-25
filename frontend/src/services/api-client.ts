@@ -102,10 +102,7 @@ export class ApiClient {
           requestConfig.body = JSON.stringify(data)
         }
 
-        // Only log first attempt to avoid spam
-        if (attempt === 0) {
-          console.log(`[API ${currentRequestId}] ${method} ${url} (attempt ${attempt + 1}/${maxRetries + 1})`)
-        }
+        // Removed verbose request logging for production
 
         const response = await fetch(url, requestConfig)
         const responseHeaders = this.parseHeaders(response.headers)
@@ -121,11 +118,7 @@ export class ApiClient {
 
         const duration = Date.now() - startTime
 
-        // Only log errors and successful non-auth requests
-        const isExpected401 = response.status === 401 && (endpoint.includes('/auth/me') || endpoint.includes('/auth/refresh'))
-        if (!response.ok && !isExpected401) {
-          console.log(`[API ${currentRequestId}] Response ${response.status} in ${duration}ms`)
-        }
+        // Removed verbose response logging for production
 
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
@@ -152,10 +145,6 @@ export class ApiClient {
         lastError = error as Error
 
         if (this.isRetriableError(error as Error) && attempt < maxRetries) {
-          // Only log retries, not every attempt
-          if (attempt > 0) {
-            console.warn(`[API ${currentRequestId}] Retry ${attempt} failed, retrying:`, (error as Error).message)
-          }
           await this.delay(this.config.retryDelay * Math.pow(2, attempt))
           continue
         }

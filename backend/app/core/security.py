@@ -7,7 +7,7 @@ import base64
 import os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
 from app.core.config import settings
@@ -26,7 +26,7 @@ def _get_encryption_key() -> bytes:
     # For now, derive from secret to ensure consistency
     salt = base64.b64encode(password[:16].ljust(16, b'0'))[:16]
 
-    kdf = PBKDF2(
+    kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,

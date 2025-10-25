@@ -86,22 +86,15 @@ export class AuthService {
   }
 
   storeOAuthState(state: string): void {
-    console.log('[AUTH DEBUG] Attempting to store state:', state.substring(0, 20) + '...')
-    
     if (!this.checkSessionStorageAvailable()) {
       throw new Error('SessionStorage is not available. Please check browser privacy settings.')
     }
-    
+
     try {
       sessionStorage.setItem('oauth_state', state)
       sessionStorage.setItem('oauth_state_timestamp', Date.now().toString())
-      
-      // Verify it was stored
-      const stored = sessionStorage.getItem('oauth_state')
-      console.log('[AUTH DEBUG] State stored successfully:', stored === state)
-      console.log('[AUTH DEBUG] Stored value:', stored?.substring(0, 20) + '...')
     } catch (error) {
-      console.error('[AUTH DEBUG] Failed to store state:', error)
+      console.error('Failed to store OAuth state:', error)
       throw new Error('Failed to store OAuth state: ' + (error as Error).message)
     }
   }
@@ -131,15 +124,10 @@ export class AuthService {
   }
 
   async initializeGoogleOAuth(): Promise<void> {
-    console.log('[AUTH DEBUG] Starting OAuth initialization')
-    
     try {
       const config = await this.getOAuthConfig()
-      console.log('[AUTH DEBUG] Got OAuth config:', config.redirect_uri)
-      
       const state = this.generateSecureState()
-      console.log('[AUTH DEBUG] Generated state:', state.substring(0, 20) + '...')
-      
+
       const params = new URLSearchParams({
         client_id: config.google_client_id,
         redirect_uri: config.redirect_uri,
@@ -151,15 +139,11 @@ export class AuthService {
       })
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-      console.log('[AUTH DEBUG] Generated auth URL with state')
-      
       this.storeOAuthState(state)
-      console.log('[AUTH DEBUG] About to redirect to Google')
-      
       window.location.href = authUrl
-      
+
     } catch (error) {
-      console.error('[AUTH DEBUG] OAuth initialization failed:', error)
+      console.error('OAuth initialization failed:', error)
       throw new Error('Authentication service unavailable: ' + (error as Error).message)
     }
   }
@@ -169,8 +153,6 @@ export class AuthService {
     state: string | null
   ): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-      console.log('[AUTH DEBUG] Starting token exchange')
-
       // Validate state if provided
       if (state && !this.validateOAuthState(state)) {
         throw new Error('Invalid OAuth state - possible security issue')
@@ -182,8 +164,6 @@ export class AuthService {
         code,
         state: state || ''
       })
-
-      console.log('[AUTH DEBUG] Token exchange successful')
 
       // Convert TokenResponse to User object (all data from backend)
       const user: User = {

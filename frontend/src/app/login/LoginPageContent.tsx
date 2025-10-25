@@ -17,7 +17,6 @@ export default function LoginPageContent() {
     const handleOAuthCallback = async () => {
       // Prevent duplicate calls (React 18 Strict Mode runs effects twice in dev)
       if (processingRef.current) {
-        console.log('[OAuth] Already processing, skipping duplicate call')
         return
       }
 
@@ -29,41 +28,35 @@ export default function LoginPageContent() {
 
         // No OAuth code - redirect to homepage
         if (!code) {
-          console.log('[OAuth] No code present, redirecting to homepage')
           router.push('/')
           return
         }
 
         // OAuth error from Google
         if (errorParam) {
-          console.error('[OAuth] Error from Google:', errorParam)
+          console.error('OAuth error from Google:', errorParam)
           setError(`Authentication error: ${errorParam}`)
           setIsProcessing(false)
           processingRef.current = false
           return
         }
 
-        console.log('[OAuth] Processing authorization code...')
-
         // Exchange authorization code for JWT tokens
         const result = await authService.exchangeGoogleToken(code, state)
-
-        console.log('[OAuth] Exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
 
         if (result.success && result.user) {
           // Redirect to dashboard
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
-          console.log('[OAuth] Success! Redirecting to:', redirectUrl)
           router.push(redirectUrl)
           // Don't reset processingRef on success - component will unmount during redirect
         } else {
-          console.error('[OAuth] Exchange failed:', result.error)
+          console.error('OAuth exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
           processingRef.current = false
         }
       } catch (err) {
-        console.error('[OAuth] Callback error:', err)
+        console.error('OAuth callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
         processingRef.current = false
