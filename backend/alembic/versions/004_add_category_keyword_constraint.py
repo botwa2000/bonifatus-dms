@@ -1,6 +1,6 @@
 """Add unique constraint to category_keywords
 
-Revision ID: 004_add_category_keyword_constraint
+Revision ID: 004_keyword_unique
 Revises: 003_add_file_hash
 Create Date: 2025-01-25 10:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '004_add_category_keyword_constraint'
+revision = '004_keyword_unique'
 down_revision = '003_add_file_hash'
 branch_labels = None
 depends_on = None
