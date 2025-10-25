@@ -17,7 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Add unique constraint to prevent duplicate keywords per category+language"""
+    """Add unique index to prevent duplicate keywords per category+language"""
     # First, remove any existing duplicates (keep the one with highest weight)
     op.execute("""
         DELETE FROM category_keywords
@@ -28,14 +28,13 @@ def upgrade() -> None:
         )
     """)
 
-    # Add unique constraint
-    op.create_unique_constraint(
-        'uq_category_keyword_lang',
-        'category_keywords',
-        ['category_id', sa.text('LOWER(keyword)'), 'language_code']
-    )
+    # Add unique index with LOWER() function
+    op.execute("""
+        CREATE UNIQUE INDEX uq_category_keyword_lang
+        ON category_keywords (category_id, LOWER(keyword), language_code)
+    """)
 
 
 def downgrade() -> None:
-    """Remove unique constraint"""
-    op.drop_constraint('uq_category_keyword_lang', 'category_keywords', type_='unique')
+    """Remove unique index"""
+    op.execute("DROP INDEX IF EXISTS uq_category_keyword_lang")
