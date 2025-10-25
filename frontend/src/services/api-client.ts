@@ -238,10 +238,10 @@ export class ApiClient {
 
   private shouldRetry(status: number, attempt: number, maxRetries: number): boolean {
     if (attempt >= maxRetries) return false
-    
-    // Only retry server errors (500+), timeouts (408), and rate limits (429)
-    // Do NOT retry 401 - those should be handled by auth flow, not retried
-    return status >= 500 || status === 408 || status === 429
+
+    // Only retry timeouts (408) and rate limits (429)
+    // Do NOT retry 401 (auth errors) or 500+ (server errors should fail fast)
+    return status === 408 || status === 429
   }
 
   private isRetriableError(error: Error): boolean {
