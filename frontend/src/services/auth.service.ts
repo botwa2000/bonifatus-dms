@@ -123,8 +123,24 @@ export class AuthService {
     sessionStorage.removeItem('oauth_state_timestamp')
   }
 
+  clearOAuthProcessingFlags(): void {
+    // Remove all oauth_processing_* keys from sessionStorage
+    // This prevents stale flags from previous login attempts from blocking new attempts
+    const keysToRemove: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key && key.startsWith('oauth_processing_')) {
+        keysToRemove.push(key)
+      }
+    }
+    keysToRemove.forEach(key => sessionStorage.removeItem(key))
+  }
+
   async initializeGoogleOAuth(): Promise<void> {
     try {
+      // Clear any stale OAuth processing flags from previous attempts
+      this.clearOAuthProcessingFlags()
+
       const config = await this.getOAuthConfig()
       const state = this.generateSecureState()
 
@@ -318,6 +334,10 @@ export class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('user')
     }
+
+    // Clear OAuth state and processing flags
+    this.clearStoredOAuthState()
+    this.clearOAuthProcessingFlags()
 
     // httpOnly cookies are cleared by backend /logout endpoint
     // Frontend cannot access or clear httpOnly cookies (by design for security)
