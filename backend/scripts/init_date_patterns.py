@@ -17,13 +17,13 @@ import json
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from backend.app.core.config import settings
+from app.core.config import settings
 
 
 # Date regex patterns for each language
