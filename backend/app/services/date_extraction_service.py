@@ -219,6 +219,7 @@ class DateExtractionService:
         if not text:
             return []
 
+        logger.info(f"[DATE DEBUG] Starting date extraction for language: {language}")
         patterns = self.get_date_patterns(db, language)
         month_names = self.get_month_names(db, language)
         keywords = self.get_date_type_keywords(db, language)
@@ -226,6 +227,9 @@ class DateExtractionService:
         if not patterns:
             logger.warning(f"No date patterns available for language: {language}")
             return []
+
+        logger.info(f"[DATE DEBUG] Using {len(patterns)} date patterns for language: {language}")
+        logger.info(f"[DATE DEBUG] Text sample (first 200 chars): {text[:200]}")
 
         dates_found = []
 
@@ -239,6 +243,12 @@ class DateExtractionService:
                         extracted_text = match.group(0)
                         confidence = 0.9 if date_type != 'unknown' else 0.7
 
+                        # DEBUG: Log each date found with context
+                        context = text[max(0, match.start()-30):min(len(text), match.end()+30)]
+                        logger.info(f"[DATE DEBUG] Found date: {parsed_date} | Type: {date_type} | "
+                                  f"Confidence: {confidence} | Extracted: '{extracted_text}' | "
+                                  f"Format: {format_type} | Context: '...{context}...'")
+
                         dates_found.append((parsed_date, date_type, confidence, extracted_text))
             except re.error as e:
                 logger.error(f"Invalid regex pattern: {pattern_str} - {e}")
@@ -247,6 +257,8 @@ class DateExtractionService:
         dates_found.sort(key=lambda x: x[2], reverse=True)
 
         logger.info(f"Extracted {len(dates_found)} dates from text (lang: {language})")
+        if dates_found:
+            logger.info(f"[DATE DEBUG] Primary date selected: {dates_found[0][0]} (type: {dates_found[0][1]}, confidence: {dates_found[0][2]})")
         return dates_found
 
     def get_primary_date(

@@ -304,11 +304,11 @@ export default function BatchUploadPage() {
       setMessage(null)
       
       // Upload all files
-      const uploads = uploadStates.map(state => 
+      const uploads = uploadStates.map(state =>
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/confirm-upload`, {
           method: 'POST',
+          credentials: 'include', // Send httpOnly cookies with JWT token
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({

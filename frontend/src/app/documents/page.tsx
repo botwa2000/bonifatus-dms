@@ -3,11 +3,13 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuth } from '@/contexts/auth-context'
+import { authService } from '@/services/auth.service'
 import { apiClient } from '@/services/api-client'
 import { Button, Alert, Badge } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
 interface Category {
   id: string
@@ -42,9 +44,9 @@ type SortField = 'title' | 'created_at' | 'file_size'
 type SortDirection = 'asc' | 'desc'
 
 export default function DocumentsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, user, logout } = useAuth()
   const router = useRouter()
-  
+
   const [documents, setDocuments] = useState<Document[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -52,20 +54,53 @@ export default function DocumentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  
+
   const [deletingDocument, setDeletingDocument] = useState<Document | null>(null)
+
+  // Header state
+  const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login')
     }
   }, [isAuthenticated, authLoading, router])
+
+  // Load trial info
+  useEffect(() => {
+    const loadTrialInfo = async () => {
+      try {
+        const info = await authService.getTrialInfo()
+        setTrialInfo(info)
+      } catch (error) {
+        console.error('Failed to load trial info:', error)
+      }
+    }
+
+    if (isAuthenticated) {
+      loadTrialInfo()
+    }
+  }, [isAuthenticated])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -246,31 +281,123 @@ export default function DocumentsPage() {
 
   const totalSize = documents.reduce((sum, doc) => sum + doc.file_size, 0)
 
+  const isTrialActive = authService.isTrialActive()
+
+  const handleLogout = async () => {
+    await logout()
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
       <header className="bg-white shadow-sm border-b border-neutral-200">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-neutral-600 hover:text-neutral-900">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </Link>
+              <div className="relative h-8 w-8">
+                <Image
+                  src="/favicon.ico"
+                  alt="Bonifatus DMS"
+                  fill
+                  className="object-contain"
+                />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Documents</h1>
-                <p className="text-sm text-neutral-600">Manage your document library</p>
+                <h1 className="text-2xl font-bold text-neutral-900">
+                  Bonifatus DMS
+                </h1>
+                <p className="text-sm text-neutral-600">Document Management System</p>
               </div>
             </div>
-            
-            <Link href="/documents/upload">
-              <Button>
-                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Upload Document
-              </Button>
-            </Link>
+
+            <div className="flex items-center space-x-4">
+              {/* Trial Status */}
+              {isTrialActive && trialInfo && (
+                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                  Premium Trial: {String(trialInfo.days_remaining)} days left
+                </div>
+              )}
+
+              {/* User Menu */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-neutral-100 transition-colors"
+                >
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-neutral-900">{user?.full_name}</p>
+                    <p className="text-xs text-neutral-600">{user?.email}</p>
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-admin-primary flex items-center justify-center text-white font-medium">
+                    {user?.full_name?.charAt(0) || 'U'}
+                  </div>
+                  <svg
+                    className={`h-4 w-4 text-neutral-600 transition-transform ${showDropdown ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false)
+                        router.push('/dashboard')
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      <span>Dashboard</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false)
+                        router.push('/settings')
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Settings</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false)
+                        router.push('/profile')
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span>Profile</span>
+                    </button>
+                    <hr className="my-1 border-neutral-200" />
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false)
+                        handleLogout()
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </header>

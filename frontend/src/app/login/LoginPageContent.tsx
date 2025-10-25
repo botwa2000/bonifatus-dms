@@ -6,6 +6,9 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
 
+let renderCount = 0
+let effectCount = 0
+
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -13,12 +16,23 @@ export default function LoginPageContent() {
   const [isProcessing, setIsProcessing] = useState(true)
   const processingRef = useRef(false)
 
+  renderCount++
+  console.log(`[DEBUG] Component render #${renderCount}`)
+
   useEffect(() => {
+    effectCount++
+    console.log(`[DEBUG] useEffect execution #${effectCount}, processingRef.current = ${processingRef.current}`)
+
     const handleOAuthCallback = async () => {
       // Block ALL re-executions immediately (synchronous check + set)
+      console.log(`[DEBUG] handleOAuthCallback called (effect #${effectCount}), checking processingRef = ${processingRef.current}`)
+
       if (processingRef.current) {
+        console.log(`[DEBUG] BLOCKED - processingRef already true, exiting`)
         return
       }
+
+      console.log(`[DEBUG] Setting processingRef = true`)
       processingRef.current = true // Set BEFORE any async operations
 
       const code = searchParams.get('code')
@@ -55,7 +69,9 @@ export default function LoginPageContent() {
           // Redirect to dashboard (replace = no back button to /login)
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
+          console.log(`[DEBUG] About to call router.replace('${redirectUrl}')`)
           router.replace(redirectUrl)
+          console.log(`[DEBUG] router.replace called, processingRef = ${processingRef.current}`)
           // Don't reset processingRef - it stays true, blocking any future renders
         } else {
           console.error('[OAuth] Exchange failed:', result.error)
@@ -69,9 +85,12 @@ export default function LoginPageContent() {
         setIsProcessing(false)
         processingRef.current = false
       }
+
+      console.log(`[DEBUG] handleOAuthCallback completed (effect #${effectCount})`)
     }
 
     handleOAuthCallback()
+    console.log(`[DEBUG] useEffect #${effectCount} finished synchronous part, async handleOAuthCallback running in background`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run only once on mount to prevent re-execution during navigation
 
