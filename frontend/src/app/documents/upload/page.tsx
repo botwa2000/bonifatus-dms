@@ -25,6 +25,9 @@ interface FileAnalysisSuccess {
     suggested_category_id: string | null
     confidence: number
     detected_language?: string
+    document_date?: string | null
+    document_date_type?: string | null
+    document_date_confidence?: number | null
   }
   batch_id: string
 }
@@ -444,6 +447,24 @@ export default function BatchUploadPage() {
                               {state.analysis?.detected_language?.toUpperCase() || 'Unknown'} •
                               {(state.analysis?.keywords && Array.isArray(state.analysis.keywords)) ? state.analysis.keywords.length : 0} keywords
                             </p>
+                            {/* Display extracted date if available */}
+                            {state.analysis?.document_date && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge variant="info" className="text-xs">
+                                  📅 {new Date(state.analysis.document_date).toLocaleDateString()}
+                                  {state.analysis.document_date_type && (
+                                    <span className="ml-1 opacity-75">
+                                      ({state.analysis.document_date_type.replace('_', ' ')})
+                                    </span>
+                                  )}
+                                  {state.analysis.document_date_confidence && (
+                                    <span className="ml-1 opacity-75">
+                                      {Math.round(state.analysis.document_date_confidence)}% confidence
+                                    </span>
+                                  )}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                           <Button
                             variant="ghost"
