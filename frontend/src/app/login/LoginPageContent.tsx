@@ -15,13 +15,20 @@ export default function LoginPageContent() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
+      // FIRST: Check if we're already processing or redirecting
+      // This prevents race conditions during navigation
+      if (processingRef.current) {
+        console.log('[OAuth] Already processing/redirecting, skipping')
+        return
+      }
+
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const errorParam = searchParams.get('error')
 
       console.log('[OAuth] Callback initiated:', { hasCode: !!code, hasState: !!state, hasError: !!errorParam })
 
-      // No OAuth code - redirect to homepage
+      // No OAuth code - only redirect if we haven't started processing yet
       if (!code) {
         console.log('[OAuth] No code found, redirecting to homepage')
         router.push('/')
@@ -32,8 +39,8 @@ export default function LoginPageContent() {
       const attemptKey = `oauth_processing_${state || code}`
 
       // Check if already processed (prevents duplicate processing)
-      if (processingRef.current || sessionStorage.getItem(attemptKey)) {
-        console.log('[OAuth] Already processing, skipping duplicate')
+      if (sessionStorage.getItem(attemptKey)) {
+        console.log('[OAuth] Already processed this attempt, skipping')
         return
       }
 
@@ -59,10 +66,10 @@ export default function LoginPageContent() {
         console.log('[OAuth] Token exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
 
         if (result.success && result.user) {
-          // Redirect to dashboard
+          // Redirect to dashboard (use replace to avoid back button issues)
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
-          router.push(redirectUrl)
+          router.replace(redirectUrl)
           // Don't reset processingRef or remove attemptKey - component will unmount during redirect
         } else {
           console.error('[OAuth] Exchange failed:', result.error)
