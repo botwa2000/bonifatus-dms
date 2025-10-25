@@ -23,6 +23,7 @@ export function KeywordsManager({ categoryId, languageCode = 'en' }: KeywordsMan
   useEffect(() => {
     loadKeywords()
     loadOverlaps()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, languageCode])
 
   const loadKeywords = async () => {
@@ -70,8 +71,9 @@ export function KeywordsManager({ categoryId, languageCode = 'en' }: KeywordsMan
 
       await loadKeywords()
       await loadOverlaps()
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to add keyword')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Failed to add keyword')
     }
   }
 
@@ -80,8 +82,9 @@ export function KeywordsManager({ categoryId, languageCode = 'en' }: KeywordsMan
       await categoryService.updateKeywordWeight(categoryId, keywordId, weight)
       await loadKeywords()
       await loadOverlaps()
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update weight')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Failed to update weight')
     }
   }
 
@@ -99,8 +102,9 @@ export function KeywordsManager({ categoryId, languageCode = 'en' }: KeywordsMan
       await categoryService.deleteKeyword(categoryId, keywordId)
       await loadKeywords()
       await loadOverlaps()
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete keyword')
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Failed to delete keyword')
     }
   }
 
