@@ -22,11 +22,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // Initialize state from localStorage synchronously
+  // Initialize state from sessionStorage synchronously (more secure than localStorage)
   const getInitialUser = () => {
     if (typeof window === 'undefined') return null
     try {
-      const stored = localStorage.getItem('user')
+      const stored = sessionStorage.getItem('user')
       return stored ? JSON.parse(stored) : null
     } catch {
       return null
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null
+        const storedUser = typeof window !== 'undefined' ? sessionStorage.getItem('user') : null
 
         if (storedUser) {
           try {
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })
             return
           } catch {
-            localStorage.removeItem('user')
+            sessionStorage.removeItem('user')
           }
         }
 

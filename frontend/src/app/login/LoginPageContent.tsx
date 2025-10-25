@@ -15,10 +15,8 @@ export default function LoginPageContent() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // FIRST: Check if we're already processing or redirecting
-      // This prevents race conditions during navigation
+      // If already processing, NEVER run again (prevents all race conditions)
       if (processingRef.current) {
-        console.log('[OAuth] Already processing/redirecting, skipping')
         return
       }
 
@@ -28,25 +26,15 @@ export default function LoginPageContent() {
 
       console.log('[OAuth] Callback initiated:', { hasCode: !!code, hasState: !!state, hasError: !!errorParam })
 
-      // No OAuth code - only redirect if we haven't started processing yet
+      // No code? Redirect home. Simple.
       if (!code) {
         console.log('[OAuth] No code found, redirecting to homepage')
         router.push('/')
         return
       }
 
-      // Create unique key for this OAuth attempt
-      const attemptKey = `oauth_processing_${state || code}`
-
-      // Check if already processed (prevents duplicate processing)
-      if (sessionStorage.getItem(attemptKey)) {
-        console.log('[OAuth] Already processed this attempt, skipping')
-        return
-      }
-
-      // Mark as processing immediately
+      // Mark as processing FIRST (blocks all future useEffect runs)
       processingRef.current = true
-      sessionStorage.setItem(attemptKey, 'true')
       console.log('[OAuth] Starting token exchange...')
 
       try {
@@ -56,7 +44,6 @@ export default function LoginPageContent() {
           setError(`Authentication error: ${errorParam}`)
           setIsProcessing(false)
           processingRef.current = false
-          sessionStorage.removeItem(attemptKey)
           return
         }
 
@@ -66,24 +53,22 @@ export default function LoginPageContent() {
         console.log('[OAuth] Token exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
 
         if (result.success && result.user) {
-          // Redirect to dashboard (use replace to avoid back button issues)
+          // Redirect to dashboard (replace = no back button to /login)
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
           console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
           router.replace(redirectUrl)
-          // Don't reset processingRef or remove attemptKey - component will unmount during redirect
+          // Don't reset processingRef - it stays true, blocking any future renders
         } else {
           console.error('[OAuth] Exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
           processingRef.current = false
-          sessionStorage.removeItem(attemptKey)
         }
       } catch (err) {
         console.error('[OAuth] Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
         processingRef.current = false
-        sessionStorage.removeItem(attemptKey)
       }
     }
 

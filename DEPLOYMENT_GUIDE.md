@@ -482,23 +482,26 @@ Immutable Filename Strategy:
 **Phase 1: Security Foundation** (Complete - October 17, 2025)
 - httpOnly cookie authentication (replaced localStorage)
 - Cross-domain authentication architecture (api.bonidoc.com ↔ bonidoc.com)
-- OAuth 2.0 login flow with Google (fully working)
+- OAuth 2.0 login flow with Google (fully working, first attempt success)
 - Session management with 7-day refresh tokens
 - Rate limiting (3-tier: auth/write/read)
 - Security headers middleware (HSTS, CSP, X-Frame-Options)
-- Field-level encryption service (AES-256)
+- Field-level encryption service (AES-256) with dedicated ENCRYPTION_KEY
 - Behavioral trust scoring
 - CAPTCHA service integration
 - File validation (multi-layer security)
 - AuthContext with localStorage caching for performance
+- Secure token storage (Google Drive refresh tokens encrypted with Fernet)
 
-**Infrastructure** (Production)
+**Infrastructure** (Production - October 25, 2025)
 - Hetzner VPS deployment (Docker + Nginx)
 - Local PostgreSQL 16 database (30 tables + SSL)
 - Manual deployment workflow
 - Alembic migrations (2 clean migrations: schema + data)
-- Google OAuth authentication
+- Google OAuth authentication (login + Drive scopes)
 - JWT-based session management
+- Docker container deployment (frontend + backend)
+- Automated container rebuilds (clearing Python bytecode cache)
 
 **Core Features** (Production)
 - User management (profile, settings, deactivation)
@@ -509,33 +512,7 @@ Immutable Filename Strategy:
 - Comprehensive audit logging
 - Multi-category assignment architecture (unlimited categories, one primary)
 
-**Document Processing** (Partial)
-- Batch upload analysis endpoint
-- ML keyword extraction (frequency-based)
-- Language detection (en/de/ru)
-- Standardized filename generation
-- ML category learning framework (structure in place)
-
-### 5.2 In Progress ⏳
-
-**Document Upload Flow**
-- Google Drive storage integration (Phase 3)
-- Confirm upload endpoint (permanent storage)
-- Document list view with filters
-- Document detail page
-- Download functionality
-
-### 5.3 Next Immediate Steps
-
-**Start Phase 2: Document Processing & Classification**
-
-**Step 1: Database Schema Updates**
-- Add document_date, document_date_confidence to documents table
-- Create document_dates table for secondary dates (optional, can be Phase 2B)
-- Verify document_categories has is_primary flag
-- Verify category_keywords has language column and weight column
-
-**Step 2: OCR & Text Extraction (Phase 2A)** ✅ COMPLETED
+**Phase 2A: OCR & Text Extraction** ✅ COMPLETE (October 24, 2025)
 - ✅ Replaced PyPDF2 with PyMuPDF for superior text extraction
 - ✅ Implemented spell-check based quality assessment (pyspellchecker)
 - ✅ Created two-stage extraction strategy (fast path + quality check + re-OCR)
@@ -545,39 +522,81 @@ Immutable Filename Strategy:
 - ✅ Tested: 100% accuracy on problematic bank statement (9/9 keywords)
 - Performance: 95% of docs <1s, 5% need OCR (3-8s/page)
 
-**Step 3: Keyword Extraction (Phase 2B)**
-- Create keyword extraction service (language-aware)
-- Implement stop word filtering per language
-- Extract semantic keywords only (no entities, no numbers)
-- Frequency-based scoring with 50-char length limit
-- Store in keywords and document_keywords tables
+**Phase 3: Google Drive Integration** ✅ COMPLETE (October 25, 2025)
+- ✅ OAuth 2.0 Drive connection with scope: `drive.file` (secure, limited access)
+- ✅ Folder structure initialization on first connection:
+  - Main folder: `/Bonifatus_DMS/`
+  - Category subfolders created automatically with translations
+  - Config folder: `.config/` for metadata
+- ✅ Document upload to Drive with standardized filenames
+- ✅ Filename normalization: `YYYYMMDD_HHMMSS_CategoryCode_OriginalName.ext`
+- ✅ Drive file ID storage in database
+- ✅ Google Drive service with proper error handling
+- ✅ Drive connection status in settings UI
+- ✅ Document metadata stored in PostgreSQL, files in user's Drive
 
-**Step 4: Date Extraction (Phase 2D)**
-- Create date extraction service with multi-language patterns
-- Extract ONE primary document date per document
-- Store as ISO format with confidence score
-- Pattern matching for ru/en/de date formats
+**Phase 2B: Date Extraction** ✅ COMPLETE (October 25, 2025 - 14:50 UTC)
+- ✅ Multi-language date pattern recognition (en/de/ru)
+- ✅ 11 date types supported: invoice_date, due_date, tax_year, signature_date, effective_date, expiry_date, tax_period_start, tax_period_end, birth_date, issue_date, unknown
+- ✅ Database-driven configuration (9 system_settings entries)
+- ✅ Date extraction service fully integrated into document analysis workflow
+- ✅ Primary date storage in documents.document_date with type and confidence
+- ✅ UI display with date badge showing date, type, and confidence percentage
+- ✅ Standardized filename generation using extracted document date
+- ✅ Initialization script: `backend/scripts/init_date_patterns.py`
+- Deployment: Frontend rebuilt 14:42 UTC, Backend rebuilt 14:50 UTC
+- Database: 9 patterns populated (3 per language: patterns, month names, keywords)
+- Example UI output: "📅 10/15/2024 (invoice date) 90% confidence"
 
-**Step 5: Classification Engine (Phase 2C)**
-- Implement keyword overlap scoring per language
-- Apply confidence thresholds (60% min, 20% gap)
-- Suggest ONE primary category (highest score)
-- Populate system keywords database (150+ in en/de/ru)
-- Handle ambiguous cases ("Other" category)
+**Document Processing** (October 25, 2025)
+- ✅ Batch upload analysis endpoint with virus scanning
+- ✅ Confirm upload endpoint (saves to Drive + database)
+- ✅ ML keyword extraction service (frequency-based, language-aware)
+- ✅ Language detection (en/de/ru)
+- ✅ Standardized filename generation with category codes
+- ✅ Date extraction service (comprehensive, multi-language) - ✅ COMPLETE
+- ✅ Date extraction UI display (badge with date type and confidence)
+- ✅ Date patterns configuration (9 system_settings entries for en/de/ru)
+- ⏳ ML category learning framework (structure in place, needs training data)
+- ⏳ Classification engine (needs keyword population)
 
-**Step 6: ML Learning Loop (Phase 2E)**
-- Record classification decisions in document_classification_log
-- Implement weight adjustment logic (+10% correct, -5% incorrect)
-- Track both primary and secondary category assignments
-- Create daily metrics calculation
-- Build "why this category?" explanation UI
+### 5.2 In Progress ⏳
 
-**Step 7: Testing**
-- Test with sample documents in all three languages
-- Verify ≥70% primary category accuracy
-- Verify ≥80% date extraction accuracy
-- Confirm ML weight adjustments working
-- Test multi-category assignment flow
+**Phase 2: Document Processing & Classification** (Active - October 25, 2025)
+- ⏳ Classification engine training (populate category_keywords)
+- ⏳ ML learning loop activation
+- ⏳ Keyword extraction integration with classification
+
+**UI Development**
+- ⏳ Document list view with filters and search
+- ⏳ Document detail page with Drive preview
+- ⏳ Download functionality via temporary links
+- ⏳ "Why this category?" explanation UI
+
+### 5.3 Next Immediate Steps
+
+**PRIORITY 1: Populate Category Keywords** (Phase 2C)
+
+The classification engine exists but needs training data:
+
+1. Create seed data script with 150+ keywords across 9 categories
+2. Populate category_keywords table with initial weights (1.0 default)
+3. Map keywords to categories for each language (en, de, ru)
+4. Test classification accuracy on sample documents
+
+**PRIORITY 2: Activate ML Learning Loop** (Phase 2E)
+
+1. Integrate classification logging on document confirm
+2. Implement weight adjustment on user corrections
+3. Create daily metrics calculation job
+4. Build UI to show matched keywords and confidence
+
+**PRIORITY 3: Complete UI Features**
+
+1. Document list view with category filters
+2. Document detail page with metadata
+3. Download via temporary Drive links
+4. Search functionality with date range filters
 
 ---
 

@@ -202,10 +202,11 @@ export class AuthService {
         updated_at: new Date().toISOString()  // Not returned by backend, use current time
       }
 
-      // Cache user data for immediate use - NO EXTRA API CALL NEEDED!
+      // Cache user data for immediate use in sessionStorage (more secure than localStorage)
+      // sessionStorage clears when browser tab closes, reducing data persistence risk
       if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(user))
-        console.log('[AuthService] User cached in localStorage')
+        sessionStorage.setItem('user', JSON.stringify(user))
+        console.log('[AuthService] User cached in sessionStorage')
       }
 
       // Clear OAuth state
@@ -252,9 +253,9 @@ export class AuthService {
       // httpOnly cookies are sent automatically with this request
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
-      // Cache user info in localStorage for UI display (non-sensitive data only)
+      // Cache user info in sessionStorage for UI display (non-sensitive data only)
       if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(response))
+        sessionStorage.setItem('user', JSON.stringify(response))
       }
 
       return response
@@ -341,9 +342,9 @@ export class AuthService {
   }
 
   clearAllAuthData(): void {
-    // Clear cached user data from localStorage
+    // Clear cached user data from sessionStorage
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('user')
+      sessionStorage.removeItem('user')
     }
 
     // Clear OAuth state and processing flags
