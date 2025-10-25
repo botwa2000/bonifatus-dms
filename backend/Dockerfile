@@ -62,6 +62,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY app/ ./app/
 
+# Copy scripts directory
+COPY scripts/ ./scripts/
+
 # Copy Alembic migration files
 COPY alembic.ini .
 COPY alembic/ ./alembic/
