@@ -15,10 +15,11 @@ export default function LoginPageContent() {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // If already processing, NEVER run again (prevents all race conditions)
+      // Block ALL re-executions immediately (synchronous check + set)
       if (processingRef.current) {
         return
       }
+      processingRef.current = true // Set BEFORE any async operations
 
       const code = searchParams.get('code')
       const state = searchParams.get('state')
@@ -33,8 +34,6 @@ export default function LoginPageContent() {
         return
       }
 
-      // Mark as processing FIRST (blocks all future useEffect runs)
-      processingRef.current = true
       console.log('[OAuth] Starting token exchange...')
 
       try {
@@ -73,7 +72,8 @@ export default function LoginPageContent() {
     }
 
     handleOAuthCallback()
-  }, [searchParams, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run only once on mount to prevent re-execution during navigation
 
   // Show error page
   if (error) {
