@@ -169,8 +169,11 @@ export class AuthService {
     state: string | null
   ): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
+      console.log('[AuthService] Exchanging token with backend...')
+
       // Validate state if provided
       if (state && !this.validateOAuthState(state)) {
+        console.error('[AuthService] State validation failed')
         throw new Error('Invalid OAuth state - possible security issue')
       }
 
@@ -179,6 +182,12 @@ export class AuthService {
       const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
         code,
         state: state || ''
+      })
+
+      console.log('[AuthService] Backend response received:', {
+        hasUserId: !!response.user_id,
+        email: response.email,
+        tier: response.tier
       })
 
       // Convert TokenResponse to User object (all data from backend)
@@ -196,15 +205,17 @@ export class AuthService {
       // Cache user data for immediate use - NO EXTRA API CALL NEEDED!
       if (typeof window !== 'undefined') {
         localStorage.setItem('user', JSON.stringify(user))
+        console.log('[AuthService] User cached in localStorage')
       }
 
       // Clear OAuth state
       this.clearStoredOAuthState()
 
+      console.log('[AuthService] Token exchange successful')
       return { success: true, user }
 
     } catch (error) {
-      console.error('Token exchange failed:', error)
+      console.error('[AuthService] Token exchange failed:', error)
       this.clearStoredOAuthState()
 
       const errorMessage = error instanceof Error ? error.message : 'Authentication failed'

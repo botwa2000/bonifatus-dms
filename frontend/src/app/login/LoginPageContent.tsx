@@ -19,8 +19,11 @@ export default function LoginPageContent() {
       const state = searchParams.get('state')
       const errorParam = searchParams.get('error')
 
+      console.log('[OAuth] Callback initiated:', { hasCode: !!code, hasState: !!state, hasError: !!errorParam })
+
       // No OAuth code - redirect to homepage
       if (!code) {
+        console.log('[OAuth] No code found, redirecting to homepage')
         router.push('/')
         return
       }
@@ -30,12 +33,14 @@ export default function LoginPageContent() {
 
       // Check if already processed (prevents duplicate processing)
       if (processingRef.current || sessionStorage.getItem(attemptKey)) {
+        console.log('[OAuth] Already processing, skipping duplicate')
         return
       }
 
       // Mark as processing immediately
       processingRef.current = true
       sessionStorage.setItem(attemptKey, 'true')
+      console.log('[OAuth] Starting token exchange...')
 
       try {
         // OAuth error from Google
@@ -51,20 +56,23 @@ export default function LoginPageContent() {
         // Exchange authorization code for JWT tokens
         const result = await authService.exchangeGoogleToken(code, state)
 
+        console.log('[OAuth] Token exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
+
         if (result.success && result.user) {
           // Redirect to dashboard
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
+          console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
           router.push(redirectUrl)
           // Don't reset processingRef or remove attemptKey - component will unmount during redirect
         } else {
-          console.error('OAuth exchange failed:', result.error)
+          console.error('[OAuth] Exchange failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
           processingRef.current = false
           sessionStorage.removeItem(attemptKey)
         }
       } catch (err) {
-        console.error('OAuth callback error:', err)
+        console.error('[OAuth] Callback error:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
         processingRef.current = false
