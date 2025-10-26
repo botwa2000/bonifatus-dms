@@ -150,7 +150,7 @@ export class AuthService {
         response_type: 'code',
         scope: config.scope,
         access_type: 'offline',
-        prompt: 'consent',
+        prompt: 'select_account', // Allow quick re-auth without re-consent for returning users
         state
       })
 

@@ -229,6 +229,153 @@ class DriveService:
             logger.error(f"Failed to get/create category folder '{category_name}': {e}")
             raise
 
+    def upload_document(
+        self,
+        refresh_token_encrypted: str,
+        file_content,
+        filename: str,
+        mime_type: str,
+        folder_id: Optional[str] = None
+    ) -> Optional[Dict]:
+        """
+        Upload document to user's Google Drive
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from user
+            file_content: File content (BytesIO or file-like object)
+            filename: Name of the file
+            mime_type: MIME type of the file
+            folder_id: Optional folder ID (uses main folder if not specified)
+
+        Returns:
+            Dict with file metadata (drive_file_id, name, size, web_view_link, etc.)
+        """
+        try:
+            from googleapiclient.http import MediaIoBaseUpload
+
+            service = self._get_drive_service(refresh_token_encrypted)
+
+            # If no folder specified, find/create main app folder
+            if not folder_id:
+                folder_id = self._find_folder(service, self.app_folder_name)
+                if not folder_id:
+                    folder_id = self._create_folder(service, self.app_folder_name)
+
+            file_metadata = {
+                'name': filename,
+                'parents': [folder_id]
+            }
+
+            media = MediaIoBaseUpload(
+                file_content,
+                mimetype=mime_type,
+                resumable=True
+            )
+
+            file_result = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id,name,size,mimeType,createdTime,modifiedTime,webViewLink'
+            ).execute()
+
+            logger.info(f"Document uploaded successfully: {file_result['id']}")
+
+            return {
+                'drive_file_id': file_result['id'],
+                'name': file_result['name'],
+                'size': int(file_result.get('size', 0)),
+                'mime_type': file_result['mimeType'],
+                'created_time': file_result['createdTime'],
+                'modified_time': file_result['modifiedTime'],
+                'web_view_link': file_result.get('webViewLink'),
+                'folder_id': folder_id
+            }
+
+        except HttpError as e:
+            logger.error(f"Failed to upload document '{filename}': {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Document upload error: {e}")
+            return None
+
+    def download_document(
+        self,
+        refresh_token_encrypted: str,
+        drive_file_id: str
+    ) -> Optional[bytes]:
+        """
+        Download document content from Google Drive
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from user
+            drive_file_id: Google Drive file ID
+
+        Returns:
+            File content as bytes, or None if download fails
+        """
+        try:
+            import io
+            from googleapiclient.http import MediaIoBaseDownload
+
+            service = self._get_drive_service(refresh_token_encrypted)
+
+            request = service.files().get_media(fileId=drive_file_id)
+            file_content = io.BytesIO()
+
+            downloader = MediaIoBaseDownload(file_content, request)
+            done = False
+
+            while not done:
+                status, done = downloader.next_chunk()
+                if status:
+                    logger.debug(f"Download progress: {int(status.progress() * 100)}%")
+
+            file_content.seek(0)
+            logger.info(f"Document downloaded successfully: {drive_file_id}")
+            return file_content.getvalue()
+
+        except HttpError as e:
+            if e.resp.status == 404:
+                logger.warning(f"File not found in Google Drive: {drive_file_id}")
+            else:
+                logger.error(f"Failed to download document: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Document download error: {e}")
+            return None
+
+    def delete_document(
+        self,
+        refresh_token_encrypted: str,
+        drive_file_id: str
+    ) -> bool:
+        """
+        Delete document from Google Drive
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from user
+            drive_file_id: Google Drive file ID
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            service = self._get_drive_service(refresh_token_encrypted)
+            service.files().delete(fileId=drive_file_id).execute()
+            logger.info(f"Document deleted successfully: {drive_file_id}")
+            return True
+
+        except HttpError as e:
+            if e.resp.status == 404:
+                logger.warning(f"File not found for deletion: {drive_file_id}")
+                return True  # Consider already deleted as success
+            else:
+                logger.error(f"Failed to delete document: {e}")
+                return False
+        except Exception as e:
+            logger.error(f"Document deletion error: {e}")
+            return False
+
 
 # Singleton instance
 drive_service = DriveService()

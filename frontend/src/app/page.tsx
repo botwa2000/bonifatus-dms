@@ -57,13 +57,13 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <GoogleLoginButton size="lg" className="min-w-[200px]">
-                Start Free Trial - 30 Days Premium
+                Start Free - 50 Pages/Month
               </GoogleLoginButton>
-              <Link 
-                href="/features" 
+              <Link
+                href="/pricing"
                 className="inline-flex items-center px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors"
               >
-                Learn More
+                View Pricing
                 <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -182,26 +182,79 @@ export default function HomePage() {
                   <span className="text-3xl font-bold text-neutral-900">€0</span>
                   <span className="text-neutral-600">/month</span>
                 </div>
-                <p className="text-neutral-600">Perfect for personal use</p>
+                <p className="text-neutral-600">Perfect for trying it out</p>
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Up to 100 documents</span>
+                  <span className="text-neutral-700"><strong>50 pages/month</strong></span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">1GB storage</span>
+                  <span className="text-neutral-700">Full AI features</span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Basic search</span>
+                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700">Solo user only</span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700">Community support</span>
+                </li>
+              </ul>
+              <GoogleLoginButton className="w-full" variant="secondary">
+                Start Free
+              </GoogleLoginButton>
+            </div>
+
+            {/* Starter Tier */}
+            <div className="bg-white rounded-xl border border-neutral-200 p-8">
+              <div className="text-center mb-8">
+                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Starter</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-bold text-neutral-900">€2.99</span>
+                  <span className="text-neutral-600">/month</span>
+                </div>
+                <p className="text-neutral-600">For light personal use</p>
+              </div>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700"><strong>250 pages/month</strong></span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700">Full AI features</span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700">Solo user only</span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -211,43 +264,49 @@ export default function HomePage() {
                 </li>
               </ul>
               <GoogleLoginButton className="w-full" variant="secondary">
-                Start Free
+                Get Started
               </GoogleLoginButton>
             </div>
 
-            {/* Trial/Premium Tier */}
+            {/* Professional Tier */}
             <div className="bg-white rounded-xl border-2 border-admin-primary p-8 relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-admin-primary text-white px-4 py-1 rounded-full text-sm font-medium">
-                  30 Days Free
+                  Most Popular
                 </span>
               </div>
               <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Premium</h3>
+                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Professional</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900">€29</span>
+                  <span className="text-3xl font-bold text-neutral-900">€7.99</span>
                   <span className="text-neutral-600">/month</span>
                 </div>
-                <p className="text-neutral-600">For professionals and teams</p>
+                <p className="text-neutral-600">For professionals & teams</p>
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Unlimited documents</span>
+                  <span className="text-neutral-700"><strong>1,500 pages/month</strong></span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">100GB storage</span>
+                  <span className="text-neutral-700">Full AI features</span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">AI-powered search & categorization</span>
+                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                </li>
+                <li className="flex items-center">
+                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700"><strong>+ Multi-user (3 delegates)</strong></span>
                 </li>
                 <li className="flex items-center">
                   <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -255,66 +314,18 @@ export default function HomePage() {
                   </svg>
                   <span className="text-neutral-700">Priority support</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">Advanced analytics</span>
-                </li>
               </ul>
               <GoogleLoginButton className="w-full">
-                Start 30-Day Free Trial
+                Get Started
               </GoogleLoginButton>
             </div>
+          </div>
 
-            {/* Enterprise Tier */}
-            <div className="bg-white rounded-xl border border-neutral-200 p-8">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Enterprise</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900">Custom</span>
-                </div>
-                <p className="text-neutral-600">For large organizations</p>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">Everything in Premium</span>
-                </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">Unlimited storage</span>
-                </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">SSO integration</span>
-                </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">Dedicated support</span>
-                </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700">Custom integrations</span>
-                </li>
-              </ul>
-              <Link 
-                href="/contact" 
-                className="w-full inline-flex items-center justify-center px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors"
-              >
-                Contact Sales
-              </Link>
-            </div>
+          <div className="mt-12 text-center">
+            <p className="text-neutral-600 text-sm">
+              <strong>Fair use policy:</strong> Consistent usage above 2x stated limits may require an upgrade.
+              Documents stored on your own Google Drive - no storage limits from us!
+            </p>
           </div>
         </div>
       </section>
@@ -326,10 +337,10 @@ export default function HomePage() {
             Ready to transform your document management?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of professionals who trust Bonifatus DMS for their document needs.
+            Start free with 50 pages/month. Upgrade anytime as you grow.
           </p>
           <GoogleLoginButton size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
-            Get Started Free - 30 Days Premium
+            Get Started Free
           </GoogleLoginButton>
         </div>
       </section>

@@ -17,8 +17,7 @@ from app.schemas.category_schemas import (
     CategoryCreate, CategoryUpdate, CategoryResponse, CategoryListResponse,
     CategoryDeleteRequest, CategoryDeleteResponse, RestoreDefaultsResponse
 )
-from app.services.google_drive_service import google_drive_service
-from app.core.google_config import google_config
+from app.services.drive_service import drive_service
 
 logger = logging.getLogger(__name__)
 
@@ -591,29 +590,40 @@ class CategoryService:
 
     async def _create_google_drive_folder(self, user_email: str, folder_name: str) -> Optional[str]:
         """Create category subfolder in Google Drive"""
+        session = db_manager.session_local()
         try:
-            # 1. Get Bonifatus_DMS root folder
-            root_folder_id = await google_config.find_bonifatus_folder(user_email)
+            # Get user's Google Drive refresh token
+            from sqlalchemy import text
+            user_result = session.execute(
+                text("SELECT drive_refresh_token_encrypted FROM users WHERE email = :email"),
+                {'email': user_email}
+            ).first()
+
+            if not user_result or not user_result[0]:
+                logger.warning(f"User {user_email} has not connected Google Drive, skipping folder creation")
+                return None
+
+            refresh_token_encrypted = user_result[0]
+
+            # Get Drive service
+            service = drive_service._get_drive_service(refresh_token_encrypted)
+
+            # 1. Find or create Bonifatus_DMS root folder
+            root_folder_id = drive_service._find_folder(service, drive_service.app_folder_name)
             if not root_folder_id:
-                root_folder_id = await google_config.create_bonifatus_folder(user_email)
-            
-            # 2. Create subfolder
-            file_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [root_folder_id]
-            }
-            
-            folder = google_drive_service.drive_service.files().create(
-                body=file_metadata,
-                fields='id'
-            ).execute()
-            
-            logger.info(f"Created Google Drive folder: {folder_name} ({folder['id']})")
-            return folder['id']
+                root_folder_id = drive_service._create_folder(service, drive_service.app_folder_name)
+
+            # 2. Create category subfolder
+            folder_id = drive_service._create_folder(service, folder_name, root_folder_id)
+
+            logger.info(f"Created Google Drive folder: {folder_name} ({folder_id})")
+            return folder_id
+
         except Exception as e:
             logger.error(f"Failed to create Google Drive folder: {e}")
             return None
+        finally:
+            session.close()
 
     async def _rename_google_drive_folder(
         self, 

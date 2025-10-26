@@ -16,29 +16,29 @@ export default function LoginPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // Check if user is already authenticated
-  // If so, redirect immediately to dashboard
+  // Single useEffect to handle both auth check and OAuth callback
+  // Priority: OAuth callback > cached user redirect
   useEffect(() => {
+    const code = searchParams.get('code')
+    const errorParam = searchParams.get('error')
+
+    // Priority 1: Handle OAuth callback if present
+    if (code || errorParam) {
+      handleOAuthCallback()
+      return
+    }
+
+    // Priority 2: If user already authenticated, redirect to dashboard
     if (typeof window !== 'undefined') {
       const cachedUser = sessionStorage.getItem('user')
-      if (cachedUser && !searchParams.get('code')) {
+      if (cachedUser) {
         console.log('[Login] User already authenticated, redirecting to dashboard')
         router.replace('/dashboard')
       }
     }
-  }, [router, searchParams])
 
-  // Handle OAuth callback
-  useEffect(() => {
-    const handleOAuthCallback = async () => {
-      const code = searchParams.get('code')
+    async function handleOAuthCallback() {
       const state = searchParams.get('state')
-      const errorParam = searchParams.get('error')
-
-      // No OAuth code? User needs to sign in normally
-      if (!code && !errorParam) {
-        return
-      }
 
       // Block duplicate executions with module-level flag
       if (isProcessingOAuth) {
@@ -85,8 +85,6 @@ export default function LoginPageContent() {
         isProcessingOAuth = false
       }
     }
-
-    handleOAuthCallback()
   }, [searchParams, router])
 
   // Show error page

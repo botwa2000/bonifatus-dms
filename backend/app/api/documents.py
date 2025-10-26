@@ -17,7 +17,7 @@ from app.schemas.document_schemas import (
     ErrorResponse
 )
 from app.services.document_service import document_service
-from app.services.google_drive_service import google_drive_service
+from app.services.drive_service import drive_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User
 
@@ -331,9 +331,19 @@ async def download_document(
                 detail="Document not found"
             )
 
-        file_content = await google_drive_service.download_document(document.google_drive_file_id)
+        # Check if user has connected Google Drive
+        if not current_user.drive_refresh_token_encrypted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please connect your Google Drive account in Settings before downloading documents"
+            )
 
-        if not file_content:
+        file_content_bytes = drive_service.download_document(
+            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            drive_file_id=document.google_drive_file_id
+        )
+
+        if not file_content_bytes:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document content not available"
@@ -342,7 +352,7 @@ async def download_document(
         logger.info(f"Document downloaded: {document_id} by user {current_user.email}")
 
         return StreamingResponse(
-            io.BytesIO(file_content.read()),
+            io.BytesIO(file_content_bytes),
             media_type=document.mime_type,
             headers={
                 "Content-Disposition": f"attachment; filename=\"{document.file_name}\""

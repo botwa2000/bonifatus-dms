@@ -15,7 +15,7 @@ from sqlalchemy import text
 
 from app.database.connection import db_manager
 from app.database.models import Document, DocumentCategory, Category, User
-from app.services.google_drive_service import google_drive_service
+from app.services.drive_service import drive_service
 from app.services.ml_learning_service import ml_learning_service
 from app.services.config_service import config_service
 
@@ -153,17 +153,29 @@ class DocumentUploadService:
                 if not cat_exists:
                     raise ValueError(f"Category {cat_id} not found or access denied")
             
-            # Upload to Google Drive
+            # Get user's Google Drive refresh token
+            user_result = session.execute(
+                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
+                {'user_id': user_id}
+            ).first()
+
+            if not user_result or not user_result[0]:
+                logger.error(f"User {user_email} has not connected Google Drive")
+                raise ValueError("Please connect your Google Drive account in Settings before uploading documents")
+
+            refresh_token_encrypted = user_result[0]
+
+            # Upload to Google Drive using user's OAuth token
             logger.info(f"Uploading to Google Drive: {standardized_filename}")
 
             # Convert bytes to BytesIO for Google Drive API
             from io import BytesIO
             file_io = BytesIO(file_content)
 
-            drive_result = await google_drive_service.upload_document(
+            drive_result = drive_service.upload_document(
+                refresh_token_encrypted=refresh_token_encrypted,
                 file_content=file_io,
                 filename=standardized_filename,
-                user_email=user_email,
                 mime_type=mime_type
             )
 

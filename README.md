@@ -45,6 +45,42 @@ Bonifatus DMS is a **production-grade, AI-powered document management system** b
 
 ---
 
+## 💰 Pricing Model
+
+Bonifatus DMS uses **page-based pricing** to align costs with actual AI/OCR processing usage. Documents are stored on the user's own Google Drive (or OneDrive in the future) - we don't charge for storage!
+
+### **Pricing Tiers**
+
+| Tier | Price | Pages/Month | Users | Support |
+|------|-------|-------------|--------|---------|
+| **🆓 Free** | €0 | 50 pages | Solo | Community |
+| **💼 Starter** | €2.99/month | 250 pages | Solo | Email |
+| **🚀 Professional** | €7.99/month | 1,500 pages | Multi-user (3 delegates) | Priority |
+
+### **Key Features**
+
+- ✅ **No storage limits** - Files stored on your Google Drive
+- ✅ **Full AI features** on all tiers - Categorization, OCR, search
+- ✅ **Fair use policy** - Up to 2x stated limits (e.g., Pro = 3,000 pages max)
+- ✅ **Multi-user access** on Professional tier - Grant view/upload permissions to assistants, accountants, team members
+
+### **Cost Structure**
+
+Our costs are driven by AI/OCR processing (Google Vision API @ $1.50/1,000 pages), NOT storage. This allows us to offer highly competitive pricing while maintaining healthy margins:
+
+- **Free:** 50 pages = ~$0.50 cost (acquisition cost, acceptable)
+- **Starter:** 250 pages = ~$0.60 cost → **85% profit margin**
+- **Professional:** 1,500 pages = ~$2.75 cost → **70% profit margin**
+
+### **Why Page-Based Pricing?**
+
+- A 1-page invoice costs €0.001 to process
+- A 100-page contract costs €0.10 to process
+- Same "1 document" but 100x different cost!
+- Page-based pricing reflects real processing costs and is fair for all users
+
+---
+
 ## 🏗️ Architecture & Technology Stack
 
 ### **System Architecture**

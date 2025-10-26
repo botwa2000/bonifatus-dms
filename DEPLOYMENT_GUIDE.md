@@ -64,6 +64,34 @@ BoniDoc is a professional document management system that combines secure storag
 - Mobile-responsive interface with dark mode
 - Accessible via mouse, keyboard, and touch
 
+### 1.4 Pricing Model & Business Strategy
+
+**Competitive Page-Based Pricing**
+
+BoniDoc uses page-based pricing (not document count or storage) to align revenue with actual AI/OCR processing costs:
+
+| Tier | Price | Pages/Month | Users | Key Features |
+|------|-------|-------------|-------|--------------|
+| **Free** | €0 | 50 pages | Solo | Full AI features, community support |
+| **Starter** | €2.99/month | 250 pages | Solo | Full AI features, email support |
+| **Professional** | €7.99/month | 1,500 pages | Multi-user (3 delegates) | Full AI + priority support |
+
+**Business Advantages:**
+- **No storage costs** - Documents stored on user's Google Drive/OneDrive
+- **Aligned with costs** - Page processing reflects real AI/OCR expenses ($1.50/1,000 pages)
+- **Healthy margins** - 70-85% profit margins on paid tiers
+- **Competitive pricing** - €2.99-7.99/month vs competitors at €10-30/month
+- **Fair use policy** - Up to 2x stated limits (e.g., Pro = 3,000 pages soft cap)
+
+**Revenue Projections (Conservative):**
+- 1,000 users (70% free, 20% Starter, 10% Pro) = **€1,397 MRR** (€16.7k/year)
+- 5,000 users (same split) = **€6,985 MRR** (€83.8k/year)
+
+**Target Market:**
+- Individuals: Freelancers, consultants managing personal documents
+- Small businesses: 1-5 person teams needing shared document access
+- Professional services: Accountants, lawyers handling client documents
+
 ---
 
 ## 2. Technology Stack & Architecture Overview

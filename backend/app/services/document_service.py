@@ -14,7 +14,7 @@ from sqlalchemy import select, func, text, and_, or_
 
 from app.database.models import Document, Category, User, AuditLog, SystemSetting
 from app.database.connection import db_manager
-from app.services.google_drive_service import google_drive_service
+from app.services.drive_service import drive_service
 from app.schemas.document_schemas import (
     DocumentUploadResponse, DocumentResponse, DocumentUpdateRequest,
     DocumentListResponse, DocumentSearchRequest, DocumentStorageInfo,
@@ -201,13 +201,24 @@ class DocumentService:
                 primary_category.translations[0].name if primary_category.translations else "Other"
             )
 
-            drive_result = await google_drive_service.upload_document(
+            # Get user's Google Drive refresh token
+            user_result = session.execute(
+                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
+                {'user_id': user_id}
+            ).first()
+
+            if not user_result or not user_result[0]:
+                raise ValueError("Please connect your Google Drive account in Settings before uploading documents")
+
+            refresh_token_encrypted = user_result[0]
+
+            drive_result = drive_service.upload_document(
+                refresh_token_encrypted=refresh_token_encrypted,
                 file_content=file_content,
                 filename=standardized_filename,
-                user_email=user_email,
                 mime_type=mime_type
             )
-            
+
             if not drive_result:
                 raise Exception("Failed to upload to Google Drive")
 
@@ -370,9 +381,22 @@ class DocumentService:
             if not document or document.user_id != user_id:
                 return False
 
-            drive_success = await google_drive_service.delete_document(document.google_drive_file_id)
-            if not drive_success:
-                logger.warning(f"Failed to delete from Google Drive: {document.google_drive_file_id}")
+            # Get user's Google Drive refresh token
+            user_result = session.execute(
+                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
+                {'user_id': user_id}
+            ).first()
+
+            if user_result and user_result[0]:
+                refresh_token_encrypted = user_result[0]
+                drive_success = drive_service.delete_document(
+                    refresh_token_encrypted=refresh_token_encrypted,
+                    drive_file_id=document.google_drive_file_id
+                )
+                if not drive_success:
+                    logger.warning(f"Failed to delete from Google Drive: {document.google_drive_file_id}")
+            else:
+                logger.warning(f"User {user_id} has no Google Drive connection, skipping Drive deletion")
 
             old_values = {
                 "title": document.title,
