@@ -5,16 +5,23 @@ Production-ready implementation with comprehensive error handling
 """
 
 import logging
-import uuid
+import uuid as uuid_lib
 import hashlib
 import re
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import and_, or_
 
 from app.database.connection import db_manager
-from app.database.models import Document, DocumentCategory, Category, User
+from app.database.models import (
+    Document,
+    DocumentCategory,
+    Category,
+    CategoryTranslation,
+    User,
+    AuditLog
+)
 from app.services.drive_service import drive_service
 from app.services.ml_learning_service import ml_learning_service
 from app.services.config_service import config_service
@@ -84,13 +91,10 @@ class DocumentUploadService:
             else:
                 category_ids_ordered = category_ids
 
-            # Get category code for standardized filename
+            # Get category code for standardized filename using ORM
             primary_cat_id = category_ids_ordered[0]
-            category_code_result = session.execute(
-                text("SELECT category_code FROM categories WHERE id = :cat_id"),
-                {'cat_id': primary_cat_id}
-            ).scalar()
-            category_code = category_code_result or 'OTH'
+            primary_category = session.query(Category).filter(Category.id == primary_cat_id).first()
+            category_code = primary_category.category_code if primary_category else 'OTH'
 
             # Get document date for filename (or None to use current timestamp)
             document_date = analysis_result.get('document_date')
@@ -116,21 +120,17 @@ class DocumentUploadService:
             
             # Calculate file hash for duplicate detection
             file_hash = hashlib.sha256(file_content).hexdigest()
-            
-            # Check for duplicates
-            duplicate = session.execute(
-                text("""
-                    SELECT id, title, file_name
-                    FROM documents
-                    WHERE file_hash = :hash
-                    AND user_id = :user_id
-                    LIMIT 1
-                """),
-                {'hash': file_hash, 'user_id': user_id}
+
+            # Check for duplicates using ORM
+            duplicate = session.query(Document).filter(
+                and_(
+                    Document.file_hash == file_hash,
+                    Document.user_id == user_id
+                )
             ).first()
-            
+
             if duplicate:
-                logger.warning(f"Duplicate document detected: {file_hash} - existing: {duplicate[1]}")
+                logger.warning(f"Duplicate document detected: {file_hash} - existing: {duplicate.title}")
                 # Optionally: return duplicate info or continue with upload
                 # For now, we'll continue and mark as duplicate
             
@@ -139,34 +139,55 @@ class DocumentUploadService:
             if len(category_ids) > max_categories:
                 raise ValueError(f"Maximum {max_categories} categories allowed per document")
             
-            # Validate categories exist and user has access
+            # Validate categories exist and user has access using ORM
             for cat_id in category_ids_ordered:
-                cat_exists = session.execute(
-                    text("""
-                        SELECT id FROM categories 
-                        WHERE id = :cat_id 
-                        AND (user_id = :user_id OR is_system = true)
-                    """),
-                    {'cat_id': cat_id, 'user_id': user_id}
+                cat_exists = session.query(Category).filter(
+                    and_(
+                        Category.id == cat_id,
+                        or_(
+                            Category.user_id == user_id,
+                            Category.is_system == True
+                        )
+                    )
                 ).first()
-                
+
                 if not cat_exists:
                     raise ValueError(f"Category {cat_id} not found or access denied")
             
-            # Get user's Google Drive refresh token
-            user_result = session.execute(
-                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
-                {'user_id': user_id}
-            ).first()
+            # Get user's Google Drive refresh token using ORM
+            user = session.query(User).filter(User.id == user_id).first()
 
-            if not user_result or not user_result[0]:
+            if not user or not user.drive_refresh_token_encrypted:
                 logger.error(f"User {user_email} has not connected Google Drive")
                 raise ValueError("Please connect your Google Drive account in Settings before uploading documents")
 
-            refresh_token_encrypted = user_result[0]
+            refresh_token_encrypted = user.drive_refresh_token_encrypted
 
-            # Upload to Google Drive using user's OAuth token
-            logger.info(f"Uploading to Google Drive: {standardized_filename}")
+            # Get category info for folder structure
+            category_translation = session.query(CategoryTranslation).filter(
+                and_(
+                    CategoryTranslation.category_id == primary_cat_id,
+                    CategoryTranslation.language_code == language_code
+                )
+            ).first()
+
+            category_name = category_translation.name if category_translation else primary_category.reference_key
+            category_code_for_folder = primary_category.category_code
+
+            # Get or create category folder in Google Drive
+            service = drive_service._get_drive_service(refresh_token_encrypted)
+            main_folder_id = drive_service._find_folder(service, drive_service.app_folder_name)
+            if not main_folder_id:
+                main_folder_id = drive_service._create_folder(service, drive_service.app_folder_name)
+
+            category_folder_id = drive_service.get_or_create_category_folder(
+                refresh_token_encrypted=refresh_token_encrypted,
+                category_name=category_name,
+                category_code=category_code_for_folder,
+                main_folder_id=main_folder_id
+            )
+
+            logger.info(f"Uploading to Google Drive: {standardized_filename} -> {category_name} ({category_code_for_folder})")
 
             # Convert bytes to BytesIO for Google Drive API
             from io import BytesIO
@@ -176,15 +197,13 @@ class DocumentUploadService:
                 refresh_token_encrypted=refresh_token_encrypted,
                 file_content=file_io,
                 filename=standardized_filename,
-                mime_type=mime_type
+                mime_type=mime_type,
+                folder_id=category_folder_id
             )
 
             if not drive_result:
                 logger.error(f"Google Drive upload failed: No result returned")
                 raise Exception(f"Google Drive upload failed")
-            
-            # Create document record
-            document_id = uuid.uuid4()
             
             # Extract document date information
             doc_date = analysis_result.get('document_date')  # ISO string
@@ -200,74 +219,47 @@ class DocumentUploadService:
                 except:
                     logger.warning(f"Failed to parse document_date: {doc_date}")
 
-            logger.info(f"Creating document record: {document_id}")
-            session.execute(
-                text("""
-                    INSERT INTO documents (
-                        id, user_id, title, description, file_name, original_filename,
-                        file_size, mime_type, file_hash, google_drive_file_id,
-                        web_view_link, primary_language, processing_status,
-                        document_date, document_date_type, document_date_confidence,
-                        is_duplicate, duplicate_of_document_id, batch_id,
-                        is_deleted, created_at, updated_at
-                    ) VALUES (
-                        :id, :user_id, :title, :description, :file_name, :original_filename,
-                        :file_size, :mime_type, :file_hash, :google_drive_file_id,
-                        :web_view_link, :primary_language, :processing_status,
-                        :document_date, :document_date_type, :document_date_confidence,
-                        :is_duplicate, :duplicate_of_document_id, :batch_id,
-                        :is_deleted, :created_at, :updated_at
-                    )
-                """),
-                {
-                    'id': str(document_id),
-                    'user_id': user_id,
-                    'title': title,
-                    'description': description,
-                    'file_name': standardized_filename,
-                    'original_filename': original_filename,
-                    'file_size': len(file_content),
-                    'mime_type': mime_type,
-                    'file_hash': file_hash,
-                    'google_drive_file_id': drive_result['drive_file_id'],
-                    'web_view_link': drive_result.get('web_view_link'),
-                    'primary_language': language_code,
-                    'processing_status': 'completed',
-                    'document_date': doc_date_value,
-                    'document_date_type': doc_date_type,
-                    'document_date_confidence': doc_date_confidence / 100.0 if doc_date_confidence else None,
-                    'is_duplicate': duplicate is not None,
-                    'duplicate_of_document_id': str(duplicate[0]) if duplicate else None,
-                    'batch_id': batch_id,
-                    'is_deleted': False,
-                    'created_at': datetime.now(timezone.utc),
-                    'updated_at': datetime.now(timezone.utc)
-                }
+            # Create document record using ORM
+            document = Document(
+                user_id=uuid_lib.UUID(user_id),
+                title=title,
+                description=description,
+                file_name=standardized_filename,
+                original_filename=original_filename,
+                file_size=len(file_content),
+                mime_type=mime_type,
+                file_hash=file_hash,
+                google_drive_file_id=drive_result['drive_file_id'],
+                web_view_link=drive_result.get('web_view_link'),
+                primary_language=language_code,
+                processing_status='completed',
+                document_date=doc_date_value,
+                document_date_type=doc_date_type,
+                document_date_confidence=doc_date_confidence / 100.0 if doc_date_confidence else None,
+                is_duplicate=duplicate is not None,
+                duplicate_of_document_id=duplicate.id if duplicate else None,
+                batch_id=uuid_lib.UUID(batch_id) if batch_id else None,
+                is_deleted=False
             )
+
+            session.add(document)
+            session.flush()  # Flush to get the document ID for relationships
+
+            logger.info(f"Creating document record: {document.id}")
             
-            # Link categories (with primary designation)
+            # Link categories (with primary designation) using ORM
             logger.info(f"Linking {len(category_ids_ordered)} categories")
             for idx, category_id in enumerate(category_ids_ordered):
                 is_primary = (idx == 0)
                 was_ai_suggested = (category_id == analysis_result.get('suggested_category_id'))
-                
-                session.execute(
-                    text("""
-                        INSERT INTO document_categories (
-                            id, document_id, category_id, is_primary, assigned_at, assigned_by_ai
-                        ) VALUES (
-                            :id, :doc_id, :cat_id, :is_primary, :assigned_at, :assigned_by_ai
-                        )
-                    """),
-                    {
-                        'id': str(uuid.uuid4()),
-                        'doc_id': str(document_id),
-                        'cat_id': category_id,
-                        'is_primary': is_primary,
-                        'assigned_at': datetime.now(timezone.utc),
-                        'assigned_by_ai': was_ai_suggested
-                    }
+
+                doc_category = DocumentCategory(
+                    document_id=document.id,
+                    category_id=uuid_lib.UUID(category_id),
+                    is_primary=is_primary,
+                    assigned_by_ai=was_ai_suggested
                 )
+                session.add(doc_category)
             
             # Record ML feedback for category prediction learning
             suggested_category_id = analysis_result.get('suggested_category_id')
@@ -277,78 +269,63 @@ class DocumentUploadService:
 
             logger.info(f"Recording ML feedback: suggested={suggested_category_id}, actual={actual_category_id}")
 
-            # Use new ML learning service
+            # Use ML learning service
             ml_learning_service.learn_from_decision(
                 db=session,
-                document_id=document_id,
-                suggested_category_id=uuid.UUID(suggested_category_id) if suggested_category_id else None,
-                actual_category_id=uuid.UUID(actual_category_id),
+                document_id=document.id,
+                suggested_category_id=uuid_lib.UUID(suggested_category_id) if suggested_category_id else None,
+                actual_category_id=uuid_lib.UUID(actual_category_id),
                 matched_keywords=matched_keywords,
                 document_keywords=document_keywords,
                 language=language_code,
                 confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None,
-                user_id=uuid.UUID(user_id)
+                user_id=uuid_lib.UUID(user_id)
             )
-            
-            # Create audit log entry
-            session.execute(
-                text("""
-                    INSERT INTO audit_logs (
-                        id, user_id, action, resource_type, resource_id,
-                        ip_address, new_values, status, created_at
-                    ) VALUES (
-                        :id, :user_id, 'document_uploaded', 'document', :resource_id,
-                        null, :new_values, 'success', :created_at
-                    )
-                """),
-                {
-                    'id': str(uuid.uuid4()),
-                    'user_id': user_id,
-                    'resource_id': str(document_id),
-                    'new_values': f'{{"title": "{title}", "categories": {len(category_ids_ordered)}, "keywords": {len(confirmed_keywords)}}}',
-                    'created_at': datetime.now(timezone.utc)
-                }
+
+            # Create audit log entry using ORM
+            audit_log = AuditLog(
+                user_id=uuid_lib.UUID(user_id),
+                action='document_uploaded',
+                resource_type='document',
+                resource_id=document.id,
+                new_values=f'{{"title": "{title}", "categories": {len(category_ids_ordered)}, "keywords": {len(confirmed_keywords)}}}',
+                status='success'
             )
+            session.add(audit_log)
             
             # Commit all changes
             session.commit()
             
-            logger.info(f"Document uploaded successfully: {document_id} - {title}")
-            
-            # Get category names for response
+            logger.info(f"Document uploaded successfully: {document.id} - {title}")
+
+            # Get category names for response using ORM
             category_names = []
             for cat_id in category_ids_ordered:
-                cat_name = session.execute(
-                    text("""
-                        SELECT ct.name 
-                        FROM category_translations ct
-                        JOIN categories c ON c.id = ct.category_id
-                        WHERE ct.category_id = :cat_id 
-                        AND ct.language_code = :lang
-                        LIMIT 1
-                    """),
-                    {'cat_id': cat_id, 'lang': language_code}
-                ).scalar()
-                
-                if not cat_name:
+                cat_id_uuid = uuid_lib.UUID(cat_id)
+
+                # Try user's language first
+                translation = session.query(CategoryTranslation).filter(
+                    and_(
+                        CategoryTranslation.category_id == cat_id_uuid,
+                        CategoryTranslation.language_code == language_code
+                    )
+                ).first()
+
+                if not translation:
                     # Fallback to English
-                    cat_name = session.execute(
-                        text("""
-                            SELECT name 
-                            FROM category_translations
-                            WHERE category_id = :cat_id 
-                            AND language_code = 'en'
-                            LIMIT 1
-                        """),
-                        {'cat_id': cat_id}
-                    ).scalar()
-                
-                category_names.append(cat_name or 'Unknown')
-            
+                    translation = session.query(CategoryTranslation).filter(
+                        and_(
+                            CategoryTranslation.category_id == cat_id_uuid,
+                            CategoryTranslation.language_code == 'en'
+                        )
+                    ).first()
+
+                category_names.append(translation.name if translation else 'Unknown')
+
             # Build success response
             return {
                 'success': True,
-                'document_id': str(document_id),
+                'document_id': str(document.id),
                 'title': title,
                 'filename': standardized_filename,
                 'original_filename': original_filename,
@@ -359,10 +336,10 @@ class DocumentUploadService:
                 'google_drive_file_id': drive_result['drive_file_id'],
                 'web_view_link': drive_result.get('web_view_link'),
                 'is_duplicate': duplicate is not None,
-                'duplicate_of_id': str(duplicate[0]) if duplicate else None,
+                'duplicate_of_id': str(duplicate.id) if duplicate else None,
                 'keywords_count': len(confirmed_keywords),
                 'language': language_code,
-                'created_at': datetime.now(timezone.utc).isoformat()
+                'created_at': document.created_at.isoformat()
             }
             
         except ValueError as e:

@@ -66,38 +66,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Set loading state BEFORE any async operations to prevent race conditions
-      console.log('[AuthContext] Starting auth initialization')
+      // CRITICAL: Load from sessionStorage SYNCHRONOUSLY before setting loading state
+      // This prevents race condition where Dashboard checks auth before user is loaded
+      const storedUser = typeof window !== 'undefined' ? sessionStorage.getItem('user') : null
+
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser)
+          console.log('[AuthContext] User loaded from sessionStorage SYNC:', userData.email)
+
+          // Set user and auth state IMMEDIATELY (synchronous)
+          setUser(userData)
+          setIsAuthenticated(true)
+          setIsLoading(false)
+          initializedRef.current = true
+
+          // Background refresh (async, doesn't block)
+          authService.getCurrentUser().catch(() => {
+            console.log('[AuthContext] Background refresh failed, clearing user')
+            if (mountedRef.current) {
+              setUser(null)
+              setIsAuthenticated(false)
+            }
+          })
+          return
+        } catch {
+          console.log('[AuthContext] Failed to parse stored user, removing')
+          sessionStorage.removeItem('user')
+        }
+      }
+
+      // No cached user - fetch from API
+      console.log('[AuthContext] No cached user, starting auth initialization')
       setIsLoading(true)
       initializedRef.current = true
 
       try {
-        const storedUser = typeof window !== 'undefined' ? sessionStorage.getItem('user') : null
-
-        if (storedUser) {
-          try {
-            const userData = JSON.parse(storedUser)
-            console.log('[AuthContext] User loaded from sessionStorage:', userData.email)
-            setUser(userData)
-            setIsAuthenticated(true)
-            setIsLoading(false)
-
-            // Background refresh
-            authService.getCurrentUser().catch(() => {
-              console.log('[AuthContext] Background refresh failed, clearing user')
-              if (mountedRef.current) {
-                setUser(null)
-                setIsAuthenticated(false)
-              }
-            })
-            return
-          } catch {
-            console.log('[AuthContext] Failed to parse stored user, removing')
-            sessionStorage.removeItem('user')
-          }
-        }
-
-        // Fetch current user from API
         console.log('[AuthContext] Fetching user from API')
         const currentUser = await authService.getCurrentUser()
 
@@ -122,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, [pathname, user])
+  }, [pathname])
 
   const initializeGoogleAuth = useCallback(async () => {
     try {
