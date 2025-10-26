@@ -946,6 +946,110 @@ This allows Claude Code to help debug, deploy, and maintain the production serve
 
 ---
 
+#### 🤖 Claude Code Autonomous Deployment Workflow
+
+**Authorization Model:** Once the user approves changes, Claude Code executes the complete deployment pipeline end-to-end without requiring additional approval for each step.
+
+**When to Use:**
+- User reviews code changes and says "commit and deploy to prod"
+- User approves all pending changes in one go
+- User wants hands-off deployment after initial review
+
+**Full Deployment Pipeline (Executed Automatically):**
+
+```bash
+# 1. LOCAL: Stage all changes
+git add backend/ frontend/
+
+# 2. LOCAL: Create comprehensive commit
+git commit -m "feat: descriptive message with full changelog"
+
+# 3. LOCAL: Push to GitHub
+git push origin main
+
+# 4. REMOTE: Pull latest code on production server
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main"
+
+# 5. REMOTE: Run database migrations
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose exec backend alembic upgrade head"
+
+# 6. REMOTE: Rebuild and restart containers
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose down && docker compose up -d --build"
+
+# 7. REMOTE: Verify deployment health
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose ps"
+curl -s https://api.bonidoc.com/health | python3 -m json.tool
+```
+
+**What Happens Automatically:**
+1. ✅ Git commit with detailed changelog
+2. ✅ Push to GitHub (triggers backup)
+3. ✅ SSH to production server
+4. ✅ Pull latest code
+5. ✅ Run database migrations
+6. ✅ Rebuild Docker containers (frontend + backend)
+7. ✅ Restart services
+8. ✅ Health check verification
+9. ✅ Report deployment status to user
+
+**User Approval Points:**
+- ✅ **BEFORE pipeline starts**: User reviews changes and approves deployment
+- ❌ **NOT during pipeline**: No interruptions for git commands, SSH, docker, etc.
+
+**Safety Mechanisms:**
+- All changes reviewed by user before deployment starts
+- Database migrations run before container restart (prevents data loss)
+- Health check after deployment confirms success
+- Git history preserved (can rollback if needed)
+- Docker logs available for troubleshooting
+
+**Example User Interaction:**
+
+```
+User: "The changes look good. Commit and deploy to production."
+
+Claude Code: [Executes full pipeline autonomously]
+  ✅ Committed: feat: Add document metadata schema
+  ✅ Pushed to GitHub: main → origin/main
+  ✅ Deployed to server: git pull
+  ✅ Ran migrations: 005_add_metadata
+  ✅ Rebuilt containers: backend + frontend
+  ✅ Health check: HEALTHY ✓
+
+  Deployment complete! 🚀
+  - Backend: healthy (24 seconds uptime)
+  - Frontend: running
+  - Database: connected
+  - API: https://api.bonidoc.com/health
+```
+
+**Rollback Process (if needed):**
+
+```bash
+# 1. Revert Git commit locally
+git revert HEAD
+git push origin main
+
+# 2. Claude Code automatically deploys the revert
+# (Same autonomous pipeline)
+```
+
+**When Autonomous Deployment is NOT Used:**
+- Experimental changes (user wants manual control)
+- Database schema changes requiring data migration planning
+- Breaking changes requiring downtime coordination
+- First deployment to new server
+- User explicitly requests step-by-step deployment
+
+**Benefits:**
+- ⚡ Faster deployments (no waiting for approval between steps)
+- 🎯 Reduced human error (consistent pipeline execution)
+- 📋 Complete audit trail (full commit messages + logs)
+- 🔄 Repeatable process (same steps every time)
+- 🤝 User maintains control (approves before pipeline starts)
+
+---
+
 #### Automated Deployment (GitHub Actions → Hetzner)
 
 ```
