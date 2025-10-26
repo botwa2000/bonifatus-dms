@@ -1,100 +1,93 @@
 // frontend/src/app/login/LoginPageContent.tsx
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authService } from '@/services/auth.service'
+import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 
-let renderCount = 0
-let effectCount = 0
-// Module-level flag that persists across component remounts
+// Module-level flag to prevent duplicate OAuth processing across remounts
 let isProcessingOAuth = false
 
 export default function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [isProcessing, setIsProcessing] = useState(true)
-  const processingRef = useRef(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  renderCount++
-  console.log(`[DEBUG] Component render #${renderCount}`)
-
+  // Check if user is already authenticated
+  // If so, redirect immediately to dashboard
   useEffect(() => {
-    effectCount++
-    console.log(`[DEBUG] useEffect execution #${effectCount}, isProcessingOAuth = ${isProcessingOAuth}`)
-
-    const handleOAuthCallback = async () => {
-      // Block ALL re-executions immediately (synchronous check + set)
-      console.log(`[DEBUG] handleOAuthCallback called (effect #${effectCount}), checking isProcessingOAuth = ${isProcessingOAuth}`)
-
-      if (isProcessingOAuth) {
-        console.log(`[DEBUG] BLOCKED - isProcessingOAuth already true, exiting`)
-        return
+    if (typeof window !== 'undefined') {
+      const cachedUser = sessionStorage.getItem('user')
+      if (cachedUser && !searchParams.get('code')) {
+        console.log('[Login] User already authenticated, redirecting to dashboard')
+        router.replace('/dashboard')
       }
+    }
+  }, [router, searchParams])
 
-      console.log(`[DEBUG] Setting isProcessingOAuth = true`)
-      isProcessingOAuth = true // Set BEFORE any async operations (module-level, persists across remounts)
-
+  // Handle OAuth callback
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const errorParam = searchParams.get('error')
 
-      console.log('[OAuth] Callback initiated:', { hasCode: !!code, hasState: !!state, hasError: !!errorParam })
-
-      // No code? Redirect home. Simple.
-      if (!code) {
-        console.log('[OAuth] No code found, redirecting to homepage')
-        router.push('/')
+      // No OAuth code? User needs to sign in normally
+      if (!code && !errorParam) {
         return
       }
 
-      console.log('[OAuth] Starting token exchange...')
+      // Block duplicate executions with module-level flag
+      if (isProcessingOAuth) {
+        console.log('[OAuth] Already processing, skipping duplicate execution')
+        return
+      }
+
+      isProcessingOAuth = true
+      setIsProcessing(true)
+
+      console.log('[OAuth] Processing callback...')
 
       try {
-        // OAuth error from Google
+        // Handle OAuth error from Google
         if (errorParam) {
-          console.error('OAuth error from Google:', errorParam)
+          console.error('[OAuth] Error from Google:', errorParam)
           setError(`Authentication error: ${errorParam}`)
           setIsProcessing(false)
-          processingRef.current = false
+          isProcessingOAuth = false
           return
         }
 
-        // Exchange authorization code for JWT tokens
-        const result = await authService.exchangeGoogleToken(code, state)
-
-        console.log('[OAuth] Token exchange result:', { success: result.success, hasUser: !!result.user, error: result.error })
+        // Exchange authorization code for tokens
+        const result = await authService.exchangeGoogleToken(code!, state)
 
         if (result.success && result.user) {
-          // Redirect to dashboard (replace = no back button to /login)
+          // Success - user is cached in sessionStorage by authService
           const redirectUrl = searchParams.get('redirect') || '/dashboard'
-          console.log('[OAuth] Login successful, redirecting to:', redirectUrl)
-          console.log(`[DEBUG] About to call router.replace('${redirectUrl}')`)
+          console.log('[OAuth] Success! Navigating to:', redirectUrl)
+
+          // Stop spinner and navigate - auth context will load user from sessionStorage
+          setIsProcessing(false)
           router.replace(redirectUrl)
-          console.log(`[DEBUG] router.replace called, isProcessingOAuth = ${isProcessingOAuth}`)
-          // Don't reset isProcessingOAuth - it stays true, blocking any future renders
         } else {
-          console.error('[OAuth] Exchange failed:', result.error)
+          console.error('[OAuth] Failed:', result.error)
           setError(result.error || 'Authentication failed. Please try again.')
           setIsProcessing(false)
           isProcessingOAuth = false
         }
       } catch (err) {
-        console.error('[OAuth] Callback error:', err)
+        console.error('[OAuth] Exception:', err)
         setError(err instanceof Error ? err.message : 'Authentication failed')
         setIsProcessing(false)
         isProcessingOAuth = false
       }
-
-      console.log(`[DEBUG] handleOAuthCallback completed (effect #${effectCount})`)
     }
 
     handleOAuthCallback()
-    console.log(`[DEBUG] useEffect #${effectCount} finished synchronous part, async handleOAuthCallback running in background`)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Run only once on mount to prevent re-execution during navigation
+  }, [searchParams, router])
 
   // Show error page
   if (error) {
@@ -127,18 +120,47 @@ export default function LoginPageContent() {
     )
   }
 
-  // Show loading indicator during OAuth processing
+  // Show processing spinner during OAuth callback
+  if (isProcessing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-primary mx-auto"></div>
+            <h2 className="mt-6 text-2xl font-bold text-neutral-900">
+              Completing sign in...
+            </h2>
+            <p className="mt-2 text-sm text-neutral-600">
+              Please wait while we verify your account
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show normal login page
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-primary mx-auto"></div>
-          <h2 className="mt-6 text-2xl font-bold text-neutral-900">
-            Completing sign in...
+          <h2 className="mt-6 text-3xl font-extrabold text-neutral-900">
+            Sign in to Bonifatus DMS
           </h2>
           <p className="mt-2 text-sm text-neutral-600">
-            Please wait while we verify your account
+            Document Management System
           </p>
+        </div>
+        <div className="mt-8">
+          <GoogleLoginButton size="lg" className="w-full" />
+        </div>
+        <div className="text-center mt-4">
+          <Link
+            href="/"
+            className="text-sm text-admin-primary hover:underline"
+          >
+            Back to Homepage
+          </Link>
         </div>
       </div>
     </div>

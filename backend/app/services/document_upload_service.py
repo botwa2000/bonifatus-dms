@@ -155,17 +155,21 @@ class DocumentUploadService:
             
             # Upload to Google Drive
             logger.info(f"Uploading to Google Drive: {standardized_filename}")
-            drive_result = await google_drive_service.upload_file(
-                file_content=file_content,
+
+            # Convert bytes to BytesIO for Google Drive API
+            from io import BytesIO
+            file_io = BytesIO(file_content)
+
+            drive_result = await google_drive_service.upload_document(
+                file_content=file_io,
                 filename=standardized_filename,
-                mime_type=mime_type,
-                user_email=user_email
+                user_email=user_email,
+                mime_type=mime_type
             )
-            
-            if not drive_result.get('success'):
-                error_msg = drive_result.get('error', 'Unknown error')
-                logger.error(f"Google Drive upload failed: {error_msg}")
-                raise Exception(f"Google Drive upload failed: {error_msg}")
+
+            if not drive_result:
+                logger.error(f"Google Drive upload failed: No result returned")
+                raise Exception(f"Google Drive upload failed")
             
             # Create document record
             document_id = uuid.uuid4()
@@ -213,7 +217,7 @@ class DocumentUploadService:
                     'file_size': len(file_content),
                     'mime_type': mime_type,
                     'file_hash': file_hash,
-                    'google_drive_file_id': drive_result['file_id'],
+                    'google_drive_file_id': drive_result['drive_file_id'],
                     'web_view_link': drive_result.get('web_view_link'),
                     'primary_language': language_code,
                     'processing_status': 'completed',
@@ -338,7 +342,7 @@ class DocumentUploadService:
                 'category_ids': category_ids_ordered,
                 'category_names': category_names,
                 'primary_category_id': category_ids_ordered[0],
-                'google_drive_file_id': drive_result['file_id'],
+                'google_drive_file_id': drive_result['drive_file_id'],
                 'web_view_link': drive_result.get('web_view_link'),
                 'is_duplicate': duplicate is not None,
                 'duplicate_of_id': str(duplicate[0]) if duplicate else None,
