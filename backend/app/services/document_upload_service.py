@@ -120,9 +120,9 @@ class DocumentUploadService:
             # Check for duplicates
             duplicate = session.execute(
                 text("""
-                    SELECT id, title, filename 
-                    FROM documents 
-                    WHERE file_hash = :hash 
+                    SELECT id, title, file_name
+                    FROM documents
+                    WHERE file_hash = :hash
                     AND user_id = :user_id
                     LIMIT 1
                 """),
@@ -188,18 +188,18 @@ class DocumentUploadService:
             session.execute(
                 text("""
                     INSERT INTO documents (
-                        id, user_id, title, description, filename, original_filename,
+                        id, user_id, title, description, file_name, original_filename,
                         file_size, mime_type, file_hash, google_drive_file_id,
                         web_view_link, primary_language, processing_status,
                         document_date, document_date_type, document_date_confidence,
                         is_duplicate, duplicate_of_document_id, batch_id,
                         created_at, updated_at
                     ) VALUES (
-                        :id, :user_id, :title, :description, :filename, :original_filename,
+                        :id, :user_id, :title, :description, :file_name, :original_filename,
                         :file_size, :mime_type, :file_hash, :google_drive_file_id,
                         :web_view_link, :primary_language, :processing_status,
                         :document_date, :document_date_type, :document_date_confidence,
-                        :is_duplicate, :duplicate_of, :batch_id,
+                        :is_duplicate, :duplicate_of_document_id, :batch_id,
                         :created_at, :updated_at
                     )
                 """),
@@ -208,7 +208,7 @@ class DocumentUploadService:
                     'user_id': user_id,
                     'title': title,
                     'description': description,
-                    'filename': standardized_filename,
+                    'file_name': standardized_filename,
                     'original_filename': original_filename,
                     'file_size': len(file_content),
                     'mime_type': mime_type,
@@ -221,7 +221,7 @@ class DocumentUploadService:
                     'document_date_type': doc_date_type,
                     'document_date_confidence': doc_date_confidence / 100.0 if doc_date_confidence else None,
                     'is_duplicate': duplicate is not None,
-                    'duplicate_of': str(duplicate[0]) if duplicate else None,
+                    'duplicate_of_document_id': str(duplicate[0]) if duplicate else None,
                     'batch_id': batch_id,
                     'created_at': datetime.now(timezone.utc),
                     'updated_at': datetime.now(timezone.utc)

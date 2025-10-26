@@ -136,11 +136,13 @@ class Document(Base, TimestampMixin):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    file_name = Column(String(255), nullable=False)
+    file_name = Column(String(255), nullable=False)  # Standardized filename for Google Drive
+    original_filename = Column(String(255), nullable=True)  # What user originally uploaded
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
     file_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash for deduplication
     google_drive_file_id = Column(String(100), nullable=False, unique=True)
+    web_view_link = Column(String(500), nullable=True)  # Google Drive web link for direct access
 
     # Processing status
     processing_status = Column(String(20), nullable=False, default="pending")
@@ -156,6 +158,10 @@ class Document(Base, TimestampMixin):
     document_date = Column(sa.Date, nullable=True)
     document_date_confidence = Column(Float, nullable=True)
     document_date_type = Column(String(50), nullable=True)
+
+    # Duplicate detection
+    is_duplicate = Column(Boolean, default=False, nullable=False)
+    duplicate_of_document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
 
     # Soft delete support
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
@@ -182,6 +188,7 @@ class Document(Base, TimestampMixin):
         Index('idx_document_primary_lang', 'primary_language'),
         Index('idx_document_date', 'document_date'),
         Index('idx_documents_batch', 'batch_id'),
+        Index('idx_documents_duplicate_of', 'duplicate_of_document_id'),
     )
 
 class DocumentCategory(Base):

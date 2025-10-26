@@ -43,11 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const mountedRef = useRef(true)
 
   useEffect(() => {
-    if (initializedRef.current) {
-      return
-    }
-    initializedRef.current = true
-
     const initialize = async () => {
       const currentPath = pathname || '/'
 
@@ -55,6 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false)
         return
       }
+
+      // Check if already initialized for this protected route and user exists
+      if (initializedRef.current && user) {
+        setIsLoading(false)
+        return
+      }
+
+      // Set loading state BEFORE any async operations to prevent race conditions
+      setIsLoading(true)
+      initializedRef.current = true
 
       try {
         const storedUser = typeof window !== 'undefined' ? sessionStorage.getItem('user') : null
