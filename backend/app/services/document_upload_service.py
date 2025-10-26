@@ -99,6 +99,16 @@ class DocumentUploadService:
             # Get document date for filename (or None to use current timestamp)
             document_date = analysis_result.get('document_date')
 
+            # Get user's timezone setting (default to UTC if not set)
+            from app.database.models import UserSetting
+            timezone_setting = session.query(UserSetting).filter(
+                and_(
+                    UserSetting.user_id == user_id,
+                    UserSetting.setting_key == 'timezone'
+                )
+            ).first()
+            user_timezone = timezone_setting.setting_value if timezone_setting else 'UTC'
+
             # Get standardized filename (user may have edited it)
             if custom_filename:
                 standardized_filename = custom_filename
@@ -106,7 +116,8 @@ class DocumentUploadService:
                 standardized_filename = self._generate_standardized_filename(
                     original_filename=original_filename,
                     category_code=category_code,
-                    document_date=document_date
+                    document_date=document_date,
+                    user_timezone=user_timezone
                 )
             
             # Validate filename length
@@ -125,14 +136,18 @@ class DocumentUploadService:
             duplicate = session.query(Document).filter(
                 and_(
                     Document.file_hash == file_hash,
-                    Document.user_id == user_id
+                    Document.user_id == user_id,
+                    Document.is_deleted == False
                 )
             ).first()
 
             if duplicate:
                 logger.warning(f"Duplicate document detected: {file_hash} - existing: {duplicate.title}")
-                # Optionally: return duplicate info or continue with upload
-                # For now, we'll continue and mark as duplicate
+                raise ValueError(
+                    f"This document has already been uploaded. "
+                    f"Existing document: '{duplicate.title}' uploaded on {duplicate.created_at.strftime('%Y-%m-%d')}. "
+                    f"Document ID: {duplicate.id}"
+                )
             
             # Validate category count
             max_categories = await config_service.get_setting('max_categories_per_document', 5, session)
@@ -236,8 +251,8 @@ class DocumentUploadService:
                 document_date=doc_date_value,
                 document_date_type=doc_date_type,
                 document_date_confidence=doc_date_confidence / 100.0 if doc_date_confidence else None,
-                is_duplicate=duplicate is not None,
-                duplicate_of_document_id=duplicate.id if duplicate else None,
+                is_duplicate=False,
+                duplicate_of_document_id=None,
                 batch_id=uuid_lib.UUID(batch_id) if batch_id else None,
                 is_deleted=False
             )
@@ -335,8 +350,6 @@ class DocumentUploadService:
                 'primary_category_id': category_ids_ordered[0],
                 'google_drive_file_id': drive_result['drive_file_id'],
                 'web_view_link': drive_result.get('web_view_link'),
-                'is_duplicate': duplicate is not None,
-                'duplicate_of_id': str(duplicate.id) if duplicate else None,
                 'keywords_count': len(confirmed_keywords),
                 'language': language_code,
                 'created_at': document.created_at.isoformat()
@@ -358,7 +371,8 @@ class DocumentUploadService:
         self,
         original_filename: str,
         category_code: str,
-        document_date: Optional[str] = None
+        document_date: Optional[str] = None,
+        user_timezone: str = 'UTC'
     ) -> str:
         """
         Generate standardized filename following naming convention
@@ -369,10 +383,14 @@ class DocumentUploadService:
             original_filename: Original uploaded filename
             category_code: 3-letter category code (e.g. 'BNK', 'TAX', 'INS')
             document_date: Extracted document date (ISO format) or None for current timestamp
+            user_timezone: User's timezone (e.g. 'Europe/Berlin', 'America/New_York')
 
         Returns:
             Standardized filename (max 200 chars)
         """
+        # Import timezone support
+        from zoneinfo import ZoneInfo
+
         # Extract file extension
         extension = original_filename.split('.')[-1] if '.' in original_filename else 'pdf'
 
@@ -381,18 +399,25 @@ class DocumentUploadService:
         clean_name = re.sub(r'[^\w\s-]', '', clean_name)
         clean_name = re.sub(r'\s+', '_', clean_name.strip())
 
+        # Get user timezone (fallback to UTC if invalid)
+        try:
+            user_tz = ZoneInfo(user_timezone)
+        except Exception:
+            logger.warning(f"Invalid timezone '{user_timezone}', using UTC")
+            user_tz = timezone.utc
+
         # Use document date if available, otherwise current timestamp
         if document_date:
             try:
                 from dateutil.parser import parse
                 doc_dt = parse(document_date)
                 date_prefix = doc_dt.strftime('%Y%m%d')
-                time_prefix = datetime.now(timezone.utc).strftime('%H%M%S')
+                time_prefix = datetime.now(user_tz).strftime('%H%M%S')
             except:
-                date_prefix = datetime.now(timezone.utc).strftime('%Y%m%d')
-                time_prefix = datetime.now(timezone.utc).strftime('%H%M%S')
+                date_prefix = datetime.now(user_tz).strftime('%Y%m%d')
+                time_prefix = datetime.now(user_tz).strftime('%H%M%S')
         else:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(user_tz)
             date_prefix = now.strftime('%Y%m%d')
             time_prefix = now.strftime('%H%M%S')
 
