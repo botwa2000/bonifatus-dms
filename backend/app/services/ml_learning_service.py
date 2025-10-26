@@ -57,7 +57,8 @@ class MLLearningService:
         actual_category_id: UUID,
         document_keywords: List[str],
         language: str,
-        confidence: Optional[float] = None
+        confidence: Optional[float] = None,
+        user_id: Optional[UUID] = None
     ) -> bool:
         """
         Record a classification decision for tracking and learning
@@ -70,6 +71,7 @@ class MLLearningService:
             document_keywords: Keywords that were used
             language: Document language
             confidence: Confidence score of suggestion
+            user_id: User who made the decision
 
         Returns:
             True if recorded successfully
@@ -87,7 +89,7 @@ class MLLearningService:
                 confidence=confidence,
                 text_sample=", ".join(document_keywords[:20]),
                 language_code=language,
-                user_id=None
+                user_id=user_id
             )
 
             db.add(training_data)
@@ -221,7 +223,8 @@ class MLLearningService:
         matched_keywords: List[str],
         document_keywords: List[str],
         language: str,
-        confidence: Optional[float] = None
+        confidence: Optional[float] = None,
+        user_id: Optional[UUID] = None
     ) -> bool:
         """
         Complete learning workflow: record decision and adjust weights
@@ -235,6 +238,7 @@ class MLLearningService:
             document_keywords: All document keywords
             language: Document language
             confidence: Confidence score
+            user_id: User who made the decision
 
         Returns:
             True if learning completed successfully
@@ -247,7 +251,8 @@ class MLLearningService:
                 actual_category_id,
                 document_keywords,
                 language,
-                confidence
+                confidence,
+                user_id
             )
 
             if suggested_category_id == actual_category_id:

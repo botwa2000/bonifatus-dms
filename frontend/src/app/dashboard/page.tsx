@@ -24,10 +24,17 @@ export default function DashboardPage() {
   
   // Redirect unauthenticated users to login
   useEffect(() => {
+    console.log('[Dashboard] Auth check:', {
+      isLoading,
+      isAuthenticated,
+      hasUser: !!user
+    })
+
     if (!isLoading && !isAuthenticated) {
+      console.log('[Dashboard] Not authenticated, redirecting to /login')
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router, user])
 
   // Load trial info asynchronously
   useEffect(() => {

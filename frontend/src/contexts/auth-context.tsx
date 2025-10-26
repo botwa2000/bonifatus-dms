@@ -46,18 +46,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initialize = async () => {
       const currentPath = pathname || '/'
 
+      console.log('[AuthContext] Initialize called:', {
+        pathname: currentPath,
+        isProtected: isProtectedRoute(currentPath),
+        hasUser: !!user,
+        initialized: initializedRef.current
+      })
+
       if (!isProtectedRoute(currentPath)) {
+        console.log('[AuthContext] Public route, skipping auth check')
         setIsLoading(false)
         return
       }
 
       // Check if already initialized for this protected route and user exists
       if (initializedRef.current && user) {
+        console.log('[AuthContext] Already initialized with user, skipping')
         setIsLoading(false)
         return
       }
 
       // Set loading state BEFORE any async operations to prevent race conditions
+      console.log('[AuthContext] Starting auth initialization')
       setIsLoading(true)
       initializedRef.current = true
 
@@ -67,12 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedUser) {
           try {
             const userData = JSON.parse(storedUser)
+            console.log('[AuthContext] User loaded from sessionStorage:', userData.email)
             setUser(userData)
             setIsAuthenticated(true)
             setIsLoading(false)
 
             // Background refresh
             authService.getCurrentUser().catch(() => {
+              console.log('[AuthContext] Background refresh failed, clearing user')
               if (mountedRef.current) {
                 setUser(null)
                 setIsAuthenticated(false)
@@ -80,19 +92,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })
             return
           } catch {
+            console.log('[AuthContext] Failed to parse stored user, removing')
             sessionStorage.removeItem('user')
           }
         }
 
         // Fetch current user from API
+        console.log('[AuthContext] Fetching user from API')
         const currentUser = await authService.getCurrentUser()
 
         if (mountedRef.current) {
+          console.log('[AuthContext] API returned user:', currentUser?.email || 'null')
           setUser(currentUser)
           setIsAuthenticated(!!currentUser)
           setIsLoading(false)
         }
-      } catch {
+      } catch (error) {
+        console.log('[AuthContext] Auth check failed:', error)
         if (mountedRef.current) {
           setUser(null)
           setIsAuthenticated(false)
@@ -106,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false
     }
-  }, [pathname])
+  }, [pathname, user])
 
   const initializeGoogleAuth = useCallback(async () => {
     try {

@@ -286,7 +286,8 @@ class DocumentUploadService:
                 matched_keywords=matched_keywords,
                 document_keywords=document_keywords,
                 language=language_code,
-                confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None
+                confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None,
+                user_id=uuid.UUID(user_id)
             )
             
             # Create audit log entry
@@ -294,10 +295,10 @@ class DocumentUploadService:
                 text("""
                     INSERT INTO audit_logs (
                         id, user_id, action, resource_type, resource_id,
-                        ip_address, new_values, created_at
+                        ip_address, new_values, status, created_at
                     ) VALUES (
                         :id, :user_id, 'document_uploaded', 'document', :resource_id,
-                        null, :new_values, :created_at
+                        null, :new_values, 'success', :created_at
                     )
                 """),
                 {
