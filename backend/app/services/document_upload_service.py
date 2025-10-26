@@ -209,14 +209,14 @@ class DocumentUploadService:
                         web_view_link, primary_language, processing_status,
                         document_date, document_date_type, document_date_confidence,
                         is_duplicate, duplicate_of_document_id, batch_id,
-                        created_at, updated_at
+                        is_deleted, created_at, updated_at
                     ) VALUES (
                         :id, :user_id, :title, :description, :file_name, :original_filename,
                         :file_size, :mime_type, :file_hash, :google_drive_file_id,
                         :web_view_link, :primary_language, :processing_status,
                         :document_date, :document_date_type, :document_date_confidence,
                         :is_duplicate, :duplicate_of_document_id, :batch_id,
-                        :created_at, :updated_at
+                        :is_deleted, :created_at, :updated_at
                     )
                 """),
                 {
@@ -239,6 +239,7 @@ class DocumentUploadService:
                     'is_duplicate': duplicate is not None,
                     'duplicate_of_document_id': str(duplicate[0]) if duplicate else None,
                     'batch_id': batch_id,
+                    'is_deleted': False,
                     'created_at': datetime.now(timezone.utc),
                     'updated_at': datetime.now(timezone.utc)
                 }

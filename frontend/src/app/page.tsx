@@ -369,7 +369,6 @@ export default function HomePage() {
                 <li><Link href="/features" className="hover:text-white transition-colors">Features</Link></li>
                 <li><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
                 <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
-                <li><Link href="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
               </ul>
             </div>
 
@@ -378,8 +377,6 @@ export default function HomePage() {
               <ul className="space-y-2">
                 <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
                 <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-                <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
               </ul>
             </div>
 

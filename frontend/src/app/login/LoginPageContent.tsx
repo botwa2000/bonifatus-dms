@@ -19,6 +19,12 @@ export default function LoginPageContent() {
   // Single useEffect to handle both auth check and OAuth callback
   // Priority: OAuth callback > cached user redirect
   useEffect(() => {
+    // Early exit if already processing OAuth to prevent duplicate redirects
+    if (isProcessingOAuth) {
+      console.log('[Login] OAuth already in progress, skipping')
+      return
+    }
+
     const code = searchParams.get('code')
     const errorParam = searchParams.get('error')
 
@@ -40,12 +46,7 @@ export default function LoginPageContent() {
     async function handleOAuthCallback() {
       const state = searchParams.get('state')
 
-      // Block duplicate executions with module-level flag
-      if (isProcessingOAuth) {
-        console.log('[OAuth] Already processing, skipping duplicate execution')
-        return
-      }
-
+      // Set processing flag to prevent duplicate executions
       isProcessingOAuth = true
       setIsProcessing(true)
 
