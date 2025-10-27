@@ -122,15 +122,39 @@ export default function BatchUploadPage() {
         let errorDetail = 'Analysis failed'
         try {
           const errorData = await response.json() as ErrorResponse
-          // Better error serialization
-          if (typeof errorData === 'object' && errorData !== null) {
+
+          // Handle duplicate file error (HTTP 409 Conflict)
+          if (response.status === 409 && typeof errorData.detail === 'object') {
+            const duplicateInfo = errorData.detail as {
+              error?: string
+              message?: string
+              existing_document?: {
+                id: string
+                title: string
+                filename: string
+                uploaded_at: string
+              }
+            }
+
+            if (duplicateInfo.error === 'duplicate_file' && duplicateInfo.existing_document) {
+              const uploadDate = new Date(duplicateInfo.existing_document.uploaded_at).toLocaleDateString()
+              errorDetail = `This document has already been uploaded.\n\n` +
+                `Existing document: "${duplicateInfo.existing_document.title}"\n` +
+                `Uploaded on: ${uploadDate}\n\n` +
+                `Please select a different file.`
+            } else if (duplicateInfo.message) {
+              errorDetail = duplicateInfo.message
+            }
+          }
+          // Better error serialization for other errors
+          else if (typeof errorData === 'object' && errorData !== null) {
             if (errorData.detail && typeof errorData.detail === 'string') {
               errorDetail = errorData.detail
             } else if (errorData.message && typeof errorData.message === 'string') {
               errorDetail = errorData.message
             } else if (Array.isArray(errorData.detail)) {
               // Handle validation errors from FastAPI
-              errorDetail = errorData.detail.map((err: { loc?: string[]; msg: string }) => 
+              errorDetail = errorData.detail.map((err: { loc?: string[]; msg: string }) =>
                 `${err.loc?.join('.')}: ${err.msg}`
               ).join('; ')
             } else {

@@ -77,7 +77,37 @@ async def analyze_document(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File size exceeds maximum of {max_size / 1024 / 1024:.1f}MB"
             )
-        
+
+        # Check for duplicates BEFORE expensive analysis (saves time and resources)
+        import hashlib
+        from app.database.models import Document
+        from sqlalchemy import and_
+
+        file_hash = hashlib.sha256(file_content).hexdigest()
+        duplicate = session.query(Document).filter(
+            and_(
+                Document.file_hash == file_hash,
+                Document.user_id == current_user.id,
+                Document.is_deleted == False
+            )
+        ).first()
+
+        if duplicate:
+            logger.warning(f"Duplicate file upload attempted: {file.filename} (hash: {file_hash[:16]}...)")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "duplicate_file",
+                    "message": f"This document has already been uploaded.",
+                    "existing_document": {
+                        "id": str(duplicate.id),
+                        "title": duplicate.title,
+                        "filename": duplicate.file_name,
+                        "uploaded_at": duplicate.created_at.isoformat()
+                    }
+                }
+            )
+
         # Get user's categories
         categories_response = await category_service.list_categories(
             user_id=str(current_user.id),

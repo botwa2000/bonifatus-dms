@@ -14,27 +14,15 @@ import { authService } from '@/services/auth.service'
 import Link from 'next/link'
 
 export default function DashboardPage() {
-  const { isAuthenticated, user, isLoading, logout } = useAuth()
-  const router = useRouter()
-  
+  const { user, isLoading, logout } = useAuth()
+
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
   const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  
-  // Redirect unauthenticated users to login
-  useEffect(() => {
-    console.log('[Dashboard] Auth check:', {
-      isLoading,
-      isAuthenticated,
-      hasUser: !!user
-    })
 
-    if (!isLoading && !isAuthenticated) {
-      console.log('[Dashboard] Not authenticated, redirecting to /login')
-      router.push('/login')
-    }
-  }, [isAuthenticated, isLoading, router, user])
+  // Note: Authentication is handled by middleware
+  // This page only renders if user has valid access_token cookie
 
   // Load trial info asynchronously
   useEffect(() => {
@@ -46,11 +34,9 @@ export default function DashboardPage() {
         console.error('Failed to load trial info:', error)
       }
     }
-    
-    if (isAuthenticated) {
-      loadTrialInfo()
-    }
-  }, [isAuthenticated])
+
+    loadTrialInfo()
+  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -66,8 +52,8 @@ export default function DashboardPage() {
 
   const isTrialActive = authService.isTrialActive()
 
-  // CONDITIONAL RETURNS COME AFTER ALL HOOKS
-  if (isLoading) {
+  // Show loading state while user data loads
+  if (isLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
         <div className="text-center">
@@ -76,10 +62,6 @@ export default function DashboardPage() {
         </div>
       </div>
     )
-  }
-
-  if (!isAuthenticated || !user) {
-    return null // Will redirect to login
   }
 
   const handleLogout = async () => {

@@ -128,27 +128,10 @@ class DocumentUploadService:
             # Validate filename characters
             if not self._validate_filename(standardized_filename):
                 raise ValueError("Filename contains invalid characters")
-            
-            # Calculate file hash for duplicate detection
+
+            # Calculate file hash for storage (duplicate check happens earlier in /analyze endpoint)
             file_hash = hashlib.sha256(file_content).hexdigest()
 
-            # Check for duplicates using ORM
-            duplicate = session.query(Document).filter(
-                and_(
-                    Document.file_hash == file_hash,
-                    Document.user_id == user_id,
-                    Document.is_deleted == False
-                )
-            ).first()
-
-            if duplicate:
-                logger.warning(f"Duplicate document detected: {file_hash} - existing: {duplicate.title}")
-                raise ValueError(
-                    f"This document has already been uploaded. "
-                    f"Existing document: '{duplicate.title}' uploaded on {duplicate.created_at.strftime('%Y-%m-%d')}. "
-                    f"Document ID: {duplicate.id}"
-                )
-            
             # Validate category count
             max_categories = await config_service.get_setting('max_categories_per_document', 5, session)
             if len(category_ids) > max_categories:

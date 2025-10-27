@@ -1,22 +1,30 @@
 // frontend/middleware.ts
 /**
- * Next.js Middleware for security headers and performance optimization
+ * Next.js Middleware for authentication and security
  *
- * AUTHENTICATION ARCHITECTURE:
- * - Authentication is enforced at the API level with httpOnly cookies
- * - Frontend pages check auth by calling /auth/me API
- * - Middleware does NOT redirect based on auth status because:
- *   1. Backend cookies are on api.bonidoc.com domain
- *   2. Frontend runs on bonidoc.com domain
- *   3. Cross-domain cookie access is blocked by browsers (security feature)
- *   4. Client-side auth checks would be manipulable
+ * AUTHENTICATION ARCHITECTURE (Updated October 26, 2025):
+ * - Backend sets cookies with Domain=.bonidoc.com (accessible across subdomains)
+ * - Middleware checks for access_token cookie presence on protected routes
+ * - If no token: redirect to login
+ * - If token exists: allow through (backend validates JWT on API calls)
+ * - This provides instant UX (no loading states) while maintaining security
  *
- * This is the correct architecture for cross-domain SPA + API setups.
- * Security is enforced where it matters: at the API boundary with httpOnly cookies.
+ * Security Model:
+ * - Cookie presence check = UX optimization (prevents unnecessary renders)
+ * - JWT validation = security enforcement (happens on backend API)
+ * - httpOnly cookies = XSS protection (JavaScript cannot access)
+ * - SameSite=Lax/Strict = CSRF protection
  */
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+
+// Protected routes that require authentication
+const PROTECTED_PATHS = ['/dashboard', '/documents', '/settings', '/categories', '/profile']
+
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_PATHS.some(path => pathname.startsWith(path))
+}
 
 interface SecurityConfig {
   enableCSP: boolean
@@ -64,7 +72,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): NextR
   headers.set('X-Frame-Options', 'DENY')
   headers.set('X-XSS-Protection', '1; mode=block')
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-  
+
   if (SECURITY_CONFIG.enableReferrerPolicy) {
     headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   }
@@ -72,18 +80,15 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest): NextR
   return response
 }
 
-// No auth redirects in middleware - handled by page components
-// This is the correct pattern for cross-domain authentication
-
 function addPerformanceHeaders(response: NextResponse, request: NextRequest): NextResponse {
   const requestId = crypto.randomUUID()
   response.headers.set('X-Request-ID', requestId)
-  
+
   const { pathname } = request.nextUrl
   if (pathname.startsWith('/_next/static/') || pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2)$/)) {
     response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   }
-  
+
   return response
 }
 
@@ -98,6 +103,23 @@ export function middleware(request: NextRequest) {
   ) {
     const response = NextResponse.next()
     return addPerformanceHeaders(addSecurityHeaders(response, request), request)
+  }
+
+  // Authentication check for protected routes
+  if (isProtectedRoute(pathname)) {
+    const accessToken = request.cookies.get('access_token')
+
+    // No access token → redirect to login
+    if (!accessToken) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      console.log(`[Middleware] No access_token, redirecting to login. Path: ${pathname}`)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Access token exists → allow through
+    // Note: JWT validation happens on backend API calls, not here
+    console.log(`[Middleware] Access token found, allowing access to: ${pathname}`)
   }
 
   // All other requests: apply security headers

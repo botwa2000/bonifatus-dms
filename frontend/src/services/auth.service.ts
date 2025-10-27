@@ -202,14 +202,7 @@ export class AuthService {
         updated_at: new Date().toISOString()  // Not returned by backend, use current time
       }
 
-      // Cache user data for immediate use in sessionStorage (more secure than localStorage)
-      // sessionStorage clears when browser tab closes, reducing data persistence risk
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('user', JSON.stringify(user))
-        console.log('[AuthService] User cached in sessionStorage')
-      }
-
-      // Clear OAuth state
+      // Clear OAuth state (user data now stored only in cookies, not sessionStorage)
       this.clearStoredOAuthState()
 
       console.log('[AuthService] Token exchange successful')
@@ -253,10 +246,8 @@ export class AuthService {
       // httpOnly cookies are sent automatically with this request
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
-      // Cache user info in sessionStorage for UI display (non-sensitive data only)
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('user', JSON.stringify(response))
-      }
+      // User data no longer cached in sessionStorage (XSS risk)
+      // Cookies are the single source of truth
 
       return response
 
@@ -342,11 +333,6 @@ export class AuthService {
   }
 
   clearAllAuthData(): void {
-    // Clear cached user data from sessionStorage
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('user')
-    }
-
     // Clear OAuth state and processing flags
     this.clearStoredOAuthState()
     this.clearOAuthProcessingFlags()

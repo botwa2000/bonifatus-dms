@@ -152,15 +152,16 @@ async def google_oauth_callback(
             )
         
         # Set tokens in httpOnly cookies
-        # Note: Domain is NOT set to allow cookies to work across api.bonidoc.com and bonidoc.com
-        # Using SameSite=None with Secure=True for cross-origin requests
+        # Domain=.bonidoc.com allows cookies to work across api.bonidoc.com and bonidoc.com
+        # SameSite=Lax for access token (allows navigation), Strict for refresh token (max security)
 
         response.set_cookie(
             key="access_token",
             value=auth_result["access_token"],
             httponly=True,
-            secure=True,  # Always use Secure in production
-            samesite="none",  # Required for cross-origin (api.bonidoc.com -> bonidoc.com)
+            secure=True,
+            samesite="lax",  # Lax allows navigation while preventing CSRF
+            domain=".bonidoc.com",  # Accessible across all *.bonidoc.com subdomains
             max_age=900,  # 15 minutes
             path="/"
         )
@@ -170,18 +171,8 @@ async def google_oauth_callback(
             value=auth_result["refresh_token"],
             httponly=True,
             secure=True,
-            samesite="none",
-            max_age=604800,  # 7 days
-            path="/"
-        )
-
-        # Set authentication flag for frontend (non-httpOnly for JS access)
-        response.set_cookie(
-            key="is_authenticated",
-            value="true",
-            httponly=False,
-            secure=True,
-            samesite="none",
+            samesite="strict",  # Strict for maximum security on refresh token
+            domain=".bonidoc.com",
             max_age=604800,  # 7 days
             path="/"
         )
@@ -249,7 +240,8 @@ async def refresh_token(
             value=refresh_result["access_token"],
             httponly=True,
             secure=True,
-            samesite="none",
+            samesite="lax",
+            domain=".bonidoc.com",
             max_age=900,  # 15 minutes
             path="/"
         )
@@ -341,7 +333,8 @@ async def logout(
             value="",
             httponly=True,
             secure=True,
-            samesite="none",
+            samesite="lax",
+            domain=".bonidoc.com",
             max_age=0,
             path="/"
         )
@@ -351,17 +344,8 @@ async def logout(
             value="",
             httponly=True,
             secure=True,
-            samesite="none",
-            max_age=0,
-            path="/"
-        )
-
-        response.set_cookie(
-            key="is_authenticated",
-            value="",
-            httponly=False,
-            secure=True,
-            samesite="none",
+            samesite="strict",
+            domain=".bonidoc.com",
             max_age=0,
             path="/"
         )
