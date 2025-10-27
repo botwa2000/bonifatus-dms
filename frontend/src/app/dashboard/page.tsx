@@ -15,6 +15,7 @@ import Link from 'next/link'
 
 export default function DashboardPage() {
   const { user, isLoading, logout } = useAuth()
+  const router = useRouter()
 
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
   const [trialInfo, setTrialInfo] = useState<{ days_remaining: number; expires_at: string; features: string[] } | null>(null)
