@@ -242,9 +242,20 @@ export class AuthService {
   }
 
   async getCurrentUser(): Promise<User | null> {
+    const requestId = Math.random().toString(36).substr(2, 9)
+    const isDevelopment = process.env.NODE_ENV === 'development'
+
     try {
+      if (isDevelopment) {
+        console.log(`[AuthService:${requestId}] 🔄 Fetching current user...`)
+      }
+
       // httpOnly cookies are sent automatically with this request
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
+
+      if (isDevelopment) {
+        console.log(`[AuthService:${requestId}] ✅ User retrieved:`, response?.email || 'unknown')
+      }
 
       // User data no longer cached in sessionStorage (XSS risk)
       // Cookies are the single source of truth
@@ -252,15 +263,15 @@ export class AuthService {
       return response
 
     } catch (error) {
-        // Silent fail for 401 on public pages (expected behavior)
+        // Clean error logging (development only)
         const apiError = error as { status?: number; message?: string }
-        if (apiError?.status !== 401) {
-            console.error('Failed to get current user:', error)
-        }
-
-        // Clear stale data on auth failure
         if (apiError?.status === 401) {
+          if (isDevelopment) {
+            console.log(`[AuthService:${requestId}] ⚠️  Unauthorized - cookies not sent or invalid`)
+          }
           this.clearAllAuthData()
+        } else if (isDevelopment) {
+          console.log(`[AuthService:${requestId}] ❌ Failed:`, apiError.message || 'Unknown error')
         }
 
         return null
