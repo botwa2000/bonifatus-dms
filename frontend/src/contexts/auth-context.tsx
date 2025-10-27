@@ -27,25 +27,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Note: Middleware handles auth redirects, so this only runs on authenticated pages
   useEffect(() => {
     let mounted = true
+    let isLoading = false // Prevent race conditions from multiple simultaneous calls
 
     const loadUser = async () => {
+      // Prevent multiple simultaneous API calls
+      if (isLoading) {
+        console.log('[AuthContext] ⏩ Skipping duplicate user load request')
+        return
+      }
+
+      isLoading = true
+      const requestId = Math.random().toString(36).substr(2, 9)
+
       try {
-        console.log('[AuthContext] Loading user from API...')
+        console.log(`[AuthContext:${requestId}] 🔄 Loading user from API...`)
+        console.log(`[AuthContext:${requestId}] 🍪 Document cookies:`, document.cookie.split('; ').filter(c => c.includes('token')))
+
         const currentUser = await authService.getCurrentUser()
 
         if (mounted) {
-          console.log('[AuthContext] User loaded:', currentUser?.email || 'null')
+          console.log(`[AuthContext:${requestId}] ✅ User loaded:`, currentUser?.email || 'null')
           setUser(currentUser)
           setIsAuthenticated(!!currentUser)
           setIsLoading(false)
         }
       } catch (err) {
-        console.log('[AuthContext] Failed to load user:', err)
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        console.log(`[AuthContext:${requestId}] ❌ Failed to load user:`, errorMsg)
         if (mounted) {
           setUser(null)
           setIsAuthenticated(false)
           setIsLoading(false)
         }
+      } finally {
+        isLoading = false
       }
     }
 
