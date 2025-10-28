@@ -110,8 +110,91 @@ async def google_oauth_login(request: Request):
         )
 
 
+@router.get(
+    "/google/callback",
+    responses={
+        302: {"description": "Redirect to dashboard on success"},
+        401: {"description": "OAuth authentication failed"},
+        500: {"description": "Internal server error"}
+    },
+    summary="Complete Google OAuth Flow (Server-side)",
+    description="Industry-standard OAuth callback - exchanges code for tokens server-side and redirects"
+)
+async def google_oauth_callback_redirect(
+    request: Request,
+    code: str,
+    state: str
+):
+    """
+    Industry-standard OAuth callback endpoint (GET with redirect)
+
+    Security benefits:
+    - OAuth code never exposed to frontend JavaScript
+    - Tokens set in httpOnly cookies before redirect
+    - Follows OAuth 2.0 confidential client pattern
+    - Reduces attack surface
+
+    Flow:
+    1. Google redirects here with authorization code
+    2. Backend exchanges code for tokens server-side
+    3. Tokens stored in httpOnly cookies
+    4. User redirected to dashboard with cookies set
+    """
+    try:
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("User-Agent", "unknown")
+
+        # Exchange authorization code for tokens
+        auth_result = await auth_service.authenticate_with_google_code(
+            code,
+            ip_address,
+            user_agent
+        )
+
+        if not auth_result:
+            logger.warning(f"Google authentication failed from IP: {ip_address}")
+            error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
+            return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+        # Create redirect response to dashboard
+        redirect_url = f"{settings.app.app_frontend_url}/dashboard"
+        redirect_response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+        # Set tokens in httpOnly cookies before redirect
+        redirect_response.set_cookie(
+            key="access_token",
+            value=auth_result["access_token"],
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            domain=".bonidoc.com",
+            max_age=900,  # 15 minutes
+            path="/"
+        )
+
+        redirect_response.set_cookie(
+            key="refresh_token",
+            value=auth_result["refresh_token"],
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            domain=".bonidoc.com",
+            max_age=604800,  # 7 days
+            path="/"
+        )
+
+        logger.info(f"User {auth_result['email']} authenticated, redirecting to dashboard")
+
+        return redirect_response
+
+    except Exception as e:
+        logger.error(f"Google OAuth callback error: {e}")
+        error_url = f"{settings.app.app_frontend_url}/login?error=server_error"
+        return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+
 @router.post(
-    "/google/callback", 
+    "/google/callback",
     response_model=TokenResponse,
     responses={
         200: {"model": TokenResponse, "description": "Authentication successful"},
@@ -120,19 +203,20 @@ async def google_oauth_login(request: Request):
         422: {"model": ErrorResponse, "description": "Invalid request data"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     },
-    summary="Complete Google OAuth Flow",
-    description="Exchange Google OAuth code for JWT tokens"
+    summary="Complete Google OAuth Flow (Legacy)",
+    description="Legacy AJAX endpoint - use GET /google/callback instead",
+    deprecated=True
 )
-async def google_oauth_callback(
+async def google_oauth_callback_ajax(
     request: Request,
     response: Response,
     google_request: GoogleTokenRequest
 ) -> TokenResponse:
     """
-    Complete Google OAuth flow and return JWT tokens
-    
-    Validates Google OAuth ID token, creates or updates user account,
-    and returns access and refresh JWT tokens for authenticated sessions.
+    Legacy OAuth callback endpoint (POST with JSON)
+
+    DEPRECATED: Use GET /google/callback instead for better security.
+    This endpoint will be removed in a future version.
     """
     try:
         ip_address = get_client_ip(request)

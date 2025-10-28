@@ -163,61 +163,8 @@ export class AuthService {
       throw new Error('Authentication service unavailable: ' + (error as Error).message)
     }
   }
-  
-  async exchangeGoogleToken(
-    code: string,
-    state: string | null
-  ): Promise<{ success: boolean; user?: User; error?: string }> {
-    try {
-      console.log('[AuthService] Exchanging token with backend...')
 
-      // Validate state if provided
-      if (state && !this.validateOAuthState(state)) {
-        console.error('[AuthService] State validation failed')
-        throw new Error('Invalid OAuth state - possible security issue')
-      }
-
-      // Exchange authorization code for JWT tokens via backend
-      // Backend returns user data AND sets httpOnly cookies
-      const response = await apiClient.post<TokenResponse>('/api/v1/auth/google/callback', {
-        code,
-        state: state || ''
-      })
-
-      console.log('[AuthService] Backend response received:', {
-        hasUserId: !!response.user_id,
-        email: response.email,
-        tier: response.tier
-      })
-
-      // Convert TokenResponse to User object (all data from backend)
-      const user: User = {
-        id: response.user_id,
-        email: response.email,
-        full_name: response.full_name,
-        profile_picture: response.profile_picture,
-        tier: response.tier,
-        is_active: response.is_active,
-        created_at: new Date().toISOString(), // Not returned by backend, use current time
-        updated_at: new Date().toISOString()  // Not returned by backend, use current time
-      }
-
-      // Clear OAuth state (user data now stored only in cookies, not sessionStorage)
-      this.clearStoredOAuthState()
-
-      console.log('[AuthService] Token exchange successful')
-      return { success: true, user }
-
-    } catch (error) {
-      console.error('[AuthService] Token exchange failed:', error)
-      this.clearStoredOAuthState()
-
-      const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
-      return { success: false, error: errorMessage }
-    }
-  }
-
-  // Tokens are stored in secure httpOnly cookies by backend
+  // Tokens are stored in secure httpOnly cookies by backend (set during OAuth redirect)
   // Frontend cannot and should not access them directly
   // This is a security feature, not a limitation
 
