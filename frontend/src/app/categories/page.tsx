@@ -21,19 +21,24 @@ type SortField = 'name' | 'documents' | 'updated' | 'created'
 type SortDirection = 'asc' | 'desc'
 
 export default function CategoriesPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, loadUser } = useAuth()
   const router = useRouter()
-  
+
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null)
-  
+
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  // Load user data on mount
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {

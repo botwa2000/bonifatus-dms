@@ -10,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  loadUser: () => Promise<void>
   initializeGoogleAuth: () => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
@@ -20,53 +21,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load user from API on mount
-  // Note: Middleware handles auth redirects, so this only runs on authenticated pages
-  useEffect(() => {
-    let mounted = true
-    let isLoadingUser = false // Prevent race conditions from multiple simultaneous calls
+  // Passive provider: No auto-fetch on mount
+  // Pages that need authentication explicitly call loadUser()
+  // This prevents unnecessary API calls and 401 errors on public pages
 
-    const loadUser = async () => {
-      // Skip loading during OAuth flow to prevent 401 errors
-      if (typeof window !== 'undefined' && window.location.pathname === '/login') {
-        setIsLoading(false)
-        return
-      }
+  const loadUser = useCallback(async () => {
+    setIsLoading(true)
 
-      // Prevent multiple simultaneous API calls
-      if (isLoadingUser) {
-        return
-      }
-
-      isLoadingUser = true
-
-      try {
-        const currentUser = await authService.getCurrentUser()
-
-        if (mounted) {
-          setUser(currentUser)
-          setIsAuthenticated(!!currentUser)
-          setIsLoading(false)
-        }
-      } catch (err) {
-        // Silently handle errors - expected during OAuth and on public pages
-        if (mounted) {
-          setUser(null)
-          setIsAuthenticated(false)
-          setIsLoading(false)
-        }
-      } finally {
-        isLoadingUser = false
-      }
-    }
-
-    loadUser()
-
-    return () => {
-      mounted = false
+    try {
+      const currentUser = await authService.getCurrentUser()
+      setUser(currentUser)
+      setIsAuthenticated(!!currentUser)
+    } catch (err) {
+      // Silently handle errors
+      setUser(null)
+      setIsAuthenticated(false)
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
@@ -106,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated,
       isLoading,
       error,
+      loadUser,
       initializeGoogleAuth,
       logout,
       clearError

@@ -43,7 +43,7 @@ type SortField = 'title' | 'created_at' | 'file_size'
 type SortDirection = 'asc' | 'desc'
 
 export default function DocumentsPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, loadUser } = useAuth()
   const router = useRouter()
 
   const [documents, setDocuments] = useState<Document[]>([])
@@ -61,6 +61,11 @@ export default function DocumentsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const [deletingDocument, setDeletingDocument] = useState<Document | null>(null)
+
+  // Load user data on mount
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {

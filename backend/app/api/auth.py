@@ -411,8 +411,22 @@ async def logout(
     try:
         ip_address = get_client_ip(request)
 
-        # Clear all authentication cookies
-        response.set_cookie(
+        # Revoke user sessions in database
+        await auth_service.logout_user(str(current_user.id), ip_address)
+
+        logger.info(f"User {current_user.email} logged out from IP: {ip_address}")
+
+        # Create response with cookies cleared
+        logout_response = JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Logout successful",
+                "timestamp": time.time()
+            }
+        )
+
+        # Clear all authentication cookies on the response we're returning
+        logout_response.set_cookie(
             key="access_token",
             value="",
             httponly=True,
@@ -423,7 +437,7 @@ async def logout(
             path="/"
         )
 
-        response.set_cookie(
+        logout_response.set_cookie(
             key="refresh_token",
             value="",
             httponly=True,
@@ -433,18 +447,8 @@ async def logout(
             max_age=0,
             path="/"
         )
-        
-        await auth_service.logout_user(str(current_user.id), ip_address)
-        
-        logger.info(f"User {current_user.email} logged out from IP: {ip_address}")
-        
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "message": "Logout successful",
-                "timestamp": time.time()
-            }
-        )
+
+        return logout_response
         
     except Exception as e:
         logger.error(f"Logout error: {e}")

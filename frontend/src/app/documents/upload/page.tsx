@@ -52,8 +52,8 @@ interface FileUploadState extends FileAnalysisSuccess {
 
 export default function BatchUploadPage() {
   const router = useRouter()
-  useAuth() // Ensure user is authenticated
-  
+  const { loadUser } = useAuth()
+
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisComplete, setAnalysisComplete] = useState(false)
@@ -61,6 +61,11 @@ export default function BatchUploadPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
   const [maxFilenameLength, setMaxFilenameLength] = useState(200)
+
+  // Load user data on mount
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   useEffect(() => {
     loadCategories()

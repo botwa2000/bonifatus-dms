@@ -29,7 +29,7 @@ interface UserStatistics {
 }
 
 export default function ProfilePage() {
-  const { isAuthenticated, isLoading, logout } = useAuth()
+  const { isAuthenticated, isLoading, loadUser, logout } = useAuth()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
@@ -41,6 +41,11 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  // Load user data on mount
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

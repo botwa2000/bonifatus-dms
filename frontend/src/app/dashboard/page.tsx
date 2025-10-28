@@ -14,7 +14,7 @@ import { authService } from '@/services/auth.service'
 import Link from 'next/link'
 
 export default function DashboardPage() {
-  const { user, isLoading, logout } = useAuth()
+  const { user, isLoading, loadUser, logout } = useAuth()
   const router = useRouter()
 
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
@@ -22,8 +22,10 @@ export default function DashboardPage() {
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Note: Authentication is handled by middleware
-  // This page only renders if user has valid access_token cookie
+  // Load user data on mount (passive auth context requires explicit call)
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   // Load trial info asynchronously
   useEffect(() => {

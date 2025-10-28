@@ -31,7 +31,7 @@ interface DriveStatus {
 }
 
 export default function SettingsPage() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, loadUser } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
@@ -44,6 +44,11 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Load user data on mount
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
