@@ -27,49 +27,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Note: Middleware handles auth redirects, so this only runs on authenticated pages
   useEffect(() => {
     let mounted = true
-    let isLoading = false // Prevent race conditions from multiple simultaneous calls
-    const isDevelopment = process.env.NODE_ENV === 'development'
+    let isLoadingUser = false // Prevent race conditions from multiple simultaneous calls
 
     const loadUser = async () => {
-      // Prevent multiple simultaneous API calls
-      if (isLoading) {
-        if (isDevelopment) {
-          console.log('[AuthContext] ⏩ Skipping duplicate user load request')
-        }
+      // Skip loading during OAuth flow to prevent 401 errors
+      if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+        setIsLoading(false)
         return
       }
 
-      isLoading = true
-      const requestId = Math.random().toString(36).substr(2, 9)
+      // Prevent multiple simultaneous API calls
+      if (isLoadingUser) {
+        return
+      }
+
+      isLoadingUser = true
 
       try {
-        if (isDevelopment) {
-          console.log(`[AuthContext:${requestId}] 🔄 Loading user from API...`)
-          console.log(`[AuthContext:${requestId}] 🍪 Document cookies:`, document.cookie.split('; ').filter(c => c.includes('token')))
-        }
-
         const currentUser = await authService.getCurrentUser()
 
         if (mounted) {
-          if (isDevelopment) {
-            console.log(`[AuthContext:${requestId}] ✅ User loaded:`, currentUser?.email || 'null')
-          }
           setUser(currentUser)
           setIsAuthenticated(!!currentUser)
           setIsLoading(false)
         }
       } catch (err) {
-        if (isDevelopment) {
-          const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-          console.log(`[AuthContext:${requestId}] ❌ Failed to load user:`, errorMsg)
-        }
+        // Silently handle errors - expected during OAuth and on public pages
         if (mounted) {
           setUser(null)
           setIsAuthenticated(false)
           setIsLoading(false)
         }
       } finally {
-        isLoading = false
+        isLoadingUser = false
       }
     }
 

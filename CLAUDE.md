@@ -1,1 +1,2 @@
 - add to memory
+- avoid hard coded elements in the code. any definitions are to be made either in centralized config files or environmental variables

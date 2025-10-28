@@ -12,7 +12,6 @@ interface ApiClientConfig {
 export class ApiClient {
   private readonly config: ApiClientConfig
   private requestCounter = 0
-  private readonly isDevelopment = process.env.NODE_ENV === 'development'
 
   constructor() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -104,13 +103,6 @@ export class ApiClient {
           requestConfig.body = JSON.stringify(data)
         }
 
-        // Comprehensive debug logging for cookie transmission (development only)
-        if (this.isDevelopment) {
-          console.log(`[ApiClient:${requestId}] 🌐 ${method} ${url}`)
-          console.log(`[ApiClient:${requestId}] 📤 Headers:`, headers)
-          console.log(`[ApiClient:${requestId}] 🍪 Credentials:`, requestConfig.credentials)
-        }
-
         const response = await fetch(url, requestConfig)
         const responseHeaders = this.parseHeaders(response.headers)
 
@@ -125,19 +117,8 @@ export class ApiClient {
 
         const duration = Date.now() - startTime
 
-        // Response logging with status and cookie information (development only)
-        if (this.isDevelopment) {
-          console.log(`[ApiClient:${requestId}] 📥 ${response.status} ${response.statusText} (${duration}ms)`)
-          if (response.headers.has('set-cookie')) {
-            console.log(`[ApiClient:${requestId}] 🍪 Set-Cookie received`)
-          }
-        }
-
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
-          if (this.isDevelopment) {
-            console.log(`[ApiClient:${requestId}] ❌ Error: ${error.message}`)
-          }
 
           if (this.shouldRetry(response.status, attempt, maxRetries)) {
             lastError = error
@@ -161,18 +142,10 @@ export class ApiClient {
         lastError = error as Error
 
         if (this.isRetriableError(error as Error) && attempt < maxRetries) {
-          if (this.isDevelopment) {
-            console.log(`[ApiClient:${requestId}] 🔄 Retry ${attempt + 1}/${maxRetries}`)
-          }
           await this.delay(this.config.retryDelay * Math.pow(2, attempt))
           continue
         }
 
-        // Clean error logging without stack traces (development only)
-        if (this.isDevelopment) {
-          const err = error as Error
-          console.log(`[ApiClient:${requestId}] ❌ Failed: ${err.message}`)
-        }
         throw this.normalizeError(error as Error)
       }
     }
