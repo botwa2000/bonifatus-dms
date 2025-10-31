@@ -193,6 +193,151 @@ def check_migration_006():
         db.close()
 
 
+def check_category_standardization():
+    """Verify all template categories are standardized with uniform structure"""
+    db = db_manager.session_local()
+    try:
+        print_separator("CATEGORY STANDARDIZATION CHECK")
+
+        # Check template categories (user_id IS NULL)
+        result = db.execute(text("""
+            SELECT reference_key, category_code, sort_order, is_system,
+                   (SELECT COUNT(*) FROM category_translations ct WHERE ct.category_id = c.id) as translations,
+                   (SELECT COUNT(*) FROM category_keywords ck WHERE ck.category_id = c.id) as keywords
+            FROM categories c
+            WHERE user_id IS NULL
+            ORDER BY sort_order
+        """))
+        template_categories = result.fetchall()
+
+        print(f"\nTemplate Categories: {len(template_categories)}")
+        print("\n  Ref Key | Code | Sort | System | Translations | Keywords")
+        print("  --------|------|------|--------|--------------|----------")
+
+        all_valid = True
+        for cat in template_categories:
+            ref_key, code, sort_order, is_system, trans_count, kw_count = cat
+
+            # Check if reference key is 3-letter format
+            is_3letter = len(ref_key) == 3 and ref_key.isupper()
+            status = "✅" if is_3letter and trans_count >= 4 and kw_count > 0 else "⚠️"
+
+            print(f"  {status} {ref_key:7s} | {code:4s} | {sort_order:4d} | {is_system!s:6s} | {trans_count:12d} | {kw_count:8d}")
+
+            if not is_3letter or trans_count < 4 or kw_count == 0:
+                all_valid = False
+
+        # Check for French translations
+        result = db.execute(text("""
+            SELECT c.reference_key, ct.language_code
+            FROM categories c
+            LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.language_code = 'fr'
+            WHERE c.user_id IS NULL
+            ORDER BY c.sort_order
+        """))
+        french_check = result.fetchall()
+
+        print("\n  French Translations:")
+        missing_french = []
+        for ref_key, lang_code in french_check:
+            if lang_code:
+                print(f"    ✅ {ref_key}: Has French")
+            else:
+                print(f"    ❌ {ref_key}: Missing French")
+                missing_french.append(ref_key)
+                all_valid = False
+
+        # Check current migration version
+        result = db.execute(text("SELECT version_num FROM alembic_version"))
+        version = result.fetchone()
+        print(f"\n  Current Migration: {version[0]}")
+
+        if all_valid:
+            print("\n✅ All categories standardized correctly")
+        else:
+            print("\n⚠️ Some categories need standardization")
+            if missing_french:
+                print(f"  Missing French: {', '.join(missing_french)}")
+
+    finally:
+        db.close()
+
+
+def check_per_user_architecture():
+    """Verify per-user category architecture is working correctly"""
+    db = db_manager.session_local()
+    try:
+        print_separator("PER-USER CATEGORY ARCHITECTURE CHECK")
+
+        # Count template vs user categories
+        result = db.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE user_id IS NULL) as template_count,
+                COUNT(*) FILTER (WHERE user_id IS NOT NULL) as user_count,
+                COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL) as unique_users
+            FROM categories
+        """))
+        counts = result.fetchone()
+
+        print(f"\n  Template Categories (user_id=NULL): {counts[0]}")
+        print(f"  User Categories (user_id≠NULL): {counts[1]}")
+        print(f"  Unique Users with Categories: {counts[2]}")
+
+        # Check users
+        result = db.execute(text("SELECT COUNT(*) FROM users"))
+        user_count = result.fetchone()[0]
+        print(f"\n  Total Users: {user_count}")
+
+        # Check if users have their own category copies
+        if user_count > 0:
+            result = db.execute(text("""
+                SELECT u.email, COUNT(c.id) as category_count
+                FROM users u
+                LEFT JOIN categories c ON u.id = c.user_id
+                GROUP BY u.email
+            """))
+            user_categories = result.fetchall()
+
+            print("\n  User Category Counts:")
+            for email, cat_count in user_categories:
+                expected = counts[0]  # Should match template count
+                status = "✅" if cat_count == expected else "⚠️"
+                print(f"    {status} {email}: {cat_count} categories (expected: {expected})")
+
+        # Verify no duplicate reference_keys per user
+        result = db.execute(text("""
+            SELECT user_id, reference_key, COUNT(*) as dup_count
+            FROM categories
+            WHERE user_id IS NOT NULL
+            GROUP BY user_id, reference_key
+            HAVING COUNT(*) > 1
+        """))
+        duplicates = result.fetchall()
+
+        if duplicates:
+            print("\n  ❌ Found duplicate reference_keys per user:")
+            for user_id, ref_key, dup_count in duplicates:
+                print(f"    User {user_id}: {ref_key} appears {dup_count} times")
+        else:
+            print("\n  ✅ No duplicate reference_keys per user")
+
+        print("\n  Architecture Status:")
+        if counts[0] == 7:
+            print("    ✅ 7 template categories exist")
+        else:
+            print(f"    ⚠️ Expected 7 template categories, found {counts[0]}")
+
+        if user_count == 0:
+            print("    ℹ️ No users registered yet (clean slate)")
+        elif counts[1] == user_count * counts[0]:
+            print("    ✅ Each user has complete category set")
+        else:
+            print("    ⚠️ User category counts don't match expected")
+
+    finally:
+        db.close()
+
+
 def check_admin_users():
     """Display admin users and their roles"""
     db = db_manager.session_local()
@@ -249,6 +394,12 @@ def main():
 
     # Check migration 006 status
     check_migration_006()
+
+    # NEW: Check category standardization (Migration 011)
+    check_category_standardization()
+
+    # NEW: Check per-user category architecture
+    check_per_user_architecture()
 
     # Check admin users
     check_admin_users()
