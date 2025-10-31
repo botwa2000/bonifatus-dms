@@ -202,14 +202,15 @@ class AuthService:
                 )
 
             hashed_password = self.get_password_hash(user_create.password)
-            
+
             db_user = User(
                 email=user_create.email,
                 full_name=user_create.full_name,
                 hashed_password=hashed_password,
                 is_active=True,
                 is_admin=user_create.email in settings.security.admin_emails,
-                tier=settings.security.default_user_tier
+                tier=settings.security.default_user_tier,
+                preferred_doc_languages=["en"]  # Default to English
             )
             
             db.add(db_user)
@@ -388,7 +389,8 @@ class AuthService:
                             google_id=google_id,
                             profile_picture=profile_picture,
                             is_active=True,
-                            tier=settings.security.default_user_tier
+                            tier=settings.security.default_user_tier,
+                            preferred_doc_languages=["en"]  # Default to English
                         )
                         db.add(user)
                         is_new_user = True
