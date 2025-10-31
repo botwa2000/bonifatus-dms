@@ -89,11 +89,27 @@ class LanguageDetectionService:
             return 'en'
 
     async def get_supported_languages(self, session: Optional[object] = None) -> list:
-        """Get list of supported languages"""
-        return [
-            'en', 'de', 'ru', 'fr', 'es', 'it',
-            'nl', 'pt', 'pl', 'cs', 'uk'
-        ]
+        """Get list of supported languages from database"""
+        from app.database.connection import db_manager
+        from app.database.models import SystemSetting
+        from sqlalchemy import select
+
+        db_session = session if session else db_manager.session_local()
+        try:
+            result = db_session.execute(
+                select(SystemSetting.setting_value).where(
+                    SystemSetting.setting_key == 'supported_languages'
+                )
+            ).scalar_one_or_none()
+
+            if result:
+                return [lang.strip() for lang in result.split(',')]
+            else:
+                logger.warning("supported_languages not found in DB, using fallback")
+                return ['en']
+        finally:
+            if not session:
+                db_session.close()
 
 
 # Global instance

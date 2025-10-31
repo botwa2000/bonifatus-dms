@@ -77,15 +77,17 @@ class UserStatistics(BaseModel):
 
 class UserPreferences(BaseModel):
     """User preferences and settings"""
-    language: str = Field(..., description="Preferred language")
+    language: str = Field(..., description="Preferred UI language")
+    preferred_doc_languages: List[str] = Field(..., description="Preferred document processing languages")
     timezone: str = Field(..., description="User timezone")
     notifications_enabled: bool = Field(..., description="Email notifications enabled")
     auto_categorization: bool = Field(..., description="AI auto-categorization enabled")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "language": "en",
+                "preferred_doc_languages": ["en", "de"],
                 "timezone": "Europe/Berlin",
                 "notifications_enabled": True,
                 "auto_categorization": True
@@ -95,15 +97,17 @@ class UserPreferences(BaseModel):
 
 class UserPreferencesUpdate(BaseModel):
     """Request model for updating user preferences"""
-    language: Optional[str] = Field(None, description="Preferred language")
+    language: Optional[str] = Field(None, description="Preferred UI language")
+    preferred_doc_languages: Optional[List[str]] = Field(None, description="Preferred document processing languages")
     timezone: Optional[str] = Field(None, description="User timezone")
     notifications_enabled: Optional[bool] = Field(None, description="Email notifications")
     auto_categorization: Optional[bool] = Field(None, description="AI auto-categorization")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "language": "de",
+                "preferred_doc_languages": ["de", "en", "ru"],
                 "timezone": "Europe/Berlin",
                 "notifications_enabled": False
             }

@@ -25,6 +25,7 @@ interface FileAnalysisSuccess {
     suggested_category_id: string | null
     confidence: number
     detected_language?: string
+    language_warning?: string | null
     document_date?: string | null
     document_date_type?: string | null
     document_date_confidence?: number | null
@@ -492,6 +493,12 @@ export default function BatchUploadPage() {
                                     </span>
                                   )}
                                 </Badge>
+                              </div>
+                            )}
+                            {/* Display language warning if present */}
+                            {state.analysis?.language_warning && (
+                              <div className="mt-2">
+                                <Alert type="warning" message={state.analysis.language_warning} />
                               </div>
                             )}
                           </div>

@@ -73,15 +73,17 @@ class ClassificationService:
         self,
         db: Session,
         category_id: UUID,
-        language: str
+        language: str,
+        is_multi_lingual: bool = False
     ) -> Dict[str, float]:
         """
-        Get keywords and weights for a category in a specific language
+        Get keywords and weights for a category
 
         Args:
             db: Database session
             category_id: Category UUID
             language: Language code
+            is_multi_lingual: If True, load ALL keywords regardless of language
 
         Returns:
             Dict mapping keywords to weights
@@ -89,14 +91,20 @@ class ClassificationService:
         try:
             from app.database.models import CategoryKeyword
 
-            keywords = db.query(CategoryKeyword).filter(
-                CategoryKeyword.category_id == category_id,
-                CategoryKeyword.language_code == language
-            ).all()
+            query = db.query(CategoryKeyword).filter(
+                CategoryKeyword.category_id == category_id
+            )
+
+            # For language-specific categories, filter by language
+            if not is_multi_lingual:
+                query = query.filter(CategoryKeyword.language_code == language)
+
+            keywords = query.all()
 
             keyword_weights = {kw.keyword.lower(): kw.weight for kw in keywords}
 
-            logger.debug(f"Loaded {len(keyword_weights)} keywords for category {category_id} (lang: {language})")
+            mode = "all languages" if is_multi_lingual else f"lang: {language}"
+            logger.debug(f"Loaded {len(keyword_weights)} keywords for category {category_id} ({mode})")
 
             return keyword_weights
 
@@ -183,7 +191,13 @@ class ClassificationService:
             results = []
 
             for category in categories:
-                category_keywords = self.get_category_keywords(db, category.id, language)
+                # For multi-lingual categories, load ALL keywords regardless of language
+                category_keywords = self.get_category_keywords(
+                    db,
+                    category.id,
+                    language,
+                    is_multi_lingual=category.is_multi_lingual
+                )
 
                 if not category_keywords:
                     continue

@@ -222,6 +222,7 @@ routers = [
     ("app.api.document_analysis", "DocumentAnalysis"),
     ("app.api.documents", "Documents"),
     ("app.api.security", "Security"),
+    ("app.api.translation", "Translation"),
 ]
 
 for module_path, name in routers:

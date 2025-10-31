@@ -78,8 +78,10 @@ class UserService:
 
     async def _get_default_preferences(self) -> Dict[str, Any]:
         """Get default user preferences from system settings"""
+        default_lang = await self._get_system_setting("default_user_language", "en")
         return {
-            "language": await self._get_system_setting("default_user_language", "en"),
+            "language": default_lang,
+            "preferred_doc_languages": [default_lang],  # Default to same as UI language
             "timezone": await self._get_system_setting("default_timezone", "UTC"),
             "notifications_enabled": await self._get_system_setting("default_notifications_enabled", True),
             "auto_categorization": await self._get_system_setting("default_auto_categorization", True)
@@ -225,7 +227,12 @@ class UserService:
         session = db_manager.session_local()
         try:
             preferences = {}
-            
+
+            # Get user from database for preferred_doc_languages
+            user = session.get(User, user_id)
+            if user and user.preferred_doc_languages:
+                preferences['preferred_doc_languages'] = user.preferred_doc_languages
+
             # Get user settings from database
             settings_stmt = select(UserSetting).where(UserSetting.user_id == user_id)
             user_settings = session.execute(settings_stmt).scalars().all()
@@ -252,8 +259,8 @@ class UserService:
             session.close()
 
     async def update_user_preferences(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         preferences_update: UserPreferencesUpdate,
         ip_address: str = None
     ) -> Optional[UserPreferences]:
@@ -264,12 +271,39 @@ class UserService:
             old_values = {}
             new_values = {}
 
-            # Validate language if provided
+            # Get user for preferred_doc_languages update
+            user = session.get(User, user_id)
+            if not user:
+                raise ValueError("User not found")
+
+            # Handle preferred_doc_languages separately (stored in users table)
+            if "preferred_doc_languages" in update_data:
+                doc_languages = update_data["preferred_doc_languages"]
+                supported_languages = await self._get_supported_languages()
+
+                # Validate each language
+                if not isinstance(doc_languages, list) or len(doc_languages) == 0:
+                    raise ValueError("At least one document language must be selected")
+
+                for lang in doc_languages:
+                    if lang not in supported_languages:
+                        raise ValueError(f"Invalid language code '{lang}'. Supported: {', '.join(supported_languages)}")
+
+                # Update users table
+                old_values['preferred_doc_languages'] = user.preferred_doc_languages
+                user.preferred_doc_languages = doc_languages
+                new_values['preferred_doc_languages'] = doc_languages
+
+                # Remove from update_data so it doesn't go to user_settings
+                del update_data["preferred_doc_languages"]
+
+            # Validate UI language if provided
             if "language" in update_data:
                 if not await self._validate_language(update_data["language"]):
                     supported_languages = await self._get_supported_languages()
-                    raise ValueError(f"Language must be one of: {', '.join(supported_languages)}")
+                    raise ValueError(f"UI language must be one of: {', '.join(supported_languages)}")
 
+            # Handle other settings (stored in user_settings table)
             for key, value in update_data.items():
                 # Get existing setting
                 setting_stmt = select(UserSetting).where(

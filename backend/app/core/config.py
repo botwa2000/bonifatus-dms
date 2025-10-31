@@ -62,9 +62,25 @@ class SecuritySettings(BaseSettings):
         env_file = ".env"
 
 
+class TranslationSettings(BaseSettings):
+    """Translation service configuration from environment variables"""
+
+    translation_provider: str = Field(..., description="Translation provider: libretranslate or deepl")
+    translation_libretranslate_url: str = Field(..., description="LibreTranslate API URL")
+    translation_deepl_api_key: Optional[str] = Field(default=None, description="DeepL API key (for paid tier)")
+    translation_deepl_url: str = Field(..., description="DeepL API URL")
+    translation_force_provider: Optional[str] = Field(default=None, description="Force specific provider (dev/test only)")
+    translation_timeout: int = Field(..., description="Translation request timeout in seconds")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
-    
+
     app_environment: str = Field(..., description="Environment")
     app_debug_mode: bool = Field(..., description="Enable debug mode")
     app_cors_origins: str = Field(..., description="CORS origins")
@@ -83,11 +99,12 @@ class AppSettings(BaseSettings):
 
 class Settings(BaseSettings):
     """Complete application settings with modular structure"""
-    
+
     app: AppSettings = Field(default_factory=AppSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     google: GoogleSettings = Field(default_factory=GoogleSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
+    translation: TranslationSettings = Field(default_factory=TranslationSettings)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -6,6 +6,7 @@
 
 import Link from 'next/link'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
+import { Button } from '@/components/ui/Button'
 
 export default function HomePage() {
   return (
@@ -59,14 +60,13 @@ export default function HomePage() {
               <GoogleLoginButton size="lg" className="min-w-[200px]">
                 Start Free - 50 Pages/Month
               </GoogleLoginButton>
-              <Link
-                href="/pricing"
-                className="inline-flex items-center px-6 py-3 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors"
-              >
-                View Pricing
-                <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+              <Link href="/pricing">
+                <Button variant="secondary" size="lg" className="min-w-[200px]">
+                  View Pricing
+                  <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Button>
               </Link>
             </div>
           </div>

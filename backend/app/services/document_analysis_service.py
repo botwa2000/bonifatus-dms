@@ -58,6 +58,38 @@ class DocumentAnalysisService:
 
             detected_language = await language_detection_service.detect_language(extracted_text, db)
 
+            # Check if detected language is in user's preferred languages
+            language_warning = None
+            if user_id:
+                from app.database.models import User
+                user = db.get(User, UUID(user_id))
+                if user and user.preferred_doc_languages:
+                    if detected_language not in user.preferred_doc_languages:
+                        # Get language names from system settings
+                        from app.database.models import SystemSetting
+                        from sqlalchemy import select
+                        import json
+
+                        lang_metadata_result = db.execute(
+                            select(SystemSetting.setting_value).where(
+                                SystemSetting.setting_key == 'language_metadata'
+                            )
+                        ).scalar_one_or_none()
+
+                        lang_name = detected_language.upper()
+                        if lang_metadata_result:
+                            try:
+                                metadata = json.loads(lang_metadata_result)
+                                if detected_language in metadata:
+                                    lang_name = metadata[detected_language]['native_name']
+                            except:
+                                pass
+
+                        language_warning = (
+                            f"Document detected in {lang_name} ({detected_language}), which is not in your "
+                            f"preferred document languages. You can add it in Settings."
+                        )
+
             keywords = keyword_extraction_service.extract_keywords(
                 text=extracted_text,
                 db=db,
@@ -118,6 +150,7 @@ class DocumentAnalysisService:
                 'ocr_confidence': round(ocr_confidence * 100, 1) if ocr_confidence < 1.0 else None,
                 'keywords': validated_keywords,
                 'detected_language': detected_language,
+                'language_warning': language_warning,
                 'document_date': None,
                 'document_date_type': None,
                 'document_date_confidence': None,

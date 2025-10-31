@@ -61,11 +61,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.logout()
       setUser(null)
       setIsAuthenticated(false)
+
+      // Clear theme preference and reset to light mode for logged-out users
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('theme')
+        document.documentElement.classList.remove('dark')
+        document.documentElement.classList.add('light')
+      }
+
       window.location.href = '/'
     } catch (err) {
       console.error('[AuthProvider] Logout failed:', err)
       setUser(null)
       setIsAuthenticated(false)
+
+      // Clear theme even on logout failure
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('theme')
+        document.documentElement.classList.remove('dark')
+        document.documentElement.classList.add('light')
+      }
+
       window.location.href = '/'
     }
   }, [])

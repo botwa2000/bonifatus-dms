@@ -35,6 +35,8 @@ class User(Base, TimestampMixin):
     tier = Column(String(20), nullable=False, default="free")
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+    admin_role = Column(String(50), nullable=True)
+    preferred_doc_languages = Column(JSONB, nullable=False, server_default='["en"]')
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)
 
@@ -92,6 +94,7 @@ class Category(Base, TimestampMixin):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     sort_order = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_multi_lingual = Column(Boolean, default=True, nullable=False, server_default='true')
 
     # Relationships
     user = relationship("User", back_populates="categories")

@@ -83,16 +83,16 @@ async def require_premium_user(current_user: User = Depends(get_current_active_u
 
 async def get_current_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
     """Require user to have admin privileges"""
-    
-    admin_emails = settings.admin_email_list
-    
-    if current_user.email not in admin_emails:
+
+    # Check is_admin flag from database (preferred method after migration 006)
+    if not current_user.is_admin:
         logger.warning(f"User {current_user.email} attempted admin access")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Administrative privileges required"
         )
-    
+
+    logger.info(f"Admin user {current_user.email} (role: {current_user.admin_role or 'none'}) authenticated")
     return current_user
 
 

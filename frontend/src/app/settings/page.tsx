@@ -10,10 +10,17 @@ import AppHeader from '@/components/AppHeader'
 
 interface UserPreferences {
   language: string
+  preferred_doc_languages: string[]
   timezone: string
   theme?: string
   notifications_enabled: boolean
   auto_categorization: boolean
+}
+
+interface LanguageMetadata {
+  code: string
+  name: string
+  native_name: string
 }
 
 interface SystemSettings {
@@ -21,6 +28,7 @@ interface SystemSettings {
   available_themes: string[]
   default_theme: string
   default_language: string
+  language_metadata?: Record<string, LanguageMetadata>
 }
 
 interface DriveStatus {
@@ -39,6 +47,7 @@ export default function SettingsPage() {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null)
   const [saving, setSaving] = useState(false)
   const [driveLoading, setDriveLoading] = useState(false)
+  const [resettingCategories, setResettingCategories] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   useEffect(() => {
@@ -148,6 +157,50 @@ export default function SettingsPage() {
     }
   }
 
+  const handleResetCategories = async () => {
+    if (!confirm('Are you sure you want to reset to default categories? This will DELETE ALL your custom categories and restore only the system default categories. This action cannot be undone.')) {
+      return
+    }
+
+    setResettingCategories(true)
+    setMessage(null)
+
+    try {
+      const response = await apiClient.post<{ message: string, created: string[], skipped: string[] }>(
+        '/api/v1/categories/restore-defaults',
+        {},
+        true
+      )
+      setMessage({ type: 'success', text: response.message })
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to reset categories. Please try again.' })
+    } finally {
+      setResettingCategories(false)
+    }
+  }
+
+  const toggleDocLanguage = (langCode: string) => {
+    if (!preferences) return
+
+    const currentLangs = preferences.preferred_doc_languages || [preferences.language]
+    if (currentLangs.includes(langCode)) {
+      // Don't allow removing the last language
+      if (currentLangs.length === 1) {
+        setMessage({ type: 'error', text: 'You must have at least one document language selected' })
+        return
+      }
+      setPreferences({
+        ...preferences,
+        preferred_doc_languages: currentLangs.filter(l => l !== langCode)
+      })
+    } else {
+      setPreferences({
+        ...preferences,
+        preferred_doc_languages: [...currentLangs, langCode]
+      })
+    }
+  }
+
   const ToggleSwitch = ({ enabled, onChange, label, description }: {
     enabled: boolean
     onChange: () => void
@@ -186,9 +239,17 @@ export default function SettingsPage() {
     )
   }
 
+  // Get language display name from database metadata
+  const getLanguageName = (code: string): string => {
+    if (systemSettings.language_metadata && systemSettings.language_metadata[code]) {
+      return systemSettings.language_metadata[code].native_name
+    }
+    return code.toUpperCase()
+  }
+
   const languageOptions = systemSettings.available_languages.map(lang => ({
     value: lang,
-    label: lang === 'en' ? 'English' : lang === 'de' ? 'Deutsch' : lang === 'ru' ? 'Русский' : lang
+    label: getLanguageName(lang)
   }))
 
   const themeOptions = systemSettings.available_themes.map(theme => ({
@@ -248,6 +309,38 @@ export default function SettingsPage() {
                 onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
                 options={timezoneOptions}
               />
+
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Document Languages
+                </label>
+                <p className="text-xs text-neutral-500 mb-3">
+                  Select which languages you work with. Categories will be auto-translated to these languages.
+                </p>
+                <div className="space-y-2">
+                  {systemSettings.available_languages.map(langCode => {
+                    const currentLangs = preferences.preferred_doc_languages || [preferences.language]
+                    const isSelected = currentLangs.includes(langCode)
+
+                    return (
+                      <label
+                        key={langCode}
+                        className="flex items-center space-x-3 p-3 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleDocLanguage(langCode)}
+                          className="h-4 w-4 text-admin-primary border-neutral-300 rounded focus:ring-admin-primary"
+                        />
+                        <span className="text-sm text-neutral-900">
+                          {getLanguageName(langCode)}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -272,6 +365,22 @@ export default function SettingsPage() {
                 label="AI Auto-Categorization"
                 description="Automatically suggest categories for uploaded documents"
               />
+
+              <div className="mt-6 pt-6 border-t border-neutral-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">Reset Categories</p>
+                    <p className="text-xs text-neutral-500">Delete all custom categories and restore system defaults</p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={handleResetCategories}
+                    disabled={resettingCategories}
+                  >
+                    {resettingCategories ? 'Resetting...' : 'Reset'}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

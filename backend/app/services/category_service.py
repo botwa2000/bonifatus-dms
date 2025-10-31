@@ -114,7 +114,7 @@ class CategoryService:
             session.close()
 
     async def create_category(
-        self, 
+        self,
         user_id: str,
         user_email: str,
         user_language: str,
@@ -122,15 +122,20 @@ class CategoryService:
         ip_address: str = None
     ) -> CategoryResponse:
         """
-        Create new category with dynamic translations
+        Create new category with translations for user's preferred languages
+        Auto-generates missing translations using translation service
         """
         session = db_manager.session_local()
         try:
+            # Get user's preferred document languages
+            user = session.get(User, user_id)
+            preferred_languages = user.preferred_doc_languages if user and user.preferred_doc_languages else [user_language]
+
             # Generate unique reference key
             base_key = f"category.{category_data.translations.get('en', list(category_data.translations.values())[0]).name.lower().replace(' ', '_')}"
             reference_key = base_key
             counter = 1
-            
+
             while session.execute(
                 select(Category).where(Category.reference_key == reference_key)
             ).scalar_one_or_none():
@@ -159,7 +164,7 @@ class CategoryService:
             category_code = f"C{str(max_code_num + 1).zfill(2)}"
             logger.info(f"Generated category code: {category_code} (previous max: C{str(max_code_num).zfill(2)})")
             
-            # Create category
+            # Create category (multi-lingual by default)
             new_category = Category(
                 reference_key=reference_key,
                 category_code=category_code,
@@ -168,14 +173,56 @@ class CategoryService:
                 is_system=False,
                 user_id=user_id,
                 sort_order=category_data.sort_order or 999,
-                is_active=category_data.is_active if category_data.is_active is not None else True
+                is_active=category_data.is_active if category_data.is_active is not None else True,
+                is_multi_lingual=True
             )
             
             session.add(new_category)
             session.flush()
-            
-            # Create translations
-            for lang_code, translation_data in category_data.translations.items():
+
+            # Auto-generate translations for user's preferred languages
+            from app.services.translation_service import translation_service
+
+            final_translations = {}
+
+            # Get the source translation (from user input)
+            source_lang = list(category_data.translations.keys())[0]
+            source_translation = category_data.translations[source_lang]
+
+            # For each preferred language, ensure we have a translation
+            for lang_code in preferred_languages:
+                if lang_code in category_data.translations:
+                    # User provided this translation
+                    final_translations[lang_code] = category_data.translations[lang_code]
+                else:
+                    # Auto-translate using translation service
+                    translated_name = await translation_service.translate(
+                        text=source_translation.name,
+                        source_lang=source_lang,
+                        target_lang=lang_code,
+                        user_tier=user.tier if user else None
+                    )
+
+                    translated_desc = None
+                    if source_translation.description:
+                        translated_desc = await translation_service.translate(
+                            text=source_translation.description,
+                            source_lang=source_lang,
+                            target_lang=lang_code,
+                            user_tier=user.tier if user else None
+                        )
+
+                    # Create translation data object
+                    from app.schemas.category_schemas import CategoryTranslationData
+                    final_translations[lang_code] = CategoryTranslationData(
+                        name=translated_name or source_translation.name,
+                        description=translated_desc or source_translation.description
+                    )
+
+                    logger.info(f"Auto-translated category to {lang_code}: {translated_name}")
+
+            # Create translation records only for preferred languages
+            for lang_code, translation_data in final_translations.items():
                 translation = CategoryTranslation(
                     category_id=new_category.id,
                     language_code=lang_code,
@@ -479,27 +526,43 @@ class CategoryService:
             session.close()
 
     async def restore_default_categories(
-        self, 
+        self,
         user_id: str,
         ip_address: str = None
     ) -> RestoreDefaultsResponse:
         """
-        Restore default system categories from database configuration
-        Only creates missing categories, doesn't delete existing ones
+        Restore default system categories and delete all custom categories
+        Deletes all user's custom categories and ensures system categories exist
         """
         session = db_manager.session_local()
         try:
+            # Step 1: Delete all user's custom categories
+            deleted_count = 0
+            user_categories = session.execute(
+                select(Category).where(
+                    Category.user_id == user_id,
+                    Category.is_system == False
+                )
+            ).scalars().all()
+
+            for cat in user_categories:
+                session.delete(cat)
+                deleted_count += 1
+
+            logger.info(f"Deleted {deleted_count} custom categories for user {user_id}")
+
+            # Step 2: Ensure system categories exist
             category_config = session.execute(
                 select(SystemSetting).where(
                     SystemSetting.setting_key == 'default_system_categories'
                 )
             ).scalar_one_or_none()
-            
+
             if not category_config:
                 raise ValueError("Default category configuration not found in system_settings")
-            
+
             default_categories = json.loads(category_config.setting_value)
-            
+
             created = []
             skipped = []
 
@@ -547,15 +610,16 @@ class CategoryService:
                 action="defaults_restored",
                 resource_id=None,
                 ip_address=ip_address,
-                new_values={"created": created, "skipped": skipped}
+                new_values={"created": created, "skipped": skipped, "deleted": deleted_count}
             )
 
-            logger.info(f"Default categories restored: created={created}, skipped={skipped}")
+            logger.info(f"Default categories restored: deleted={deleted_count}, created={created}, skipped={skipped}")
 
+            message = f"Deleted {deleted_count} custom categories and restored {len(created)} default categories"
             return RestoreDefaultsResponse(
                 created=created,
                 skipped=skipped,
-                message=f"Restored {len(created)} default categories"
+                message=message
             )
 
         except Exception as e:

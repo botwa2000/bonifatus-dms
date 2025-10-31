@@ -519,6 +519,415 @@ User continues work (never noticed the refresh)
 - ML learns from both primary and secondary assignments
 - All user decisions feed back into keyword weight adjustments
 
+**2F: Multi-Language Category Management & Auto-Translation**
+
+**Objective:**
+Enable users to create categories in any language while ensuring documents in ALL languages are correctly classified. Categories should work across languages by default, with optional language-specific mode for advanced users.
+
+**Problem Statement:**
+A German user creating "Rechnungen" category with German keywords should automatically match English "invoice" documents. Current system requires manual keyword entry for each language, causing classification failures for multi-language users.
+
+**Solution Architecture: Multi-Lingual by Default**
+
+**Two Category Modes:**
+1. **Multi-lingual (Default, 95% of users)**: Keywords from all languages match documents regardless of language
+2. **Language-specific (Advanced)**: Keywords only match documents in specified language (for users who need strict separation)
+
+**Database Schema:**
+- Add `is_multi_lingual` BOOLEAN column to categories table (default TRUE)
+- Keep `language_code` in category_keywords table as informational metadata only
+- Multi-lingual categories ignore language_code during classification matching
+- Language-specific categories enforce language_code matching
+
+**Category Creation User Flow:**
+
+When user creates new category:
+1. User enters category name (e.g., "Invoices") and description
+2. System detects source language from interface locale
+3. Default option checked: ☑ Auto-translate to all languages
+4. Expandable preview (collapsed by default): [▶ Preview translations]
+5. When expanded, shows suggested translations:
+   - DE: Rechnungen [Edit]
+   - RU: Счета [Edit]
+   - FR: Factures [Edit]
+6. User can:
+   - Accept all (most common)
+   - Edit individual translations before accepting
+   - Skip auto-translate entirely
+   - Uncheck multi-lingual and select "Language-specific" mode
+
+**Keyword Management UI:**
+
+Single unified keyword list with language indicators:
+- Shows all keywords together (no language tabs)
+- Language tag displayed next to each keyword: "rechnung (de)", "invoice (en)", "iban (multi)"
+- New keyword input has "Detect Language" button
+- Keywords work across all languages in multi-lingual mode
+- Visual clarity: user sees which language each keyword comes from
+
+**Classification Logic Changes:**
+
+For multi-lingual categories:
+- Retrieve ALL keywords regardless of language_code
+- Match against document keywords from any language
+- Score and rank normally using combined keyword pool
+
+For language-specific categories:
+- Only retrieve keywords matching document's detected language
+- Enforces strict language separation
+- Used by power users who need separate German/English category hierarchies
+
+**Translation Service Architecture:**
+
+**Hybrid Approach (Cost-Effective):**
+- **Free users**: LibreTranslate (self-hosted, open source, offline)
+- **Paid users**: DeepL API (premium quality, €5-10/month total cost)
+
+**LibreTranslate (Free Tier):**
+- Self-hosted Docker container on same infrastructure
+- Completely free, no external dependencies
+- Privacy-first (all processing on-premise)
+- Supports 20+ languages
+- Good enough quality for category names
+- Zero API costs
+
+**DeepL API (Premium Tier):**
+- Best-in-class translation quality
+- Used only for Starter & Professional users
+- €4.99/month + €20 per 1M characters
+- Estimated cost: €5-10/month total (negligible vs revenue)
+- Premium differentiator for paid plans
+
+**Service Selection Logic:**
+```
+if user.tier in ['starter', 'professional']:
+    use DeepL API (premium quality)
+else:
+    use LibreTranslate (free, self-hosted)
+```
+
+**Deployment Components:**
+
+**LibreTranslate Service:**
+- Docker container running libretranslate/libretranslate:latest
+- Port 5000 exposed internally (not public)
+- Persistent volume for translation models
+- Connected to bonifatus-network
+
+**Translation Service (Backend):**
+- `TranslationService` class with provider abstraction
+- Methods: translate_text(), translate_category_name()
+- Provider switching based on user tier
+- Fallback to original text on translation failure
+- Configuration via environment variables
+
+**Configuration Settings:**
+- TRANSLATION_ENABLED: true/false
+- TRANSLATION_DEFAULT_PROVIDER: libretranslate/deepl
+- LIBRETRANSLATE_URL: http://libretranslate:5000
+- DEEPL_API_KEY: (for paid tier only)
+
+**User Experience Scenarios:**
+
+**Scenario 1: Simple User (Most Common)**
+- Creates "Invoices" category with auto-translate ☑ (default)
+- Clicks [▶ Preview translations] to review
+- Sees DE: Rechnungen, RU: Счета, accepts all
+- Adds keywords: "rechnung", "invoice", "iban"
+- System auto-detects keyword languages
+- Documents in ANY language now match correctly
+
+**Scenario 2: User Doesn't Trust Auto-Translation**
+- Creates "Invoices" category with auto-translate ☑
+- Expands preview, sees "Rechnungen"
+- Edits to "Rechnungen und Quittungen" (preferred term)
+- Edits Russian translation to preferred term
+- Confirms with custom translations
+
+**Scenario 3: Power User (Separate Language Hierarchies)**
+- Creates "Steuer (DE)" category
+- Unchecks "Auto-translate"
+- Selects "Language-specific (Advanced)"
+- Adds German keywords only
+- Creates separate "Taxes (EN)" category for English docs
+- Two separate categories with language enforcement
+
+**Backend API Endpoints:**
+
+POST /api/v1/categories/suggest-translations
+- Input: text, source_language, target_languages[]
+- Output: {translations: {de: "...", ru: "...", fr: "..."}}
+- Uses appropriate translation provider based on user tier
+
+POST /api/v1/categories (enhanced)
+- Accepts is_multi_lingual flag (default true)
+- Accepts auto_translate flag
+- Accepts custom translations override
+- Creates category with all language translations
+
+**Migration Strategy for Existing Data:**
+
+Existing custom categories need:
+1. Set is_multi_lingual = TRUE by default
+2. Auto-generate missing translations for category names
+3. Keep existing keywords as-is (language_code becomes informational)
+4. System immediately starts matching across all languages
+
+**Implementation Phases:**
+
+**Phase 1 (Immediate - This Week):**
+1. Add is_multi_lingual column to categories table
+2. Update classification service to support multi-lingual matching
+3. Deploy LibreTranslate Docker container
+4. Create TranslationService with LibreTranslate integration
+5. Fix existing "Invoices" category classification issue
+
+**Phase 2 (Next Week):**
+1. Add DeepL API integration for paid users
+2. Update category creation UI with auto-translate checkbox
+3. Add expandable translation preview component
+4. Add tier-based translation provider selection
+5. Migrate existing custom categories
+
+**Phase 3 (Future, Optional):**
+1. Keyword translation suggestions during entry
+2. Bulk translation tool for existing categories
+3. Translation quality feedback mechanism
+4. Support for additional languages beyond EN/DE/RU
+
+**Cost Analysis:**
+
+**LibreTranslate (Free Users):**
+- Infrastructure: ~€5/month (Docker container on existing VPS)
+- Per-translation cost: €0
+- Total: ~€5/month fixed
+
+**DeepL (Paid Users Only):**
+- Base fee: €4.99/month
+- Usage: ~€5/month (assuming 250k chars = 8,300 category translations)
+- Total: ~€10/month maximum
+- Scales with revenue (only paid users use it)
+
+**Total Translation Infrastructure:**
+- Free users: €5/month (LibreTranslate)
+- Paid users: €15/month (both services)
+- Negligible vs. revenue (1-2 paid users cover entire cost)
+
+**Benefits:**
+
+**For Users:**
+- ✅ Categories work across all languages automatically
+- ✅ No manual translation of keywords required
+- ✅ Simple default (auto-translate) with advanced control available
+- ✅ Paid users get premium translation quality
+- ✅ Free users still get functional translations
+
+**For System:**
+- ✅ Solves multi-language classification problem completely
+- ✅ Premium differentiator (DeepL quality for paid users)
+- ✅ Scalable architecture (works with 20+ languages)
+- ✅ Privacy-first (LibreTranslate is self-hosted)
+- ✅ Cost-effective (€15/month total, scales with revenue)
+
+**Implementation Steps (Ring-Fenced & Testable):**
+
+Each step is independent, implementable, and fully testable before moving to the next:
+
+**Step 1: Database Schema Changes**
+- Add `is_multi_lingual` BOOLEAN column to categories table (default TRUE)
+- Add `is_admin` BOOLEAN and `admin_role` VARCHAR(50) to users table
+- Run Alembic migration
+- **Test**: Query database, verify columns exist
+- **Test**: Set test user as admin, verify flag persists
+- **Deliverable**: Database ready for multi-lingual categories and admin features
+
+**Step 2: Deploy LibreTranslate Container**
+- Add libretranslate service to docker-compose.yml
+- Configure port 5000 (internal only)
+- Add persistent volume for translation models
+- Deploy container locally and on production
+- **Test**: `curl -X POST "http://localhost:5000/translate" -d '{"q":"Invoice","source":"en","target":"de"}'`
+- **Expected**: `{"translatedText":"Rechnung"}`
+- **Deliverable**: Self-hosted translation service running and accessible
+
+**Step 3: Translation Service Backend (LibreTranslate Only)**
+- Create `backend/app/services/translation_service.py`
+- Implement `TranslationService` class with LibreTranslate integration
+- Add TranslationSettings to config.py
+- Add `/api/v1/translation/test` endpoint (admin-only)
+- **Test**: Call test endpoint with "Invoice" → verify returns "Rechnung"
+- **Test**: Unit test translation service directly
+- **Deliverable**: Working translation API with LibreTranslate
+
+**Step 4: Multi-Lingual Classification Logic**
+- Update `classification_service.py` to check `is_multi_lingual` flag
+- If TRUE: retrieve ALL keywords regardless of language_code
+- If FALSE: retrieve only keywords matching document language (existing behavior)
+- **Test**: Create multi-lingual category manually in DB with mixed-language keywords
+- **Test**: Upload German document, verify matches English keywords
+- **Test**: Create language-specific category, verify only matches same language
+- **Deliverable**: Classification engine supports multi-lingual matching
+
+**Step 5: Fix Existing "Invoices" Category (Migration)**
+- Create migration script to update existing custom categories
+- Set `is_multi_lingual = TRUE` for all custom categories
+- Add missing German translation for "Invoices" category
+- Fix keyword language_code if needed
+- **Test**: Upload invoice with "rechnung" keyword
+- **Expected**: Should now match "Invoices" category
+- **Test**: Check via test_db_query.py to verify category configuration
+- **Deliverable**: Existing user categories work correctly with multi-lingual logic
+
+**Step 6: Settings Page - Translation Provider Toggle (Development)**
+- Add TranslationSettings section to settings page
+- Show "Developer Settings" section (only when `app.app_debug_mode = true`)
+- Add radio buttons: Auto (tier-based) | Force LibreTranslate | Force DeepL
+- Store preference in backend user settings or environment override
+- **Test**: Toggle to "Force LibreTranslate", call translation endpoint
+- **Test**: Toggle to "Force DeepL" (without API key), verify fallback
+- **Deliverable**: Developer can test translation providers manually
+
+**Step 7: DeepL Integration (Premium Tier)**
+- Install `deepl` Python library
+- Add `DEEPL_API_KEY` to environment variables
+- Update TranslationService to support both providers
+- Add tier-based provider selection logic
+- **Test**: Create test paid user, verify uses DeepL
+- **Test**: Create test free user, verify uses LibreTranslate
+- **Test**: Compare translation quality side-by-side
+- **Deliverable**: Premium users get DeepL quality translations
+
+**Step 8: Category Creation API - Auto-Translate Endpoint**
+- Add `POST /api/v1/categories/suggest-translations` endpoint
+- Accept: category_name, source_language, target_languages[]
+- Use TranslationService to generate translations
+- Return: {translations: {de: "...", ru: "...", fr: "..."}}
+- **Test**: POST with "Invoices" → verify returns accurate translations
+- **Test**: Test with both LibreTranslate and DeepL
+- **Deliverable**: Backend API ready for frontend integration
+
+**Step 9: Category Creation UI - Auto-Translate Feature (Future)**
+- Add "Auto-translate to all languages" checkbox (default checked)
+- Add expandable translation preview component
+- Wire up to suggest-translations endpoint
+- Add edit capability for each translation
+- **Test**: Create category, expand preview, verify translations accurate
+- **Test**: Edit translation, verify custom value saved
+- **Deliverable**: Complete end-to-end multi-lingual category creation
+
+**Step 10: Production Deployment & Verification (Future)**
+- Remove development toggles from production build
+- Verify tier-based provider selection works
+- Set bonifatus.app@gmail.com as admin
+- Monitor DeepL usage (should stay under free tier initially)
+- **Test**: Create free user account, verify LibreTranslate used
+- **Test**: Create paid user account, verify DeepL used
+- **Deliverable**: Production-ready multi-lingual translation system
+
+**Current Status: Steps 1-5 COMPLETE ✅**
+
+---
+
+### **2F.2 Preferred Document Languages Feature**
+
+**Goal**: Allow users to select multiple languages for document processing while keeping a single UI language.
+
+**Two-Tier Language System:**
+1. **UI Language** (single selection): Controls interface text (buttons, labels, navigation)
+2. **Document Languages** (multi-selection): Controls which languages to process/classify documents in
+
+**Supported Languages:** English (en), German (de), Russian (ru), French (fr)
+
+**User Flow Example:**
+- User sets UI Language = German (sees "Hochladen", "Einstellungen", etc.)
+- User sets Document Languages = [German, English, Russian]
+- System creates category translations only for selected doc languages
+- If user uploads French document: Prompt "Add French to your document languages?"
+
+**Implementation Steps (Ring-Fenced & Testable):**
+
+**Step 11: Database Schema - Add preferred_doc_languages Column**
+- Add `preferred_doc_languages` JSONB column to users table (default: user's current language)
+- Run Alembic migration 008
+- Initialize existing users with their current `language` preference
+- **Test**: Query database, verify column exists with correct default
+- **Test**: Update test user's preferred_doc_languages, verify persists
+- **Deliverable**: Database ready to store multi-language preferences
+
+**Step 12: Update Language Detection Service - Add French Support**
+- Add French to Lingua detector configuration
+- Update supported_languages list to include 'fr'
+- Add French stop words to database
+- **Test**: Run language detection on French text, verify returns 'fr'
+- **Test**: Check stop words table has French entries
+- **Deliverable**: System can detect and process French documents
+
+**Step 13: Backend User Settings API - Preferred Doc Languages**
+- Add `preferred_doc_languages` field to UserPreferences schema
+- Update GET /api/v1/users/preferences to return array
+- Update PUT /api/v1/users/preferences to accept and validate array
+- Validate language codes against supported list [en, de, ru, fr]
+- **Test**: GET preferences, verify returns array
+- **Test**: PUT with ["de", "en"], verify saves correctly
+- **Test**: PUT with invalid language "zz", verify returns 400 error
+- **Deliverable**: API ready to manage document language preferences
+
+**Step 14: Update Category Translation Logic**
+- Modify category creation to generate translations for ALL preferred_doc_languages
+- Update suggest-translations endpoint to use user's preferred_doc_languages
+- Skip auto-translation for languages not in user's preferences
+- **Test**: Set user preferred_doc_languages = ["de", "en"]
+- **Test**: Create category, verify only DE and EN translations created
+- **Test**: User adds "ru" to preferences, create new category, verify RU included
+- **Deliverable**: Categories only translated to user's needed languages
+
+**Step 15: Frontend Settings Page - Dual Language Selection**
+- Update settings page with two sections:
+  - UI Language (single select radio buttons)
+  - Document Languages (multi-select checkboxes)
+- Add French (fr) to both language lists
+- Wire up to new API endpoint
+- Show visual feedback when saving
+- **Test**: Change UI language, verify interface updates
+- **Test**: Select multiple doc languages, save, refresh page, verify persists
+- **Test**: Uncheck a language, verify subsequent categories skip that translation
+- **Deliverable**: User can control UI and document languages independently
+
+**Step 16: Document Upload Language Check**
+- Add language validation during document upload
+- If detected language NOT in user's preferred_doc_languages:
+  - Option 1: Show warning in upload response
+  - Option 2: Auto-classify to "Other" category with review flag
+- Add user preference: "auto_add_detected_languages" (default: false)
+- **Test**: Upload French doc with preferences = ["de", "en"]
+- **Expected**: Warning returned in API response
+- **Test**: Upload German doc with preferences = ["de", "en"]
+- **Expected**: Normal classification, no warning
+- **Deliverable**: System notifies user of unexpected document languages
+
+**Step 17: Frontend Upload Dialog - Language Prompt**
+- Detect language warning in upload API response
+- Show dialog: "Document detected in [French]. Add to your languages?"
+- Options: [Add French] [Keep as Other] [Cancel]
+- If user adds language, update preferences + retry classification
+- **Test**: Upload French doc, verify dialog appears
+- **Test**: Click "Add French", verify preferences updated and doc classified
+- **Test**: Click "Keep as Other", verify doc goes to Other category
+- **Deliverable**: Complete user flow for unexpected languages
+
+**Step 18: Production Deployment & Testing**
+- Deploy all changes to production
+- Migrate existing users (set preferred_doc_languages = [current language])
+- Verify LibreTranslate supports all 4 languages (en, de, ru, fr)
+- Test complete flow end-to-end
+- **Test**: Create new user, verify default language preferences set
+- **Test**: Existing user creates category, verify uses their preferences
+- **Test**: Upload documents in all 4 languages, verify detection accurate
+- **Deliverable**: Production-ready preferred languages system
+
+**Current Priority: Steps 11-18**
+These steps enable user-controlled multi-language document processing.
+
 **Milestone Criteria:**
 - OCR successfully extracts text from scanned documents
 - Classification suggests correct primary category ≥70% of the time
@@ -1292,7 +1701,380 @@ ssh deploy@YOUR_SERVER_IP "~/deploy.sh"
 
 ---
 
-## 9. Environment Variables
+## 9. Admin User & System Administration
+
+### 9.1 Admin User Setup
+
+**Purpose:**
+The admin user (bonifatus.app@gmail.com) has elevated privileges to manage the system, support users, and access system-wide statistics and controls.
+
+**Database Configuration:**
+```sql
+-- Add admin columns to users table
+ALTER TABLE users
+ADD COLUMN is_admin BOOLEAN DEFAULT FALSE,
+ADD COLUMN admin_role VARCHAR(50);  -- 'super_admin', 'support', 'viewer'
+
+-- Set bonifatus.app@gmail.com as super admin
+UPDATE users
+SET is_admin = TRUE,
+    admin_role = 'super_admin'
+WHERE email = 'bonifatus.app@gmail.com';
+```
+
+**Admin Role Levels:**
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **super_admin** | Full system access | All features, user management, system config, database access |
+| **support** | Customer support | View users, view documents (for support), limited editing |
+| **viewer** | Read-only access | System statistics, user list, no modifications |
+
+### 9.2 Admin Dashboard Features
+
+**User Management:**
+- View all users with filters (tier, status, registration date, last active)
+- Search users by email, name, or ID
+- Edit user details:
+  - Change tier (Free → Starter → Professional)
+  - Manual tier override (for testing, promotions, support cases)
+  - Enable/disable user accounts
+  - Reset password (trigger email)
+  - Impersonate user (view as user, for support debugging)
+- View user statistics:
+  - Total documents
+  - Total pages processed (for billing verification)
+  - Storage used
+  - Categories created
+  - Last activity timestamp
+  - OAuth connection status (Google Drive)
+
+**System Statistics Dashboard:**
+- Total users by tier (Free, Starter, Professional)
+- Monthly recurring revenue (MRR)
+- Page processing statistics:
+  - Pages processed today/week/month
+  - Pages remaining per tier
+  - Average pages per user
+  - Peak processing times
+- Document statistics:
+  - Total documents in system
+  - Documents uploaded today/week/month
+  - Average document size
+  - Most popular categories
+- Classification accuracy metrics:
+  - Auto-classification accuracy rate
+  - User correction frequency
+  - Top performing categories
+  - Categories needing keyword improvement
+- System health:
+  - Database size and growth rate
+  - API response times (p50, p95, p99)
+  - Error rates
+  - Background job queue status
+  - LibreTranslate/DeepL usage statistics
+
+**Translation Management:**
+- View translation provider usage:
+  - LibreTranslate: requests/day, errors
+  - DeepL: characters used/limit, cost tracking
+- Manual translation provider override per user:
+  - Force DeepL for specific free users (testing, VIP)
+  - Force LibreTranslate for paid users (if DeepL down)
+- Translation quality monitoring:
+  - User feedback on translations
+  - Most translated terms
+  - Translation cache hit rate
+
+**Category & Keyword Management:**
+- View all system categories and their usage
+- View user-created categories across all users
+- Bulk operations:
+  - Add keywords to system categories
+  - Update keyword weights based on ML feedback
+  - Deprecate low-performing keywords
+- Translation health:
+  - Categories missing translations
+  - Suggest translation improvements
+  - Fix broken multi-lingual categories
+
+**Document Administration:**
+- View all documents (anonymized for privacy unless in support mode)
+- Search documents by:
+  - User
+  - Category
+  - Date range
+  - File type
+  - Classification confidence
+- Support operations:
+  - View document details (with user consent flag)
+  - Reprocess failed documents
+  - Fix classification errors manually
+  - Delete documents (GDPR compliance)
+
+**User Support Tools:**
+- Support ticket system (future):
+  - View open tickets
+  - Assign to support staff
+  - Track resolution time
+- Impersonation mode:
+  - "View as user" to debug issues
+  - All actions logged in audit trail
+  - Clear indication when in impersonation mode
+  - Automatic timeout after 30 minutes
+- Manual operations:
+  - Trigger document reprocessing
+  - Force Drive reconnection
+  - Clear user cache
+  - Reset ML weights for user
+
+**Financial & Billing:**
+- Revenue tracking:
+  - MRR by tier
+  - New subscriptions this month
+  - Churned subscriptions
+  - Upgrade/downgrade trends
+- Usage monitoring:
+  - Users approaching tier limits
+  - Users exceeding fair use policy (2x limit)
+  - Notification triggers for upgrade prompts
+- Manual adjustments:
+  - Grant free pages for support issues
+  - Apply promotional credits
+  - Extend trial periods
+  - Manual tier changes
+
+**System Configuration:**
+- Feature flags:
+  - Enable/disable features globally
+  - Beta features for select users
+  - A/B testing controls
+- Settings management:
+  - Update classification thresholds
+  - Modify ML learning rates
+  - Adjust rate limits
+  - Configure email templates
+- Translation settings:
+  - Default translation provider
+  - DeepL API key rotation
+  - LibreTranslate configuration
+  - Translation cache settings
+
+**Audit & Compliance:**
+- Audit log viewer:
+  - All admin actions logged
+  - User login/logout events
+  - Document access logs
+  - Tier changes and billing events
+  - Filter by user, action type, date range
+- GDPR compliance tools:
+  - Export user data (JSON format)
+  - Delete user account and all data
+  - View data retention policies
+  - Track data processing consents
+- Security monitoring:
+  - Failed login attempts
+  - Suspicious activity detection
+  - API abuse detection
+  - Rate limit violations
+
+### 9.3 Admin API Endpoints
+
+**User Management:**
+```
+GET    /api/v1/admin/users              # List all users with filters
+GET    /api/v1/admin/users/{id}         # Get user details
+PUT    /api/v1/admin/users/{id}         # Update user (tier, status, etc.)
+POST   /api/v1/admin/users/{id}/impersonate  # Start impersonation session
+DELETE /api/v1/admin/users/{id}         # Delete user (GDPR)
+GET    /api/v1/admin/users/{id}/documents  # View user's documents
+POST   /api/v1/admin/users/{id}/grant-pages  # Grant free pages
+```
+
+**System Statistics:**
+```
+GET /api/v1/admin/stats/overview        # Dashboard overview
+GET /api/v1/admin/stats/revenue         # Revenue metrics
+GET /api/v1/admin/stats/classification  # ML accuracy metrics
+GET /api/v1/admin/stats/translation     # Translation usage
+GET /api/v1/admin/stats/system-health   # Infrastructure health
+```
+
+**Translation Management:**
+```
+GET  /api/v1/admin/translation/usage    # Provider usage stats
+POST /api/v1/admin/translation/override/{user_id}  # Override provider
+GET  /api/v1/admin/translation/quality  # Quality metrics
+```
+
+**Category Management:**
+```
+GET    /api/v1/admin/categories          # All categories (system + user)
+PUT    /api/v1/admin/categories/{id}     # Update system category
+POST   /api/v1/admin/categories/{id}/keywords  # Bulk add keywords
+DELETE /api/v1/admin/categories/{id}/keywords/{keyword_id}  # Remove keyword
+```
+
+**Audit & Compliance:**
+```
+GET  /api/v1/admin/audit-logs           # View audit logs
+POST /api/v1/admin/export-user-data/{user_id}  # GDPR export
+POST /api/v1/admin/delete-user-data/{user_id}  # GDPR deletion
+```
+
+### 9.4 Admin UI/UX Considerations
+
+**Navigation Structure:**
+```
+Admin Dashboard
+├── Overview (statistics cards, charts)
+├── Users
+│   ├── User List (searchable table)
+│   ├── User Details (individual user view)
+│   └── Impersonation Mode
+├── Documents
+│   ├── Document Search
+│   └── Reprocessing Queue
+├── Categories & Keywords
+│   ├── System Categories
+│   ├── User Categories
+│   └── Keyword Management
+├── Translation
+│   ├── Usage Statistics
+│   ├── Provider Configuration
+│   └── Quality Monitoring
+├── Financial
+│   ├── Revenue Dashboard
+│   ├── Usage Tracking
+│   └── Billing Adjustments
+├── System
+│   ├── Configuration
+│   ├── Feature Flags
+│   └── Health Monitoring
+└── Audit & Compliance
+    ├── Audit Logs
+    ├── GDPR Tools
+    └── Security Alerts
+```
+
+**Access Control:**
+```typescript
+// Middleware: Admin-only routes
+if (!user.is_admin) {
+  throw new UnauthorizedException("Admin access required");
+}
+
+// Role-based permissions
+if (action === 'delete_user' && user.admin_role !== 'super_admin') {
+  throw new ForbiddenException("Super admin required");
+}
+```
+
+**UI Indicators:**
+- Red "ADMIN MODE" banner at top of all admin pages
+- Clear distinction from user interface
+- Impersonation mode: Orange banner "Viewing as: user@email.com [Exit]"
+- Audit trail: All admin actions logged and visible
+
+### 9.5 Development vs Production Admin Access
+
+**Development/Testing:**
+- Admin toggle in settings page (for testing translation providers)
+- Development mode allows:
+  - Any user can become admin (via settings toggle)
+  - Translation provider override for testing
+  - Access to debug endpoints
+  - Bypass rate limits
+  - View raw API responses
+
+**Production:**
+- Admin access locked to specific email: bonifatus.app@gmail.com
+- No settings toggle visible to regular users
+- Admin features hidden from non-admin users
+- All admin actions logged in audit trail
+- Automatic timeout after 1 hour of inactivity
+- Require 2FA for admin actions (future enhancement)
+
+**Settings Page Admin Toggle (Development Only):**
+```
+┌─────────────────────────────────────┐
+│ Developer Settings                  │
+│ (Only visible in development mode)  │
+│                                     │
+│ ☐ Enable Admin Mode                │
+│   Access admin dashboard and tools  │
+│                                     │
+│ Translation Provider Override:      │
+│ ○ Auto (tier-based)                │
+│ ○ Force LibreTranslate             │
+│ ○ Force DeepL                      │
+│                                     │
+│ [Save Settings]                     │
+└─────────────────────────────────────┘
+```
+
+### 9.6 Implementation Priority
+
+**Phase 1 (Immediate - This Week):**
+- Set bonifatus.app@gmail.com as admin in database
+- Add admin middleware for API protection
+- Add translation provider toggle to settings (development mode)
+- Basic admin check: `if (user.is_admin) show_admin_nav()`
+
+**Phase 2 (Next 2 Weeks):**
+- Admin dashboard with basic statistics
+- User list with search and filters
+- Translation usage statistics
+- System health monitoring
+
+**Phase 3 (Month 2):**
+- User impersonation mode
+- Document reprocessing tools
+- Category and keyword management
+- Audit log viewer
+
+**Phase 4 (Future):**
+- Financial dashboard and billing adjustments
+- Support ticket system
+- GDPR compliance tools
+- Advanced analytics and reporting
+
+### 9.7 Security Considerations
+
+**Admin Session Security:**
+- Admin sessions expire after 1 hour of inactivity
+- Require re-authentication for destructive actions
+- All admin actions logged with timestamp, IP, and user agent
+- Rate limiting on admin endpoints
+- Admin API keys separate from user API keys
+
+**Data Access Restrictions:**
+- Document content only viewable in support mode (with explicit flag)
+- User passwords never visible (even to admin)
+- Encryption keys never exposed through admin UI
+- OAuth tokens not accessible
+- Personal data access logged for GDPR compliance
+
+**Audit Trail:**
+Every admin action records:
+- Admin user ID and email
+- Action type (view, edit, delete, impersonate)
+- Target user/resource ID
+- Timestamp
+- IP address and user agent
+- Changes made (before/after values for edits)
+- Success/failure status
+
+**Impersonation Safety:**
+- Clear visual indicator when in impersonation mode
+- Automatic timeout after 30 minutes
+- Cannot impersonate other admins
+- Cannot perform destructive actions while impersonating
+- All impersonation sessions logged
+
+---
+
+## 10. Environment Variables
 
 ### Backend (Required)
 ```
@@ -1312,7 +2094,7 @@ NEXT_PUBLIC_API_URL=https://api.bonidoc.com
 
 ---
 
-## 10. Database Migrations
+## 11. Database Migrations
 
 ### Current Migration Status
 - Total migrations: 10
@@ -1327,6 +2109,188 @@ alembic upgrade head               # Apply all pending migrations
 alembic downgrade -1               # Rollback one migration
 psql $DATABASE_URL -c "\dt"        # List all tables
 ```
+
+---
+
+## 12. Multi-Language Category Management Deployment
+
+### Overview
+This deployment adds multi-language document processing with user-selectable preferred languages, French support, language metadata, and category reset functionality.
+
+### Changes Summary
+
+#### Backend Changes
+
+**Database Migrations:**
+- `008_add_preferred_doc_languages.py` - Adds preferred_doc_languages JSONB column to users table
+- `009_add_language_metadata.py` - Adds language metadata to system_settings (display names for each language code)
+
+**Models Updated:**
+- User model: Added `preferred_doc_languages` column
+
+**Services Updated:**
+- `user_service.py` - Validates preferred languages against database, reads from users table
+- `category_service.py` - Auto-translates categories to user's preferred languages only
+- `translation_service.py` - Fixed to read supported languages from database (NO hard-coding)
+- `language_detection_service.py` - Fixed to read supported languages from database (NO hard-coding)
+- `document_analysis_service.py` - Validates detected language, returns warning if not in preferences
+
+**Support Scripts (Manual Execution):**
+- `add_french_stopwords.py` - Adds 66 French stop words
+- `update_supported_languages.py` - Updates supported_languages to 'en,de,ru,fr'
+
+#### Frontend Changes
+
+**Settings Page (`frontend/src/app/settings/page.tsx`):**
+- Added document languages multi-select checkboxes
+- Added Reset Categories button
+- All language names from database (NO hard-coding)
+
+**Upload Dialog (`frontend/src/app/documents/upload/page.tsx`):**
+- Displays language warning when detected language not in user preferences
+
+### Production Deployment Steps
+
+#### Step 1: Backup Database
+```bash
+pg_dump -U bonifatus -d bonifatus_dms > backup_multilingual_$(date +%Y%m%d).sql
+```
+
+#### Step 2: Deploy Backend Code
+```bash
+cd /path/to/bonifatus-dms
+git pull origin main
+sudo systemctl restart bonifatus-backend
+```
+
+#### Step 3: Run Database Migrations
+```bash
+docker exec bonifatus-backend alembic upgrade head
+
+# Expected migrations:
+# - 008_add_preferred_doc_languages
+# - 009_add_language_metadata
+
+# Verify
+docker exec bonifatus-backend alembic current
+```
+
+#### Step 4: Add French Support
+```bash
+# Add French stop words (66 words)
+docker exec bonifatus-backend python /app/add_french_stopwords.py
+
+# Update supported languages
+docker exec bonifatus-backend python /app/update_supported_languages.py
+
+# Verify
+docker exec -it bonifatus-backend psql -U bonifatus -d bonifatus_dms -c \
+  "SELECT setting_value FROM system_settings WHERE setting_key = 'supported_languages';"
+# Expected: en,de,ru,fr
+```
+
+#### Step 5: Deploy Frontend
+```bash
+cd /path/to/bonifatus-dms/frontend
+npm run build
+pm2 restart bonifatus-frontend
+```
+
+#### Step 6: Verify Deployment
+
+**Backend Checks:**
+```bash
+# Check migrations
+docker exec bonifatus-backend alembic current
+
+# Check column exists
+docker exec -it bonifatus-backend psql -U bonifatus -d bonifatus_dms -c \
+  "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='preferred_doc_languages';"
+
+# Check language metadata
+docker exec -it bonifatus-backend psql -U bonifatus -d bonifatus_dms -c \
+  "SELECT setting_value FROM system_settings WHERE setting_key = 'language_metadata';"
+
+# Check French stop words
+docker exec -it bonifatus-backend psql -U bonifatus -d bonifatus_dms -c \
+  "SELECT COUNT(*) FROM stop_words WHERE language_code = 'fr';"
+# Expected: 66
+```
+
+**Frontend Checks:**
+1. Navigate to Settings → Language & Region
+2. Verify "Document Languages" checkboxes appear
+3. Verify language names display correctly (English, Deutsch, Русский, Français)
+4. Test Reset Categories button in Document Processing section
+5. Upload a French document, verify language warning if FR not selected
+
+#### Step 7: Test End-to-End
+
+**Test Case 1: Document Language Selection**
+1. Select English + German as document languages
+2. Upload a French document
+3. Verify warning: "Document detected in Français (fr)..."
+
+**Test Case 2: Category Translation**
+1. Create new category "Test" in English
+2. Verify auto-translation to selected languages
+3. Check database: `SELECT * FROM category_translations WHERE category_id = '<id>';`
+
+**Test Case 3: Reset Categories**
+1. Go to Settings → Document Processing → Reset
+2. Verify all custom categories deleted, system categories restored
+
+### Rollback Plan
+
+```bash
+# 1. Restore database
+psql -U bonifatus -d bonifatus_dms < backup_multilingual_YYYYMMDD.sql
+
+# 2. Revert code
+git revert HEAD
+git push origin main
+
+# 3. Restart services
+docker-compose restart backend frontend
+```
+
+### Configuration Changes
+
+**Database (system_settings):**
+- `supported_languages`: `"en,de,ru,fr"` (was `"en,de,ru"`)
+- `language_metadata`: NEW setting with JSON metadata
+
+**Database (users table):**
+- `preferred_doc_languages`: NEW column (JSONB, NOT NULL, default `["en"]`)
+
+### Key Implementation Details
+
+**No Hard-Coded Language Lists:**
+- All language codes from `system_settings.supported_languages`
+- Language display names from `system_settings.language_metadata`
+- Fallback is ONLY `["en"]`
+
+**Two-Tier Language System:**
+- UI Language: Single selection, controls interface
+- Document Languages: Multi-selection, controls document processing
+
+**Category Translation Behavior:**
+- Categories ONLY translated to languages in user's `preferred_doc_languages`
+- New categories auto-translate to all selected languages
+
+**Language Warning Behavior:**
+- Soft warning only - does not block upload
+- User can proceed despite warning
+
+### Success Criteria
+
+- ✅ Migrations 008 and 009 applied
+- ✅ French stop words added (66 rows)
+- ✅ Supported languages includes 'fr'
+- ✅ Settings page displays document language checkboxes
+- ✅ Upload dialog shows language warnings
+- ✅ Category reset button functional
+- ✅ No errors related to language features
 
 ---
 
