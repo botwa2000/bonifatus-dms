@@ -248,16 +248,18 @@ export default function CategoriesPage() {
             }
           />
           
-          <CategoryStatsCard
-            label="Custom Categories"
-            value={categories.filter(c => !c.is_system).length}
-            color="bg-green-100"
-            icon={
-              <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          />
+          <div onClick={() => setShowCreateModal(true)} className="cursor-pointer">
+            <CategoryStatsCard
+              label="Custom Categories"
+              value={categories.filter(c => !c.is_system).length}
+              color="bg-green-100"
+              icon={
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              }
+            />
+          </div>
         </div>
 
         <div className="bg-white rounded-lg border border-neutral-200 mb-6">

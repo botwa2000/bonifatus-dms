@@ -102,6 +102,29 @@ export default function BatchUploadPage() {
     }
   }
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const files = Array.from(e.dataTransfer.files).filter(file => {
+      const acceptedTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']
+      const extension = '.' + file.name.split('.').pop()?.toLowerCase()
+      return acceptedTypes.includes(extension)
+    })
+
+    if (files.length > 0) {
+      setSelectedFiles(files)
+    } else {
+      setMessage({type: 'error', text: 'Please drop only supported file types (PDF, DOC, DOCX, JPG, PNG)'})
+      setTimeout(() => setMessage(null), 3000)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   const handleAnalyzeBatch = async () => {
     if (selectedFiles.length === 0) {
       setMessage({type: 'error', text: 'Please select files first'})
@@ -399,7 +422,11 @@ export default function BatchUploadPage() {
             ) : uploadStates.length === 0 ? (
               <>
                 {/* File Selection */}
-                <div className="border-2 border-dashed border-admin-primary/30 hover:border-admin-primary/60 dark:border-admin-primary/40 dark:hover:border-admin-primary/70 rounded-xl p-12 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900 transition-all duration-200 hover:shadow-lg">
+                <div
+                  className="border-2 border-dashed border-admin-primary/30 hover:border-admin-primary/60 dark:border-admin-primary/40 dark:hover:border-admin-primary/70 rounded-xl p-12 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-800 dark:to-neutral-900 transition-all duration-200 hover:shadow-lg"
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                >
                   <input
                     type="file"
                     multiple
@@ -498,7 +525,13 @@ export default function BatchUploadPage() {
                             {/* Display language warning if present */}
                             {state.analysis?.language_warning && (
                               <div className="mt-2">
-                                <Alert type="warning" message={state.analysis.language_warning} />
+                                <Alert type="warning">
+                                  <span>{state.analysis.language_warning.split('visit settings')[0]}</span>
+                                  <a href="/settings" className="underline hover:text-yellow-800 font-medium">
+                                    visit settings
+                                  </a>
+                                  <span>{state.analysis.language_warning.split('visit settings')[1] || ''}</span>
+                                </Alert>
                               </div>
                             )}
                           </div>
