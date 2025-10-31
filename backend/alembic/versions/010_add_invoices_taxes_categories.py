@@ -1,18 +1,18 @@
 """add invoices and taxes categories with french translations
 
-Revision ID: 010
-Revises: 009
+Revision ID: 010_invoices_taxes
+Revises: 009_language_metadata
 Create Date: 2025-10-31 14:30:00.000000
 
 """
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import text
 from datetime import datetime, timezone
+import uuid
 
 # revision identifiers, used by Alembic.
-revision = '010'
-down_revision = '009'
+revision = '010_invoices_taxes'
+down_revision = '009_language_metadata'
 branch_labels = None
 depends_on = None
 
@@ -23,285 +23,144 @@ def upgrade():
     Add French translations to all 7 template categories
     """
 
-    # Create bind to execute raw SQL
-    bind = op.get_bind()
+    conn = op.get_bind()
+    now = datetime.now(timezone.utc)
 
     # Step 1: Add Invoices category (INV)
     print("Adding Invoices category...")
-    bind.execute(sa.text("""
-        INSERT INTO categories (id, name, reference_key, description, is_system, user_id, created_at, updated_at)
-        VALUES (
-            gen_random_uuid(),
-            'Invoices',
-            'INV',
-            'Bills, invoices, payment requests',
-            true,
-            NULL,
-            :now,
-            :now
-        )
-        ON CONFLICT (reference_key, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    invoices_id = str(uuid.uuid4())
+    conn.execute(text("""
+        INSERT INTO categories (id, reference_key, category_code, color_hex, icon_name, is_system, user_id, sort_order, is_active, created_at, updated_at)
+        VALUES (:id, 'INV', 'INV', '#10B981', 'receipt', true, NULL, 5, true, :now, :now)
+        ON CONFLICT (reference_key) DO NOTHING
+    """), {'id': invoices_id, 'now': now})
+
+    # Get the actual ID if it already exists
+    result = conn.execute(text("SELECT id FROM categories WHERE reference_key = 'INV' AND user_id IS NULL"))
+    row = result.fetchone()
+    if row:
+        invoices_id = str(row[0])
 
     # Step 2: Add Taxes category (TAX)
     print("Adding Taxes category...")
-    bind.execute(sa.text("""
-        INSERT INTO categories (id, name, reference_key, description, is_system, user_id, created_at, updated_at)
-        VALUES (
-            gen_random_uuid(),
-            'Taxes',
-            'TAX',
-            'Tax returns, receipts, tax-related documents',
-            true,
-            NULL,
-            :now,
-            :now
-        )
-        ON CONFLICT (reference_key, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    taxes_id = str(uuid.uuid4())
+    conn.execute(text("""
+        INSERT INTO categories (id, reference_key, category_code, color_hex, icon_name, is_system, user_id, sort_order, is_active, created_at, updated_at)
+        VALUES (:id, 'TAX', 'TAX', '#EF4444', 'calculator', true, NULL, 6, true, :now, :now)
+        ON CONFLICT (reference_key) DO NOTHING
+    """), {'id': taxes_id, 'now': now})
 
-    # Step 3: Add French translations for all 7 categories
-    print("Adding French translations for all categories...")
+    # Get the actual ID if it already exists
+    result = conn.execute(text("SELECT id FROM categories WHERE reference_key = 'TAX' AND user_id IS NULL"))
+    row = result.fetchone()
+    if row:
+        taxes_id = str(row[0])
 
-    # Insurance (INS) - French
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Assurance',
-            'Polices d''assurance, réclamations, documents de couverture',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'INS' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    # Step 3: Add translations for Invoices
+    print("Adding translations for Invoices...")
+    invoices_translations = {
+        'en': {'name': 'Invoices', 'description': 'Bills, invoices, payment requests'},
+        'de': {'name': 'Rechnungen', 'description': 'Rechnungen, Zahlungsaufforderungen'},
+        'ru': {'name': 'Счета', 'description': 'Счета, счета-фактуры, запросы на оплату'},
+        'fr': {'name': 'Factures', 'description': 'Factures, demandes de paiement'}
+    }
 
-    # Legal (LEG) - French
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Juridique',
-            'Contrats, accords, documents juridiques',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'LEG' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    for lang_code, trans in invoices_translations.items():
+        conn.execute(text("""
+            INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
+            VALUES (:id, :category_id, :language_code, :name, :description, :now, :now)
+            ON CONFLICT (category_id, language_code) DO NOTHING
+        """), {
+            'id': str(uuid.uuid4()),
+            'category_id': invoices_id,
+            'language_code': lang_code,
+            'name': trans['name'],
+            'description': trans['description'],
+            'now': now
+        })
 
-    # Real Estate (RES) - French
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Immobilier',
-            'Documents immobiliers, actes, hypothèques',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'RES' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    # Step 4: Add translations for Taxes
+    print("Adding translations for Taxes...")
+    taxes_translations = {
+        'en': {'name': 'Taxes', 'description': 'Tax returns, receipts, tax-related documents'},
+        'de': {'name': 'Steuern', 'description': 'Steuererklärungen, Quittungen, steuerbezogene Dokumente'},
+        'ru': {'name': 'Налоги', 'description': 'Налоговые декларации, квитанции, налоговые документы'},
+        'fr': {'name': 'Impôts', 'description': 'Déclarations fiscales, reçus, documents fiscaux'}
+    }
 
-    # Banking (BNK) - French
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Banque',
-            'Relevés bancaires, transactions, documents financiers',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'BNK' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    for lang_code, trans in taxes_translations.items():
+        conn.execute(text("""
+            INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
+            VALUES (:id, :category_id, :language_code, :name, :description, :now, :now)
+            ON CONFLICT (category_id, language_code) DO NOTHING
+        """), {
+            'id': str(uuid.uuid4()),
+            'category_id': taxes_id,
+            'language_code': lang_code,
+            'name': trans['name'],
+            'description': trans['description'],
+            'now': now
+        })
 
-    # Invoices (INV) - All languages
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'de',
-            'Rechnungen',
-            'Rechnungen, Zahlungsaufforderungen',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'INV' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    # Step 5: Add French translations for existing categories
+    print("Adding French translations for existing categories...")
 
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'ru',
-            'Счета',
-            'Счета, счета-фактуры, запросы на оплату',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'INV' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    french_translations = {
+        'INS': {'name': 'Assurance', 'description': "Polices d'assurance, réclamations, documents de couverture"},
+        'LEG': {'name': 'Juridique', 'description': 'Contrats, accords, documents juridiques'},
+        'RES': {'name': 'Immobilier', 'description': 'Documents immobiliers, actes, hypothèques'},
+        'BNK': {'name': 'Banque', 'description': 'Relevés bancaires, transactions, documents financiers'},
+        'OTH': {'name': 'Autre', 'description': 'Divers, catégorie par défaut'}
+    }
 
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Factures',
-            'Factures, demandes de paiement',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'INV' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    for ref_key, trans in french_translations.items():
+        result = conn.execute(text("SELECT id FROM categories WHERE reference_key = :ref_key AND user_id IS NULL"), {'ref_key': ref_key})
+        row = result.fetchone()
+        if row:
+            category_id = str(row[0])
+            conn.execute(text("""
+                INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
+                VALUES (:id, :category_id, 'fr', :name, :description, :now, :now)
+                ON CONFLICT (category_id, language_code) DO NOTHING
+            """), {
+                'id': str(uuid.uuid4()),
+                'category_id': category_id,
+                'name': trans['name'],
+                'description': trans['description'],
+                'now': now
+            })
 
-    # Taxes (TAX) - All languages
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'de',
-            'Steuern',
-            'Steuererklärungen, Quittungen, steuerbezogene Dokumente',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'TAX' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'ru',
-            'Налоги',
-            'Налоговые декларации, квитанции, налоговые документы',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'TAX' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Impôts',
-            'Déclarations fiscales, reçus, documents fiscaux',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'TAX' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Other (OTH) - French
-    bind.execute(sa.text("""
-        INSERT INTO category_translations (id, category_id, language_code, name, description, created_at, updated_at)
-        SELECT
-            gen_random_uuid(),
-            c.id,
-            'fr',
-            'Autre',
-            'Divers, catégorie par défaut',
-            :now,
-            :now
-        FROM categories c
-        WHERE c.reference_key = 'OTH' AND c.user_id IS NULL
-        ON CONFLICT (category_id, language_code) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Step 4: Add category keywords for all categories
+    # Step 6: Add category keywords
     print("Adding category keywords...")
 
-    # Insurance keywords
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['insurance', 'policy', 'coverage', 'premium', 'claim']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'INS' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    keywords_map = {
+        'INS': ['insurance', 'policy', 'coverage', 'premium', 'claim'],
+        'LEG': ['contract', 'agreement', 'legal', 'terms', 'conditions'],
+        'RES': ['property', 'real estate', 'mortgage', 'deed', 'lease', 'rent'],
+        'BNK': ['bank', 'account', 'statement', 'transaction', 'balance', 'payment'],
+        'INV': ['invoice', 'bill', 'payment', 'due', 'total', 'amount'],
+        'TAX': ['tax', 'receipt', 'deduction', 'return', 'fiscal', 'revenue'],
+        'OTH': ['document', 'file', 'misc']
+    }
 
-    # Legal keywords
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['contract', 'agreement', 'legal', 'terms', 'conditions']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'LEG' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
+    for ref_key, keywords in keywords_map.items():
+        result = conn.execute(text("SELECT id FROM categories WHERE reference_key = :ref_key AND user_id IS NULL"), {'ref_key': ref_key})
+        row = result.fetchone()
+        if row:
+            category_id = str(row[0])
+            for keyword in keywords:
+                conn.execute(text("""
+                    INSERT INTO category_keywords (id, category_id, keyword, language_code, weight, match_count, is_system_default, created_at, last_updated)
+                    VALUES (:id, :category_id, :keyword, 'en', 1.0, 1, true, :now, :now)
+                    ON CONFLICT (category_id, lower(keyword), language_code) DO NOTHING
+                """), {
+                    'id': str(uuid.uuid4()),
+                    'category_id': category_id,
+                    'keyword': keyword.lower(),
+                    'now': now
+                })
 
-    # Real Estate keywords
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['property', 'real estate', 'mortgage', 'deed', 'lease', 'rent']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'RES' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Banking keywords
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['bank', 'account', 'statement', 'transaction', 'balance', 'payment']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'BNK' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Invoices keywords (NEW)
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['invoice', 'bill', 'payment', 'due', 'total', 'amount']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'INV' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Taxes keywords (NEW)
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['tax', 'receipt', 'deduction', 'return', 'fiscal', 'revenue']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'TAX' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    # Other keywords
-    bind.execute(sa.text("""
-        INSERT INTO category_keywords (id, category_id, keyword, weight, created_at, updated_at)
-        SELECT gen_random_uuid(), c.id, unnest(ARRAY['document', 'file', 'misc']), 1.0, :now, :now
-        FROM categories c
-        WHERE c.reference_key = 'OTH' AND c.user_id IS NULL
-        ON CONFLICT (category_id, keyword) DO NOTHING
-    """), {"now": datetime.now(timezone.utc)})
-
-    print("✓ Migration 010 completed: Added Invoices and Taxes categories with full translations")
+    print("✓ Migration 010 completed: Added Invoices and Taxes categories with full translations and keywords")
 
 
 def downgrade():
@@ -309,16 +168,16 @@ def downgrade():
     Remove Invoices and Taxes categories and their translations
     """
 
-    bind = op.get_bind()
+    conn = op.get_bind()
 
     # Remove Invoices and Taxes categories (cascade will remove translations and keywords)
-    bind.execute(sa.text("""
+    conn.execute(text("""
         DELETE FROM categories
         WHERE reference_key IN ('INV', 'TAX') AND user_id IS NULL
     """))
 
     # Remove French translations for other categories
-    bind.execute(sa.text("""
+    conn.execute(text("""
         DELETE FROM category_translations
         WHERE language_code = 'fr'
         AND category_id IN (
