@@ -16,6 +16,7 @@ from app.schemas.auth_schemas import TokenData, UserCreate, UserResponse
 
 from app.services.session_service import session_service
 from app.services.encryption_service import encryption_service
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -37,6 +38,82 @@ class AuthService:
     def get_password_hash(self, password: str) -> str:
         """Generate password hash"""
         return pwd_context.hash(password)
+
+    def _copy_template_categories_to_user(self, user_id: UUID, db: Session) -> None:
+        """
+        Copy all template categories (user_id=NULL) to new user's workspace
+        Creates personal copies of system categories with all translations and keywords
+        """
+        from app.database.models import Category, CategoryTranslation, CategoryKeyword
+        from sqlalchemy import select
+
+        try:
+            # Get all template categories (user_id is NULL)
+            template_categories = db.execute(
+                select(Category).where(Category.user_id.is_(None))
+            ).scalars().all()
+
+            if not template_categories:
+                logger.warning("No template categories found to copy")
+                return
+
+            # Map old category IDs to new category IDs
+            category_id_map = {}
+
+            # Copy each template category to user's workspace
+            for template_cat in template_categories:
+                # Create new category for user
+                new_category = Category(
+                    name=template_cat.name,
+                    reference_key=template_cat.reference_key,
+                    description=template_cat.description,
+                    is_system=template_cat.is_system,
+                    user_id=user_id
+                )
+                db.add(new_category)
+                db.flush()  # Get the new ID
+
+                # Store mapping for reference
+                category_id_map[template_cat.id] = new_category.id
+
+                # Copy translations
+                translations = db.execute(
+                    select(CategoryTranslation).where(
+                        CategoryTranslation.category_id == template_cat.id
+                    )
+                ).scalars().all()
+
+                for trans in translations:
+                    new_translation = CategoryTranslation(
+                        category_id=new_category.id,
+                        language_code=trans.language_code,
+                        name=trans.name,
+                        description=trans.description
+                    )
+                    db.add(new_translation)
+
+                # Copy keywords
+                keywords = db.execute(
+                    select(CategoryKeyword).where(
+                        CategoryKeyword.category_id == template_cat.id
+                    )
+                ).scalars().all()
+
+                for keyword in keywords:
+                    new_keyword = CategoryKeyword(
+                        category_id=new_category.id,
+                        keyword=keyword.keyword,
+                        weight=keyword.weight
+                    )
+                    db.add(new_keyword)
+
+            db.commit()
+            logger.info(f"Copied {len(template_categories)} template categories to user {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to copy template categories to user {user_id}: {e}")
+            db.rollback()
+            raise
 
     def create_access_token(self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """Create JWT access token"""
@@ -138,7 +215,10 @@ class AuthService:
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-            
+
+            # Copy template categories to new user's workspace
+            self._copy_template_categories_to_user(db_user.id, db)
+
             logger.info(f"User created: {db_user.email}")
             return db_user
             
@@ -300,6 +380,7 @@ class AuthService:
                 try:
                     user = db.query(User).filter(User.email == email).first()
                     
+                    is_new_user = False
                     if not user:
                         user = User(
                             email=email,
@@ -310,18 +391,23 @@ class AuthService:
                             tier=settings.security.default_user_tier
                         )
                         db.add(user)
+                        is_new_user = True
                         logger.info(f"Creating new user: {email}")
                     else:
                         user.google_id = google_id
                         user.profile_picture = profile_picture
                         user.full_name = full_name
                         logger.info(f"Updating existing user: {email}")
-                    
+
                     user.last_login_at = datetime.now(timezone.utc)
                     user.last_login_ip = ip_address
-                    
+
                     db.commit()
                     db.refresh(user)
+
+                    # Copy template categories to new user's workspace
+                    if is_new_user:
+                        self._copy_template_categories_to_user(user.id, db)
 
                     # Create session with refresh token
                     session_info = await session_service.create_session(

@@ -34,24 +34,26 @@ class CategoryService:
     ) -> CategoryListResponse:
         """
         List categories with translations in user's preferred language only
+
+        Architecture note:
+        - Template categories (user_id=NULL) are never shown to users
+        - Users only see their personal workspace categories (user_id=user_id)
+        - This includes both system copies (is_system=True) and custom (is_system=False)
         """
         session = db_manager.session_local()
         try:
-            # Build query
+            # Build query - only show user's personal categories
             stmt = select(Category).options(
                 joinedload(Category.translations)
             )
-            
-            if include_system:
-                stmt = stmt.where(
-                    or_(
-                        Category.user_id == user_id,
-                        Category.is_system == True
-                    )
-                )
-            else:
-                stmt = stmt.where(Category.user_id == user_id)
-            
+
+            # Filter by user's workspace only
+            stmt = stmt.where(Category.user_id == user_id)
+
+            # Optionally filter custom categories only
+            if not include_system:
+                stmt = stmt.where(Category.is_system == False)
+
             stmt = stmt.where(Category.is_active == True)
             stmt = stmt.order_by(Category.sort_order, Category.created_at)
             
@@ -428,8 +430,8 @@ class CategoryService:
                 return None
 
             # Protect OTHER category from deletion
-            if category.reference_key == 'category.other':
-                raise PermissionError("Cannot delete the OTHER category - it is required as a fallback category")
+            if category.reference_key == 'OTH':
+                raise PermissionError("Cannot delete the 'Other' category - it is required as a fallback category")
 
             if category.user_id and str(category.user_id) != user_id:
                 raise PermissionError("Cannot delete another user's category")
@@ -531,76 +533,141 @@ class CategoryService:
         ip_address: str = None
     ) -> RestoreDefaultsResponse:
         """
-        Restore default system categories and delete all custom categories
-        Deletes all user's custom categories and ensures system categories exist
+        Restore default categories from templates with smart document remapping
+
+        Architecture:
+        - Deletes ALL user's categories (both system copies and custom)
+        - Re-copies fresh templates from template categories (user_id=NULL)
+        - Smart document remapping:
+          * Documents from system categories: remapped by reference_key
+          * Documents from custom categories: moved to "Other"
         """
         session = db_manager.session_local()
         try:
-            # Step 1: Delete all user's custom categories
-            deleted_count = 0
+            from app.database.models import CategoryKeyword
+            from uuid import UUID
+
+            # Step 1: Get all template categories (user_id=NULL)
+            template_categories = session.execute(
+                select(Category)
+                .options(joinedload(Category.translations))
+                .where(Category.user_id.is_(None))
+            ).unique().scalars().all()
+
+            if not template_categories:
+                raise ValueError("No template categories found in database")
+
+            # Step 2: Create document remapping plan
             user_categories = session.execute(
-                select(Category).where(
-                    Category.user_id == user_id,
-                    Category.is_system == False
-                )
+                select(Category).where(Category.user_id == user_id)
             ).scalars().all()
 
+            # Map old category IDs to reference keys for remapping
+            old_category_map = {}  # old_id -> (reference_key, is_system)
+            for cat in user_categories:
+                old_category_map[str(cat.id)] = (cat.reference_key, cat.is_system)
+
+            # Step 3: Get all user's documents before deleting categories
+            user_documents = session.execute(
+                select(Document).where(Document.user_id == user_id)
+            ).scalars().all()
+
+            logger.info(f"Found {len(user_documents)} documents to remap for user {user_id}")
+
+            # Step 4: Copy template categories to user's workspace
+            new_category_map = {}  # reference_key -> new_category_id
+            created_names = []
+
+            for template_cat in template_categories:
+                # Create new category for user
+                new_category = Category(
+                    name=template_cat.name,
+                    reference_key=template_cat.reference_key,
+                    description=template_cat.description,
+                    category_code=template_cat.category_code,
+                    color_hex=template_cat.color_hex,
+                    icon_name=template_cat.icon_name,
+                    is_system=template_cat.is_system,
+                    user_id=UUID(user_id),
+                    sort_order=template_cat.sort_order,
+                    is_active=True,
+                    is_multi_lingual=template_cat.is_multi_lingual
+                )
+                session.add(new_category)
+                session.flush()  # Get the new ID
+
+                # Store mapping for document remapping
+                new_category_map[template_cat.reference_key] = new_category.id
+
+                # Copy translations
+                translations = session.execute(
+                    select(CategoryTranslation).where(
+                        CategoryTranslation.category_id == template_cat.id
+                    )
+                ).scalars().all()
+
+                for trans in translations:
+                    new_translation = CategoryTranslation(
+                        category_id=new_category.id,
+                        language_code=trans.language_code,
+                        name=trans.name,
+                        description=trans.description
+                    )
+                    session.add(new_translation)
+
+                # Copy keywords
+                keywords = session.execute(
+                    select(CategoryKeyword).where(
+                        CategoryKeyword.category_id == template_cat.id
+                    )
+                ).scalars().all()
+
+                for keyword in keywords:
+                    new_keyword = CategoryKeyword(
+                        category_id=new_category.id,
+                        keyword=keyword.keyword,
+                        weight=keyword.weight
+                    )
+                    session.add(new_keyword)
+
+                # Get English name for reporting
+                en_trans = next((t for t in translations if t.language_code == 'en'), None)
+                created_names.append(en_trans.name if en_trans else template_cat.name)
+
+            session.flush()
+
+            # Step 5: Smart document remapping
+            documents_remapped = 0
+            documents_moved_to_other = 0
+            other_category_id = new_category_map.get('OTH')  # "Other" category
+
+            if not other_category_id:
+                raise ValueError("'Other' category not found in templates")
+
+            for doc in user_documents:
+                old_category_id = str(doc.category_id)
+
+                if old_category_id in old_category_map:
+                    old_ref_key, was_system = old_category_map[old_category_id]
+
+                    if was_system and old_ref_key in new_category_map:
+                        # System category: remap to new copy by reference_key
+                        doc.category_id = new_category_map[old_ref_key]
+                        documents_remapped += 1
+                    else:
+                        # Custom category: move to "Other"
+                        doc.category_id = other_category_id
+                        documents_moved_to_other += 1
+                else:
+                    # Orphaned document: move to "Other"
+                    doc.category_id = other_category_id
+                    documents_moved_to_other += 1
+
+            # Step 6: Delete ALL old user categories
+            deleted_count = 0
             for cat in user_categories:
                 session.delete(cat)
                 deleted_count += 1
-
-            logger.info(f"Deleted {deleted_count} custom categories for user {user_id}")
-
-            # Step 2: Ensure system categories exist
-            category_config = session.execute(
-                select(SystemSetting).where(
-                    SystemSetting.setting_key == 'default_system_categories'
-                )
-            ).scalar_one_or_none()
-
-            if not category_config:
-                raise ValueError("Default category configuration not found in system_settings")
-
-            default_categories = json.loads(category_config.setting_value)
-
-            created = []
-            skipped = []
-
-            for cat_data in default_categories:
-                existing = session.execute(
-                    select(Category).where(
-                        Category.reference_key == cat_data['reference_key'],
-                        Category.is_system == True
-                    )
-                ).scalar_one_or_none()
-
-                if existing:
-                    skipped.append(cat_data['translations']['en']['name'])
-                    continue
-
-                new_category = Category(
-                    reference_key=cat_data['reference_key'],
-                    category_code=cat_data['category_code'],
-                    color_hex=cat_data['color_hex'],
-                    icon_name=cat_data['icon_name'],
-                    is_system=True,
-                    user_id=None,
-                    sort_order=cat_data['sort_order'],
-                    is_active=True
-                )
-                session.add(new_category)
-                session.flush()
-
-                for lang_code, trans_data in cat_data['translations'].items():
-                    translation = CategoryTranslation(
-                        category_id=new_category.id,
-                        language_code=lang_code,
-                        name=trans_data['name'],
-                        description=trans_data['description']
-                    )
-                    session.add(translation)
-
-                created.append(cat_data['translations']['en']['name'])
 
             session.commit()
 
@@ -610,15 +677,30 @@ class CategoryService:
                 action="defaults_restored",
                 resource_id=None,
                 ip_address=ip_address,
-                new_values={"created": created, "skipped": skipped, "deleted": deleted_count}
+                new_values={
+                    "created": created_names,
+                    "deleted": deleted_count,
+                    "documents_remapped": documents_remapped,
+                    "documents_moved_to_other": documents_moved_to_other
+                }
             )
 
-            logger.info(f"Default categories restored: deleted={deleted_count}, created={created}, skipped={skipped}")
+            logger.info(
+                f"Categories restored for user {user_id}: "
+                f"deleted={deleted_count}, created={len(created_names)}, "
+                f"docs_remapped={documents_remapped}, docs_to_other={documents_moved_to_other}"
+            )
 
-            message = f"Deleted {deleted_count} custom categories and restored {len(created)} default categories"
+            message = (
+                f"Reset complete: Deleted {deleted_count} categories, "
+                f"restored {len(created_names)} default categories. "
+                f"{documents_remapped} documents kept their categories, "
+                f"{documents_moved_to_other} moved to 'Other'."
+            )
+
             return RestoreDefaultsResponse(
-                created=created,
-                skipped=skipped,
+                created=created_names,
+                skipped=[],
                 message=message
             )
 

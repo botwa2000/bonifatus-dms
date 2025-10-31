@@ -2112,10 +2112,55 @@ psql $DATABASE_URL -c "\dt"        # List all tables
 
 ---
 
-## 12. Multi-Language Category Management Deployment
+## 12. Multi-Language Category Management & Per-User Category Architecture
 
 ### Overview
-This deployment adds multi-language document processing with user-selectable preferred languages, French support, language metadata, and category reset functionality.
+This deployment implements a per-user category architecture where each user gets their own copy of system categories, multi-language document processing, French support, and intelligent category reset functionality.
+
+### Architecture Changes
+
+**Old Architecture:**
+- Shared system categories (user_id=NULL)
+- All users see same categories
+- No way to customize system categories
+
+**New Architecture:**
+- **Template categories** (`is_system=true`, `user_id=NULL`): Pristine defaults, never touched by users
+- **User's system categories** (`is_system=true`, `user_id=<uuid>`): Personal copies, fully editable
+- **User's custom categories** (`is_system=false`, `user_id=<uuid>`): Created by user
+
+**On Registration:**
+- 7 template categories copied to user's workspace
+- Translations generated for user's preferred_doc_languages
+- User gets isolated category workspace
+
+**On Reset Categories:**
+- Delete ALL user's categories (system copies + custom)
+- Re-copy fresh templates
+- Smart document remapping:
+  - Documents in system categories (by reference_key) → Remapped to new system category
+  - Documents in custom categories → Moved to "Other"
+
+### Default System Categories (7 Total)
+
+1. **Insurance (INS)** - Insurance policies, claims, coverage documents
+2. **Legal (LEG)** - Contracts, agreements, legal documents
+3. **Real Estate (RES)** - Property documents, deeds, mortgages
+4. **Banking (BNK)** - Bank statements, transactions, financial docs
+5. **Invoices (INV)** - Bills, invoices, payment requests (NEW)
+6. **Taxes (TAX)** - Tax returns, receipts, tax-related documents (NEW)
+7. **Other (OTH)** - Miscellaneous, fallback category (cannot be deleted)
+
+**Languages:** English, German, Russian, French (en, de, ru, fr)
+
+**Default Keywords per Category:**
+- **Insurance:** insurance, policy, coverage, premium, claim
+- **Legal:** contract, agreement, legal, terms, conditions
+- **Real Estate:** property, real estate, mortgage, deed, lease, rent
+- **Banking:** bank, account, statement, transaction, balance, payment
+- **Invoices:** invoice, bill, payment, due, total, amount
+- **Taxes:** tax, receipt, deduction, return, fiscal, revenue
+- **Other:** document, file, misc
 
 ### Changes Summary
 
@@ -2123,21 +2168,24 @@ This deployment adds multi-language document processing with user-selectable pre
 
 **Database Migrations:**
 - `008_add_preferred_doc_languages.py` - Adds preferred_doc_languages JSONB column to users table
-- `009_add_language_metadata.py` - Adds language metadata to system_settings (display names for each language code)
+- `009_add_language_metadata.py` - Adds language metadata to system_settings
+- `010_add_invoices_taxes_categories.py` - Adds 2 new template categories + French translations to all
 
 **Models Updated:**
 - User model: Added `preferred_doc_languages` column
 
 **Services Updated:**
-- `user_service.py` - Validates preferred languages against database, reads from users table
-- `category_service.py` - Auto-translates categories to user's preferred languages only
+- `auth_service.py` - NEW: Copy template categories on user registration
+- `category_service.py` - REWRITTEN: Smart reset with document remapping
+- `user_service.py` - Validates preferred languages against database
 - `translation_service.py` - Fixed to read supported languages from database (NO hard-coding)
 - `language_detection_service.py` - Fixed to read supported languages from database (NO hard-coding)
 - `document_analysis_service.py` - Validates detected language, returns warning if not in preferences
 
-**Support Scripts (Manual Execution):**
+**Support Scripts:**
 - `add_french_stopwords.py` - Adds 66 French stop words
 - `update_supported_languages.py` - Updates supported_languages to 'en,de,ru,fr'
+- `delete_test_user.py` - Clean slate for testing new architecture
 
 #### Frontend Changes
 
