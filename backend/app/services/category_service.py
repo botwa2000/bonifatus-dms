@@ -579,11 +579,9 @@ class CategoryService:
             created_names = []
 
             for template_cat in template_categories:
-                # Create new category for user
+                # Create new category for user (no name/description - those are in translations)
                 new_category = Category(
-                    name=template_cat.name,
                     reference_key=template_cat.reference_key,
-                    description=template_cat.description,
                     category_code=template_cat.category_code,
                     color_hex=template_cat.color_hex,
                     icon_name=template_cat.icon_name,
@@ -626,13 +624,16 @@ class CategoryService:
                     new_keyword = CategoryKeyword(
                         category_id=new_category.id,
                         keyword=keyword.keyword,
-                        weight=keyword.weight
+                        language_code=keyword.language_code,
+                        weight=keyword.weight,
+                        match_count=keyword.match_count,
+                        is_system_default=keyword.is_system_default
                     )
                     session.add(new_keyword)
 
                 # Get English name for reporting
                 en_trans = next((t for t in translations if t.language_code == 'en'), None)
-                created_names.append(en_trans.name if en_trans else template_cat.name)
+                created_names.append(en_trans.name if en_trans else template_cat.reference_key)
 
             session.flush()
 

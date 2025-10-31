@@ -62,13 +62,17 @@ class AuthService:
 
             # Copy each template category to user's workspace
             for template_cat in template_categories:
-                # Create new category for user
+                # Create new category for user (no name/description - those are in translations)
                 new_category = Category(
-                    name=template_cat.name,
                     reference_key=template_cat.reference_key,
-                    description=template_cat.description,
+                    category_code=template_cat.category_code,
+                    color_hex=template_cat.color_hex,
+                    icon_name=template_cat.icon_name,
                     is_system=template_cat.is_system,
-                    user_id=user_id
+                    user_id=user_id,
+                    sort_order=template_cat.sort_order,
+                    is_active=template_cat.is_active,
+                    is_multi_lingual=template_cat.is_multi_lingual
                 )
                 db.add(new_category)
                 db.flush()  # Get the new ID
@@ -103,7 +107,10 @@ class AuthService:
                     new_keyword = CategoryKeyword(
                         category_id=new_category.id,
                         keyword=keyword.keyword,
-                        weight=keyword.weight
+                        language_code=keyword.language_code,
+                        weight=keyword.weight,
+                        match_count=keyword.match_count,
+                        is_system_default=keyword.is_system_default
                     )
                     db.add(new_keyword)
 
