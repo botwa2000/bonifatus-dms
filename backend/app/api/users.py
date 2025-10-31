@@ -392,44 +392,43 @@ async def get_drive_status(
 
 
 @router.get(
-    "/drive/connect",
+    "/drive/oauth-config",
     responses={
-        302: {"description": "Redirect to Google OAuth for Drive permissions"},
+        200: {"description": "OAuth configuration for Drive"},
         401: {"model": ErrorResponse, "description": "Authentication required"},
-        500: {"model": ErrorResponse, "description": "OAuth initialization failed"}
-    }
+        500: {"model": ErrorResponse, "description": "OAuth configuration unavailable"}
+    },
+    summary="Get Google Drive OAuth Configuration",
+    description="Get OAuth config for frontend-initiated Drive OAuth flow"
 )
-async def connect_google_drive(
+async def get_drive_oauth_config(
     current_user: User = Depends(get_current_active_user)
-):
+) -> Dict:
     """
-    Initiate Google OAuth flow for Drive permissions
+    Get Google OAuth configuration for Drive connection
 
-    Redirects user to Google OAuth with Drive API scope
+    Returns OAuth config so frontend can initiate Drive OAuth flow directly.
+    This follows the same secure pattern as login OAuth, where the frontend
+    builds the OAuth URL and redirects to Google directly.
+
+    Benefits:
+    - Cookies don't need to survive backend→Google→frontend redirects
+    - More reliable authentication flow
+    - Follows OAuth 2.0 best practices for SPAs
     """
     try:
-        # Build Google OAuth URL with Drive scope
-        oauth_params = {
-            "client_id": settings.google.google_client_id,
+        return {
+            "google_client_id": settings.google.google_client_id,
             "redirect_uri": f"{settings.app.app_frontend_url}/settings/drive/callback",
-            "response_type": "code",
-            "scope": "https://www.googleapis.com/auth/drive.file",  # Drive file scope
-            "access_type": "offline",  # Get refresh token
-            "prompt": "consent",  # Force consent to get refresh token
-            "state": str(current_user.id),  # User ID for callback
-            "login_hint": current_user.email  # Pre-fill email
+            "scope": "https://www.googleapis.com/auth/drive.file",
+            "state": str(current_user.id),  # User ID for callback verification
+            "login_hint": current_user.email
         }
-
-        oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(oauth_params)}"
-
-        logger.info(f"Redirecting to Google Drive OAuth for user: {current_user.email}")
-        return RedirectResponse(url=oauth_url, status_code=status.HTTP_302_FOUND)
-
     except Exception as e:
-        logger.error(f"Drive OAuth initialization failed: {e}")
+        logger.error(f"Failed to get Drive OAuth config: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OAuth initialization failed"
+            detail="OAuth configuration unavailable"
         )
 
 

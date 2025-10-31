@@ -56,7 +56,10 @@ function DriveCallbackContent() {
         if (result.success) {
           setStatus('success')
           setMessage('Google Drive connected successfully!')
-          setTimeout(() => router.push('/settings'), 2000)
+          // Use router.push for client-side navigation
+          setTimeout(() => {
+            router.push('/settings')
+          }, 2000)
           // Don't remove attemptKey - component will unmount during redirect
         } else {
           setStatus('error')

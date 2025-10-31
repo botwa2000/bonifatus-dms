@@ -126,10 +126,36 @@ export default function SettingsPage() {
 
   const handleConnectDrive = async () => {
     setDriveLoading(true)
+    setMessage(null)
+
     try {
-      // Redirect to backend OAuth endpoint
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/users/drive/connect`
-    } catch {
+      // Get OAuth config from backend (includes user ID as state)
+      const config = await apiClient.get<{
+        google_client_id: string
+        redirect_uri: string
+        scope: string
+        state: string
+        login_hint: string
+      }>('/api/v1/users/drive/oauth-config', true)
+
+      // Build Google OAuth URL client-side (same pattern as login OAuth)
+      const params = new URLSearchParams({
+        client_id: config.google_client_id,
+        redirect_uri: config.redirect_uri,
+        response_type: 'code',
+        scope: config.scope,
+        access_type: 'offline',
+        prompt: 'consent',
+        state: config.state,
+        login_hint: config.login_hint
+      })
+
+      const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+
+      // Redirect directly to Google (no backend redirect)
+      window.location.href = oauthUrl
+    } catch (error) {
+      console.error('Drive OAuth initialization failed:', error)
       setMessage({ type: 'error', text: 'Failed to initiate Drive connection' })
       setDriveLoading(false)
     }
