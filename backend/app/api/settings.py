@@ -34,20 +34,23 @@ router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 async def get_public_system_settings() -> SystemSettingsResponse:
     """
     Get public system settings
-    
+
     Returns all public system settings available to unauthenticated users.
     Used by frontend to configure UI options (languages, themes, etc.)
+
+    Note: available_languages is dynamically generated from language_metadata keys
+    to avoid maintaining duplicate hardcoded lists.
     """
     session = db_manager.session_local()
     try:
         stmt = select(SystemSetting).where(SystemSetting.is_public == True)
         settings = session.execute(stmt).scalars().all()
-        
+
         settings_dict = {}
         for setting in settings:
             key = setting.setting_key
             value = setting.setting_value
-            
+
             # Parse JSON values
             if setting.data_type == 'json':
                 try:
@@ -66,10 +69,16 @@ async def get_public_system_settings() -> SystemSettingsResponse:
             # String values
             else:
                 settings_dict[key] = value
-        
+
+        # Override available_languages with keys from language_metadata
+        # This ensures the language list is always in sync with defined languages
+        if 'language_metadata' in settings_dict and isinstance(settings_dict['language_metadata'], dict):
+            settings_dict['available_languages'] = list(settings_dict['language_metadata'].keys())
+            logger.info(f"Derived available_languages from language_metadata: {settings_dict['available_languages']}")
+
         logger.info("Public system settings retrieved successfully")
         return SystemSettingsResponse(settings=settings_dict)
-        
+
     except Exception as e:
         logger.error(f"Failed to retrieve public settings: {e}")
         raise HTTPException(
