@@ -659,7 +659,7 @@ export default function BatchUploadPage() {
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={() => {}}
-                                          className="w-4 h-4 rounded"
+                                          className="w-4 h-4 rounded border-neutral-300 text-admin-primary focus:ring-1 focus:ring-admin-primary cursor-pointer"
                                         />
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2">
