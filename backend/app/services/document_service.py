@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, text, and_, or_
 
-from app.database.models import Document, Category, User, AuditLog, SystemSetting
+from app.database.models import Document, Category, DocumentCategory, CategoryTranslation, User, AuditLog, SystemSetting
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
 from app.schemas.document_schemas import (
@@ -346,13 +346,22 @@ class DocumentService:
                 return None
 
             document = session.get(Document, doc_uuid)
-            if not document or document.user_id != user_id:
+            if not document:
+                return None
+
+            # Convert user_id string to UUID for comparison
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                logger.warning(f"Invalid user ID format: {user_id}")
+                return None
+
+            if document.user_id != user_uuid:
                 return None
 
             old_values = {
                 "title": document.title,
-                "description": document.description,
-                "category_id": str(document.category_id) if document.category_id else None
+                "description": document.description
             }
 
             update_data = update_request.dict(exclude_unset=True)
@@ -408,10 +417,20 @@ class DocumentService:
 
             logger.info(f"[DELETE DEBUG] ✅ Document found: {document.title}")
             logger.info(f"[DELETE DEBUG] Document user_id: {document.user_id}, Request user_id: {user_id}")
+            logger.info(f"[DELETE DEBUG] Document user_id type: {type(document.user_id)}, Request user_id type: {type(user_id)}")
 
-            if document.user_id != user_id:
-                logger.error(f"[DELETE DEBUG] ❌ User ID mismatch - document belongs to {document.user_id}, not {user_id}")
+            # Convert user_id string to UUID for comparison
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                logger.error(f"[DELETE DEBUG] ❌ Invalid user ID format: {user_id}")
                 return False
+
+            if document.user_id != user_uuid:
+                logger.error(f"[DELETE DEBUG] ❌ User ID mismatch - document belongs to {document.user_id}, not {user_uuid}")
+                return False
+
+            logger.info(f"[DELETE DEBUG] ✅ User ID matches, proceeding with deletion")
 
             # Get user's Google Drive refresh token
             logger.info(f"[DELETE DEBUG] Fetching user's Google Drive token...")
@@ -472,7 +491,22 @@ class DocumentService:
             sort_by = search_request.sort_by or await self._get_system_setting("default_documents_sort_field", "created_at")
             sort_order = search_request.sort_order or await self._get_system_setting("default_documents_sort_order", "desc")
 
-            base_query = select(Document, Category).outerjoin(Category).where(Document.user_id == user_id)
+            # Join through document_categories to get the primary category
+            # This supports the many-to-many relationship
+            base_query = (
+                select(Document, Category, CategoryTranslation)
+                .outerjoin(DocumentCategory, and_(
+                    DocumentCategory.document_id == Document.id,
+                    DocumentCategory.is_primary == True
+                ))
+                .outerjoin(Category, Category.id == DocumentCategory.category_id)
+                .outerjoin(CategoryTranslation, and_(
+                    CategoryTranslation.category_id == Category.id,
+                    CategoryTranslation.language_code == 'en'  # TODO: Use user's language preference
+                ))
+                .where(Document.user_id == user_id)
+                .where(Document.is_deleted == False)
+            )
 
             if search_request.query:
                 search_term = f"%{search_request.query}%"
@@ -486,7 +520,14 @@ class DocumentService:
                 )
 
             if search_request.category_id:
-                base_query = base_query.where(Document.category_id == search_request.category_id)
+                # Filter by documents that have this category (check junction table)
+                base_query = base_query.join(
+                    DocumentCategory,
+                    and_(
+                        DocumentCategory.document_id == Document.id,
+                        DocumentCategory.category_id == search_request.category_id
+                    )
+                )
 
             if search_request.language:
                 base_query = base_query.where(Document.primary_language == search_request.language)
@@ -512,7 +553,14 @@ class DocumentService:
             results = session.execute(documents_stmt).all()
 
             documents = []
-            for document, category in results:
+            for document, category, category_translation in results:
+                # Use translated category name if available, otherwise fallback to category reference_key
+                category_name = None
+                if category_translation and category_translation.name:
+                    category_name = category_translation.name
+                elif category:
+                    category_name = category.reference_key  # Fallback to reference key
+
                 documents.append(DocumentResponse(
                     id=str(document.id),
                     title=document.title,
@@ -526,8 +574,8 @@ class DocumentService:
                     keywords=document.keywords,
                     confidence_score=document.confidence_score,
                     primary_language=document.primary_language,
-                    category_id=str(document.category_id) if document.category_id else None,
-                    category_name=category.name_en if category else None,
+                    category_id=str(category.id) if category else None,
+                    category_name=category_name,
                     web_view_link=None,
                     created_at=document.created_at,
                     updated_at=document.updated_at
