@@ -200,12 +200,15 @@ class CategoryService {
   }
 
   async getKeywordOverlaps(
-    languageCode: string = 'en'
+    languageCode?: string
   ): Promise<KeywordOverlapResponse> {
+    // For overlaps, default to 'en' if not specified (overlap check is language-specific)
+    const lang = languageCode || 'en'
+
     return await apiClient.get<KeywordOverlapResponse>(
       '/api/v1/categories/keywords/overlaps',
       true,
-      { params: { language_code: languageCode } }
+      { params: { language_code: lang } }
     )
   }
 }

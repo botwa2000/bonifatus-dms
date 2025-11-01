@@ -61,7 +61,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
       setError(null)
       await categoryService.addKeyword(categoryId, {
         keyword: newKeyword.trim(),
-        language_code: languageCode,
+        language_code: languageCode || 'en', // Default to 'en' when adding new keywords
         weight: newWeight
       })
 
