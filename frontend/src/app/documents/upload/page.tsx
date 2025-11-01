@@ -229,27 +229,28 @@ export default function BatchUploadPage() {
           console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence}%`)
 
           return {
-          ...r,
-          file: selectedFiles.find(f => f.name === r.original_filename)!,
-          selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
-          primary_category: r.analysis.suggested_category_id,
-          confirmed_keywords: (r.analysis?.keywords && Array.isArray(r.analysis.keywords))
-            ? r.analysis.keywords
-                .slice(0, 10)
-                .filter(k => {
-                  return k !== null &&
-                         k !== undefined &&
-                         typeof k === 'object' &&
-                         k.word !== null &&
-                         k.word !== undefined &&
-                         typeof k.word === 'string' &&
-                         k.word.trim().length > 0
-                })
-                .map(k => k.word.trim())
-            : [],
-          custom_filename: r.standardized_filename || r.original_filename || 'untitled',
-          filename_error: null
-        }))
+            ...r,
+            file: selectedFiles.find(f => f.name === r.original_filename)!,
+            selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
+            primary_category: r.analysis.suggested_category_id,
+            confirmed_keywords: (r.analysis?.keywords && Array.isArray(r.analysis.keywords))
+              ? r.analysis.keywords
+                  .slice(0, 10)
+                  .filter(k => {
+                    return k !== null &&
+                           k !== undefined &&
+                           typeof k === 'object' &&
+                           k.word !== null &&
+                           k.word !== undefined &&
+                           typeof k.word === 'string' &&
+                           k.word.trim().length > 0
+                  })
+                  .map(k => k.word.trim())
+              : [],
+            custom_filename: r.standardized_filename || r.original_filename || 'untitled',
+            filename_error: null
+          }
+        })
 
       setUploadStates(states)
 
