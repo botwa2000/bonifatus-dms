@@ -377,6 +377,7 @@ async def list_category_keywords(
     Returns list of keywords with weights, match statistics, and system flag.
     """
     try:
+        logger.info(f"[KEYWORD API DEBUG] list_category_keywords called for category={category_id}, language_code={language_code}, user={current_user.email}")
         session = db_manager.session_local()
 
         keywords = keyword_management_service.list_keywords(
@@ -384,6 +385,11 @@ async def list_category_keywords(
             language_code=language_code,
             session=session
         )
+
+        logger.info(f"[KEYWORD API DEBUG] Returning {len(keywords)} keywords for category={category_id}")
+        if keywords:
+            languages = list(set(kw.get('language_code') for kw in keywords if isinstance(kw, dict)))
+            logger.info(f"[KEYWORD API DEBUG] Languages in response: {languages}")
 
         session.close()
 

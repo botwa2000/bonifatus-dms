@@ -1654,6 +1654,265 @@ ssh deploy@YOUR_SERVER_IP "~/deploy.sh"
 - Starts containers with new code
 - Verifies health checks
 
+---
+
+#### 🔧 Production Deployment: Step-by-Step Guide
+
+**⚠️ CRITICAL: Understanding User Roles**
+
+The Hetzner server has two users with different permissions:
+
+| User | Purpose | Access | When to Use |
+|------|---------|--------|-------------|
+| **root** | System administration | Full system access, can modify any files | Fixing permissions, system configuration, emergency recovery |
+| **deploy** | Application deployment | Owner of `/opt/bonifatus-dms`, runs Docker containers | Normal deployments, pulling code, rebuilding containers |
+
+**SSH Access:**
+```bash
+# As root (for system admin tasks)
+ssh root@91.99.212.17
+
+# As deploy (for normal deployments)
+ssh deploy@91.99.212.17
+```
+
+---
+
+#### ✅ Error-Free Deployment Process
+
+**Step 1: Local - Commit and Push Changes**
+
+```bash
+# On your local machine
+cd C:\Users\Alexa\bonifatus-dms
+
+# Stage changes
+git add backend/ frontend/
+
+# Commit with detailed message
+git commit -m "feat: descriptive message with changelog"
+
+# Push to GitHub
+git push origin main
+```
+
+**Step 2: Remote - Pull Latest Code (AS DEPLOY USER)**
+
+```bash
+# SSH as deploy user (normal deployment)
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main"
+```
+
+**⚠️ Common Issue: Git Permission Errors**
+
+If you see:
+```
+error: insufficient permission for adding an object to repository database .git/objects
+fatal: failed to write object
+fatal: unpack-objects failed
+```
+
+**Root Cause:** Some git object files are owned by `root` instead of `deploy` (happens when you previously ran git commands as root)
+
+**Fix (AS ROOT USER):**
+```bash
+# Fix ownership - run this as root
+ssh root@91.99.212.17 "chown -R deploy:deploy /opt/bonifatus-dms/.git"
+
+# Then retry as deploy
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main"
+```
+
+**Step 3: Remote - Run Database Migrations (AS DEPLOY USER)**
+
+```bash
+# Only if there are new migrations
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose exec -T backend alembic upgrade head"
+```
+
+**Step 4: Remote - Rebuild and Restart Backend (AS DEPLOY USER)**
+
+```bash
+# Rebuild backend container with new code
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose up -d --build backend"
+```
+
+**Step 5: Remote - Rebuild Frontend (AS DEPLOY USER, if frontend changed)**
+
+```bash
+# Only if frontend code changed
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose up -d --build frontend"
+```
+
+**Step 6: Verify Deployment Health**
+
+```bash
+# Check container status
+ssh deploy@91.99.212.17 "docker compose ps"
+
+# Test backend health
+curl -s https://api.bonidoc.com/health | python3 -m json.tool
+
+# Test frontend
+curl -s -o /dev/null -w "%{http_code}" https://bonidoc.com
+# Expected: 200
+```
+
+---
+
+#### 🎯 Complete Clean Deployment Script
+
+**Use this complete script for error-free deployments:**
+
+```bash
+#!/bin/bash
+# Clean Production Deployment Script
+# Run this from your LOCAL machine (Claude Code can execute this)
+
+set -e  # Exit on error
+
+echo "🚀 Starting Production Deployment..."
+
+# === LOCAL: Push to GitHub ===
+echo "Step 1/6: Pushing to GitHub..."
+git push origin main
+
+# === REMOTE: Fix Git Permissions (if needed) ===
+echo "Step 2/6: Ensuring correct git permissions..."
+ssh root@91.99.212.17 "chown -R deploy:deploy /opt/bonifatus-dms/.git" || true
+
+# === REMOTE: Pull Latest Code ===
+echo "Step 3/6: Pulling latest code..."
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main"
+
+# === REMOTE: Run Migrations ===
+echo "Step 4/6: Running database migrations..."
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose exec -T backend alembic upgrade head" || echo "No new migrations"
+
+# === REMOTE: Rebuild Backend ===
+echo "Step 5/6: Rebuilding backend..."
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose up -d --build backend"
+
+# === VERIFY: Health Check ===
+echo "Step 6/6: Verifying deployment..."
+sleep 10
+curl -f https://api.bonidoc.com/health > /dev/null 2>&1 && echo "✅ Backend: Healthy" || echo "❌ Backend: Failed"
+curl -f https://bonidoc.com > /dev/null 2>&1 && echo "✅ Frontend: Healthy" || echo "❌ Frontend: Failed"
+
+echo ""
+echo "🎉 Deployment Complete!"
+echo "   Backend:  https://api.bonidoc.com/health"
+echo "   Frontend: https://bonidoc.com"
+```
+
+**Save as:** `deploy_production.sh`
+
+**Usage:**
+```bash
+chmod +x deploy_production.sh
+./deploy_production.sh
+```
+
+---
+
+#### 🛠️ Troubleshooting Common Deployment Issues
+
+**Issue 1: "Permission denied" when pulling code**
+```bash
+# Problem: Git objects owned by wrong user
+# Fix: Reset ownership as root
+ssh root@91.99.212.17 "chown -R deploy:deploy /opt/bonifatus-dms/.git"
+```
+
+**Issue 2: "Container already exists" error**
+```bash
+# Problem: Old container blocking new build
+# Fix: Remove and rebuild
+ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && docker compose down && docker compose up -d --build"
+```
+
+**Issue 3: Migration fails with "relation already exists"**
+```bash
+# Problem: Database schema out of sync with migrations
+# Check current migration
+ssh deploy@91.99.212.17 "docker compose exec -T backend alembic current"
+
+# Check migration history
+ssh deploy@91.99.212.17 "docker compose exec -T backend alembic history"
+```
+
+**Issue 4: Backend unhealthy after deployment**
+```bash
+# Check logs
+ssh deploy@91.99.212.17 "docker logs bonifatus-backend --tail=50"
+
+# Restart backend
+ssh deploy@91.99.212.17 "docker compose restart backend"
+```
+
+---
+
+#### 📋 Deployment Checklist
+
+**Before Deployment:**
+- [ ] All changes committed locally
+- [ ] Code pushed to GitHub (`git push origin main`)
+- [ ] Local tests pass
+- [ ] Breaking changes documented
+
+**During Deployment:**
+- [ ] Git pull successful (no permission errors)
+- [ ] Migrations applied (if any)
+- [ ] Backend container rebuilt
+- [ ] Frontend container rebuilt (if changed)
+- [ ] No error logs in docker logs
+
+**After Deployment:**
+- [ ] Backend health check returns 200
+- [ ] Frontend loads correctly
+- [ ] Database connected
+- [ ] Test critical features (login, upload, categorization)
+- [ ] Monitor logs for 5-10 minutes
+
+---
+
+#### 🔑 Key Rules to Remember
+
+1. **Use `deploy` user for normal deployments**
+   - Pulling code: ✅ deploy
+   - Building containers: ✅ deploy
+   - Running migrations: ✅ deploy
+
+2. **Use `root` user ONLY for:**
+   - Fixing file permissions
+   - System-level configuration
+   - Emergency recovery
+
+3. **Always fix permissions as root, then switch back to deploy:**
+   ```bash
+   # Fix (as root)
+   ssh root@91.99.212.17 "chown -R deploy:deploy /opt/bonifatus-dms/.git"
+
+   # Deploy (as deploy)
+   ssh deploy@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main"
+   ```
+
+4. **Never run git commands as root on the production server**
+   - Running git as root creates files owned by root
+   - This blocks deploy user from future pulls
+   - Always use deploy user for git operations
+
+5. **Full rebuild vs quick restart:**
+   ```bash
+   # Full rebuild (when code changed)
+   docker compose up -d --build backend
+
+   # Quick restart (config changes only)
+   docker compose restart backend
+   ```
+
+---
+
 **Post-Deployment Verification**
 ```
 1. Backend health check: curl https://api.bonidoc.com/health

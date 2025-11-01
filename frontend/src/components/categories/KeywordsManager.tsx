@@ -29,11 +29,22 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
   const loadKeywords = async () => {
     try {
       setLoading(true)
+      console.log('[KeywordsManager DEBUG] Loading keywords:', {
+        categoryId,
+        languageCode,
+        languageCodeType: typeof languageCode,
+        isUndefined: languageCode === undefined
+      })
       const data = await categoryService.getKeywords(categoryId, languageCode)
+      console.log('[KeywordsManager DEBUG] Received keywords:', {
+        count: data.keywords.length,
+        languages: [...new Set(data.keywords.map(k => k.language_code))],
+        sample: data.keywords.slice(0, 3).map(k => ({ keyword: k.keyword, lang: k.language_code }))
+      })
       setKeywords(data.keywords)
       setError(null)
     } catch (err) {
-      console.error('Failed to load keywords:', err)
+      console.error('[KeywordsManager DEBUG] Failed to load keywords:', err)
       setError('Failed to load keywords')
     } finally {
       setLoading(false)
@@ -152,6 +163,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
           <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-neutral-700">Keyword</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-700">Language</th>
               <th className="px-4 py-3 text-left font-medium text-neutral-700">Weight</th>
               <th className="px-4 py-3 text-center font-medium text-neutral-700">Matches</th>
               <th className="px-4 py-3 text-center font-medium text-neutral-700">Type</th>
@@ -161,7 +173,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
           <tbody className="divide-y divide-neutral-200">
             {keywords.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
                   No keywords yet. Add your first keyword to improve document classification.
                 </td>
               </tr>
@@ -179,6 +191,11 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-neutral-100 text-neutral-700 uppercase">
+                        {kw.language_code}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-1">

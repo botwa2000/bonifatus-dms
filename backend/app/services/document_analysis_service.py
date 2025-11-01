@@ -57,6 +57,7 @@ class DocumentAnalysisService:
                 raise ValueError("Unable to extract meaningful text from document")
 
             detected_language = await language_detection_service.detect_language(extracted_text, db)
+            logger.info(f"[LANG DEBUG] Detected language: {detected_language} for document: {file_name}")
 
             # Check if detected language is in user's preferred languages
             language_warning = None
@@ -99,6 +100,7 @@ class DocumentAnalysisService:
             )
 
             keyword_strings = [kw[0] for kw in keywords]
+            logger.info(f"[KEYWORD DEBUG] Extracted {len(keywords)} keywords in language: {detected_language}")
 
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,

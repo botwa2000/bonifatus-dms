@@ -157,11 +157,26 @@ class CategoryService {
     languageCode?: string
   ): Promise<KeywordListResponse> {
     // Only include language_code param if specified, otherwise backend returns ALL languages
-    return await apiClient.get<KeywordListResponse>(
+    console.log('[CategoryService DEBUG] getKeywords called:', {
+      categoryId,
+      languageCode,
+      languageCodeType: typeof languageCode,
+      isUndefined: languageCode === undefined,
+      isNull: languageCode === null
+    })
+    const params = languageCode ? { params: { language_code: languageCode } } : undefined
+    console.log('[CategoryService DEBUG] Request params:', params)
+
+    const result = await apiClient.get<KeywordListResponse>(
       `/api/v1/categories/${categoryId}/keywords`,
       true,
-      languageCode ? { params: { language_code: languageCode } } : undefined
+      params
     )
+    console.log('[CategoryService DEBUG] Response:', {
+      keywordCount: result.keywords?.length,
+      languages: result.keywords ? [...new Set(result.keywords.map(k => k.language_code))] : []
+    })
+    return result
   }
 
   async addKeyword(

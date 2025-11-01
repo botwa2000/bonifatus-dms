@@ -104,7 +104,7 @@ class ClassificationService:
             keyword_weights = {kw.keyword.lower(): kw.weight for kw in keywords}
 
             mode = "all languages" if is_multi_lingual else f"lang: {language}"
-            logger.debug(f"Loaded {len(keyword_weights)} keywords for category {category_id} ({mode})")
+            logger.info(f"[CLASSIFICATION DEBUG] Loaded {len(keyword_weights)} keywords for category {category_id} ({mode}), is_multi_lingual={is_multi_lingual}")
 
             return keyword_weights
 
@@ -192,6 +192,7 @@ class ClassificationService:
 
             for category in categories:
                 # For multi-lingual categories, load ALL keywords regardless of language
+                logger.info(f"[CLASSIFICATION DEBUG] Processing category {category.reference_key}, is_multi_lingual={category.is_multi_lingual}, requested_language={language}")
                 category_keywords = self.get_category_keywords(
                     db,
                     category.id,
@@ -200,6 +201,7 @@ class ClassificationService:
                 )
 
                 if not category_keywords:
+                    logger.info(f"[CLASSIFICATION DEBUG] No keywords found for category {category.reference_key}")
                     continue
 
                 score, matched_keywords = self.calculate_score(document_keywords, category_keywords)

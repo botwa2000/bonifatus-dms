@@ -386,35 +386,98 @@ def check_admin_users():
         db.close()
 
 
+def check_french_language_config():
+    """Check if French is properly configured in system settings"""
+    db = db_manager.session_local()
+    try:
+        print_separator("FRENCH LANGUAGE CONFIGURATION")
+
+        # Check supported_languages
+        result = db.execute(text("""
+            SELECT setting_value FROM system_settings
+            WHERE setting_key = 'supported_languages'
+        """))
+        row = result.fetchone()
+
+        print("\n  1. SUPPORTED LANGUAGES:")
+        if row:
+            langs = row[0]
+            print(f"     Current value: {langs}")
+            lang_list = langs.split(',')
+            if 'fr' in lang_list:
+                print("     ✅ French (fr) is included")
+            else:
+                print("     ❌ French (fr) is MISSING")
+        else:
+            print("     ❌ supported_languages setting not found")
+
+        # Check language_metadata
+        result = db.execute(text("""
+            SELECT setting_value FROM system_settings
+            WHERE setting_key = 'language_metadata'
+        """))
+        row = result.fetchone()
+
+        print("\n  2. LANGUAGE METADATA:")
+        if row:
+            import json
+            metadata = json.loads(row[0])
+            print(f"     Languages: {', '.join(metadata.keys())}")
+            if 'fr' in metadata:
+                print(f"     ✅ French metadata exists:")
+                print(f"        - Code: {metadata['fr']['code']}")
+                print(f"        - Name: {metadata['fr']['name']}")
+                print(f"        - Native: {metadata['fr']['native_name']}")
+            else:
+                print("     ❌ French metadata MISSING")
+        else:
+            print("     ❌ language_metadata setting not found")
+
+        # Check French translations for template categories
+        result = db.execute(text("""
+            SELECT c.reference_key, ct.name
+            FROM categories c
+            LEFT JOIN category_translations ct ON c.id = ct.category_id AND ct.language_code = 'fr'
+            WHERE c.user_id IS NULL
+            ORDER BY c.sort_order
+        """))
+        french_trans = result.fetchall()
+
+        print("\n  3. FRENCH CATEGORY TRANSLATIONS:")
+        missing_count = 0
+        for ref_key, name in french_trans:
+            if name:
+                print(f"     ✅ {ref_key}: {name}")
+            else:
+                print(f"     ❌ {ref_key}: MISSING")
+                missing_count += 1
+
+        if missing_count > 0:
+            print(f"\n     ⚠️  {missing_count} categories missing French translations")
+
+    finally:
+        db.close()
+
+
 def main():
     """Main function to run tests"""
     print("\n" + "=" * 70)
     print("  BONIFATUS DMS - DATABASE INSPECTION TOOL")
     print("=" * 70)
 
-    # Check migration 006 status
-    check_migration_006()
+    # Check French language configuration
+    check_french_language_config()
 
-    # NEW: Check category standardization (Migration 011)
-    check_category_standardization()
-
-    # NEW: Check per-user category architecture
-    check_per_user_architecture()
-
-    # Check admin users
-    check_admin_users()
-
-    # Check categories and keywords
-    check_categories_and_keywords()
-
-    # Check stop words
-    check_stop_words()
-
-    # Example: Search for specific keywords
-    print("\n")
-    search_keyword("rechnung", "de")
-    search_keyword("invoice", "en")
-    search_keyword("volksbank", "de")
+    # COMMENTED OUT - Uncomment to run full checks
+    # check_migration_006()
+    # check_category_standardization()
+    # check_per_user_architecture()
+    # check_admin_users()
+    # check_categories_and_keywords()
+    # check_stop_words()
+    # search_keyword("rechnung", "de")
+    # search_keyword("invoice", "en")
+    # search_keyword("volksbank", "de")
 
     print("\n" + "=" * 70)
     print("  INSPECTION COMPLETE")

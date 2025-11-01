@@ -124,7 +124,8 @@ export function CategoryForm({
       {/* Keywords Tab */}
       {activeTab === 'keywords' && category?.id && (
         <div>
-          <KeywordsManager categoryId={category.id} languageCode="en" />
+          {/* Remove languageCode prop to load ALL languages instead of just English */}
+          <KeywordsManager categoryId={category.id} />
           <div className="flex justify-end pt-4">
             <Button type="button" variant="secondary" onClick={onCancel}>
               Close

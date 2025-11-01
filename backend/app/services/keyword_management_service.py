@@ -37,6 +37,8 @@ class KeywordManagementService:
             List of keyword dictionaries with metadata
         """
         try:
+            logger.info(f"[KEYWORD MGMT DEBUG] list_keywords called: category_id={category_id}, language_code={language_code}")
+
             # Build query
             query = session.query(CategoryKeyword).filter(
                 CategoryKeyword.category_id == category_id
@@ -44,7 +46,10 @@ class KeywordManagementService:
 
             # Apply language filter if specified
             if language_code:
+                logger.info(f"[KEYWORD MGMT DEBUG] Filtering by language_code={language_code}")
                 query = query.filter(CategoryKeyword.language_code == language_code)
+            else:
+                logger.info(f"[KEYWORD MGMT DEBUG] No language filter - returning ALL languages")
 
             # Order by language, weight, keyword
             keywords = query.order_by(
@@ -52,6 +57,11 @@ class KeywordManagementService:
                 CategoryKeyword.weight.desc(),
                 CategoryKeyword.keyword
             ).all()
+
+            logger.info(f"[KEYWORD MGMT DEBUG] Found {len(keywords)} keywords")
+            if keywords:
+                languages_found = list(set(kw.language_code for kw in keywords))
+                logger.info(f"[KEYWORD MGMT DEBUG] Languages in result: {languages_found}")
 
             return [{
                 'id': str(keyword.id),
