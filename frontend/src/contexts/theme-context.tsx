@@ -2,6 +2,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { shouldLog } from '@/config/app.config'
 
 type Theme = 'light' | 'dark'
 
@@ -21,35 +22,55 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initializeTheme = async () => {
+      if (shouldLog('debug')) console.log('[THEME DEBUG] === Initializing Theme ===')
       setMounted(true)
 
       // Try to fetch theme from backend (for logged-in users)
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`, {
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
+        if (shouldLog('debug')) console.log('[THEME DEBUG] Fetching theme from backend:', url)
+
+        const response = await fetch(url, {
           credentials: 'include'
         })
+
+        if (shouldLog('debug')) {
+          console.log('[THEME DEBUG] Response status:', response.status)
+          console.log('[THEME DEBUG] Response ok:', response.ok)
+        }
+
         if (response.ok) {
           const data = await response.json()
+          if (shouldLog('debug')) console.log('[THEME DEBUG] Response data:', data)
+
           if (data.value === 'light' || data.value === 'dark') {
-            console.log('[THEME DEBUG] Loaded theme from backend:', data.value)
+            if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Loaded theme from backend:', data.value)
             setThemeState(data.value as Theme)
             applyTheme(data.value as Theme)
             localStorage.setItem('theme', data.value)
             return
+          } else {
+            if (shouldLog('debug')) console.log('[THEME DEBUG] ⚠️  Invalid theme value from backend:', data.value)
           }
+        } else {
+          if (shouldLog('debug')) console.log('[THEME DEBUG] ⚠️  Backend request failed with status:', response.status)
         }
       } catch (error) {
         // User not logged in or API error, fall back to localStorage
-        console.log('[THEME DEBUG] Could not fetch theme from backend, using localStorage')
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ❌ Could not fetch theme from backend:', error)
       }
 
       // Fallback to localStorage
+      if (shouldLog('debug')) console.log('[THEME DEBUG] Falling back to localStorage...')
       const localTheme = localStorage.getItem('theme') as Theme
+      if (shouldLog('debug')) console.log('[THEME DEBUG] localStorage theme:', localTheme)
 
       if (localTheme) {
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Using theme from localStorage:', localTheme)
         setThemeState(localTheme)
         applyTheme(localTheme)
       } else {
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ℹ️  No theme in localStorage, using default: light')
         const root = document.documentElement
         root.classList.add('light')
       }
@@ -66,27 +87,54 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   const setTheme = async (newTheme: Theme) => {
-    setThemeState(newTheme)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', newTheme)
+    if (shouldLog('debug')) {
+      console.log('[THEME DEBUG] === Setting Theme ===')
+      console.log('[THEME DEBUG] New theme:', newTheme)
     }
+
+    setThemeState(newTheme)
+
+    if (typeof window !== 'undefined') {
+      if (shouldLog('debug')) console.log('[THEME DEBUG] Saving to localStorage...')
+      localStorage.setItem('theme', newTheme)
+      if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Saved to localStorage')
+    }
+
+    if (shouldLog('debug')) console.log('[THEME DEBUG] Applying theme to DOM...')
     applyTheme(newTheme)
+    if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Applied to DOM')
 
     // Save to backend for logged-in users
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`, {
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
+      if (shouldLog('debug')) console.log('[THEME DEBUG] Saving to backend:', url)
+
+      const body = { value: newTheme }
+      if (shouldLog('debug')) console.log('[THEME DEBUG] Request body:', body)
+
+      const response = await fetch(url, {
         method: 'PUT',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ value: newTheme })
+        body: JSON.stringify(body)
       })
+
+      if (shouldLog('debug')) {
+        console.log('[THEME DEBUG] Response status:', response.status)
+        console.log('[THEME DEBUG] Response ok:', response.ok)
+      }
+
       if (response.ok) {
-        console.log('[THEME DEBUG] Saved theme to backend:', newTheme)
+        const data = await response.json()
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ✅✅✅ Saved theme to backend successfully:', data)
+      } else {
+        const errorText = await response.text()
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ❌ Backend save failed:', response.status, errorText)
       }
     } catch (error) {
-      console.log('[THEME DEBUG] Could not save theme to backend:', error)
+      if (shouldLog('debug')) console.log('[THEME DEBUG] ❌ Could not save theme to backend:', error)
     }
   }
 

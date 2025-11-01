@@ -95,9 +95,11 @@ class DocumentUploadService:
             primary_cat_id = category_ids_ordered[0]
             primary_category = session.query(Category).filter(Category.id == primary_cat_id).first()
             category_code = primary_category.category_code if primary_category else 'OTH'
+            logger.info(f"[FILENAME DEBUG] Primary category: {primary_category.reference_key if primary_category else 'None'}, code: {category_code}")
 
             # Get document date for filename (or None to use current timestamp)
             document_date = analysis_result.get('document_date')
+            logger.info(f"[FILENAME DEBUG] Document date: {document_date}")
 
             # Get user's timezone setting (default to UTC if not set)
             from app.database.models import UserSetting
@@ -108,9 +110,11 @@ class DocumentUploadService:
                 )
             ).first()
             user_timezone = timezone_setting.setting_value if timezone_setting else 'UTC'
+            logger.info(f"[FILENAME DEBUG] User timezone: {user_timezone}")
 
             # Get standardized filename (user may have edited it)
             if custom_filename:
+                logger.info(f"[FILENAME DEBUG] Using custom filename: {custom_filename}")
                 standardized_filename = custom_filename
             else:
                 standardized_filename = self._generate_standardized_filename(
@@ -119,6 +123,7 @@ class DocumentUploadService:
                     document_date=document_date,
                     user_timezone=user_timezone
                 )
+                logger.info(f"[FILENAME DEBUG] Generated standardized filename: {standardized_filename}")
             
             # Validate filename length
             max_length = await config_service.get_setting('max_filename_length', 200, session)

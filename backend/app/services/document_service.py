@@ -7,6 +7,7 @@ Business logic for document operations with database-driven configuration
 import logging
 import json
 import mimetypes
+import uuid
 from typing import Optional, Dict, Any, List, BinaryIO
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -337,7 +338,14 @@ class DocumentService:
         """Update document metadata"""
         session = db_manager.session_local()
         try:
-            document = session.get(Document, document_id)
+            # Convert string UUID to UUID object for session.get()
+            try:
+                doc_uuid = uuid.UUID(document_id)
+            except ValueError:
+                logger.warning(f"Invalid document ID format: {document_id}")
+                return None
+
+            document = session.get(Document, doc_uuid)
             if not document or document.user_id != user_id:
                 return None
 
@@ -375,43 +383,73 @@ class DocumentService:
 
     async def delete_document(self, document_id: str, user_id: str, ip_address: str = None) -> bool:
         """Delete document and remove from Google Drive"""
+        logger.info(f"[DELETE DEBUG] === Document Deletion Started ===")
+        logger.info(f"[DELETE DEBUG] Document ID (raw): {document_id}")
+        logger.info(f"[DELETE DEBUG] Document ID type: {type(document_id)}")
+        logger.info(f"[DELETE DEBUG] User ID: {user_id}")
+
         session = db_manager.session_local()
         try:
-            document = session.get(Document, document_id)
-            if not document or document.user_id != user_id:
+            # Convert string UUID to UUID object for session.get()
+            try:
+                doc_uuid = uuid.UUID(document_id)
+                logger.info(f"[DELETE DEBUG] Converted to UUID object: {doc_uuid}")
+                logger.info(f"[DELETE DEBUG] UUID type: {type(doc_uuid)}")
+            except ValueError as e:
+                logger.error(f"[DELETE DEBUG] ❌ Invalid document ID format: {document_id}, error: {e}")
+                return False
+
+            logger.info(f"[DELETE DEBUG] Querying document with UUID: {doc_uuid}")
+            document = session.get(Document, doc_uuid)
+
+            if not document:
+                logger.error(f"[DELETE DEBUG] ❌ Document not found in database: {doc_uuid}")
+                return False
+
+            logger.info(f"[DELETE DEBUG] ✅ Document found: {document.title}")
+            logger.info(f"[DELETE DEBUG] Document user_id: {document.user_id}, Request user_id: {user_id}")
+
+            if document.user_id != user_id:
+                logger.error(f"[DELETE DEBUG] ❌ User ID mismatch - document belongs to {document.user_id}, not {user_id}")
                 return False
 
             # Get user's Google Drive refresh token
+            logger.info(f"[DELETE DEBUG] Fetching user's Google Drive token...")
             user_result = session.execute(
                 text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
                 {'user_id': user_id}
             ).first()
 
             if user_result and user_result[0]:
+                logger.info(f"[DELETE DEBUG] User has Google Drive token, deleting from Drive...")
                 refresh_token_encrypted = user_result[0]
                 drive_success = drive_service.delete_document(
                     refresh_token_encrypted=refresh_token_encrypted,
                     drive_file_id=document.google_drive_file_id
                 )
                 if not drive_success:
-                    logger.warning(f"Failed to delete from Google Drive: {document.google_drive_file_id}")
+                    logger.warning(f"[DELETE DEBUG] ⚠️  Failed to delete from Google Drive: {document.google_drive_file_id}")
+                else:
+                    logger.info(f"[DELETE DEBUG] ✅ Deleted from Google Drive: {document.google_drive_file_id}")
             else:
-                logger.warning(f"User {user_id} has no Google Drive connection, skipping Drive deletion")
+                logger.warning(f"[DELETE DEBUG] ⚠️  User {user_id} has no Google Drive connection, skipping Drive deletion")
 
             old_values = {
                 "title": document.title,
                 "google_drive_file_id": document.google_drive_file_id
             }
 
+            logger.info(f"[DELETE DEBUG] Deleting document from database...")
             session.delete(document)
             session.commit()
+            logger.info(f"[DELETE DEBUG] ✅ Document deleted from database")
 
             await self._log_document_action(
                 user_id, "document_delete", "document", document_id,
                 old_values, {}, ip_address, session
             )
 
-            logger.info(f"Document deleted: {document_id}")
+            logger.info(f"[DELETE DEBUG] ✅✅✅ Document deletion completed successfully: {document_id}")
             return True
 
         except Exception as e:

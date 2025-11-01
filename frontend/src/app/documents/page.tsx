@@ -9,6 +9,7 @@ import { Button, Alert, Badge } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import { useEffect, useState, useCallback } from 'react'
+import { shouldLog } from '@/config/app.config'
 
 interface Category {
   id: string
@@ -142,11 +143,26 @@ export default function DocumentsPage() {
   }
 
   const handleDelete = async (documentId: string) => {
+    if (shouldLog('debug')) {
+      console.log('[DELETE DEBUG] === Frontend Delete Started ===')
+      console.log('[DELETE DEBUG] Document ID:', documentId)
+      console.log('[DELETE DEBUG] Document ID type:', typeof documentId)
+    }
+
     try {
-      await apiClient.delete(`/api/v1/documents/${documentId}`, true)
+      if (shouldLog('debug')) console.log('[DELETE DEBUG] Calling API delete endpoint:', `/api/v1/documents/${documentId}`)
+      const response = await apiClient.delete(`/api/v1/documents/${documentId}`, true)
+      if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅ Delete API response:', response)
+
       setDeletingDocument(null)
+      if (shouldLog('debug')) console.log('[DELETE DEBUG] Reloading documents list...')
       loadDocuments()
+      if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅✅✅ Delete completed successfully')
     } catch (err) {
+      if (shouldLog('debug')) {
+        console.error('[DELETE DEBUG] ❌ Delete failed:', err)
+        console.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
+      }
       setError('Failed to delete document')
       console.error('Delete error:', err)
     }

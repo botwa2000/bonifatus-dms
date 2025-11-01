@@ -163,24 +163,28 @@ async def get_localization_strings(
 @router.get("/theme")
 async def get_user_theme(current_user: User = Depends(get_current_active_user)) -> Dict[str, str]:
     """Get user's theme preference (light/dark)"""
+    logger.info(f"[THEME DEBUG] === GET Theme Request ===")
+    logger.info(f"[THEME DEBUG] User: {current_user.email} (ID: {current_user.id})")
+
     session = db_manager.session_local()
     try:
         stmt = select(UserSetting).where(
             UserSetting.user_id == current_user.id,
             UserSetting.setting_key == 'theme'
         )
+        logger.info(f"[THEME DEBUG] Querying user_settings for theme...")
         setting = session.execute(stmt).scalar_one_or_none()
 
         if setting:
-            logger.info(f"[THEME DEBUG] Loaded theme for user {current_user.email}: {setting.setting_value}")
+            logger.info(f"[THEME DEBUG] ✅ Found theme: '{setting.setting_value}'")
             return {"value": setting.setting_value}
 
         # Default to light theme
-        logger.info(f"[THEME DEBUG] No theme found for user {current_user.email}, returning default: light")
+        logger.info(f"[THEME DEBUG] ⚠️  No theme setting in DB, returning default: 'light'")
         return {"value": "light"}
 
     except Exception as e:
-        logger.error(f"Failed to get user theme: {e}")
+        logger.error(f"[THEME DEBUG] ❌ Error getting theme: {e}")
         return {"value": "light"}
     finally:
         session.close()
@@ -192,7 +196,12 @@ async def set_user_theme(
     current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, str]:
     """Set user's theme preference (light/dark)"""
+    logger.info(f"[THEME DEBUG] === PUT Theme Request ===")
+    logger.info(f"[THEME DEBUG] User: {current_user.email} (ID: {current_user.id})")
+    logger.info(f"[THEME DEBUG] Requested theme: '{theme.value}'")
+
     if theme.value not in ('light', 'dark'):
+        logger.error(f"[THEME DEBUG] ❌ Invalid theme value: '{theme.value}'")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Theme must be 'light' or 'dark'"
@@ -205,13 +214,16 @@ async def set_user_theme(
             UserSetting.user_id == current_user.id,
             UserSetting.setting_key == 'theme'
         )
+        logger.info(f"[THEME DEBUG] Checking if theme setting exists...")
         setting = session.execute(stmt).scalar_one_or_none()
 
         if setting:
             # Update existing
+            logger.info(f"[THEME DEBUG] Found existing setting, updating from '{setting.setting_value}' to '{theme.value}'")
             setting.setting_value = theme.value
         else:
             # Create new
+            logger.info(f"[THEME DEBUG] No existing setting, creating new with value '{theme.value}'")
             setting = UserSetting(
                 user_id=current_user.id,
                 setting_key='theme',
@@ -219,7 +231,9 @@ async def set_user_theme(
             )
             session.add(setting)
 
+        logger.info(f"[THEME DEBUG] Committing to database...")
         session.commit()
+        logger.info(f"[THEME DEBUG] ✅✅✅ Theme saved successfully: '{theme.value}'")
         logger.info(f"[THEME DEBUG] Saved theme for user {current_user.email}: {theme.value}")
         return {"value": theme.value, "message": "Theme saved successfully"}
 

@@ -4,10 +4,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
-import { Card, CardHeader, CardContent, Button, Alert, Badge, Input } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
 import AppHeader from '@/components/AppHeader'
+import { shouldLog } from '@/config/app.config'
 
 interface ErrorResponse {
   detail?: string
@@ -215,17 +216,21 @@ export default function BatchUploadPage() {
       }
 
       // Build upload states only for successful analyses
-      console.log('[UPLOAD DEBUG] ==== Analysis Results ====')
-      console.log(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
+      if (shouldLog('debug')) {
+        console.log('[UPLOAD DEBUG] ==== Analysis Results ====')
+        console.log(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
+      }
 
       const states: FileUploadState[] = result.results
         .filter((r: FileAnalysisResult): r is FileAnalysisSuccess => r.success)
         .map((r: FileAnalysisSuccess) => {
-          console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
-          console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
-          console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
-          console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id || 'None'}`)
-          console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
+          if (shouldLog('debug')) {
+            console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
+            console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
+            console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
+            console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+            console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
+          }
 
           return {
             ...r,
@@ -638,7 +643,7 @@ export default function BatchUploadPage() {
                                 const isPrimary = state.primary_category === category.id
 
                                 // Debug logging
-                                if (catIdx === 0) {
+                                if (catIdx === 0 && shouldLog('debug')) {
                                   console.log(`[CATEGORY DEBUG] File: ${state.original_filename}`)
                                   console.log(`[CATEGORY DEBUG] Selected categories:`, state.selected_categories)
                                   console.log(`[CATEGORY DEBUG] Primary category:`, state.primary_category)
@@ -655,11 +660,9 @@ export default function BatchUploadPage() {
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3 flex-1">
-                                        <input
-                                          type="checkbox"
+                                        <Checkbox
                                           checked={isSelected}
                                           onChange={() => {}}
-                                          className="w-4 h-4 rounded border-neutral-300 text-admin-primary focus:ring-1 focus:ring-admin-primary cursor-pointer"
                                         />
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2">

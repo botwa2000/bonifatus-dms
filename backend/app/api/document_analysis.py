@@ -79,11 +79,17 @@ async def analyze_document(
             )
 
         # Check for duplicates BEFORE expensive analysis (saves time and resources)
+        logger.info(f"[DUPLICATE DEBUG] === Checking for duplicate (single file) ===")
+        logger.info(f"[DUPLICATE DEBUG] Filename: {file.filename}")
+
         import hashlib
         from app.database.models import Document
         from sqlalchemy import and_
 
         file_hash = hashlib.sha256(file_content).hexdigest()
+        logger.info(f"[DUPLICATE DEBUG] File hash (SHA-256): {file_hash}")
+        logger.info(f"[DUPLICATE DEBUG] User ID: {current_user.id}")
+
         duplicate = session.query(Document).filter(
             and_(
                 Document.file_hash == file_hash,
@@ -93,7 +99,12 @@ async def analyze_document(
         ).first()
 
         if duplicate:
-            logger.warning(f"Duplicate file upload attempted: {file.filename} (hash: {file_hash[:16]}...)")
+            logger.warning(f"[DUPLICATE DEBUG] ❌ DUPLICATE FOUND!")
+            logger.warning(f"[DUPLICATE DEBUG] Existing document ID: {duplicate.id}")
+            logger.warning(f"[DUPLICATE DEBUG] Existing document title: {duplicate.title}")
+            logger.warning(f"[DUPLICATE DEBUG] Uploaded at: {duplicate.created_at}")
+            logger.warning(f"[DUPLICATE DEBUG] Returning 409 Conflict")
+
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
@@ -107,6 +118,8 @@ async def analyze_document(
                     }
                 }
             )
+
+        logger.info(f"[DUPLICATE DEBUG] ✅ No duplicate found, proceeding with analysis")
 
         # Get user's categories
         categories_response = await category_service.list_categories(
@@ -390,8 +403,50 @@ async def analyze_batch(
 
         # Process each file
         results = []
-        for file_data in files_data:
+        for idx, file_data in enumerate(files_data):
+            logger.info(f"[DUPLICATE DEBUG] === Processing file {idx+1}/{len(files_data)} ===")
             try:
+                # Check for duplicates BEFORE expensive analysis (saves time and resources)
+                logger.info(f"[DUPLICATE DEBUG] Filename: {file_data['filename']}")
+
+                import hashlib
+                from app.database.models import Document
+                from sqlalchemy import and_
+
+                file_hash = hashlib.sha256(file_data['content']).hexdigest()
+                logger.info(f"[DUPLICATE DEBUG] File hash: {file_hash}")
+                logger.info(f"[DUPLICATE DEBUG] User ID: {current_user.id}")
+
+                duplicate = session.query(Document).filter(
+                    and_(
+                        Document.file_hash == file_hash,
+                        Document.user_id == current_user.id,
+                        Document.is_deleted == False
+                    )
+                ).first()
+
+                if duplicate:
+                    logger.warning(f"[DUPLICATE DEBUG] ❌ DUPLICATE FOUND in batch!")
+                    logger.warning(f"[DUPLICATE DEBUG] Existing document: {duplicate.title} (ID: {duplicate.id})")
+                    logger.warning(f"[DUPLICATE DEBUG] Uploaded at: {duplicate.created_at}")
+
+                    # Return error for this specific file in the batch
+                    results.append({
+                        'success': False,
+                        'original_filename': file_data['filename'],
+                        'error': f"This document has already been uploaded as '{duplicate.title}' on {duplicate.created_at.strftime('%Y-%m-%d')}",
+                        'batch_id': batch_id,
+                        'duplicate_of': {
+                            'id': str(duplicate.id),
+                            'title': duplicate.title,
+                            'filename': duplicate.file_name,
+                            'uploaded_at': duplicate.created_at.isoformat()
+                        }
+                    })
+                    continue  # Skip analysis for this duplicate file
+
+                logger.info(f"[DUPLICATE DEBUG] ✅ No duplicate, proceeding with analysis")
+
                 # Analyze document
                 analysis_result = await document_analysis_service.analyze_document(
                     file_content=file_data['content'],
