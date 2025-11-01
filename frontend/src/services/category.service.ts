@@ -157,12 +157,10 @@ class CategoryService {
     languageCode?: string
   ): Promise<KeywordListResponse> {
     // Only include language_code param if specified, otherwise backend returns ALL languages
-    const params = languageCode ? { language_code: languageCode } : {}
-
     return await apiClient.get<KeywordListResponse>(
       `/api/v1/categories/${categoryId}/keywords`,
       true,
-      { params }
+      languageCode ? { params: { language_code: languageCode } } : undefined
     )
   }
 
