@@ -11,7 +11,7 @@ interface KeywordsManagerProps {
   languageCode?: string
 }
 
-export function KeywordsManager({ categoryId, languageCode = 'en' }: KeywordsManagerProps) {
+export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerProps) {
   const [keywords, setKeywords] = useState<CategoryKeyword[]>([])
   const [overlaps, setOverlaps] = useState<KeywordOverlap[]>([])
   const [loading, setLoading] = useState(true)
