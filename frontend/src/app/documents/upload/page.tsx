@@ -215,9 +215,20 @@ export default function BatchUploadPage() {
       }
 
       // Build upload states only for successful analyses
+      console.log('[UPLOAD DEBUG] ==== Analysis Results ====')
+      console.log(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
+
       const states: FileUploadState[] = result.results
         .filter((r: FileAnalysisResult): r is FileAnalysisSuccess => r.success)
-        .map((r: FileAnalysisSuccess) => ({
+        .map((r: FileAnalysisSuccess) => {
+          console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
+          console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
+          console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
+          console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id}`)
+          console.log(`[UPLOAD DEBUG]   - Suggested Category Name: ${(result.results.find((res: FileAnalysisResult) => res.success && res.original_filename === r.original_filename) as FileAnalysisSuccess)?.analysis?.suggested_category_name || 'N/A'}`)
+          console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence}%`)
+
+          return {
           ...r,
           file: selectedFiles.find(f => f.name === r.original_filename)!,
           selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],

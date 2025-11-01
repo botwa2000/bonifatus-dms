@@ -128,6 +128,7 @@ class ClassificationService:
             Tuple of (score, matched_keywords)
         """
         if not document_keywords or not category_keywords:
+            logger.debug(f"[SCORE DEBUG] Empty input: doc_kw={len(document_keywords)}, cat_kw={len(category_keywords)}")
             return 0.0, []
 
         document_keywords_lower = [kw.lower() for kw in document_keywords]
@@ -142,15 +143,17 @@ class ClassificationService:
                 matched_keywords.append(doc_keyword)
 
         if not matched_keywords:
+            logger.debug(f"[SCORE DEBUG] No keyword matches found")
             return 0.0, []
 
         avg_weight = total_weight / len(matched_keywords)
 
+        # Score formula: (matched_count * avg_weight) / total_doc_keywords
         score = (len(matched_keywords) * avg_weight) / len(document_keywords_lower)
 
         score = min(score, 1.0)
 
-        logger.debug(f"Score: {score:.2f}, Matched: {len(matched_keywords)}/{len(document_keywords_lower)}")
+        logger.debug(f"[SCORE DEBUG] Score={score:.3f}, Matched={len(matched_keywords)}/{len(document_keywords_lower)}, AvgWeight={avg_weight:.2f}, TotalWeight={total_weight:.2f}")
 
         return score, matched_keywords
 
@@ -177,6 +180,10 @@ class ClassificationService:
         try:
             from app.database.models import Category, CategoryTranslation
 
+            logger.info(f"[CLASSIFICATION DEBUG] === Starting classification ===")
+            logger.info(f"[CLASSIFICATION DEBUG] Document keywords ({len(document_keywords)}): {document_keywords[:10]}{'...' if len(document_keywords) > 10 else ''}")
+            logger.info(f"[CLASSIFICATION DEBUG] Language: {language}, User ID: {user_id}")
+
             query = db.query(Category).filter(Category.is_active == True)
 
             if user_id:
@@ -187,6 +194,7 @@ class ClassificationService:
                 query = query.filter(Category.is_system == True)
 
             categories = query.all()
+            logger.info(f"[CLASSIFICATION DEBUG] Found {len(categories)} active categories to check")
 
             results = []
 
@@ -204,6 +212,8 @@ class ClassificationService:
                     logger.info(f"[CLASSIFICATION DEBUG] No keywords found for category {category.reference_key}")
                     continue
 
+                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key} keywords ({len(category_keywords)}): {list(category_keywords.keys())[:10]}{'...' if len(category_keywords) > 10 else ''}")
+
                 score, matched_keywords = self.calculate_score(document_keywords, category_keywords)
 
                 translation = db.query(CategoryTranslation).filter(
@@ -213,13 +223,16 @@ class ClassificationService:
 
                 category_name = translation.name if translation else category.reference_key
 
-                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key}: score={score:.3f}, matched={len(matched_keywords)}/{len(document_keywords)}")
+                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key}: score={score:.3f}, matched={len(matched_keywords)}/{len(document_keywords)}, matched_kw={matched_keywords[:5]}{'...' if len(matched_keywords) > 5 else ''}")
 
                 results.append((category.id, category_name, score, matched_keywords))
 
             results.sort(key=lambda x: x[2], reverse=True)
 
-            logger.info(f"Classified document against {len(categories)} categories (lang: {language})")
+            logger.info(f"[CLASSIFICATION DEBUG] === Classification complete ===")
+            logger.info(f"[CLASSIFICATION DEBUG] Top 3 results:")
+            for i, (cat_id, cat_name, score, matched) in enumerate(results[:3], 1):
+                logger.info(f"[CLASSIFICATION DEBUG]   {i}. {cat_name}: {score:.3f} ({len(matched)} matches)")
 
             return results
 
@@ -242,28 +255,41 @@ class ClassificationService:
         Returns:
             Tuple of (category_id, category_name, score, matched_keywords) or None
         """
+        logger.info(f"[CLASSIFICATION DEBUG] === Selecting primary category ===")
+
         if not classification_results:
+            logger.info(f"[CLASSIFICATION DEBUG] No classification results to evaluate")
             return None
 
         config = self.get_classification_config(db)
         min_confidence = config['min_confidence']
         gap_threshold = config['gap_threshold']
 
+        logger.info(f"[CLASSIFICATION DEBUG] Thresholds: min_confidence={min_confidence}, gap_threshold={gap_threshold}")
+
         top_category = classification_results[0]
         top_score = top_category[2]
+        top_name = top_category[1]
+
+        logger.info(f"[CLASSIFICATION DEBUG] Top candidate: {top_name} with score {top_score:.3f}")
 
         if top_score < min_confidence:
-            logger.info(f"[CLASSIFICATION DEBUG] Top score {top_score:.3f} below minimum confidence {min_confidence}")
+            logger.info(f"[CLASSIFICATION DEBUG] REJECTED: Top score {top_score:.3f} below minimum confidence {min_confidence}")
             return None
 
         if len(classification_results) > 1:
-            second_score = classification_results[1][2]
+            second_category = classification_results[1]
+            second_score = second_category[2]
+            second_name = second_category[1]
             gap = top_score - second_score
 
+            logger.info(f"[CLASSIFICATION DEBUG] Second candidate: {second_name} with score {second_score:.3f}, gap={gap:.3f}")
+
             if gap < gap_threshold:
-                logger.info(f"Gap {gap:.2f} below threshold {gap_threshold}, ambiguous classification")
+                logger.info(f"[CLASSIFICATION DEBUG] REJECTED: Gap {gap:.3f} below threshold {gap_threshold}, ambiguous classification")
                 return None
 
+        logger.info(f"[CLASSIFICATION DEBUG] ACCEPTED: {top_name} as primary category")
         return top_category
 
     def get_other_category(
@@ -331,6 +357,9 @@ class ClassificationService:
             Returns OTHER category if no confident match and fallback_to_other=True
             Returns None only if fallback_to_other=False or OTHER category doesn't exist
         """
+        logger.info(f"[SUGGEST CATEGORY DEBUG] === Starting category suggestion ===")
+        logger.info(f"[SUGGEST CATEGORY DEBUG] Language: {language}, Fallback to OTHER: {fallback_to_other}")
+
         classification_results = self.classify_document(
             document_keywords,
             db,
@@ -341,15 +370,22 @@ class ClassificationService:
         primary_category = self.get_primary_category(classification_results, db)
 
         if primary_category:
-            logger.info(f"Suggested category: {primary_category[1]} ({primary_category[2]:.1%} confidence)")
+            logger.info(f"[SUGGEST CATEGORY DEBUG] ✅ Suggested category: {primary_category[1]} ({primary_category[2]:.1%} confidence)")
             return primary_category
 
         # No confident match found
-        logger.info("No confident category match found")
+        logger.info(f"[SUGGEST CATEGORY DEBUG] ⚠️  No confident category match found")
 
         if fallback_to_other:
-            return self.get_other_category(db, language)
+            logger.info(f"[SUGGEST CATEGORY DEBUG] Attempting fallback to OTHER category...")
+            other = self.get_other_category(db, language)
+            if other:
+                logger.info(f"[SUGGEST CATEGORY DEBUG] ✅ Fallback successful: {other[1]}")
+            else:
+                logger.error(f"[SUGGEST CATEGORY DEBUG] ❌ Fallback failed: OTHER category not found!")
+            return other
 
+        logger.info(f"[SUGGEST CATEGORY DEBUG] No fallback requested, returning None")
         return None
 
 

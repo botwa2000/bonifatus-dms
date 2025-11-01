@@ -181,6 +181,9 @@ class DocumentAnalysisService:
                 analysis_result['suggested_category_name'] = cat_name
                 analysis_result['classification_confidence'] = round(confidence * 100, 1)
                 analysis_result['matched_keywords'] = matched[:10]
+                logger.info(f"[ANALYSIS DEBUG] ✅ Suggested category: {cat_name} (confidence: {confidence:.1%}, matched: {len(matched)})")
+            else:
+                logger.warning(f"[ANALYSIS DEBUG] ⚠️  No category suggested for document (this should never happen if fallback_to_other=True)")
 
             logger.info(f"Document analyzed: {file_name}, language={detected_language}, keywords={len(keywords)}")
             return analysis_result

@@ -22,8 +22,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeTheme = async () => {
       setMounted(true)
+
+      // Try to fetch theme from backend (for logged-in users)
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`, {
+          credentials: 'include'
+        })
+        if (response.ok) {
+          const data = await response.json()
+          if (data.value === 'light' || data.value === 'dark') {
+            console.log('[THEME DEBUG] Loaded theme from backend:', data.value)
+            setThemeState(data.value as Theme)
+            applyTheme(data.value as Theme)
+            localStorage.setItem('theme', data.value)
+            return
+          }
+        }
+      } catch (error) {
+        // User not logged in or API error, fall back to localStorage
+        console.log('[THEME DEBUG] Could not fetch theme from backend, using localStorage')
+      }
+
+      // Fallback to localStorage
       const localTheme = localStorage.getItem('theme') as Theme
-      
+
       if (localTheme) {
         setThemeState(localTheme)
         applyTheme(localTheme)
@@ -32,7 +54,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.classList.add('light')
       }
     }
-    
+
     initializeTheme()
   }, [])
 
@@ -43,12 +65,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.add(newTheme)
   }
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = async (newTheme: Theme) => {
     setThemeState(newTheme)
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme)
     }
     applyTheme(newTheme)
+
+    // Save to backend for logged-in users
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ value: newTheme })
+      })
+      if (response.ok) {
+        console.log('[THEME DEBUG] Saved theme to backend:', newTheme)
+      }
+    } catch (error) {
+      console.log('[THEME DEBUG] Could not save theme to backend:', error)
+    }
   }
 
   if (!mounted) {
