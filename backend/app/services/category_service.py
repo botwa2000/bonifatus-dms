@@ -574,7 +574,15 @@ class CategoryService:
 
             logger.info(f"Found {len(user_documents)} documents to remap for user {user_id}")
 
-            # Step 4: Copy template categories to user's workspace
+            # Step 4: Delete ALL old user categories FIRST (to avoid unique constraint violation)
+            deleted_count = 0
+            for cat in user_categories:
+                session.delete(cat)
+                deleted_count += 1
+
+            session.flush()  # Apply deletes before creating new ones
+
+            # Step 5: Copy template categories to user's workspace
             new_category_map = {}  # reference_key -> new_category_id
             created_names = []
 
@@ -637,7 +645,7 @@ class CategoryService:
 
             session.flush()
 
-            # Step 5: Smart document remapping
+            # Step 6: Smart document remapping (old categories already deleted)
             documents_remapped = 0
             documents_moved_to_other = 0
             other_category_id = new_category_map.get('OTH')  # "Other" category
@@ -663,12 +671,6 @@ class CategoryService:
                     # Orphaned document: move to "Other"
                     doc.category_id = other_category_id
                     documents_moved_to_other += 1
-
-            # Step 6: Delete ALL old user categories
-            deleted_count = 0
-            for cat in user_categories:
-                session.delete(cat)
-                deleted_count += 1
 
             session.commit()
 
