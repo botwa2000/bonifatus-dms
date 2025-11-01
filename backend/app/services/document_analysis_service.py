@@ -94,7 +94,8 @@ class DocumentAnalysisService:
                 text=extracted_text,
                 db=db,
                 language=detected_language,
-                max_keywords=50
+                max_keywords=50,
+                user_id=user_id  # Enable category-aware extraction
             )
 
             keyword_strings = [kw[0] for kw in keywords]

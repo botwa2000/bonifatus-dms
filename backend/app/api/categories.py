@@ -365,11 +365,14 @@ async def get_category_documents_count(
 )
 async def list_category_keywords(
     category_id: str,
-    language_code: str = 'en',
+    language_code: str = None,
     current_user: User = Depends(get_current_active_user)
 ) -> KeywordListResponse:
     """
-    Get all keywords for a category in specified language
+    Get all keywords for a category, optionally filtered by language
+
+    If language_code is not specified, returns keywords in ALL languages.
+    This allows the UI to display multi-language keywords properly.
 
     Returns list of keywords with weights, match statistics, and system flag.
     """

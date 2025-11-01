@@ -21,27 +21,37 @@ class KeywordManagementService:
     def list_keywords(
         self,
         category_id: str,
-        language_code: str,
-        session: Session
+        language_code: Optional[str] = None,
+        session: Session = None
     ) -> List[Dict]:
         """
-        Get all keywords for a category in specified language
+        Get all keywords for a category, optionally filtered by language
 
         Args:
             category_id: Category UUID
-            language_code: Language code (e.g., 'en', 'de', 'ru')
+            language_code: Optional language code filter (e.g., 'en', 'de', 'ru').
+                          If None, returns keywords in ALL languages.
             session: Database session
 
         Returns:
             List of keyword dictionaries with metadata
         """
         try:
-            keywords = session.query(CategoryKeyword).filter(
-                and_(
-                    CategoryKeyword.category_id == category_id,
-                    CategoryKeyword.language_code == language_code
-                )
-            ).order_by(CategoryKeyword.weight.desc(), CategoryKeyword.keyword).all()
+            # Build query
+            query = session.query(CategoryKeyword).filter(
+                CategoryKeyword.category_id == category_id
+            )
+
+            # Apply language filter if specified
+            if language_code:
+                query = query.filter(CategoryKeyword.language_code == language_code)
+
+            # Order by language, weight, keyword
+            keywords = query.order_by(
+                CategoryKeyword.language_code,
+                CategoryKeyword.weight.desc(),
+                CategoryKeyword.keyword
+            ).all()
 
             return [{
                 'id': str(keyword.id),

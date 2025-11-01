@@ -177,17 +177,24 @@ class KeywordExtractionService:
         db: Session,
         language: str = 'en',
         max_keywords: int = 50,
-        min_frequency: int = 1
+        min_frequency: int = 1,
+        user_id: str = None
     ) -> List[Tuple[str, int, float]]:
         """
-        Extract keywords from text using frequency analysis
+        Extract keywords using HYBRID approach:
+        1. Category-aware: Extract ANY word matching category keywords (high priority)
+        2. Frequency-based: Extract top frequent words (medium priority)
+
+        This ensures important classification terms like "rechnung", "invoice" are
+        ALWAYS extracted even if they appear only once.
 
         Args:
             text: Document text
-            db: Database session for loading stop words
+            db: Database session for loading stop words and category keywords
             language: Language code for stop word filtering
             max_keywords: Maximum number of keywords to return
             min_frequency: Minimum frequency for a keyword
+            user_id: User ID to get their category keywords
 
         Returns:
             List of tuples (keyword, frequency, relevance_score)
@@ -199,11 +206,8 @@ class KeywordExtractionService:
                 return []
 
             stop_words = self.get_stop_words(db, language)
-
             normalized_text = self.normalize_text(text)
-
             tokens = self.tokenize(normalized_text)
-
             filtered_tokens = self.filter_tokens(tokens, stop_words)
 
             if not filtered_tokens:
@@ -211,12 +215,43 @@ class KeywordExtractionService:
                 return []
 
             frequency = Counter(filtered_tokens)
-
             total_tokens = len(filtered_tokens)
             max_freq = max(frequency.values())
 
+            # STEP 1: Get all category keywords for this user/language (for matching)
+            category_keywords_set = set()
+            if user_id:
+                from sqlalchemy import text as sql_text
+                result = db.execute(sql_text("""
+                    SELECT DISTINCT LOWER(ck.keyword)
+                    FROM category_keywords ck
+                    JOIN categories c ON ck.category_id = c.id
+                    WHERE c.user_id = :user_id
+                    AND ck.language_code = :lang
+                """), {'user_id': user_id, 'lang': language})
+                category_keywords_set = {row[0] for row in result}
+                logger.info(f"Loaded {len(category_keywords_set)} category keywords for matching")
+
+            # STEP 2: Extract keywords with priority scoring
             keywords = []
+            extracted_words = set()
+
+            # Priority 1: Words that match category keywords (even if freq=1)
+            for word in frequency:
+                if word in category_keywords_set:
+                    count = frequency[word]
+                    relevance = (count / max_freq) * 100
+                    # Boost relevance for category matches
+                    relevance = min(relevance * 1.5, 100.0)
+                    keywords.append((word, count, relevance))
+                    extracted_words.add(word)
+
+            # Priority 2: Top frequent words (up to max_keywords, skip already extracted)
             for word, count in frequency.most_common(max_keywords):
+                # Skip if already extracted as category keyword
+                if word in extracted_words:
+                    continue
+
                 # Defensive validation with detailed logging
                 if not word or not isinstance(word, str):
                     logger.warning(f"Skipping keyword with invalid word: word={repr(word)}, type={type(word).__name__}, count={count}")
@@ -234,8 +269,12 @@ class KeywordExtractionService:
                     continue
 
                 keywords.append((word, count, relevance))
+                extracted_words.add(word)
 
-            logger.info(f"Extracted {len(keywords)} keywords from {total_tokens} tokens (lang: {language})")
+            # Sort by relevance (category keywords will be highest due to 1.5x boost)
+            keywords.sort(key=lambda x: x[2], reverse=True)
+
+            logger.info(f"Extracted {len(keywords)} keywords from {total_tokens} tokens (lang: {language}, category_matches: {len([k for k in keywords if k[2] > 100])})")
 
             return keywords
 
