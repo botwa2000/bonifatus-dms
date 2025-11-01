@@ -525,13 +525,15 @@ export default function BatchUploadPage() {
                             {/* Display language warning if present */}
                             {state.analysis?.language_warning && (
                               <div className="mt-2">
-                                <Alert type="warning">
-                                  <span>{state.analysis.language_warning.split('visit settings')[0]}</span>
-                                  <a href="/settings" className="underline hover:text-yellow-800 font-medium">
-                                    visit settings
-                                  </a>
-                                  <span>{state.analysis.language_warning.split('visit settings')[1] || ''}</span>
-                                </Alert>
+                                <div className="rounded-lg border p-4 bg-yellow-50 border-yellow-200 text-yellow-800">
+                                  <p className="text-sm">
+                                    <span>{state.analysis.language_warning.split('visit settings')[0]}</span>
+                                    <a href="/settings" className="underline hover:text-yellow-900 font-medium">
+                                      visit settings
+                                    </a>
+                                    <span>{state.analysis.language_warning.split('visit settings')[1] || ''}</span>
+                                  </p>
+                                </div>
                               </div>
                             )}
                           </div>
