@@ -224,9 +224,8 @@ export default function BatchUploadPage() {
           console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
           console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
           console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
-          console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id}`)
-          console.log(`[UPLOAD DEBUG]   - Suggested Category Name: ${(result.results.find((res: FileAnalysisResult) => res.success && res.original_filename === r.original_filename) as FileAnalysisSuccess)?.analysis?.suggested_category_name || 'N/A'}`)
-          console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence}%`)
+          console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+          console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
 
           return {
             ...r,
