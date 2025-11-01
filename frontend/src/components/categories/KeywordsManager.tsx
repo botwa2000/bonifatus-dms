@@ -159,7 +159,8 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
 
       {/* Keywords Table */}
       <div className="border border-neutral-200 rounded-md overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="max-h-96 overflow-y-auto">
+          <table className="w-full text-sm">
           <thead className="bg-neutral-50 border-b border-neutral-200">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-neutral-700">Keyword</th>
@@ -245,6 +246,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Add Keyword Section */}

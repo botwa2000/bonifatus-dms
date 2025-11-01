@@ -32,8 +32,8 @@ class ClassificationService:
             import json
 
             defaults = {
-                'min_confidence': 0.6,
-                'gap_threshold': 0.2,
+                'min_confidence': 0.10,  # Lowered from 0.6 to 0.10 for better multi-language support
+                'gap_threshold': 0.15,   # Lowered from 0.2 to 0.15
                 'weight_boost_correct': 0.1,
                 'weight_penalty_incorrect': 0.05,
                 'weight_min': 0.1,
@@ -213,6 +213,8 @@ class ClassificationService:
 
                 category_name = translation.name if translation else category.reference_key
 
+                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key}: score={score:.3f}, matched={len(matched_keywords)}/{len(document_keywords)}")
+
                 results.append((category.id, category_name, score, matched_keywords))
 
             results.sort(key=lambda x: x[2], reverse=True)
@@ -251,7 +253,7 @@ class ClassificationService:
         top_score = top_category[2]
 
         if top_score < min_confidence:
-            logger.info(f"Top score {top_score:.2f} below minimum confidence {min_confidence}")
+            logger.info(f"[CLASSIFICATION DEBUG] Top score {top_score:.3f} below minimum confidence {min_confidence}")
             return None
 
         if len(classification_results) > 1:
@@ -282,12 +284,13 @@ class ClassificationService:
         try:
             from app.database.models import Category, CategoryTranslation
 
+            # Fixed: reference_key is 'OTH' not 'category.other'
             other_category = db.query(Category).filter(
-                Category.reference_key == 'category.other'
+                Category.reference_key == 'OTH'
             ).first()
 
             if not other_category:
-                logger.error("OTHER category not found in database")
+                logger.error("OTHER category not found in database (looking for reference_key='OTH')")
                 return None
 
             translation = db.query(CategoryTranslation).filter(
@@ -297,7 +300,7 @@ class ClassificationService:
 
             category_name = translation.name if translation else "Other"
 
-            logger.info(f"Falling back to OTHER category: {category_name}")
+            logger.info(f"[FALLBACK DEBUG] Falling back to OTHER category: {category_name} (lang: {language})")
             return (other_category.id, category_name, 0.0, [])
 
         except Exception as e:
