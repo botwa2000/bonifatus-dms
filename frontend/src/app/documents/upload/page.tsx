@@ -637,6 +637,13 @@ export default function BatchUploadPage() {
                                 const isSelected = state.selected_categories.includes(category.id)
                                 const isPrimary = state.primary_category === category.id
 
+                                // Debug logging
+                                if (catIdx === 0) {
+                                  console.log(`[CATEGORY DEBUG] File: ${state.original_filename}`)
+                                  console.log(`[CATEGORY DEBUG] Selected categories:`, state.selected_categories)
+                                  console.log(`[CATEGORY DEBUG] Primary category:`, state.primary_category)
+                                }
+
                                 return (
                                   <div
                                     key={category.id}

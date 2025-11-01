@@ -4,33 +4,45 @@
  * Professional document management system homepage
  */
 
+'use client'
+
 import Link from 'next/link'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function HomePage() {
+  const { user } = useAuth()
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
       <nav className="bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <Link href="/" className="flex items-center">
               <div className="h-8 w-8 bg-admin-primary rounded-lg flex items-center justify-center">
                 <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <span className="ml-3 text-xl font-bold text-neutral-900">Bonifatus DMS</span>
-            </div>
-            
+            </Link>
+
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/" className="text-neutral-700 hover:text-admin-primary font-medium">Home</Link>
               <Link href="/about" className="text-neutral-600 hover:text-admin-primary">About</Link>
               <Link href="/features" className="text-neutral-600 hover:text-admin-primary">Features</Link>
               <Link href="/pricing" className="text-neutral-600 hover:text-admin-primary">Pricing</Link>
               <Link href="/contact" className="text-neutral-600 hover:text-admin-primary">Contact</Link>
-              <GoogleLoginButton size="sm">Sign In</GoogleLoginButton>
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="text-neutral-600 hover:text-admin-primary">Dashboard</Link>
+                  <Link href="/profile" className="text-neutral-600 hover:text-admin-primary">Profile</Link>
+                </>
+              ) : (
+                <GoogleLoginButton size="sm">Sign In</GoogleLoginButton>
+              )}
             </div>
 
             <div className="md:hidden">

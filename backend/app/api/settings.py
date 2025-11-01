@@ -157,6 +157,83 @@ async def get_localization_strings(
     finally:
         session.close()
 
+
+# User-specific settings endpoints (must be BEFORE /{setting_key} catch-all)
+
+@router.get("/theme")
+async def get_user_theme(current_user: User = Depends(get_current_active_user)) -> Dict[str, str]:
+    """Get user's theme preference (light/dark)"""
+    session = db_manager.session_local()
+    try:
+        stmt = select(UserSetting).where(
+            UserSetting.user_id == current_user.id,
+            UserSetting.setting_key == 'theme'
+        )
+        setting = session.execute(stmt).scalar_one_or_none()
+
+        if setting:
+            logger.info(f"[THEME DEBUG] Loaded theme for user {current_user.email}: {setting.setting_value}")
+            return {"value": setting.setting_value}
+
+        # Default to light theme
+        logger.info(f"[THEME DEBUG] No theme found for user {current_user.email}, returning default: light")
+        return {"value": "light"}
+
+    except Exception as e:
+        logger.error(f"Failed to get user theme: {e}")
+        return {"value": "light"}
+    finally:
+        session.close()
+
+
+@router.put("/theme")
+async def set_user_theme(
+    theme: ThemePreference,
+    current_user: User = Depends(get_current_active_user)
+) -> Dict[str, str]:
+    """Set user's theme preference (light/dark)"""
+    if theme.value not in ('light', 'dark'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Theme must be 'light' or 'dark'"
+        )
+
+    session = db_manager.session_local()
+    try:
+        # Check if setting exists
+        stmt = select(UserSetting).where(
+            UserSetting.user_id == current_user.id,
+            UserSetting.setting_key == 'theme'
+        )
+        setting = session.execute(stmt).scalar_one_or_none()
+
+        if setting:
+            # Update existing
+            setting.setting_value = theme.value
+        else:
+            # Create new
+            setting = UserSetting(
+                user_id=current_user.id,
+                setting_key='theme',
+                setting_value=theme.value
+            )
+            session.add(setting)
+
+        session.commit()
+        logger.info(f"[THEME DEBUG] Saved theme for user {current_user.email}: {theme.value}")
+        return {"value": theme.value, "message": "Theme saved successfully"}
+
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to save user theme: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save theme preference"
+        )
+    finally:
+        session.close()
+
+
 @router.get(
     "/{setting_key}",
     responses={
@@ -262,81 +339,6 @@ async def get_all_localizations() -> Dict[str, LocalizationResponse]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve localization strings"
-        )
-    finally:
-        session.close()
-
-# User-specific settings endpoints
-
-@router.get("/theme")
-async def get_user_theme(current_user: User = Depends(get_current_active_user)) -> Dict[str, str]:
-    """Get user's theme preference (light/dark)"""
-    session = db_manager.session_local()
-    try:
-        stmt = select(UserSetting).where(
-            UserSetting.user_id == current_user.id,
-            UserSetting.setting_key == 'theme'
-        )
-        setting = session.execute(stmt).scalar_one_or_none()
-
-        if setting:
-            logger.info(f"[THEME DEBUG] Loaded theme for user {current_user.email}: {setting.setting_value}")
-            return {"value": setting.setting_value}
-        
-        # Default to light theme
-        logger.info(f"[THEME DEBUG] No theme found for user {current_user.email}, returning default: light")
-        return {"value": "light"}
-
-    except Exception as e:
-        logger.error(f"Failed to get user theme: {e}")
-        return {"value": "light"}
-    finally:
-        session.close()
-
-
-@router.put("/theme")
-async def set_user_theme(
-    theme: ThemePreference,
-    current_user: User = Depends(get_current_active_user)
-) -> Dict[str, str]:
-    """Set user's theme preference (light/dark)"""
-    if theme.value not in ('light', 'dark'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Theme must be 'light' or 'dark'"
-        )
-
-    session = db_manager.session_local()
-    try:
-        # Check if setting exists
-        stmt = select(UserSetting).where(
-            UserSetting.user_id == current_user.id,
-            UserSetting.setting_key == 'theme'
-        )
-        setting = session.execute(stmt).scalar_one_or_none()
-
-        if setting:
-            # Update existing
-            setting.setting_value = theme.value
-        else:
-            # Create new
-            setting = UserSetting(
-                user_id=current_user.id,
-                setting_key='theme',
-                setting_value=theme.value
-            )
-            session.add(setting)
-
-        session.commit()
-        logger.info(f"[THEME DEBUG] Saved theme for user {current_user.email}: {theme.value}")
-        return {"value": theme.value, "message": "Theme saved successfully"}
-
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Failed to save user theme: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save theme preference"
         )
     finally:
         session.close()
