@@ -86,7 +86,7 @@ class Category(Base, TimestampMixin):
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    reference_key = Column(String(100), unique=True, nullable=False, index=True)
+    reference_key = Column(String(100), nullable=False, index=True)  # No unique=True - handled by composite constraint
     category_code = Column(String(3), nullable=False, index=True)
     color_hex = Column(String(7), nullable=False, default="#6B7280")
     icon_name = Column(String(50), nullable=False, default="folder")
@@ -109,6 +109,10 @@ class Category(Base, TimestampMixin):
         Index('idx_category_reference_key', 'reference_key'),
         Index('idx_category_code', 'category_code'),
         Index('idx_category_user_code_unique', 'user_id', 'category_code', unique=True, postgresql_where=sa.text('user_id IS NOT NULL')),
+        # Composite unique constraint on (reference_key, user_id) - allows each user to have their own copy
+        # Templates have user_id=NULL, users have specific UUIDs
+        # NOTE: Actual constraint created by migration 012 using COALESCE to handle NULL properly:
+        # CREATE UNIQUE INDEX ix_categories_reference_key_user ON categories (reference_key, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
     )
 
 

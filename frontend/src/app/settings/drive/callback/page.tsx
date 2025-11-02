@@ -14,11 +14,19 @@ function DriveCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('[DRIVE CALLBACK DEBUG] === Drive OAuth Callback Started ===')
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const error = searchParams.get('error')
 
+      console.log('[DRIVE CALLBACK DEBUG] OAuth params:', {
+        hasCode: !!code,
+        hasState: !!state,
+        error
+      })
+
       if (error) {
+        console.error('[DRIVE CALLBACK DEBUG] OAuth error from Google:', error)
         setStatus('error')
         setMessage(`Authentication failed: ${error}`)
         setTimeout(() => router.push('/settings'), 3000)
@@ -26,6 +34,7 @@ function DriveCallbackContent() {
       }
 
       if (!code || !state) {
+        console.error('[DRIVE CALLBACK DEBUG] Missing OAuth parameters')
         setStatus('error')
         setMessage('Missing authentication parameters')
         setTimeout(() => router.push('/settings'), 3000)
@@ -37,6 +46,7 @@ function DriveCallbackContent() {
 
       // Check if already processed (prevents duplicate processing)
       if (processingRef.current || sessionStorage.getItem(attemptKey)) {
+        console.log('[DRIVE CALLBACK DEBUG] Already processing or processed, skipping')
         return
       }
 
@@ -44,6 +54,7 @@ function DriveCallbackContent() {
       processingRef.current = true
       sessionStorage.setItem(attemptKey, 'true')
 
+      console.log('[DRIVE CALLBACK DEBUG] Calling backend /api/v1/users/drive/callback')
       try {
         // Complete OAuth flow by calling backend
         const result = await apiClient.post<{ success: boolean; message: string }>(
@@ -53,7 +64,10 @@ function DriveCallbackContent() {
           { params: { code, state } }
         )
 
+        console.log('[DRIVE CALLBACK DEBUG] Backend response:', result)
+
         if (result.success) {
+          console.log('[DRIVE CALLBACK DEBUG] ✅ Drive connected successfully')
           setStatus('success')
           setMessage('Google Drive connected successfully!')
           // Use router.push for client-side navigation
@@ -62,12 +76,19 @@ function DriveCallbackContent() {
           }, 2000)
           // Don't remove attemptKey - component will unmount during redirect
         } else {
+          console.error('[DRIVE CALLBACK DEBUG] ❌ Backend returned failure:', result.message)
           setStatus('error')
           setMessage(result.message || 'Failed to connect Drive')
           sessionStorage.removeItem(attemptKey)
           setTimeout(() => router.push('/settings'), 3000)
         }
       } catch (error) {
+        console.error('[DRIVE CALLBACK DEBUG] ❌ API call failed:', error)
+        console.error('[DRIVE CALLBACK DEBUG] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown',
+          type: error?.constructor?.name,
+          error
+        })
         setStatus('error')
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
         setMessage(errorMessage)
