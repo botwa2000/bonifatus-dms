@@ -184,7 +184,7 @@ export default function DocumentDetailPage() {
       case 'failed':
         return 'error'
       default:
-        return 'neutral'
+        return 'default'
     }
   }
 
