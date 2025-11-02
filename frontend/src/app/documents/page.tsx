@@ -80,12 +80,6 @@ export default function DocumentsPage() {
     }
   }, [isAuthenticated])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadDocuments()
-    }
-  }, [isAuthenticated, loadDocuments])
-
   const loadCategories = async () => {
     try {
       const data = await apiClient.get<{ categories: Category[] }>('/api/v1/categories', true)
@@ -125,6 +119,13 @@ export default function DocumentsPage() {
       setIsLoading(false)
     }
   }, [currentPage, searchQuery, selectedCategory, sortField, sortDirection])
+
+  // Load documents when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDocuments()
+    }
+  }, [isAuthenticated, loadDocuments])
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
