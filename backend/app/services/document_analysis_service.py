@@ -91,16 +91,37 @@ class DocumentAnalysisService:
                             f"preferred document languages. You can add it in Settings."
                         )
 
-            keywords = keyword_extraction_service.extract_keywords(
-                text=extracted_text,
-                db=db,
-                language=detected_language,
-                max_keywords=50,
-                user_id=user_id  # Enable category-aware extraction
-            )
+            # MULTI-LANGUAGE CLASSIFICATION FIX:
+            # Extract keywords across ALL user's preferred languages, not just detected language
+            # This ensures German docs are matched against German keywords even if detected as EN
+            user_preferred_languages = [detected_language]
+            if user_id:
+                from app.database.models import User
+                user = db.get(User, UUID(user_id))
+                if user and user.preferred_doc_languages:
+                    user_preferred_languages = user.preferred_doc_languages
+                    logger.info(f"[MULTI-LANG DEBUG] User preferred doc languages: {user_preferred_languages}")
 
-            keyword_strings = [kw[0] for kw in keywords]
-            logger.info(f"[KEYWORD DEBUG] Extracted {len(keywords)} keywords in language: {detected_language}")
+            # Extract keywords in ALL user's preferred languages
+            all_keywords_tuples = []  # For response
+            all_keywords_strings = set()  # For classification
+
+            for lang in user_preferred_languages:
+                lang_keywords = keyword_extraction_service.extract_keywords(
+                    text=extracted_text,
+                    db=db,
+                    language=lang,
+                    max_keywords=50,
+                    user_id=user_id
+                )
+                lang_keyword_strings = [kw[0] for kw in lang_keywords]
+                all_keywords_strings.update(lang_keyword_strings)
+                all_keywords_tuples.extend(lang_keywords)  # Keep tuples for response
+                logger.info(f"[MULTI-LANG DEBUG] Extracted {len(lang_keyword_strings)} keywords in {lang}: {lang_keyword_strings[:5]}{'...' if len(lang_keyword_strings) > 5 else ''}")
+
+            keyword_strings = list(all_keywords_strings)
+            keywords = all_keywords_tuples  # For response validation below
+            logger.info(f"[KEYWORD DEBUG] Total unique keywords across all languages: {len(keyword_strings)}")
 
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
@@ -111,6 +132,7 @@ class DocumentAnalysisService:
             # Convert user_id string to UUID for classification service
             user_uuid = UUID(user_id) if user_id else None
 
+            # Classify using multi-language keywords
             suggested_category = classification_service.suggest_category(
                 document_keywords=keyword_strings,
                 db=db,
