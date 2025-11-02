@@ -25,54 +25,50 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (shouldLog('debug')) console.log('[THEME DEBUG] === Initializing Theme ===')
       setMounted(true)
 
-      // Try to fetch theme from backend (for logged-in users)
+      // Load from localStorage first (instant, no API call)
+      const localTheme = localStorage.getItem('theme') as Theme
+      if (shouldLog('debug')) console.log('[THEME DEBUG] localStorage theme:', localTheme)
+
+      if (localTheme && (localTheme === 'light' || localTheme === 'dark')) {
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Using theme from localStorage:', localTheme)
+        setThemeState(localTheme)
+        applyTheme(localTheme)
+      } else {
+        // No valid theme in localStorage, use default
+        if (shouldLog('debug')) console.log('[THEME DEBUG] ℹ️  No theme in localStorage, using default: light')
+        setThemeState('light')
+        applyTheme('light')
+      }
+
+      // Then try to sync with backend (only for logged-in users)
+      // This will silently fail with 401 if user is not logged in - that's expected
       try {
         const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
-        if (shouldLog('debug')) console.log('[THEME DEBUG] Fetching theme from backend:', url)
+        if (shouldLog('debug')) console.log('[THEME DEBUG] Syncing theme from backend:', url)
 
         const response = await fetch(url, {
           credentials: 'include'
         })
 
-        if (shouldLog('debug')) {
-          console.log('[THEME DEBUG] Response status:', response.status)
-          console.log('[THEME DEBUG] Response ok:', response.ok)
-        }
-
+        // Only update if we get a successful response (user is logged in)
         if (response.ok) {
           const data = await response.json()
-          if (shouldLog('debug')) console.log('[THEME DEBUG] Response data:', data)
+          if (shouldLog('debug')) console.log('[THEME DEBUG] Backend response:', data)
 
           if (data.value === 'light' || data.value === 'dark') {
-            if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Loaded theme from backend:', data.value)
-            setThemeState(data.value as Theme)
-            applyTheme(data.value as Theme)
-            localStorage.setItem('theme', data.value)
-            return
-          } else {
-            if (shouldLog('debug')) console.log('[THEME DEBUG] ⚠️  Invalid theme value from backend:', data.value)
+            // Update if backend theme is different from localStorage
+            if (data.value !== localTheme) {
+              if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Syncing theme from backend:', data.value)
+              setThemeState(data.value as Theme)
+              applyTheme(data.value as Theme)
+              localStorage.setItem('theme', data.value)
+            }
           }
-        } else {
-          if (shouldLog('debug')) console.log('[THEME DEBUG] ⚠️  Backend request failed with status:', response.status)
         }
+        // Silently ignore 401/403 errors (user not logged in - expected)
       } catch (error) {
-        // User not logged in or API error, fall back to localStorage
-        if (shouldLog('debug')) console.log('[THEME DEBUG] ❌ Could not fetch theme from backend:', error)
-      }
-
-      // Fallback to localStorage
-      if (shouldLog('debug')) console.log('[THEME DEBUG] Falling back to localStorage...')
-      const localTheme = localStorage.getItem('theme') as Theme
-      if (shouldLog('debug')) console.log('[THEME DEBUG] localStorage theme:', localTheme)
-
-      if (localTheme) {
-        if (shouldLog('debug')) console.log('[THEME DEBUG] ✅ Using theme from localStorage:', localTheme)
-        setThemeState(localTheme)
-        applyTheme(localTheme)
-      } else {
-        if (shouldLog('debug')) console.log('[THEME DEBUG] ℹ️  No theme in localStorage, using default: light')
-        const root = document.documentElement
-        root.classList.add('light')
+        // Silently ignore fetch errors - theme already loaded from localStorage
+        if (shouldLog('debug')) console.log('[THEME DEBUG] Could not sync with backend (user may not be logged in)')
       }
     }
 
