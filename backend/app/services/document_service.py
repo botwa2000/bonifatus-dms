@@ -33,6 +33,27 @@ class DocumentService:
         self._cache_timestamp = None
         self._cache_ttl_seconds = 300
 
+    def _parse_keywords_to_list(self, keywords_str: Optional[str]) -> Optional[list]:
+        """Parse keywords string to list of KeywordItem dicts"""
+        if not keywords_str:
+            return None
+
+        try:
+            # Try parsing as JSON first
+            keywords_data = json.loads(keywords_str)
+            if isinstance(keywords_data, list):
+                return [
+                    {"keyword": kw, "relevance": 1.0} if isinstance(kw, str)
+                    else {"keyword": kw.get("keyword", ""), "relevance": kw.get("relevance", 1.0)}
+                    for kw in keywords_data
+                ]
+        except (json.JSONDecodeError, ValueError):
+            # If not JSON, try comma-separated string
+            keywords_list = [kw.strip() for kw in keywords_str.split(',') if kw.strip()]
+            return [{"keyword": kw, "relevance": 1.0} for kw in keywords_list]
+
+        return None
+
     def generate_document_filename(
         self,
         original_filename: str,
@@ -296,12 +317,12 @@ class DocumentService:
                 Document.user_id == user_id
             )
             result = session.execute(stmt).first()
-            
+
             if not result:
                 return None
 
             document, category = result
-            
+
             return DocumentResponse(
                 id=str(document.id),
                 title=document.title,
@@ -312,7 +333,7 @@ class DocumentService:
                 google_drive_file_id=document.google_drive_file_id,
                 processing_status=document.processing_status,
                 extracted_text=document.extracted_text,
-                keywords=document.keywords,
+                keywords=self._parse_keywords_to_list(document.keywords),
                 confidence_score=document.confidence_score,
                 primary_language=document.primary_language,
                 category_id=str(document.category_id) if document.category_id else None,
@@ -573,7 +594,7 @@ class DocumentService:
                     google_drive_file_id=document.google_drive_file_id,
                     processing_status=document.processing_status,
                     extracted_text=document.extracted_text,
-                    keywords=document.keywords,
+                    keywords=self._parse_keywords_to_list(document.keywords),
                     confidence_score=document.confidence_score,
                     primary_language=document.primary_language,
                     category_id=str(category.id) if category else None,

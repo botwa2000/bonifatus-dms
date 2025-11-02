@@ -208,10 +208,10 @@ export default function DocumentDetailPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading document...</p>
+          <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading document...</p>
         </div>
       </div>
     )
@@ -219,7 +219,7 @@ export default function DocumentDetailPage() {
 
   if (error && !document) {
     return (
-      <div className="min-h-screen bg-neutral-50">
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
         <AppHeader title="Document" />
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
@@ -240,7 +240,7 @@ export default function DocumentDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <AppHeader title={document.title} />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -266,13 +266,13 @@ export default function DocumentDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Document Info */}
-            <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                  <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
                     {document.title}
                   </h1>
-                  <p className="text-sm text-neutral-600">{document.file_name}</p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">{document.file_name}</p>
                 </div>
                 <Badge variant={getStatusBadgeVariant(document.processing_status)}>
                   {document.processing_status}
@@ -281,37 +281,37 @@ export default function DocumentDetailPage() {
 
               {document.description && (
                 <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-neutral-700 mb-2">Description</h2>
-                  <p className="text-neutral-900">{document.description}</p>
+                  <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Description</h2>
+                  <p className="text-neutral-900 dark:text-neutral-100">{document.description}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-neutral-600">File Size:</span>
-                  <span className="ml-2 text-neutral-900 font-medium">{formatFileSize(document.file_size)}</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">File Size:</span>
+                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatFileSize(document.file_size)}</span>
                 </div>
                 <div>
-                  <span className="text-neutral-600">File Type:</span>
-                  <span className="ml-2 text-neutral-900 font-medium">{document.mime_type}</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">File Type:</span>
+                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{document.mime_type}</span>
                 </div>
                 <div>
-                  <span className="text-neutral-600">Uploaded:</span>
-                  <span className="ml-2 text-neutral-900 font-medium">{formatDate(document.created_at)}</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">Uploaded:</span>
+                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatDate(document.created_at)}</span>
                 </div>
                 {document.document_date && (
                   <div>
-                    <span className="text-neutral-600">Document Date:</span>
-                    <span className="ml-2 text-neutral-900 font-medium">{formatDate(document.document_date)}</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Document Date:</span>
+                    <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatDate(document.document_date)}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Category Section */}
-            <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900">Category</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Category</h2>
                 {!isEditingCategory && (
                   <button
                     onClick={() => setIsEditingCategory(true)}
@@ -354,7 +354,7 @@ export default function DocumentDetailPage() {
                 </div>
               ) : (
                 <div>
-                  <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 text-neutral-900">
+                  <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100">
                     {document.category_name || 'Uncategorized'}
                   </span>
                 </div>
@@ -362,9 +362,9 @@ export default function DocumentDetailPage() {
             </div>
 
             {/* Keywords Section */}
-            <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900">Keywords</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Keywords</h2>
                 {!isEditingKeywords && (
                   <button
                     onClick={() => setIsEditingKeywords(true)}
@@ -431,13 +431,13 @@ export default function DocumentDetailPage() {
                     document.keywords.map((kw, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center bg-neutral-100 text-neutral-700 px-3 py-1 rounded-full text-sm"
+                        className="inline-flex items-center bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 px-3 py-1 rounded-full text-sm"
                       >
                         {kw.keyword}
                       </span>
                     ))
                   ) : (
-                    <p className="text-sm text-neutral-500">No keywords assigned</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">No keywords assigned</p>
                   )}
                 </div>
               )}
@@ -447,8 +447,8 @@ export default function DocumentDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Actions */}
-            <div className="bg-white rounded-lg border border-neutral-200 p-6">
-              <h2 className="text-lg font-semibold text-neutral-900 mb-4">Actions</h2>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Actions</h2>
               <div className="space-y-3">
                 <button
                   onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/download`, '_blank')}
@@ -474,16 +474,26 @@ export default function DocumentDetailPage() {
             </div>
 
             {/* Document Preview */}
-            <div className="bg-white rounded-lg border border-neutral-200 p-6">
-              <h2 className="text-lg font-semibold text-neutral-900 mb-4">Preview</h2>
-              <div className="aspect-[3/4] bg-neutral-100 rounded-lg flex items-center justify-center">
-                <div className="text-center p-4">
-                  <svg className="h-16 w-16 text-neutral-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-sm text-neutral-600">Preview not available</p>
-                  <p className="text-xs text-neutral-500 mt-1">Download to view</p>
-                </div>
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Preview</h2>
+              <div className="aspect-[3/4] bg-neutral-100 rounded-lg overflow-hidden">
+                {document.mime_type === 'application/pdf' ? (
+                  <iframe
+                    src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/content`}
+                    className="w-full h-full border-0"
+                    title="Document Preview"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center p-4">
+                      <svg className="h-16 w-16 text-neutral-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-sm text-neutral-600">Preview not available</p>
+                      <p className="text-xs text-neutral-500 mt-1">Download to view</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

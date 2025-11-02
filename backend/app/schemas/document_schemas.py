@@ -22,6 +22,12 @@ class DocumentUploadResponse(BaseModel):
     created_at: datetime = Field(..., description="Upload timestamp")
 
 
+class KeywordItem(BaseModel):
+    """Keyword with relevance score"""
+    keyword: str = Field(..., description="Keyword text")
+    relevance: float = Field(default=1.0, description="Keyword relevance score")
+
+
 class DocumentResponse(BaseModel):
     """Response model for document information"""
     id: str = Field(..., description="Document ID")
@@ -33,7 +39,7 @@ class DocumentResponse(BaseModel):
     google_drive_file_id: str = Field(..., description="Google Drive file ID")
     processing_status: str = Field(..., description="Processing status")
     extracted_text: Optional[str] = Field(None, description="Extracted text content")
-    keywords: Optional[str] = Field(None, description="Extracted keywords")
+    keywords: Optional[List[KeywordItem]] = Field(None, description="Extracted keywords")
     confidence_score: Optional[int] = Field(None, description="AI confidence score")
     primary_language: Optional[str] = Field(None, description="Primary detected language")
     category_id: Optional[str] = Field(None, description="Assigned category ID")

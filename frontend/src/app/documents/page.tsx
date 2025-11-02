@@ -80,6 +80,12 @@ export default function DocumentsPage() {
     }
   }, [isAuthenticated])
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDocuments()
+    }
+  }, [isAuthenticated, loadDocuments])
+
   const loadCategories = async () => {
     try {
       const data = await apiClient.get<{ categories: Category[] }>('/api/v1/categories', true)
