@@ -1,7 +1,7 @@
 """cleanup duplicate categories per user
 
 Revision ID: 014_cleanup_duplicates
-Revises: 013_german_keywords
+Revises: 013_add_german_keywords
 Create Date: 2025-11-02 10:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '014_cleanup_duplicates'
-down_revision = '013_german_keywords'
+down_revision = '013_add_german_keywords'
 branch_labels = None
 depends_on = None
 
