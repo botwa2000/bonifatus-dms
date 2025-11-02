@@ -186,12 +186,13 @@ class ClassificationService:
 
             query = db.query(Category).filter(Category.is_active == True)
 
+            # Only query user's personal categories (not templates)
+            # Templates (user_id=NULL) are only used for copying to new users
             if user_id:
-                query = query.filter(
-                    (Category.user_id == user_id) | (Category.is_system == True)
-                )
+                query = query.filter(Category.user_id == user_id)
             else:
-                query = query.filter(Category.is_system == True)
+                # Fallback for users without ID (shouldn't happen in normal flow)
+                query = query.filter(Category.user_id.is_(None))
 
             categories = query.all()
             logger.info(f"[CLASSIFICATION DEBUG] Found {len(categories)} active categories to check")
