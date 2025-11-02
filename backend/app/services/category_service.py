@@ -42,6 +42,8 @@ class CategoryService:
         """
         session = db_manager.session_local()
         try:
+            logger.info(f"[CATEGORY DEBUG] === Listing Categories for user_id={user_id}, language={user_language} ===")
+
             # Build query - only show user's personal categories
             stmt = select(Category).options(
                 joinedload(Category.translations)
@@ -56,11 +58,26 @@ class CategoryService:
 
             stmt = stmt.where(Category.is_active == True)
             stmt = stmt.order_by(Category.sort_order, Category.created_at)
-            
+
             categories = session.execute(stmt).unique().scalars().all()
-            
+            logger.info(f"[CATEGORY DEBUG] Found {len(categories)} Category records in database")
+
+            # Check for duplicate reference_keys
+            ref_key_counts = {}
+            for cat in categories:
+                if cat.reference_key not in ref_key_counts:
+                    ref_key_counts[cat.reference_key] = []
+                ref_key_counts[cat.reference_key].append(str(cat.id))
+
+            for ref_key, ids in ref_key_counts.items():
+                if len(ids) > 1:
+                    logger.warning(f"[CATEGORY DEBUG] ⚠️ DUPLICATE Category records for reference_key='{ref_key}': {ids}")
+                else:
+                    logger.info(f"[CATEGORY DEBUG] ✅ Single Category record for reference_key='{ref_key}': {ids[0]}")
+
             category_responses = []
             for category in categories:
+                logger.info(f"[CATEGORY DEBUG] Processing category ID={category.id}, ref_key={category.reference_key}, translations={len(category.translations)}")
                 # Get translation for user's language
                 translation = next(
                     (t for t in category.translations if t.language_code == user_language),
