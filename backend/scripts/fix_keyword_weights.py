@@ -9,10 +9,10 @@ import os
 sys.path.insert(0, '/app')
 
 from sqlalchemy import create_engine, text
-from app.database.config import get_database_url
+from app.core.config import settings
 
 def fix_keyword_weights():
-    engine = create_engine(get_database_url())
+    engine = create_engine(settings.database.database_url)
 
     with engine.connect() as conn:
         # Define keyword weight adjustments
