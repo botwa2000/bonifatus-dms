@@ -43,11 +43,22 @@ class AuthService:
         """
         Copy all template categories (user_id=NULL) to new user's workspace
         Creates personal copies of system categories with all translations and keywords
+
+        IMPORTANT: Only copies if user has NO categories yet (prevents duplicates)
         """
         from app.database.models import Category, CategoryTranslation, CategoryKeyword
-        from sqlalchemy import select
+        from sqlalchemy import select, func
 
         try:
+            # Check if user already has categories (prevent duplicates)
+            existing_count = db.execute(
+                select(func.count(Category.id)).where(Category.user_id == user_id)
+            ).scalar()
+
+            if existing_count > 0:
+                logger.info(f"User {user_id} already has {existing_count} categories, skipping template copy")
+                return
+
             # Get all template categories (user_id is NULL)
             template_categories = db.execute(
                 select(Category).where(Category.user_id.is_(None))

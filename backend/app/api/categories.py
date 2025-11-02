@@ -135,15 +135,16 @@ async def create_category(
         return category
 
     except ValueError as e:
+        logger.error(f"[CATEGORY CREATE DEBUG] ValueError: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Create category error: {e}")
+        logger.error(f"[CATEGORY CREATE DEBUG] ❌ Create category error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to create category"
+            detail=f"Unable to create category: {str(e)}"
         )
     finally:
         session.close()

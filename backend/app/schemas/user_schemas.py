@@ -80,6 +80,7 @@ class UserPreferences(BaseModel):
     language: str = Field(..., description="Preferred UI language")
     preferred_doc_languages: List[str] = Field(..., description="Preferred document processing languages")
     timezone: str = Field(..., description="User timezone")
+    theme: Optional[str] = Field(None, description="Preferred theme (light/dark)")
     notifications_enabled: bool = Field(..., description="Email notifications enabled")
     auto_categorization: bool = Field(..., description="AI auto-categorization enabled")
 
@@ -89,6 +90,7 @@ class UserPreferences(BaseModel):
                 "language": "en",
                 "preferred_doc_languages": ["en", "de"],
                 "timezone": "Europe/Berlin",
+                "theme": "light",
                 "notifications_enabled": True,
                 "auto_categorization": True
             }
@@ -100,6 +102,7 @@ class UserPreferencesUpdate(BaseModel):
     language: Optional[str] = Field(None, description="Preferred UI language")
     preferred_doc_languages: Optional[List[str]] = Field(None, description="Preferred document processing languages")
     timezone: Optional[str] = Field(None, description="User timezone")
+    theme: Optional[str] = Field(None, description="Preferred theme (light/dark)")
     notifications_enabled: Optional[bool] = Field(None, description="Email notifications")
     auto_categorization: Optional[bool] = Field(None, description="AI auto-categorization")
 
@@ -109,6 +112,7 @@ class UserPreferencesUpdate(BaseModel):
                 "language": "de",
                 "preferred_doc_languages": ["de", "en", "ru"],
                 "timezone": "Europe/Berlin",
+                "theme": "dark",
                 "notifications_enabled": False
             }
         }
