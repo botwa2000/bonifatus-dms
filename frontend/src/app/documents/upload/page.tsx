@@ -243,6 +243,19 @@ export default function BatchUploadPage() {
             console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
             console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
             console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
+
+            // CRITICAL DEBUG: Show if category ID mismatch
+            if (r.analysis.suggested_category_id && !suggestedCategory) {
+              console.error(`[CHECKBOX DEBUG] ❌❌❌ CATEGORY ID MISMATCH!`)
+              console.error(`[CHECKBOX DEBUG] Backend suggested category ID: ${r.analysis.suggested_category_id}`)
+              console.error(`[CHECKBOX DEBUG] This ID is NOT in the available categories list!`)
+              console.error(`[CHECKBOX DEBUG] Available category IDs:`, categories.map(c => c.id))
+              console.error(`[CHECKBOX DEBUG] Available "Other" categories:`, categories.filter(c => c.name?.toLowerCase().includes('other') || c.name?.toLowerCase().includes('sonstige')))
+              console.error(`[CHECKBOX DEBUG] Result: Checkbox will NOT be checked because ID doesn't exist in list`)
+            } else if (suggestedCategory) {
+              console.log(`[CHECKBOX DEBUG] ✅ Category found: ${suggestedCategory.name} (${suggestedCategory.id})`)
+              console.log(`[CHECKBOX DEBUG] Checkbox WILL be checked`)
+            }
           }
 
           return {
@@ -660,6 +673,15 @@ export default function BatchUploadPage() {
                                   console.log(`[CATEGORY DEBUG] File: ${state.original_filename}`)
                                   console.log(`[CATEGORY DEBUG] Selected categories:`, state.selected_categories)
                                   console.log(`[CATEGORY DEBUG] Primary category:`, state.primary_category)
+                                }
+
+                                // Enhanced debug for checkbox state
+                                if (shouldLog('debug') && (category.name.toLowerCase().includes('other') || category.name.toLowerCase().includes('sonstige') || isSelected)) {
+                                  console.log(`[CHECKBOX DEBUG] Category: ${category.name} (${category.id})`)
+                                  console.log(`[CHECKBOX DEBUG]   - Is in selected_categories array: ${isSelected}`)
+                                  console.log(`[CHECKBOX DEBUG]   - Selected categories array:`, state.selected_categories)
+                                  console.log(`[CHECKBOX DEBUG]   - Does ${category.id} === any in array: ${state.selected_categories.some(id => id === category.id)}`)
+                                  console.log(`[CHECKBOX DEBUG]   - Checkbox will be: ${isSelected ? 'CHECKED ✅' : 'UNCHECKED ❌'}`)
                                 }
 
                                 return (

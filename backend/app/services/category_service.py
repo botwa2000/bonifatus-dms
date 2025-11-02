@@ -232,8 +232,8 @@ class CategoryService:
                         )
 
                     # Create translation data object
-                    from app.schemas.category_schemas import CategoryTranslationData
-                    final_translations[lang_code] = CategoryTranslationData(
+                    from app.schemas.category_schemas import CategoryTranslationInput
+                    final_translations[lang_code] = CategoryTranslationInput(
                         name=translated_name or source_translation.name,
                         description=translated_desc or source_translation.description
                     )
