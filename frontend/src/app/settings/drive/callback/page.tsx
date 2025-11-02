@@ -53,6 +53,20 @@ function DriveCallbackContent() {
         )
 
         if (result.success) {
+          // Refresh auth tokens to prevent logout after Drive connection
+          // Drive OAuth flow can take time, and access token might be close to expiring
+          try {
+            await apiClient.post('/api/v1/auth/refresh', {}, true)
+            if (shouldLog('debug')) {
+              console.log('[Drive Callback] Auth tokens refreshed successfully')
+            }
+          } catch (refreshError) {
+            if (shouldLog('error')) {
+              console.error('[Drive Callback] Token refresh failed:', refreshError)
+            }
+            // Continue anyway - user might still be logged in with existing token
+          }
+
           setStatus('success')
           setMessage('Google Drive connected successfully!')
           setTimeout(() => router.push('/settings'), 2000)

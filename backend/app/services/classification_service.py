@@ -184,6 +184,33 @@ class ClassificationService:
             logger.info(f"[CLASSIFICATION DEBUG] Document keywords ({len(document_keywords)}): {document_keywords[:10]}{'...' if len(document_keywords) > 10 else ''}")
             logger.info(f"[CLASSIFICATION DEBUG] Language: {language}, User ID: {user_id}")
 
+            # PRIORITY KEYWORD FILTERING:
+            # Get ALL category keywords across all user's categories and languages
+            # Only use document keywords that could match at least one category (priority keywords)
+            # This prevents diluting the score with irrelevant general keywords
+            from sqlalchemy import text as sql_text
+            all_category_keywords_set = set()
+            if user_id:
+                result = db.execute(sql_text("""
+                    SELECT DISTINCT LOWER(ck.keyword)
+                    FROM category_keywords ck
+                    JOIN categories c ON ck.category_id = c.id
+                    WHERE c.user_id = :user_id
+                    AND c.is_active = true
+                """), {'user_id': str(user_id)})
+                all_category_keywords_set = {row[0] for row in result}
+                logger.info(f"[CLASSIFICATION DEBUG] Loaded {len(all_category_keywords_set)} unique category keywords across all categories")
+
+            # Filter to priority keywords only (those that could match any category)
+            document_keywords_lower = [kw.lower() for kw in document_keywords]
+            priority_keywords = [kw for kw in document_keywords if kw.lower() in all_category_keywords_set]
+
+            logger.info(f"[CLASSIFICATION DEBUG] Filtered to {len(priority_keywords)} priority keywords from {len(document_keywords)} total: {priority_keywords[:10]}{'...' if len(priority_keywords) > 10 else ''}")
+
+            # Use priority keywords for classification scoring
+            # All keywords (including general ones) are still stored for search functionality
+            classification_keywords = priority_keywords if priority_keywords else document_keywords
+
             query = db.query(Category).filter(Category.is_active == True)
 
             # Only query user's personal categories (not templates)
@@ -215,7 +242,8 @@ class ClassificationService:
 
                 logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key} keywords ({len(category_keywords)}): {list(category_keywords.keys())[:10]}{'...' if len(category_keywords) > 10 else ''}")
 
-                score, matched_keywords = self.calculate_score(document_keywords, category_keywords)
+                # Score using priority keywords only
+                score, matched_keywords = self.calculate_score(classification_keywords, category_keywords)
 
                 translation = db.query(CategoryTranslation).filter(
                     CategoryTranslation.category_id == category.id,
@@ -224,7 +252,7 @@ class ClassificationService:
 
                 category_name = translation.name if translation else category.reference_key
 
-                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key}: score={score:.3f}, matched={len(matched_keywords)}/{len(document_keywords)}, matched_kw={matched_keywords[:5]}{'...' if len(matched_keywords) > 5 else ''}")
+                logger.info(f"[CLASSIFICATION DEBUG] Category {category.reference_key}: score={score:.3f}, matched={len(matched_keywords)}/{len(classification_keywords)}, matched_kw={matched_keywords[:5]}{'...' if len(matched_keywords) > 5 else ''}")
 
                 results.append((category.id, category_name, score, matched_keywords))
 
