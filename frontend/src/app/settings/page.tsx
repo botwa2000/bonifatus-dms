@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Select, Alert } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
+import { shouldLog } from '@/config/app.config'
 
 interface UserPreferences {
   language: string
@@ -72,6 +73,8 @@ export default function SettingsPage() {
   }, [isAuthenticated])
 
   const loadSettings = async () => {
+    if (shouldLog('debug')) console.log('[SETTINGS DEBUG] === Loading Settings Page ===')
+
     try {
       const [prefsData, sysData, driveData] = await Promise.all([
         apiClient.get<UserPreferences>('/api/v1/users/preferences', true),
@@ -79,35 +82,76 @@ export default function SettingsPage() {
         apiClient.get<DriveStatus>('/api/v1/users/drive/status', true)
       ])
 
+      if (shouldLog('debug')) {
+        console.log('[SETTINGS DEBUG] === User Preferences Loaded from DB ===')
+        console.log('[SETTINGS DEBUG] Language:', prefsData.language)
+        console.log('[SETTINGS DEBUG] Preferred Doc Languages:', prefsData.preferred_doc_languages)
+        console.log('[SETTINGS DEBUG] Timezone:', prefsData.timezone)
+        console.log('[SETTINGS DEBUG] Theme:', prefsData.theme || '(not set, using default)')
+        console.log('[SETTINGS DEBUG] Notifications Enabled:', prefsData.notifications_enabled)
+        console.log('[SETTINGS DEBUG] Auto Categorization:', prefsData.auto_categorization)
+
+        console.log('[SETTINGS DEBUG] === System Settings ===')
+        console.log('[SETTINGS DEBUG] Available Languages:', sysData.settings.available_languages)
+        console.log('[SETTINGS DEBUG] Available Themes:', sysData.settings.available_themes)
+        console.log('[SETTINGS DEBUG] Default Theme:', sysData.settings.default_theme)
+        console.log('[SETTINGS DEBUG] Default Language:', sysData.settings.default_language)
+      }
+
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
       setDriveStatus(driveData)
     } catch {
       // Error already logged by API client, just show user message
+      if (shouldLog('debug')) console.log('[SETTINGS DEBUG] ❌ Failed to load settings')
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
     }
   }
 
   const handleSave = async () => {
     if (!preferences) return
-    
+
+    if (shouldLog('debug')) {
+      console.log('[SETTINGS DEBUG] === Save Button Clicked ===')
+      console.log('[SETTINGS DEBUG] Saving preferences to backend...')
+      console.log('[SETTINGS DEBUG] Components being saved:')
+      console.log('[SETTINGS DEBUG]   - Language:', preferences.language)
+      console.log('[SETTINGS DEBUG]   - Preferred Doc Languages:', preferences.preferred_doc_languages)
+      console.log('[SETTINGS DEBUG]   - Timezone:', preferences.timezone)
+      console.log('[SETTINGS DEBUG]   - Theme:', preferences.theme)
+      console.log('[SETTINGS DEBUG]   - Notifications Enabled:', preferences.notifications_enabled)
+      console.log('[SETTINGS DEBUG]   - Auto Categorization:', preferences.auto_categorization)
+      console.log('[SETTINGS DEBUG] Endpoint: PUT /api/v1/users/preferences')
+    }
+
     setSaving(true)
     setMessage(null)
-    
+
     const oldLanguage = preferences.language
-    
+
     try {
       await apiClient.put('/api/v1/users/preferences', preferences, true)
+
+      if (shouldLog('debug')) {
+        console.log('[SETTINGS DEBUG] ✅ Preferences saved successfully to database')
+        console.log('[SETTINGS DEBUG] Theme was saved as:', preferences.theme)
+      }
+
       setMessage({ type: 'success', text: 'Settings saved successfully' })
-      
+
       if (preferences.language !== oldLanguage) {
+        if (shouldLog('debug')) console.log('[SETTINGS DEBUG] Language changed, reloading page...')
         setMessage({ type: 'success', text: 'Settings saved. Reloading to apply language changes...' })
         setTimeout(() => {
           window.location.href = '/dashboard'
         }, 1500)
       }
-    } catch {
+    } catch (error) {
       // Error already logged by API client
+      if (shouldLog('debug')) {
+        console.log('[SETTINGS DEBUG] ❌ Failed to save preferences')
+        console.error('[SETTINGS DEBUG] Error:', error)
+      }
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
     } finally {
       setSaving(false)
@@ -115,12 +159,23 @@ export default function SettingsPage() {
   }
 
   const handleThemeChange = (newTheme: string) => {
+    if (shouldLog('debug')) {
+      console.log('[SETTINGS DEBUG] === Theme Changed in UI ===')
+      console.log('[SETTINGS DEBUG] New theme selected:', newTheme)
+      console.log('[SETTINGS DEBUG] Note: Theme will be saved to DB when "Save Changes" is clicked')
+    }
+
     setPreferences({ ...preferences!, theme: newTheme })
     if (mounted && typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme)
       const root = document.documentElement
       root.classList.remove('light', 'dark')
       root.classList.add(newTheme)
+
+      if (shouldLog('debug')) {
+        console.log('[SETTINGS DEBUG] Applied theme to DOM immediately for preview')
+        console.log('[SETTINGS DEBUG] Saved theme to localStorage for persistence')
+      }
     }
   }
 

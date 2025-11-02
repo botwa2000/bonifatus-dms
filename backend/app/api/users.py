@@ -162,17 +162,27 @@ async def get_user_preferences(
 ) -> UserPreferences:
     """
     Get user preferences and settings
-    
+
     Returns user preferences with defaults from system settings
     """
     try:
+        logger.info(f"[SETTINGS DEBUG] === GET /users/preferences ===")
+        logger.info(f"[SETTINGS DEBUG] User: {current_user.email}")
+
         preferences = await user_service.get_user_preferences(str(current_user.id))
-        
-        logger.info(f"Preferences retrieved for user: {current_user.email}")
+
+        logger.info(f"[SETTINGS DEBUG] Preferences loaded from DB:")
+        logger.info(f"[SETTINGS DEBUG]   - Language: {preferences.language}")
+        logger.info(f"[SETTINGS DEBUG]   - Preferred Doc Languages: {preferences.preferred_doc_languages}")
+        logger.info(f"[SETTINGS DEBUG]   - Timezone: {preferences.timezone}")
+        logger.info(f"[SETTINGS DEBUG]   - Theme: {preferences.theme if hasattr(preferences, 'theme') else '(not set)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Notifications Enabled: {preferences.notifications_enabled}")
+        logger.info(f"[SETTINGS DEBUG]   - Auto Categorization: {preferences.auto_categorization}")
+
         return preferences
-        
+
     except Exception as e:
-        logger.error(f"Get user preferences error: {e}")
+        logger.error(f"[SETTINGS DEBUG] ❌ Get user preferences error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve user preferences"
@@ -195,34 +205,46 @@ async def update_user_preferences(
 ) -> UserPreferences:
     """
     Update user preferences and settings
-    
+
     Updates user preferences and logs changes for audit trail
     """
     try:
         ip_address = get_client_ip(request)
-        
+
+        logger.info(f"[SETTINGS DEBUG] === PUT /users/preferences ===")
+        logger.info(f"[SETTINGS DEBUG] User: {current_user.email}")
+        logger.info(f"[SETTINGS DEBUG] Saving preferences to database:")
+        logger.info(f"[SETTINGS DEBUG]   - Language: {preferences_update.language if hasattr(preferences_update, 'language') and preferences_update.language else '(not changed)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Preferred Doc Languages: {preferences_update.preferred_doc_languages if hasattr(preferences_update, 'preferred_doc_languages') and preferences_update.preferred_doc_languages else '(not changed)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Timezone: {preferences_update.timezone if hasattr(preferences_update, 'timezone') and preferences_update.timezone else '(not changed)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Theme: {preferences_update.theme if hasattr(preferences_update, 'theme') and preferences_update.theme else '(not changed)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Notifications Enabled: {preferences_update.notifications_enabled if hasattr(preferences_update, 'notifications_enabled') and preferences_update.notifications_enabled is not None else '(not changed)'}")
+        logger.info(f"[SETTINGS DEBUG]   - Auto Categorization: {preferences_update.auto_categorization if hasattr(preferences_update, 'auto_categorization') and preferences_update.auto_categorization is not None else '(not changed)'}")
+
         updated_preferences = await user_service.update_user_preferences(
             str(current_user.id), preferences_update, ip_address
         )
-        
+
         if not updated_preferences:
+            logger.error(f"[SETTINGS DEBUG] ❌ Failed to update preferences")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to update user preferences"
             )
-        
-        logger.info(f"Preferences updated for user: {current_user.email}")
+
+        logger.info(f"[SETTINGS DEBUG] ✅ Preferences saved successfully to database")
         return updated_preferences
-        
+
     except HTTPException:
         raise
     except ValueError as e:
+        logger.error(f"[SETTINGS DEBUG] ❌ Validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Update user preferences error: {e}")
+        logger.error(f"[SETTINGS DEBUG] ❌ Update user preferences error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to update user preferences"

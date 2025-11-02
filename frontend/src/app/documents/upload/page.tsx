@@ -78,6 +78,14 @@ export default function BatchUploadPage() {
     try {
       const data = await categoryService.listCategories()
       setCategories(data.categories)
+
+      if (shouldLog('debug')) {
+        console.log('[UPLOAD DEBUG] === Available Categories Loaded ===')
+        console.log('[UPLOAD DEBUG] Total categories:', data.categories.length)
+        data.categories.forEach((cat: Category) => {
+          console.log(`[UPLOAD DEBUG]   - ID: ${cat.id}, Name: "${cat.name}"`)
+        })
+      }
     } catch (error) {
       console.error('Failed to load categories:', error)
     }
@@ -224,11 +232,16 @@ export default function BatchUploadPage() {
       const states: FileUploadState[] = result.results
         .filter((r: FileAnalysisResult): r is FileAnalysisSuccess => r.success)
         .map((r: FileAnalysisSuccess) => {
+          // Find category name for debugging
+          const suggestedCategory = categories.find(c => c.id === r.analysis.suggested_category_id)
+
           if (shouldLog('debug')) {
+            console.log(`[UPLOAD DEBUG] === File Analysis Complete ===`)
             console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
             console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
             console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
-            console.log(`[UPLOAD DEBUG]   - Suggested Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+            console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+            console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
             console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
           }
 

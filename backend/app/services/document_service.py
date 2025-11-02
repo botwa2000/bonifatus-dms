@@ -520,14 +520,16 @@ class DocumentService:
                 )
 
             if search_request.category_id:
-                # Filter by documents that have this category (check junction table)
-                base_query = base_query.join(
-                    DocumentCategory,
+                # Filter by documents that have this category using EXISTS subquery
+                # This avoids joining document_categories twice
+                from sqlalchemy.sql import exists
+                category_filter = exists().where(
                     and_(
                         DocumentCategory.document_id == Document.id,
                         DocumentCategory.category_id == search_request.category_id
                     )
                 )
+                base_query = base_query.where(category_filter)
 
             if search_request.language:
                 base_query = base_query.where(Document.primary_language == search_request.language)
