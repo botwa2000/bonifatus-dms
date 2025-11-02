@@ -295,7 +295,8 @@ class ClassificationService:
     def get_other_category(
         self,
         db: Session,
-        language: str = 'en'
+        language: str = 'en',
+        user_id: Optional[UUID] = None
     ) -> Optional[Tuple[UUID, str, float, List[str]]]:
         """
         Get the OTHER category as a fallback
@@ -303,6 +304,7 @@ class ClassificationService:
         Args:
             db: Database session
             language: Language for category name
+            user_id: User ID to find their specific "Other" category
 
         Returns:
             Tuple of (category_id, category_name, 0.0, []) or None if OTHER category doesn't exist
@@ -310,13 +312,20 @@ class ClassificationService:
         try:
             from app.database.models import Category, CategoryTranslation
 
-            # Fixed: reference_key is 'OTH' not 'category.other'
-            other_category = db.query(Category).filter(
-                Category.reference_key == 'OTH'
-            ).first()
+            # CRITICAL FIX: Must filter by user_id to get user's current "Other" category
+            # Without user_id filter, it returns deleted/template "Other" categories
+            query = db.query(Category).filter(Category.reference_key == 'OTH')
+
+            if user_id:
+                query = query.filter(Category.user_id == user_id)
+                logger.info(f"[FALLBACK DEBUG] Looking for OTHER category for user_id={user_id}")
+            else:
+                logger.warning(f"[FALLBACK DEBUG] No user_id provided, searching for ANY OTHER category")
+
+            other_category = query.first()
 
             if not other_category:
-                logger.error("OTHER category not found in database (looking for reference_key='OTH')")
+                logger.error(f"OTHER category not found (reference_key='OTH', user_id={user_id})")
                 return None
 
             translation = db.query(CategoryTranslation).filter(
@@ -326,7 +335,7 @@ class ClassificationService:
 
             category_name = translation.name if translation else "Other"
 
-            logger.info(f"[FALLBACK DEBUG] Falling back to OTHER category: {category_name} (lang: {language})")
+            logger.info(f"[FALLBACK DEBUG] ✅ Found OTHER category: {category_name} (ID: {other_category.id}, lang: {language})")
             return (other_category.id, category_name, 0.0, [])
 
         except Exception as e:
@@ -378,7 +387,7 @@ class ClassificationService:
 
         if fallback_to_other:
             logger.info(f"[SUGGEST CATEGORY DEBUG] Attempting fallback to OTHER category...")
-            other = self.get_other_category(db, language)
+            other = self.get_other_category(db, language, user_id)
             if other:
                 logger.info(f"[SUGGEST CATEGORY DEBUG] ✅ Fallback successful: {other[1]}")
             else:
