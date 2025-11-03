@@ -52,7 +52,6 @@ export default function DocumentDetailPage() {
   const [newKeyword, setNewKeyword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [deletingDocument, setDeletingDocument] = useState(false)
-  const [isReclassifying, setIsReclassifying] = useState(false)
 
   useEffect(() => {
     loadUser()
@@ -173,33 +172,6 @@ export default function DocumentDetailPage() {
       setError('Failed to delete document')
       console.error(err)
       setDeletingDocument(false)
-    }
-  }
-
-  const handleReclassify = async () => {
-    if (!document) return
-
-    try {
-      setIsReclassifying(true)
-      setError(null)
-      setSuccess(null)
-
-      // Trigger document reprocessing
-      await apiClient.post(`/api/v1/documents/${documentId}/reprocess`, {}, true)
-
-      setSuccess('Document is being reclassified. This may take a moment...')
-
-      // Reload document after a short delay to show updated classification
-      setTimeout(() => {
-        loadDocument()
-        setSuccess('Document reclassified successfully!')
-        setTimeout(() => setSuccess(null), 3000)
-      }, 3000)
-    } catch (err) {
-      setError('Failed to reclassify document')
-      console.error('Reclassify error:', err)
-    } finally {
-      setIsReclassifying(false)
     }
   }
 
@@ -478,61 +450,40 @@ export default function DocumentDetailPage() {
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Actions</h2>
               <div className="space-y-3">
-                <button
+                <Button
+                  variant="primary"
+                  className="w-full space-x-2"
+                  onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/content`, '_blank')}
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>Preview</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  className="w-full space-x-2"
                   onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/download`, '_blank')}
-                  className="w-full flex items-center justify-center space-x-2 bg-admin-primary text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   <span>Download</span>
-                </button>
+                </Button>
 
-                <button
-                  onClick={handleReclassify}
-                  disabled={isReclassifying}
-                  className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-medium disabled:opacity-50"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>{isReclassifying ? 'Reclassifying...' : 'Reclassify Document'}</span>
-                </button>
-
-                <button
+                <Button
+                  variant="danger"
+                  className="w-full space-x-2"
                   onClick={handleDeleteDocument}
                   disabled={deletingDocument}
-                  className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 font-medium disabled:opacity-50"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   <span>{deletingDocument ? 'Deleting...' : 'Delete Document'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Document Preview */}
-            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Preview</h2>
-              <div className="aspect-[3/4] bg-neutral-100 rounded-lg overflow-hidden">
-                {document.mime_type === 'application/pdf' ? (
-                  <iframe
-                    src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/content`}
-                    className="w-full h-full border-0"
-                    title="Document Preview"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-center p-4">
-                      <svg className="h-16 w-16 text-neutral-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="text-sm text-neutral-600">Preview not available</p>
-                      <p className="text-xs text-neutral-500 mt-1">Download to view</p>
-                    </div>
-                  </div>
-                )}
+                </Button>
               </div>
             </div>
           </div>

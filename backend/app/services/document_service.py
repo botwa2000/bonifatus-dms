@@ -319,9 +319,22 @@ class DocumentService:
             result = session.execute(stmt).first()
 
             if not result:
+                logger.warning(f"[GET_DOCUMENT DEBUG] Document {document_id} not found for user {user_id}")
                 return None
 
             document, category = result
+
+            # Parse keywords
+            parsed_keywords = self._parse_keywords_to_list(document.keywords)
+
+            logger.info(f"[GET_DOCUMENT DEBUG] Document {document_id}:")
+            logger.info(f"  - title: {document.title}")
+            logger.info(f"  - category_id: {document.category_id}")
+            logger.info(f"  - category_name: {category.name_en if category else None}")
+            logger.info(f"  - keywords (raw): {document.keywords[:200] if document.keywords else 'None'}")
+            logger.info(f"  - keywords (parsed count): {len(parsed_keywords) if parsed_keywords else 0}")
+            logger.info(f"  - processing_status: {document.processing_status}")
+            logger.info(f"  - primary_language: {document.primary_language}")
 
             return DocumentResponse(
                 id=str(document.id),
@@ -333,7 +346,7 @@ class DocumentService:
                 google_drive_file_id=document.google_drive_file_id,
                 processing_status=document.processing_status,
                 extracted_text=document.extracted_text,
-                keywords=self._parse_keywords_to_list(document.keywords),
+                keywords=parsed_keywords,
                 confidence_score=document.confidence_score,
                 primary_language=document.primary_language,
                 category_id=str(document.category_id) if document.category_id else None,

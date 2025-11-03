@@ -15,9 +15,9 @@ export default function HomePage() {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-neutral-900">
       {/* Navigation */}
-      <nav className="bg-white border-b border-neutral-200">
+      <nav className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center">
@@ -26,19 +26,19 @@ export default function HomePage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <span className="ml-3 text-xl font-bold text-neutral-900">Bonifatus DMS</span>
+              <span className="ml-3 text-xl font-bold text-neutral-900 dark:text-white">Bonifatus DMS</span>
             </Link>
 
             <div className="hidden md:flex items-center space-x-8">
-              <Link href="/" className="text-neutral-700 hover:text-admin-primary font-medium">Home</Link>
-              <Link href="/about" className="text-neutral-600 hover:text-admin-primary">About</Link>
-              <Link href="/features" className="text-neutral-600 hover:text-admin-primary">Features</Link>
-              <Link href="/pricing" className="text-neutral-600 hover:text-admin-primary">Pricing</Link>
-              <Link href="/contact" className="text-neutral-600 hover:text-admin-primary">Contact</Link>
+              <a href="#features" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Features</a>
+              <a href="#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">How It Works</a>
+              <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Pricing</a>
+              <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">About</Link>
+              <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Contact</Link>
               {user ? (
                 <>
-                  <Link href="/dashboard" className="text-neutral-600 hover:text-admin-primary">Dashboard</Link>
-                  <Link href="/profile" className="text-neutral-600 hover:text-admin-primary">Profile</Link>
+                  <Link href="/dashboard" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Dashboard</Link>
+                  <Link href="/profile" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Profile</Link>
                 </>
               ) : (
                 <GoogleLoginButton size="sm">Sign In</GoogleLoginButton>
@@ -46,7 +46,7 @@ export default function HomePage() {
             </div>
 
             <div className="md:hidden">
-              <button className="text-neutral-600 hover:text-neutral-900">
+              <button className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
@@ -57,116 +57,227 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-neutral-50 to-white py-20">
+      <section className="bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-900 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl font-bold text-neutral-900 mb-6">
-              Professional Document
-              <span className="text-admin-primary block">Management System</span>
+            <h1 className="text-5xl font-bold text-neutral-900 dark:text-white mb-6">
+              Your Documents,
+              <span className="text-admin-primary block">Organized Automatically</span>
             </h1>
-            <p className="text-xl text-neutral-600 mb-8 max-w-3xl mx-auto">
-              Organize, secure, and access your documents with AI-powered categorization, 
-              advanced search capabilities, and enterprise-grade security.
+            <p className="text-xl text-neutral-600 dark:text-neutral-400 mb-8 max-w-3xl mx-auto">
+              AI-powered document management that classifies, extracts, and organizes your PDFs in seconds.
+              No manual filing, ever again.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <GoogleLoginButton size="lg" className="min-w-[200px]">
                 Start Free - 50 Pages/Month
               </GoogleLoginButton>
-              <Link href="/pricing">
+              <a href="#pricing">
                 <Button variant="secondary" size="lg" className="min-w-[200px]">
                   View Pricing
                   <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </Button>
-              </Link>
+              </a>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="mt-12 flex flex-wrap justify-center items-center gap-8 text-sm text-neutral-600 dark:text-neutral-400">
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">GDPR Compliant</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                </svg>
+                <span className="font-medium">Bank-Level Encryption</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                </svg>
+                <span className="font-medium">99% AI Accuracy</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section id="features" className="py-20 bg-white dark:bg-neutral-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-neutral-900 mb-4">
-              Everything you need for document management
+            <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
+              Stop Manual Filing Forever
             </h2>
-            <p className="text-lg text-neutral-600">
-              Professional tools designed for modern businesses and individuals
+            <p className="text-lg text-neutral-600 dark:text-neutral-400">
+              AI that understands your documents and organizes them automatically
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Smart Upload</h3>
-              <p className="text-neutral-600">
-                Drag & drop files with automatic categorization using AI technology. Supports all major file formats.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">AI Auto-Categorization</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Invoices, contracts, receipts, taxes - automatically sorted into the right folders
               </p>
             </div>
 
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            {/* Feature 2 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Advanced Search</h3>
-              <p className="text-neutral-600">
-                Find documents instantly with full-text search, metadata filtering, and intelligent suggestions.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Find Anything Instantly</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Smart search across all documents - even finds text in handwritten notes
               </p>
             </div>
 
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            {/* Feature 3 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Enterprise Security</h3>
-              <p className="text-neutral-600">
-                Bank-level encryption, secure cloud storage, and comprehensive access controls protect your data.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Your Cloud, Your Data</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Documents stored on your Google Drive. Pro: Dropbox, OneDrive, Box support
               </p>
             </div>
 
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            {/* Feature 4 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Smart Organization</h3>
-              <p className="text-neutral-600">
-                AI-powered categorization automatically organizes documents into logical folders and tags.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Bulk Upload & Process</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Upload hundreds of documents at once - AI processes them all automatically (Starter+)
               </p>
             </div>
 
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            {/* Feature 5 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Access Control</h3>
-              <p className="text-neutral-600">
-                Granular permissions and role-based access ensure the right people see the right documents.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Email Your Documents</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Forward to your@docs.bonidoc.com - we'll process and organize it automatically (Pro)
               </p>
             </div>
 
-            <div className="text-center p-6">
-              <div className="h-12 w-12 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            {/* Feature 6 */}
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="h-12 w-12 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center mb-4">
                 <svg className="h-6 w-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">Analytics & Reports</h3>
-              <p className="text-neutral-600">
-                Comprehensive insights into document usage, storage trends, and team collaboration patterns.
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Multilingual Support</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                German, English, Russian - AI understands documents in multiple languages
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-neutral-50 dark:bg-neutral-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
+              How It Works
+            </h2>
+            <p className="text-lg text-neutral-600 dark:text-neutral-400">
+              Three simple steps to organized documents
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="h-16 w-16 bg-admin-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                1
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Upload or Email</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Drag & drop files, email them, or bulk upload hundreds at once
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="h-16 w-16 bg-admin-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                2
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">AI Processes</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                AI extracts text, identifies document type, and auto-categorizes
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="h-16 w-16 bg-admin-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                3
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Find Instantly</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Search, filter, access from anywhere - perfectly organized forever
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Use Cases Section */}
+      <section className="py-20 bg-white dark:bg-neutral-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
+              Perfect For
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="text-4xl mb-4">🏢</div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Small Business Owners</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Invoices, contracts, receipts, employee documents - all organized automatically
+              </p>
+            </div>
+
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="text-4xl mb-4">💼</div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Freelancers & Consultants</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Client documents, invoices, project files, taxes - find anything in seconds
+              </p>
+            </div>
+
+            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+              <div className="text-4xl mb-4">🏠</div>
+              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Personal Use</h3>
+              <p className="text-neutral-600 dark:text-neutral-400">
+                Medical records, warranties, bills, important documents - never lose anything again
               </p>
             </div>
           </div>
@@ -174,169 +285,186 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-20 bg-neutral-50">
+      <section id="pricing" className="py-20 bg-neutral-50 dark:bg-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-neutral-900 mb-4">
-              Choose the right plan for you
+            <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
+              Simple, Transparent Pricing
             </h2>
-            <p className="text-lg text-neutral-600">
-              Start free, upgrade as you grow
+            <p className="text-lg text-neutral-600 dark:text-neutral-400">
+              Start free, upgrade as you grow. Cancel anytime.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {/* Free Tier */}
-            <div className="bg-white rounded-xl border border-neutral-200 p-8">
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 p-8">
               <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Free</h3>
+                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Free</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900">€0</span>
-                  <span className="text-neutral-600">/month</span>
+                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€0</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
                 </div>
-                <p className="text-neutral-600">Perfect for trying it out</p>
+                <p className="text-neutral-600 dark:text-neutral-400">Perfect for trying it out</p>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700"><strong>50 pages/month</strong></span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>50 pages/month</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Full AI features</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">1 user</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">One-by-one processing</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Solo user only</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">Google Drive storage</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Community support</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
                 </li>
               </ul>
               <GoogleLoginButton className="w-full" variant="secondary">
                 Start Free
               </GoogleLoginButton>
+              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                Risk-free • Cancel anytime
+              </p>
             </div>
 
             {/* Starter Tier */}
-            <div className="bg-white rounded-xl border border-neutral-200 p-8">
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 p-8">
               <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Starter</h3>
+                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Starter</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900">€2.99</span>
-                  <span className="text-neutral-600">/month</span>
+                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€2.99</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
                 </div>
-                <p className="text-neutral-600">For light personal use</p>
+                <p className="text-neutral-600 dark:text-neutral-400">For light personal use</p>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700"><strong>250 pages/month</strong></span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>250 pages/month</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Full AI features</span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>2 users</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Bulk processing</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Solo user only</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">Google Drive storage</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Email support</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
                 </li>
               </ul>
               <GoogleLoginButton className="w-full" variant="secondary">
                 Get Started
               </GoogleLoginButton>
+              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                Risk-free • Cancel anytime
+              </p>
             </div>
 
             {/* Professional Tier */}
-            <div className="bg-white rounded-xl border-2 border-admin-primary p-8 relative">
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border-2 border-admin-primary p-8 relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-admin-primary text-white px-4 py-1 rounded-full text-sm font-medium">
                   Most Popular
                 </span>
               </div>
               <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 mb-2">Professional</h3>
+                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Professional</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900">€7.99</span>
-                  <span className="text-neutral-600">/month</span>
+                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€7.99</span>
+                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
                 </div>
-                <p className="text-neutral-600">For professionals & teams</p>
+                <p className="text-neutral-600 dark:text-neutral-400">For professionals & teams</p>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700"><strong>1,500 pages/month</strong></span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>1,500 pages/month</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Full AI features</span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>Unlimited users</strong></span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Stored on your Google Drive</span>
+                  <span className="text-neutral-700 dark:text-neutral-300">Bulk processing</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700"><strong>+ Multi-user (3 delegates)</strong></span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Email-to-process</strong> (forward docs)</span>
                 </li>
-                <li className="flex items-center">
-                  <svg className="h-4 w-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700">Priority support</span>
+                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
                 </li>
               </ul>
               <GoogleLoginButton className="w-full">
                 Get Started
               </GoogleLoginButton>
+              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                Risk-free • Cancel anytime
+              </p>
             </div>
           </div>
 
           <div className="mt-12 text-center">
-            <p className="text-neutral-600 text-sm">
+            <p className="text-neutral-600 dark:text-neutral-400 text-sm">
               <strong>Fair use policy:</strong> Consistent usage above 2x stated limits may require an upgrade.
-              Documents stored on your own Google Drive - no storage limits from us!
+            </p>
+            <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2">
+              Documents stored on your cloud - we don't store your files!
             </p>
           </div>
         </div>
@@ -346,10 +474,10 @@ export default function HomePage() {
       <section className="py-20 bg-admin-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to transform your document management?
+            Ready to Never Manually File Documents Again?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Start free with 50 pages/month. Upgrade anytime as you grow.
+            Start free with 50 pages/month. No credit card required.
           </p>
           <GoogleLoginButton size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
             Get Started Free
@@ -371,15 +499,15 @@ export default function HomePage() {
                 <span className="ml-3 text-xl font-bold text-white">Bonifatus DMS</span>
               </div>
               <p className="text-neutral-400">
-                Professional document management for modern businesses.
+                AI-powered document management for modern professionals.
               </p>
             </div>
 
             <div>
               <h3 className="text-white font-semibold mb-4">Product</h3>
               <ul className="space-y-2">
-                <li><Link href="/features" className="hover:text-white transition-colors">Features</Link></li>
-                <li><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
                 <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
               </ul>
             </div>
