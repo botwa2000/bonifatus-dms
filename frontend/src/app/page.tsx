@@ -181,7 +181,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Email Your Documents</h3>
               <p className="text-neutral-600 dark:text-neutral-400">
-                Forward to your@docs.bonidoc.com - we'll process and organize it automatically (Pro)
+                Forward to your@docs.bonidoc.com - we&apos;ll process and organize it automatically (Pro)
               </p>
             </div>
 
@@ -464,7 +464,7 @@ export default function HomePage() {
               <strong>Fair use policy:</strong> Consistent usage above 2x stated limits may require an upgrade.
             </p>
             <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-2">
-              Documents stored on your cloud - we don't store your files!
+              Documents stored on your cloud - we don&apos;t store your files!
             </p>
           </div>
         </div>
