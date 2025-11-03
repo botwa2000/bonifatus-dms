@@ -52,6 +52,7 @@ export default function DocumentDetailPage() {
   const [newKeyword, setNewKeyword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [deletingDocument, setDeletingDocument] = useState(false)
+  const [isReclassifying, setIsReclassifying] = useState(false)
 
   useEffect(() => {
     loadUser()
@@ -172,6 +173,33 @@ export default function DocumentDetailPage() {
       setError('Failed to delete document')
       console.error(err)
       setDeletingDocument(false)
+    }
+  }
+
+  const handleReclassify = async () => {
+    if (!document) return
+
+    try {
+      setIsReclassifying(true)
+      setError(null)
+      setSuccess(null)
+
+      // Trigger document reprocessing
+      await apiClient.post(`/api/v1/documents/${documentId}/reprocess`, {}, true)
+
+      setSuccess('Document is being reclassified. This may take a moment...')
+
+      // Reload document after a short delay to show updated classification
+      setTimeout(() => {
+        loadDocument()
+        setSuccess('Document reclassified successfully!')
+        setTimeout(() => setSuccess(null), 3000)
+      }, 3000)
+    } catch (err) {
+      setError('Failed to reclassify document')
+      console.error('Reclassify error:', err)
+    } finally {
+      setIsReclassifying(false)
     }
   }
 
@@ -458,6 +486,17 @@ export default function DocumentDetailPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   <span>Download</span>
+                </button>
+
+                <button
+                  onClick={handleReclassify}
+                  disabled={isReclassifying}
+                  className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 font-medium disabled:opacity-50"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isReclassifying ? 'Reclassifying...' : 'Reclassify Document'}</span>
                 </button>
 
                 <button

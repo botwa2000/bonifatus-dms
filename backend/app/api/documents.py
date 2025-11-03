@@ -18,6 +18,7 @@ from app.schemas.document_schemas import (
 )
 from app.services.document_service import document_service
 from app.services.drive_service import drive_service
+from app.services.document_analysis_service import DocumentAnalysisService
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User
 
@@ -370,6 +371,71 @@ async def download_document(
 
 
 @router.get(
+    "/{document_id}/content",
+    responses={
+        200: {"description": "Document content for preview", "content": {"application/pdf": {}}},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        500: {"model": ErrorResponse, "description": "Content retrieval failed"}
+    }
+)
+async def get_document_content(
+    document_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get document content for inline preview
+
+    Returns document content with inline disposition for browser preview
+    """
+    try:
+        document = await document_service.get_document(document_id, str(current_user.id))
+
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+
+        # Check if user has connected Google Drive
+        if not current_user.drive_refresh_token_encrypted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please connect your Google Drive account in Settings"
+            )
+
+        file_content_bytes = drive_service.download_document(
+            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            drive_file_id=document.google_drive_file_id
+        )
+
+        if not file_content_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document content not available"
+            )
+
+        logger.info(f"Document content retrieved: {document_id} by user {current_user.email}")
+
+        return StreamingResponse(
+            io.BytesIO(file_content_bytes),
+            media_type=document.mime_type,
+            headers={
+                "Content-Disposition": f"inline; filename=\"{document.file_name}\""
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get document content error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Document content service error"
+        )
+
+
+@router.get(
     "/{document_id}/status",
     response_model=DocumentProcessingStatus,
     responses={
@@ -411,6 +477,84 @@ async def get_document_processing_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Processing status service error"
+        )
+
+
+@router.post(
+    "/{document_id}/reprocess",
+    response_model=DocumentResponse,
+    responses={
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        500: {"model": ErrorResponse, "description": "Reprocessing failed"}
+    }
+)
+async def reprocess_document(
+    document_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_active_user)
+) -> DocumentResponse:
+    """
+    Reprocess document for classification and keyword extraction
+
+    Triggers document analysis, classification, and keyword extraction
+    """
+    try:
+        document = await document_service.get_document(document_id, str(current_user.id))
+
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+
+        # Check if user has connected Google Drive
+        if not current_user.drive_refresh_token_encrypted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please connect your Google Drive account in Settings"
+            )
+
+        # Download document content
+        file_content_bytes = drive_service.download_document(
+            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            drive_file_id=document.google_drive_file_id
+        )
+
+        if not file_content_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document content not available"
+            )
+
+        # Reprocess document with analysis service
+        analysis_service = DocumentAnalysisService()
+        await analysis_service.analyze_document(
+            document_id=document_id,
+            user_id=str(current_user.id),
+            file_content=io.BytesIO(file_content_bytes),
+            mime_type=document.mime_type
+        )
+
+        logger.info(f"Document reprocessed: {document_id} by user {current_user.email}")
+
+        # Return updated document
+        updated_document = await document_service.get_document(document_id, str(current_user.id))
+        if not updated_document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found after reprocessing"
+            )
+
+        return updated_document
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reprocess document error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Document reprocessing service error"
         )
 
 
