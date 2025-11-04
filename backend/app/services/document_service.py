@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, text, and_, or_
 
-from app.database.models import Document, Category, DocumentCategory, CategoryTranslation, User, AuditLog, SystemSetting
+from app.database.models import Document, Category, DocumentCategory, CategoryTranslation, User, AuditLog, SystemSetting, UserSetting
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
 from app.schemas.document_schemas import (
@@ -32,6 +32,25 @@ class DocumentService:
         self._system_settings_cache = {}
         self._cache_timestamp = None
         self._cache_ttl_seconds = 300
+
+    def _get_user_language(self, user_id: str, session: Session) -> str:
+        """Get user's preferred interface language from settings"""
+        try:
+            user_setting = session.execute(
+                select(UserSetting).where(
+                    UserSetting.user_id == user_id,
+                    UserSetting.setting_key == 'language'
+                )
+            ).scalar_one_or_none()
+
+            if user_setting:
+                return user_setting.setting_value
+
+            # Default to English if not set
+            return 'en'
+        except Exception as e:
+            logger.warning(f"Failed to get user language, defaulting to 'en': {e}")
+            return 'en'
 
     def _parse_keywords_to_list(self, keywords_str: Optional[str]) -> Optional[list]:
         """Parse keywords string to list of KeywordItem dicts"""
@@ -312,7 +331,14 @@ class DocumentService:
         """Get document by ID with user access validation"""
         session = db_manager.session_local()
         try:
-            stmt = select(Document, Category).outerjoin(Category).where(
+            # Get user's preferred language
+            user_language = self._get_user_language(user_id, session)
+
+            # Query document with category
+            stmt = select(Document, Category).outerjoin(
+                Category,
+                Document.category_id == Category.id
+            ).where(
                 Document.id == document_id,
                 Document.user_id == user_id
             )
@@ -324,13 +350,37 @@ class DocumentService:
 
             document, category = result
 
+            # Get category translation in user's language
+            category_name = None
+            if category:
+                translation = session.execute(
+                    select(CategoryTranslation).where(
+                        CategoryTranslation.category_id == category.id,
+                        CategoryTranslation.language_code == user_language
+                    )
+                ).scalar_one_or_none()
+
+                if translation:
+                    category_name = translation.name
+                else:
+                    # Fallback to English
+                    translation = session.execute(
+                        select(CategoryTranslation).where(
+                            CategoryTranslation.category_id == category.id,
+                            CategoryTranslation.language_code == 'en'
+                        )
+                    ).scalar_one_or_none()
+                    if translation:
+                        category_name = translation.name
+
             # Parse keywords
             parsed_keywords = self._parse_keywords_to_list(document.keywords)
 
             logger.info(f"[GET_DOCUMENT DEBUG] Document {document_id}:")
             logger.info(f"  - title: {document.title}")
             logger.info(f"  - category_id: {document.category_id}")
-            logger.info(f"  - category_name: {category.name_en if category else None}")
+            logger.info(f"  - category_name: {category_name}")
+            logger.info(f"  - user_language: {user_language}")
             logger.info(f"  - keywords (raw): {document.keywords[:200] if document.keywords else 'None'}")
             logger.info(f"  - keywords (parsed count): {len(parsed_keywords) if parsed_keywords else 0}")
             logger.info(f"  - processing_status: {document.processing_status}")
@@ -350,7 +400,7 @@ class DocumentService:
                 confidence_score=document.confidence_score,
                 primary_language=document.primary_language,
                 category_id=str(document.category_id) if document.category_id else None,
-                category_name=category.name_en if category else None,
+                category_name=category_name,
                 web_view_link=None,
                 created_at=document.created_at,
                 updated_at=document.updated_at
@@ -395,7 +445,8 @@ class DocumentService:
 
             old_values = {
                 "title": document.title,
-                "description": document.description
+                "description": document.description,
+                "keywords": document.keywords
             }
 
             update_data = update_request.dict(exclude_unset=True)
@@ -403,6 +454,9 @@ class DocumentService:
 
             for field, value in update_data.items():
                 if hasattr(document, field) and value is not None:
+                    # Special handling for keywords: convert list to JSON string
+                    if field == 'keywords':
+                        value = json.dumps(value)
                     setattr(document, field, value)
                     new_values[field] = value
 

@@ -222,6 +222,9 @@ class DocumentUploadService:
                 except:
                     logger.warning(f"Failed to parse document_date: {doc_date}")
 
+            # Prepare keywords for storage (as JSON array of strings)
+            keywords_json = json.dumps(confirmed_keywords) if confirmed_keywords else None
+
             # Create document record using ORM
             document = Document(
                 user_id=uuid_lib.UUID(user_id),
@@ -235,6 +238,7 @@ class DocumentUploadService:
                 google_drive_file_id=drive_result['drive_file_id'],
                 web_view_link=drive_result.get('web_view_link'),
                 primary_language=language_code,
+                keywords=keywords_json,
                 processing_status='completed',
                 document_date=doc_date_value,
                 document_date_type=doc_date_type,
@@ -264,25 +268,25 @@ class DocumentUploadService:
                 )
                 session.add(doc_category)
             
-            # Record ML feedback for category prediction learning
+            # Smart ML learning with multi-category support
             suggested_category_id = analysis_result.get('suggested_category_id')
-            actual_category_id = category_ids_ordered[0]  # Primary category
-            matched_keywords = analysis_result.get('matched_keywords', [])
+            primary_category_id = uuid_lib.UUID(category_ids_ordered[0])
+            secondary_category_ids = [uuid_lib.UUID(cid) for cid in category_ids_ordered[1:]]  # Categories 2-5
             document_keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
 
-            logger.info(f"Recording ML feedback: suggested={suggested_category_id}, actual={actual_category_id}")
+            logger.info(f"ML Learning: primary={primary_category_id}, secondary={len(secondary_category_ids)}, AI suggested={suggested_category_id}")
 
-            # Use ML learning service
-            ml_learning_service.learn_from_decision(
-                db=session,
+            # Use enhanced ML learning service with smart weight calculation
+            ml_learning_service.learn_from_classification(
                 document_id=document.id,
-                suggested_category_id=uuid_lib.UUID(suggested_category_id) if suggested_category_id else None,
-                actual_category_id=uuid_lib.UUID(actual_category_id),
-                matched_keywords=matched_keywords,
                 document_keywords=document_keywords,
+                primary_category_id=primary_category_id,
+                secondary_category_ids=secondary_category_ids,
                 language=language_code,
-                confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None,
-                user_id=uuid_lib.UUID(user_id)
+                user_id=uuid_lib.UUID(user_id),
+                ai_predicted_category=uuid_lib.UUID(suggested_category_id) if suggested_category_id else None,
+                ai_confidence=analysis_result.get('classification_confidence', 0) / 100.0 if analysis_result.get('classification_confidence') else None,
+                session=session
             )
 
             # Create audit log entry using ORM

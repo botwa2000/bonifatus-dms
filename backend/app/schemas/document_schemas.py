@@ -54,7 +54,8 @@ class DocumentUpdateRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="Document title")
     description: Optional[str] = Field(None, max_length=1000, description="Document description")
     category_id: Optional[str] = Field(None, description="Category ID")
-    
+    keywords: Optional[List[str]] = Field(None, description="Document keywords")
+
     @validator('title')
     def validate_title(cls, v):
         if v is not None and v.strip() == "":

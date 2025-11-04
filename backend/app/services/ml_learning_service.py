@@ -1,12 +1,20 @@
 """
-ML Learning Service for Bonifatus DMS
-Handles weight adjustments based on user feedback
-Updates category keyword weights when users confirm/correct classifications
+ML Learning Service for Bonifatus DMS - Smart Keyword Learning
+Implements intelligent weight adjustment with:
+- Primary + Secondary category support
+- Aggressive error correction for wrong predictions
+- Differential preservation to maintain clear category boundaries
+- Confidence-based learning rate modifiers
+- Quality filtering for keywords
+
+See ML_LEARNING_SYSTEM.md for complete design documentation
 """
 
 import logging
-from typing import Optional, List
+import json
+from typing import Optional, List, Dict, Set, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import select, and_
 from uuid import UUID
 from datetime import datetime
 
@@ -14,271 +22,461 @@ logger = logging.getLogger(__name__)
 
 
 class MLLearningService:
-    """Service for ML weight adjustment based on user feedback"""
+    """
+    Service for intelligent ML weight adjustment based on user feedback
 
-    def get_learning_config(self, db: Session) -> dict:
-        """
-        Load ML learning configuration from database
-        Returns dict with boost/penalty parameters
-        """
+    Implements the smart learning strategy defined in ML_LEARNING_SYSTEM.md
+    All configuration values loaded from database - NO hardcoded constants
+    """
+
+    def __init__(self):
+        self._config_cache = None
+        self._stopwords_cache = {}
+
+    def _load_config(self, session: Session) -> Dict[str, any]:
+        """Load ML learning configuration from database"""
+        if self._config_cache:
+            return self._config_cache
+
         try:
             from app.database.models import SystemSetting
-            import json
 
-            result = db.query(SystemSetting).filter(
-                SystemSetting.setting_key == 'classification_config'
-            ).first()
-
-            if result:
-                config = json.loads(result.setting_value)
-                return config
-            else:
-                return {
-                    'weight_boost_correct': 0.1,
-                    'weight_penalty_incorrect': 0.05,
-                    'weight_min': 0.1,
-                    'weight_max': 10.0
-                }
-
-        except Exception as e:
-            logger.error(f"Failed to load learning config: {e}")
-            return {
-                'weight_boost_correct': 0.1,
-                'weight_penalty_incorrect': 0.05,
-                'weight_min': 0.1,
-                'weight_max': 10.0
-            }
-
-    def record_classification_decision(
-        self,
-        db: Session,
-        document_id: UUID,
-        suggested_category_id: Optional[UUID],
-        actual_category_id: UUID,
-        document_keywords: List[str],
-        language: str,
-        confidence: Optional[float] = None,
-        user_id: Optional[UUID] = None
-    ) -> bool:
-        """
-        Record a classification decision for tracking and learning
-
-        Args:
-            db: Database session
-            document_id: Document UUID
-            suggested_category_id: AI-suggested category (None if no suggestion)
-            actual_category_id: User's final choice
-            document_keywords: Keywords that were used
-            language: Document language
-            confidence: Confidence score of suggestion
-            user_id: User who made the decision
-
-        Returns:
-            True if recorded successfully
-        """
-        try:
-            from app.database.models import CategoryTrainingData
-
-            was_correct = (suggested_category_id == actual_category_id) if suggested_category_id else False
-
-            training_data = CategoryTrainingData(
-                document_id=document_id,
-                suggested_category_id=suggested_category_id,
-                actual_category_id=actual_category_id,
-                was_correct=was_correct,
-                confidence=confidence,
-                text_sample=", ".join(document_keywords[:20]),
-                language_code=language,
-                user_id=user_id
+            # Load all ML settings
+            result = session.execute(
+                select(SystemSetting).where(
+                    SystemSetting.category == 'ml',
+                    SystemSetting.setting_key.like('ml_%')
+                )
             )
 
-            db.add(training_data)
-            db.commit()
+            config = {}
+            for setting in result.scalars():
+                key = setting.setting_key
+                value = setting.setting_value
 
-            logger.info(f"Recorded classification decision: correct={was_correct}, category={actual_category_id}")
+                # Parse by data type
+                if setting.data_type == 'boolean':
+                    config[key] = value.lower() == 'true'
+                elif setting.data_type == 'integer':
+                    config[key] = int(value)
+                elif setting.data_type == 'float':
+                    config[key] = float(value)
+                else:
+                    config[key] = value
 
-            return True
+            # Cache for session
+            self._config_cache = config
+
+            logger.info(f"Loaded {len(config)} ML configuration parameters from database")
+            return config
 
         except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to record classification decision: {e}")
-            return False
+            logger.error(f"Failed to load ML config from database: {e}")
+            # Return safe defaults if database fails
+            return {
+                'ml_learning_enabled': True,
+                'ml_primary_weight': 1.0,
+                'ml_secondary_weight': 0.3,
+                'ml_correct_prediction_bonus': 0.2,
+                'ml_wrong_prediction_boost': 0.5,
+                'ml_low_confidence_correct_multiplier': 1.5,
+                'ml_high_confidence_wrong_multiplier': 1.3,
+                'ml_min_keywords_required': 3,
+                'ml_min_keyword_length': 3,
+                'ml_min_weight_differential': 0.3,
+                'ml_max_weight': 10.0,
+                'ml_min_weight': 0.1,
+                'ml_learning_rate': 1.0,
+            }
 
-    def adjust_weights_correct_suggestion(
-        self,
-        db: Session,
-        category_id: UUID,
-        matched_keywords: List[str],
-        language: str
-    ) -> int:
-        """
-        Boost weights for keywords when suggestion was correct
+    def _load_stopwords(self, session: Session, language: str) -> Set[str]:
+        """Load stopwords from database for given language"""
+        if language in self._stopwords_cache:
+            return self._stopwords_cache[language]
 
-        Args:
-            db: Database session
-            category_id: Category that was correctly suggested
-            matched_keywords: Keywords that matched
-            language: Document language
-
-        Returns:
-            Number of keywords updated
-        """
         try:
-            from app.database.models import CategoryKeyword
+            from app.database.models import StopWord
 
-            config = self.get_learning_config(db)
-            boost_factor = 1.0 + config['weight_boost_correct']
-            max_weight = config['weight_max']
+            result = session.execute(
+                select(StopWord).where(
+                    StopWord.language_code == language,
+                    StopWord.is_active == True
+                )
+            )
 
-            updated_count = 0
+            stopwords = {sw.word.lower() for sw in result.scalars()}
+            self._stopwords_cache[language] = stopwords
 
-            for keyword in matched_keywords:
-                keyword_lower = keyword.lower()
-
-                existing = db.query(CategoryKeyword).filter(
-                    CategoryKeyword.category_id == category_id,
-                    CategoryKeyword.keyword == keyword_lower,
-                    CategoryKeyword.language_code == language
-                ).first()
-
-                if existing:
-                    new_weight = min(existing.weight * boost_factor, max_weight)
-                    existing.weight = new_weight
-                    existing.match_count += 1
-                    existing.last_matched_at = datetime.utcnow()
-                    updated_count += 1
-
-            db.commit()
-
-            logger.info(f"Boosted weights for {updated_count} keywords in category {category_id}")
-
-            return updated_count
+            logger.info(f"Loaded {len(stopwords)} stopwords for language: {language}")
+            return stopwords
 
         except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to boost keyword weights: {e}")
-            return 0
+            logger.error(f"Failed to load stopwords for {language}: {e}")
+            return set()
 
-    def adjust_weights_incorrect_suggestion(
+    def _filter_quality_keywords(
         self,
-        db: Session,
-        suggested_category_id: UUID,
-        actual_category_id: UUID,
-        matched_keywords: List[str],
-        language: str
-    ) -> int:
-        """
-        Penalize weights for incorrect suggestion, boost weights for correct category
-
-        Args:
-            db: Database session
-            suggested_category_id: Category that was incorrectly suggested
-            actual_category_id: Category that user selected
-            matched_keywords: Keywords that led to wrong suggestion
-            language: Document language
-
-        Returns:
-            Number of keywords updated
-        """
-        try:
-            from app.database.models import CategoryKeyword
-
-            config = self.get_learning_config(db)
-            penalty_factor = 1.0 - config['weight_penalty_incorrect']
-            min_weight = config['weight_min']
-
-            updated_count = 0
-
-            for keyword in matched_keywords:
-                keyword_lower = keyword.lower()
-
-                wrong_category_kw = db.query(CategoryKeyword).filter(
-                    CategoryKeyword.category_id == suggested_category_id,
-                    CategoryKeyword.keyword == keyword_lower,
-                    CategoryKeyword.language_code == language
-                ).first()
-
-                if wrong_category_kw:
-                    new_weight = max(wrong_category_kw.weight * penalty_factor, min_weight)
-                    wrong_category_kw.weight = new_weight
-                    updated_count += 1
-
-            db.commit()
-
-            logger.info(f"Penalized weights for {updated_count} keywords in incorrect category {suggested_category_id}")
-
-            return updated_count
-
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to adjust keyword weights: {e}")
-            return 0
-
-    def learn_from_decision(
-        self,
-        db: Session,
-        document_id: UUID,
-        suggested_category_id: Optional[UUID],
-        actual_category_id: UUID,
-        matched_keywords: List[str],
-        document_keywords: List[str],
+        keywords: List[str],
         language: str,
-        confidence: Optional[float] = None,
-        user_id: Optional[UUID] = None
+        session: Session,
+        config: Dict
+    ) -> List[str]:
+        """
+        Filter keywords based on quality criteria:
+        - Remove stopwords
+        - Remove too short keywords
+        - Remove numeric-only keywords
+        """
+        stopwords = self._load_stopwords(session, language)
+        min_length = config.get('ml_min_keyword_length', 3)
+
+        filtered = []
+        for kw in keywords:
+            kw_lower = kw.lower().strip()
+
+            # Skip empty
+            if not kw_lower:
+                continue
+
+            # Skip too short
+            if len(kw_lower) < min_length:
+                continue
+
+            # Skip stopwords
+            if kw_lower in stopwords:
+                continue
+
+            # Skip numeric-only
+            if kw_lower.isdigit():
+                continue
+
+            filtered.append(kw_lower)
+
+        logger.info(f"Filtered keywords: {len(keywords)} → {len(filtered)} (removed {len(keywords) - len(filtered)})")
+        return filtered
+
+    def _calculate_weight_adjustment(
+        self,
+        is_primary: bool,
+        ai_predicted_category: Optional[UUID],
+        category_id: UUID,
+        ai_confidence: Optional[float],
+        config: Dict
+    ) -> float:
+        """
+        Calculate weight adjustment for a keyword in a category
+
+        Returns: Float adjustment to add to current weight
+        """
+        # Base weight by category role
+        if is_primary:
+            adjustment = config['ml_primary_weight']
+        else:
+            adjustment = config['ml_secondary_weight']
+
+        # AI feedback bonus/boost (only for primary category)
+        if is_primary and ai_predicted_category:
+            if ai_predicted_category == category_id:
+                # AI was correct - small reinforcement
+                adjustment += config['ml_correct_prediction_bonus']
+
+                # Low confidence correct? Learn more
+                if ai_confidence and ai_confidence < 0.5:
+                    adjustment *= config['ml_low_confidence_correct_multiplier']
+
+            else:
+                # AI was wrong - aggressive correction
+                adjustment += config['ml_wrong_prediction_boost']
+
+                # High confidence wrong? Learn even more
+                if ai_confidence and ai_confidence > 0.8:
+                    adjustment *= config['ml_high_confidence_wrong_multiplier']
+
+        # Apply global learning rate
+        adjustment *= config['ml_learning_rate']
+
+        return adjustment
+
+    def _ensure_differential_preservation(
+        self,
+        primary_category_id: UUID,
+        keyword: str,
+        language: str,
+        primary_new_weight: float,
+        session: Session,
+        config: Dict
+    ) -> float:
+        """
+        Ensure primary category maintains minimum weight differential over others
+
+        Returns: Adjusted weight for primary category (may be boosted)
+        """
+        from app.database.models import CategoryKeyword
+
+        min_differential = config['ml_min_weight_differential']
+
+        # Get weights of this keyword in OTHER categories
+        result = session.execute(
+            select(CategoryKeyword).where(
+                CategoryKeyword.keyword == keyword,
+                CategoryKeyword.language_code == language,
+                CategoryKeyword.category_id != primary_category_id
+            )
+        )
+
+        other_keywords = result.scalars().all()
+
+        if not other_keywords:
+            # No overlap, no need for differential boost
+            return primary_new_weight
+
+        # Find highest weight in other categories
+        max_other_weight = max(kw.weight for kw in other_keywords)
+
+        # Check differential
+        differential = primary_new_weight - max_other_weight
+
+        if differential < min_differential:
+            # Need to boost primary to maintain clear winner
+            boost_needed = min_differential - differential
+            primary_new_weight += boost_needed
+            logger.info(f"Differential preservation: keyword '{keyword}' boosted by {boost_needed:.2f} to maintain {min_differential} gap")
+
+        return primary_new_weight
+
+    def _apply_weight_update(
+        self,
+        category_id: UUID,
+        keyword: str,
+        language: str,
+        weight_adjustment: float,
+        session: Session,
+        config: Dict
+    ) -> None:
+        """Update or create CategoryKeyword with new weight"""
+        from app.database.models import CategoryKeyword
+
+        # Find existing keyword
+        existing = session.execute(
+            select(CategoryKeyword).where(
+                CategoryKeyword.category_id == category_id,
+                CategoryKeyword.keyword == keyword,
+                CategoryKeyword.language_code == language
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            # Update existing
+            new_weight = existing.weight + weight_adjustment
+
+            # Clamp to bounds
+            new_weight = max(config['ml_min_weight'], min(config['ml_max_weight'], new_weight))
+
+            existing.weight = new_weight
+            existing.match_count += 1
+            existing.last_matched_at = datetime.utcnow()
+
+            logger.debug(f"Updated keyword '{keyword}' in category {category_id}: {existing.weight - weight_adjustment:.2f} → {new_weight:.2f}")
+
+        else:
+            # Create new keyword
+            new_weight = weight_adjustment
+
+            # Clamp to bounds
+            new_weight = max(config['ml_min_weight'], min(config['ml_max_weight'], new_weight))
+
+            new_keyword = CategoryKeyword(
+                category_id=category_id,
+                keyword=keyword,
+                language_code=language,
+                weight=new_weight,
+                match_count=1,
+                last_matched_at=datetime.utcnow(),
+                is_system=False  # Learned keywords are not system keywords
+            )
+            session.add(new_keyword)
+
+            logger.debug(f"Created keyword '{keyword}' in category {category_id}: weight={new_weight:.2f}")
+
+    def learn_from_classification(
+        self,
+        document_id: UUID,
+        document_keywords: List[str],
+        primary_category_id: UUID,
+        secondary_category_ids: List[UUID],
+        language: str,
+        user_id: UUID,
+        ai_predicted_category: Optional[UUID] = None,
+        ai_confidence: Optional[float] = None,
+        session: Session = None
     ) -> bool:
         """
-        Complete learning workflow: record decision and adjust weights
+        Main entry point: Learn from document classification decision
 
         Args:
-            db: Database session
             document_id: Document UUID
-            suggested_category_id: AI-suggested category
-            actual_category_id: User's final choice
-            matched_keywords: Keywords that matched for suggestion
-            document_keywords: All document keywords
+            document_keywords: Keywords extracted from document
+            primary_category_id: User's primary category choice
+            secondary_category_ids: User's secondary category choices (0-4 categories)
             language: Document language
-            confidence: Confidence score
-            user_id: User who made the decision
+            user_id: User who made classification
+            ai_predicted_category: What AI predicted (optional)
+            ai_confidence: AI's confidence score 0-1 (optional)
+            session: Database session
 
         Returns:
             True if learning completed successfully
         """
         try:
-            self.record_classification_decision(
-                db,
-                document_id,
-                suggested_category_id,
-                actual_category_id,
+            # Load configuration
+            config = self._load_config(session)
+
+            if not config.get('ml_learning_enabled', True):
+                logger.info("ML learning is disabled in configuration")
+                return False
+
+            # Filter quality keywords
+            quality_keywords = self._filter_quality_keywords(
                 document_keywords,
                 language,
-                confidence,
-                user_id
+                session,
+                config
             )
 
-            if suggested_category_id == actual_category_id:
-                self.adjust_weights_correct_suggestion(
-                    db,
-                    actual_category_id,
-                    matched_keywords,
-                    language
-                )
-                logger.info("Learning: Boosted weights for correct suggestion")
+            min_required = config.get('ml_min_keywords_required', 3)
+            if len(quality_keywords) < min_required:
+                logger.info(f"Not enough quality keywords for learning: {len(quality_keywords)} < {min_required}")
+                return False
 
-            elif suggested_category_id is not None:
-                self.adjust_weights_incorrect_suggestion(
-                    db,
-                    suggested_category_id,
-                    actual_category_id,
-                    matched_keywords,
-                    language
-                )
-                logger.info("Learning: Adjusted weights for incorrect suggestion")
+            logger.info(f"Learning from {len(quality_keywords)} keywords across {1 + len(secondary_category_ids)} categories")
 
+            # Process primary category
+            for keyword in quality_keywords:
+                # Calculate weight adjustment
+                adjustment = self._calculate_weight_adjustment(
+                    is_primary=True,
+                    ai_predicted_category=ai_predicted_category,
+                    category_id=primary_category_id,
+                    ai_confidence=ai_confidence,
+                    config=config
+                )
+
+                # Apply update
+                self._apply_weight_update(
+                    primary_category_id,
+                    keyword,
+                    language,
+                    adjustment,
+                    session,
+                    config
+                )
+
+            # After primary updates, apply differential preservation
+            session.flush()  # Ensure weights are updated before checking differentials
+
+            for keyword in quality_keywords:
+                # Get current weight after update
+                from app.database.models import CategoryKeyword
+                primary_kw = session.execute(
+                    select(CategoryKeyword).where(
+                        CategoryKeyword.category_id == primary_category_id,
+                        CategoryKeyword.keyword == keyword,
+                        CategoryKeyword.language_code == language
+                    )
+                ).scalar_one_or_none()
+
+                if primary_kw:
+                    adjusted_weight = self._ensure_differential_preservation(
+                        primary_category_id,
+                        keyword,
+                        language,
+                        primary_kw.weight,
+                        session,
+                        config
+                    )
+
+                    if adjusted_weight != primary_kw.weight:
+                        primary_kw.weight = adjusted_weight
+
+            # Process secondary categories (all get equal weight)
+            for secondary_id in secondary_category_ids:
+                for keyword in quality_keywords:
+                    adjustment = self._calculate_weight_adjustment(
+                        is_primary=False,
+                        ai_predicted_category=None,  # No AI feedback for secondary
+                        category_id=secondary_id,
+                        ai_confidence=None,
+                        config=config
+                    )
+
+                    self._apply_weight_update(
+                        secondary_id,
+                        keyword,
+                        language,
+                        adjustment,
+                        session,
+                        config
+                    )
+
+            # Log learning event
+            self._log_learning_event(
+                document_id=document_id,
+                user_id=user_id,
+                primary_category_id=primary_category_id,
+                secondary_category_ids=secondary_category_ids,
+                ai_predicted_category=ai_predicted_category,
+                ai_confidence=ai_confidence,
+                keywords_learned=quality_keywords,
+                language=language,
+                session=session
+            )
+
+            session.commit()
+
+            logger.info(f"✓ Learning completed: {len(quality_keywords)} keywords learned across {1 + len(secondary_category_ids)} categories")
             return True
 
         except Exception as e:
-            logger.error(f"Learning workflow failed: {e}")
+            logger.error(f"Learning failed: {e}", exc_info=True)
+            session.rollback()
             return False
 
+    def _log_learning_event(
+        self,
+        document_id: UUID,
+        user_id: UUID,
+        primary_category_id: UUID,
+        secondary_category_ids: List[UUID],
+        ai_predicted_category: Optional[UUID],
+        ai_confidence: Optional[float],
+        keywords_learned: List[str],
+        language: str,
+        session: Session
+    ) -> None:
+        """Log the learning event for analytics"""
+        try:
+            from app.database.models import CategoryTrainingData
 
+            was_correct = (ai_predicted_category == primary_category_id) if ai_predicted_category else None
+
+            training_data = CategoryTrainingData(
+                document_id=document_id,
+                suggested_category_id=ai_predicted_category,
+                actual_category_id=primary_category_id,
+                was_correct=was_correct if was_correct is not None else False,
+                confidence=ai_confidence,
+                text_sample=", ".join(keywords_learned[:20]),
+                language_code=language,
+                user_id=user_id
+            )
+
+            session.add(training_data)
+
+            logger.debug(f"Logged learning event: correct={was_correct}, keywords={len(keywords_learned)}")
+
+        except Exception as e:
+            logger.warning(f"Failed to log learning event: {e}")
+
+
+# Singleton instance
 ml_learning_service = MLLearningService()
