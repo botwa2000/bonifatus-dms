@@ -5,6 +5,7 @@ Production-ready implementation with comprehensive error handling
 """
 
 import logging
+import json
 import uuid as uuid_lib
 import hashlib
 import re

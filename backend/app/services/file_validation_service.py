@@ -352,10 +352,14 @@ class FileValidationService:
             if not scan_result.is_safe:
                 # Malware or exploit detected
                 threat_details = "; ".join(scan_result.threats)
-                logger.warning(f"Malware detected in {filename}: {threat_details}")
+                logger.warning(f"Security threat detected in {filename}: {threat_details}")
+
+                # Provide clear user-facing error message
+                user_message = f"File upload blocked for security reasons.\n\nDetails: {threat_details}\n\nThis file cannot be uploaded. If you believe this is an error, please contact support."
+
                 return ValidationResult(
                     allowed=False,
-                    error_message=f"Security threat detected: {threat_details}"
+                    error_message=user_message
                 )
 
             # File is safe, but may have warnings
@@ -366,11 +370,11 @@ class FileValidationService:
 
         except Exception as e:
             logger.error(f"Malware scan error: {e}", exc_info=True)
-            # Fail-open: Allow file if scanner fails (ClamAV may not be ready yet)
-            # But add warning so user knows scan didn't complete
+            # FAIL-CLOSED: Reject file if malware scanning system fails
+            # This is a security-first approach to prevent infected files from being uploaded
             return ValidationResult(
-                allowed=True,
-                warnings=[f"Security scan unavailable: {str(e)}"]
+                allowed=False,
+                error_message=f"Security scanning system error - upload rejected for safety. Please try again later or contact support."
             )
     
     def calculate_file_hash(self, file_content: BinaryIO) -> str:
