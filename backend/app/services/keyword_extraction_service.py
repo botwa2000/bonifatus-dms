@@ -176,9 +176,10 @@ class KeywordExtractionService:
         text: str,
         db: Session,
         language: str = 'en',
-        max_keywords: int = 50,
+        max_keywords: int = 1000,
         min_frequency: int = 1,
-        user_id: str = None
+        user_id: str = None,
+        stopwords: set = None
     ) -> List[Tuple[str, int, float]]:
         """
         Extract keywords using HYBRID approach:
@@ -191,10 +192,11 @@ class KeywordExtractionService:
         Args:
             text: Document text
             db: Database session for loading stop words and category keywords
-            language: Language code for stop word filtering
-            max_keywords: Maximum number of keywords to return
+            language: Language code for stop word filtering and tokenization
+            max_keywords: Maximum number of keywords to return (default: 1000)
             min_frequency: Minimum frequency for a keyword
             user_id: User ID to get their category keywords
+            stopwords: Optional pre-loaded stopwords set (if None, loads from db for language)
 
         Returns:
             List of tuples (keyword, frequency, relevance_score)
@@ -205,7 +207,8 @@ class KeywordExtractionService:
                 logger.warning("Text too short for keyword extraction")
                 return []
 
-            stop_words = self.get_stop_words(db, language)
+            # Use provided stopwords or load from database
+            stop_words = stopwords if stopwords is not None else self.get_stop_words(db, language)
             normalized_text = self.normalize_text(text)
             tokens = self.tokenize(normalized_text)
             filtered_tokens = self.filter_tokens(tokens, stop_words)

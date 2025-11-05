@@ -92,36 +92,37 @@ class DocumentAnalysisService:
                         )
 
             # MULTI-LANGUAGE CLASSIFICATION FIX:
-            # Extract keywords across ALL user's preferred languages, not just detected language
-            # This ensures German docs are matched against German keywords even if detected as EN
+            # PHASE 1: Conservative multi-language stopword filtering
+            # Load stopwords from ALL user preferred languages to catch errors in language detection
             user_preferred_languages = [detected_language]
             if user_id:
                 from app.database.models import User
                 user = db.get(User, UUID(user_id))
                 if user and user.preferred_doc_languages:
                     user_preferred_languages = user.preferred_doc_languages
-                    logger.info(f"[MULTI-LANG DEBUG] User preferred doc languages: {user_preferred_languages}")
+                    logger.info(f"[STOPWORD DEBUG] User preferred languages: {user_preferred_languages}")
 
-            # Extract keywords in ALL user's preferred languages
-            all_keywords_tuples = []  # For response
-            all_keywords_strings = set()  # For classification
-
+            # Combine stopwords from all preferred languages
+            combined_stopwords = set()
             for lang in user_preferred_languages:
-                lang_keywords = keyword_extraction_service.extract_keywords(
-                    text=extracted_text,
-                    db=db,
-                    language=lang,
-                    max_keywords=50,
-                    user_id=user_id
-                )
-                lang_keyword_strings = [kw[0] for kw in lang_keywords]
-                all_keywords_strings.update(lang_keyword_strings)
-                all_keywords_tuples.extend(lang_keywords)  # Keep tuples for response
-                logger.info(f"[MULTI-LANG DEBUG] Extracted {len(lang_keyword_strings)} keywords in {lang}: {lang_keyword_strings[:5]}{'...' if len(lang_keyword_strings) > 5 else ''}")
+                lang_stopwords = keyword_extraction_service.get_stop_words(db, lang)
+                combined_stopwords.update(lang_stopwords)
+                logger.info(f"[STOPWORD DEBUG] Loaded {len(lang_stopwords)} stopwords for {lang}")
 
-            keyword_strings = list(all_keywords_strings)
-            keywords = all_keywords_tuples  # For response validation below
-            logger.info(f"[KEYWORD DEBUG] Total unique keywords across all languages: {len(keyword_strings)}")
+            logger.info(f"[STOPWORD DEBUG] Combined {len(combined_stopwords)} stopwords from {len(user_preferred_languages)} languages")
+
+            # Extract keywords ONCE using detected language with combined stopwords
+            keywords = keyword_extraction_service.extract_keywords(
+                text=extracted_text,
+                db=db,
+                language=detected_language,
+                stopwords=combined_stopwords,
+                max_keywords=1000,  # No artificial limit - let frequency and relevance determine quality
+                user_id=user_id
+            )
+
+            keyword_strings = [kw[0] for kw in keywords]
+            logger.info(f"[KEYWORD DEBUG] Extracted {len(keyword_strings)} keywords using combined stopwords, top 10: {keyword_strings[:10]}")
 
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
@@ -140,9 +141,9 @@ class DocumentAnalysisService:
                 user_id=user_uuid
             )
 
-            # Filter and validate keywords before creating response
+            # Filter and validate all keywords before creating response (no arbitrary limit)
             validated_keywords = []
-            for idx, kw in enumerate(keywords[:20]):
+            for idx, kw in enumerate(keywords):
                 if not kw or len(kw) != 3:
                     logger.warning(f"Skipping invalid keyword tuple at index {idx}: kw={repr(kw)}, type={type(kw).__name__}, len={len(kw) if kw else 'N/A'}")
                     continue
@@ -163,7 +164,7 @@ class DocumentAnalysisService:
 
                 validated_keywords.append({'word': word, 'count': count, 'relevance': relevance})
 
-            logger.info(f"Validated {len(validated_keywords)}/20 keywords for response")
+            logger.info(f"Validated {len(validated_keywords)}/{len(keywords)} keywords for response")
 
             # Note: Standardized filename will be generated during confirmation
             # when we have the confirmed primary category code

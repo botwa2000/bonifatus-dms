@@ -107,7 +107,7 @@ export default function DocumentDetailPage() {
       setIsSaving(true)
       setError(null)
 
-      await apiClient.patch(
+      await apiClient.put(
         `/api/v1/documents/${documentId}`,
         { category_id: selectedCategoryId },
         true
@@ -131,7 +131,7 @@ export default function DocumentDetailPage() {
       setIsSaving(true)
       setError(null)
 
-      await apiClient.patch(
+      await apiClient.put(
         `/api/v1/documents/${documentId}`,
         { keywords: editedKeywords },
         true
