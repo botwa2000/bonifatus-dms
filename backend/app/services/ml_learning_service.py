@@ -292,7 +292,7 @@ class MLLearningService:
                 weight=new_weight,
                 match_count=1,
                 last_matched_at=datetime.utcnow(),
-                is_system=False  # Learned keywords are not system keywords
+                is_system_default=False  # Learned keywords are not system keywords
             )
             session.add(new_keyword)
 
