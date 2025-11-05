@@ -324,6 +324,12 @@ export default function HomePage() {
                   <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
+                  <span className="text-neutral-700 dark:text-neutral-300">AI-powered categorization & smart learning</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
                   <span className="text-neutral-700 dark:text-neutral-300">One-by-one processing</span>
                 </li>
                 <li className="flex items-start">
@@ -331,12 +337,6 @@ export default function HomePage() {
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                   <span className="text-neutral-700 dark:text-neutral-300">Google Drive storage</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
                 </li>
               </ul>
               <GoogleLoginButton className="w-full" variant="secondary">
@@ -368,7 +368,7 @@ export default function HomePage() {
                   <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>2 users</strong></span>
+                  <span className="text-neutral-700 dark:text-neutral-300">1 user</span>
                 </li>
                 <li className="flex items-start">
                   <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -382,12 +382,6 @@ export default function HomePage() {
                   </svg>
                   <span className="text-neutral-700 dark:text-neutral-300">Google Drive storage</span>
                 </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
-                </li>
               </ul>
               <GoogleLoginButton className="w-full" variant="secondary">
                 Get Started
@@ -398,10 +392,10 @@ export default function HomePage() {
             </div>
 
             {/* Professional Tier */}
-            <div className="bg-white dark:bg-neutral-900 rounded-xl border-2 border-admin-primary p-8 relative">
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border-2 border-orange-500 p-8 relative opacity-75">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-admin-primary text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Most Popular
+                <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+                  Coming Soon
                 </span>
               </div>
               <div className="text-center mb-8">
@@ -443,16 +437,10 @@ export default function HomePage() {
                   </svg>
                   <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box</span>
                 </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Email support</span>
-                </li>
               </ul>
-              <GoogleLoginButton className="w-full">
-                Get Started
-              </GoogleLoginButton>
+              <Button className="w-full" variant="secondary" disabled>
+                Coming Soon
+              </Button>
               <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
                 Risk-free • Cancel anytime
               </p>
