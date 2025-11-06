@@ -1,7 +1,7 @@
 """Add unique constraints on keywords and stopwords
 
-Revision ID: 016_add_unique_constraints_keywords_stopwords
-Revises: 015_populate_ml_learning_config
+Revision ID: 016_unique_constraints
+Revises: 015_ml_config
 Create Date: 2025-11-06 21:00:00.000000
 
 This migration adds unique constraints to prevent duplicates:
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
 
-revision = '016_add_unique_constraints_keywords_stopwords'
-down_revision = '015_populate_ml_learning_config'
+revision = '016_unique_constraints'
+down_revision = '015_ml_config'
 branch_labels = None
 depends_on = None
 
