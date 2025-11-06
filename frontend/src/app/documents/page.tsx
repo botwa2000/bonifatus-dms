@@ -55,8 +55,9 @@ export default function DocumentsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('') // Immediate input state
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -79,6 +80,16 @@ export default function DocumentsPage() {
       loadCategories()
     }
   }, [isAuthenticated])
+
+  // Debounce search input (wait 500ms after user stops typing)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput)
+      setCurrentPage(1)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const loadCategories = async () => {
     try {
@@ -128,8 +139,7 @@ export default function DocumentsPage() {
   }, [isAuthenticated, loadDocuments])
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    setCurrentPage(1)
+    setSearchInput(query) // Debounced via useEffect
   }
 
   const handleCategoryFilter = (categoryId: string) => {
@@ -326,9 +336,9 @@ export default function DocumentsPage() {
                 <input
                   type="text"
                   placeholder="Search documents..."
-                  value={searchQuery}
+                  value={searchInput}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary dark:bg-neutral-800 dark:border-neutral-600 dark:text-neutral-100"
                 />
               </div>
               
@@ -385,7 +395,7 @@ export default function DocumentsPage() {
 
                   <div className="flex items-center justify-between mb-3">
                     {doc.category_name && (
-                      <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700">
+                      <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
                         {doc.category_name}
                       </span>
                     )}
@@ -508,11 +518,11 @@ export default function DocumentsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {doc.category_name ? (
-                          <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700">
+                          <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
                             {doc.category_name}
                           </span>
                         ) : (
-                          <span className="text-sm text-neutral-400">Uncategorized</span>
+                          <span className="text-sm text-neutral-400 dark:text-neutral-500">Uncategorized</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">

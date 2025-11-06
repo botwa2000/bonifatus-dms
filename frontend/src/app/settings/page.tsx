@@ -247,13 +247,18 @@ export default function SettingsPage() {
     setMessage(null)
 
     try {
+      console.log('[CATEGORY RESET] Resetting categories to defaults...')
       const response = await apiClient.post<{ message: string, created: string[], skipped: string[] }>(
         '/api/v1/categories/restore-defaults',
         {},
         true
       )
+      console.log('[CATEGORY RESET] ✅ Reset successful:', response)
+      console.log(`[CATEGORY RESET] Created categories: ${response.created.join(', ')}`)
+      console.log(`[CATEGORY RESET] Message: ${response.message}`)
       setMessage({ type: 'success', text: response.message })
-    } catch {
+    } catch (error) {
+      console.error('[CATEGORY RESET] ❌ Reset failed:', error)
       setMessage({ type: 'error', text: 'Failed to reset categories. Please try again.' })
     } finally {
       setResettingCategories(false)

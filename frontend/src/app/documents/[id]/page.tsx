@@ -80,6 +80,10 @@ export default function DocumentDetailPage() {
         true
       )
 
+      console.log('[DOCUMENT DETAIL] Loaded document:', data)
+      console.log('[DOCUMENT DETAIL] category_id:', data.category_id)
+      console.log('[DOCUMENT DETAIL] category_name:', data.category_name)
+
       setDocument(data)
       setSelectedCategoryId(data.category_id || '')
       setEditedKeywords(data.keywords?.map(k => k.keyword) || [])

@@ -182,12 +182,13 @@ class KeywordExtractionService:
         stopwords: set = None
     ) -> List[Tuple[str, int, float]]:
         """
-        Extract keywords using HYBRID approach:
-        1. Category-aware: Extract ANY word matching category keywords (high priority)
-        2. Frequency-based: Extract top frequent words (medium priority)
+        Extract keywords using HYBRID approach with CORRECT order:
+        1. Load category keywords FIRST (these must NEVER be filtered)
+        2. Filter stopwords BUT preserve category keywords
+        3. Extract keywords with priority scoring
 
         This ensures important classification terms like "rechnung", "invoice" are
-        ALWAYS extracted even if they appear only once.
+        ALWAYS extracted even if they appear only once or in stopwords.
 
         Args:
             text: Document text
@@ -207,21 +208,7 @@ class KeywordExtractionService:
                 logger.warning("Text too short for keyword extraction")
                 return []
 
-            # Use provided stopwords or load from database
-            stop_words = stopwords if stopwords is not None else self.get_stop_words(db, language)
-            normalized_text = self.normalize_text(text)
-            tokens = self.tokenize(normalized_text)
-            filtered_tokens = self.filter_tokens(tokens, stop_words)
-
-            if not filtered_tokens:
-                logger.warning("No keywords after filtering")
-                return []
-
-            frequency = Counter(filtered_tokens)
-            total_tokens = len(filtered_tokens)
-            max_freq = max(frequency.values())
-
-            # STEP 1: Get all category keywords for this user/language (for matching)
+            # STEP 1: Get category keywords FIRST (these must NEVER be filtered out)
             category_keywords_set = set()
             if user_id:
                 from sqlalchemy import text as sql_text
@@ -233,13 +220,50 @@ class KeywordExtractionService:
                     AND ck.language_code = :lang
                 """), {'user_id': user_id, 'lang': language})
                 category_keywords_set = {row[0] for row in result}
-                logger.info(f"Loaded {len(category_keywords_set)} category keywords for matching")
+                logger.info(f"[KEYWORD EXTRACTION] Loaded {len(category_keywords_set)} category keywords for user (lang={language})")
+                if category_keywords_set:
+                    logger.info(f"[KEYWORD EXTRACTION] Sample category keywords: {', '.join(list(category_keywords_set)[:10])}")
 
-            # STEP 2: Extract keywords with priority scoring
+            # STEP 2: Load stopwords and tokenize
+            stop_words = stopwords if stopwords is not None else self.get_stop_words(db, language)
+            logger.info(f"[KEYWORD EXTRACTION] Loaded {len(stop_words)} stopwords for language '{language}'")
+
+            normalized_text = self.normalize_text(text)
+            tokens = self.tokenize(normalized_text)
+            logger.info(f"[KEYWORD EXTRACTION] Tokenized {len(tokens)} total tokens from text")
+
+            # STEP 3: Filter stopwords BUT preserve category keywords
+            # Category keywords MUST be kept even if they appear in stopwords!
+            filtered_tokens = []
+            preserved_category_keywords = set()
+
+            for token in tokens:
+                if token in category_keywords_set:
+                    # Keep category keyword even if it's a stopword!
+                    filtered_tokens.append(token)
+                    preserved_category_keywords.add(token)
+                elif token not in stop_words:
+                    # Keep non-stopword
+                    filtered_tokens.append(token)
+
+            logger.info(f"[KEYWORD EXTRACTION] After filtering: {len(filtered_tokens)} tokens (preserved {len(preserved_category_keywords)} category keywords)")
+            if preserved_category_keywords:
+                logger.info(f"[KEYWORD EXTRACTION] Preserved category keywords found in text: {', '.join(preserved_category_keywords)}")
+
+            if not filtered_tokens:
+                logger.warning("No keywords after filtering")
+                return []
+
+            frequency = Counter(filtered_tokens)
+            total_tokens = len(filtered_tokens)
+            max_freq = max(frequency.values())
+
+            # STEP 4: Extract keywords with priority scoring
             keywords = []
             extracted_words = set()
 
             # Priority 1: Words that match category keywords (even if freq=1)
+            category_matches = 0
             for word in frequency:
                 if word in category_keywords_set:
                     count = frequency[word]
@@ -248,6 +272,9 @@ class KeywordExtractionService:
                     relevance = min(relevance * 1.5, 100.0)
                     keywords.append((word, count, relevance))
                     extracted_words.add(word)
+                    category_matches += 1
+
+            logger.info(f"[KEYWORD EXTRACTION] Found {category_matches} category keyword matches in document")
 
             # Priority 2: Top frequent words (up to max_keywords, skip already extracted)
             for word, count in frequency.most_common(max_keywords):

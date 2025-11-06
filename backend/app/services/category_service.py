@@ -645,6 +645,7 @@ class CategoryService:
                     )
                 ).scalars().all()
 
+                keywords_copied = 0
                 for keyword in keywords:
                     new_keyword = CategoryKeyword(
                         category_id=new_category.id,
@@ -655,10 +656,14 @@ class CategoryService:
                         is_system_default=keyword.is_system_default
                     )
                     session.add(new_keyword)
+                    keywords_copied += 1
 
                 # Get English name for reporting
                 en_trans = next((t for t in translations if t.language_code == 'en'), None)
-                created_names.append(en_trans.name if en_trans else template_cat.reference_key)
+                category_name = en_trans.name if en_trans else template_cat.reference_key
+                created_names.append(category_name)
+
+                logger.info(f"[CATEGORY RESET] Copied {len(translations)} translations and {keywords_copied} keywords for category '{category_name}' ({template_cat.reference_key})")
 
             session.flush()
 
