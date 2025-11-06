@@ -334,13 +334,23 @@ class DocumentService:
             # Get user's preferred language
             user_language = self._get_user_language(user_id, session)
 
-            # Query document with category
-            stmt = select(Document, Category).outerjoin(
-                Category,
-                Document.category_id == Category.id
-            ).where(
-                Document.id == document_id,
-                Document.user_id == user_id
+            # Query document with category using document_categories junction table (same as list view)
+            from app.database.models import DocumentCategory
+            stmt = (
+                select(Document, Category, CategoryTranslation)
+                .outerjoin(DocumentCategory, and_(
+                    DocumentCategory.document_id == Document.id,
+                    DocumentCategory.is_primary == True
+                ))
+                .outerjoin(Category, Category.id == DocumentCategory.category_id)
+                .outerjoin(CategoryTranslation, and_(
+                    CategoryTranslation.category_id == Category.id,
+                    CategoryTranslation.language_code == user_language
+                ))
+                .where(
+                    Document.id == document_id,
+                    Document.user_id == user_id
+                )
             )
             result = session.execute(stmt).first()
 
@@ -348,37 +358,31 @@ class DocumentService:
                 logger.warning(f"[GET_DOCUMENT DEBUG] Document {document_id} not found for user {user_id}")
                 return None
 
-            document, category = result
+            document, category, category_translation = result
 
-            # Get category translation in user's language
+            # Get category name from translation
             category_name = None
-            if category:
-                translation = session.execute(
+            if category_translation and category_translation.name:
+                category_name = category_translation.name
+            elif category:
+                # Fallback to English if user's language not available
+                en_translation = session.execute(
                     select(CategoryTranslation).where(
                         CategoryTranslation.category_id == category.id,
-                        CategoryTranslation.language_code == user_language
+                        CategoryTranslation.language_code == 'en'
                     )
                 ).scalar_one_or_none()
-
-                if translation:
-                    category_name = translation.name
+                if en_translation:
+                    category_name = en_translation.name
                 else:
-                    # Fallback to English
-                    translation = session.execute(
-                        select(CategoryTranslation).where(
-                            CategoryTranslation.category_id == category.id,
-                            CategoryTranslation.language_code == 'en'
-                        )
-                    ).scalar_one_or_none()
-                    if translation:
-                        category_name = translation.name
+                    category_name = category.reference_key  # Last resort fallback
 
             # Parse keywords
             parsed_keywords = self._parse_keywords_to_list(document.keywords)
 
             logger.info(f"[GET_DOCUMENT DEBUG] Document {document_id}:")
             logger.info(f"  - title: {document.title}")
-            logger.info(f"  - category_id: {document.category_id}")
+            logger.info(f"  - category_id (from junction table): {category.id if category else None}")
             logger.info(f"  - category_name: {category_name}")
             logger.info(f"  - user_language: {user_language}")
             logger.info(f"  - keywords (raw): {document.keywords[:200] if document.keywords else 'None'}")
@@ -399,7 +403,7 @@ class DocumentService:
                 keywords=parsed_keywords,
                 confidence_score=document.confidence_score,
                 primary_language=document.primary_language,
-                category_id=str(document.category_id) if document.category_id else None,
+                category_id=str(category.id) if category else None,
                 category_name=category_name,
                 web_view_link=None,
                 created_at=document.created_at,

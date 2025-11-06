@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
-import { Button, Alert, Badge } from '@/components/ui'
+import { Button, Alert, Badge, SpinnerFullPage, SpinnerOverlay } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import { useEffect, useState, useCallback } from 'react'
@@ -52,7 +52,8 @@ export default function DocumentsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -104,22 +105,22 @@ export default function DocumentsPage() {
     try {
       setIsLoading(true)
       setError(null)
-      
+
       const params = new URLSearchParams({
         page: currentPage.toString(),
         page_size: '12',
         sort_by: sortField,
         sort_order: sortDirection
       })
-      
+
       if (searchQuery) params.append('query', searchQuery)
       if (selectedCategory) params.append('category_id', selectedCategory)
-      
+
       const data = await apiClient.get<DocumentsResponse>(
         `/api/v1/documents?${params.toString()}`,
         true
       )
-      
+
       setDocuments(data.documents)
       setTotalCount(data.total_count)
       setTotalPages(data.total_pages)
@@ -128,6 +129,7 @@ export default function DocumentsPage() {
       console.error('Load documents error:', err)
     } finally {
       setIsLoading(false)
+      setIsInitialLoad(false)
     }
   }, [currentPage, searchQuery, selectedCategory, sortField, sortDirection])
 
@@ -270,15 +272,8 @@ export default function DocumentsPage() {
     </div>
   )
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading documents...</p>
-        </div>
-      </div>
-    )
+  if (authLoading || isInitialLoad) {
+    return <SpinnerFullPage message="Loading documents..." />
   }
 
   const totalSize = documents.reduce((sum, doc) => sum + doc.file_size, 0)
@@ -329,7 +324,9 @@ export default function DocumentsPage() {
           />
         </div>
 
-        <div className="bg-white rounded-lg border border-neutral-200 mb-6">
+        <div className="bg-white rounded-lg border border-neutral-200 mb-6 relative">
+          {isLoading && <SpinnerOverlay message="Updating..." />}
+
           <div className="px-6 py-4 border-b border-neutral-200">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
               <div className="flex-1 max-w-md">
