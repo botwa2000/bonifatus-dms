@@ -396,7 +396,7 @@ export default function DocumentsPage() {
                     <span className="text-xs text-neutral-500">{formatDate(doc.created_at)}</span>
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => router.push(`/documents/${doc.id}`)}
+                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${doc.id}/content`, '_blank')}
                         className="text-neutral-600 hover:text-admin-primary"
                         title="Preview"
                       >
@@ -527,7 +527,7 @@ export default function DocumentsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end space-x-2">
                           <button
-                            onClick={() => router.push(`/documents/${doc.id}`)}
+                            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${doc.id}/content`, '_blank')}
                             className="text-neutral-600 hover:text-admin-primary"
                             title="Preview"
                           >

@@ -92,7 +92,7 @@ def check_stop_words():
     try:
         print_separator("STOP WORDS")
 
-        for lang in ['de', 'en', 'ru']:
+        for lang in ['de', 'en', 'ru', 'fr']:
             stop_words = db.query(StopWord).filter(
                 StopWord.language_code == lang,
                 StopWord.is_active == True
@@ -100,10 +100,27 @@ def check_stop_words():
 
             print(f"\n{lang.upper()}: {len(stop_words)} stop words")
             if stop_words:
-                words_list = [sw.word for sw in stop_words[:30]]
-                print(f"  Sample: {', '.join(words_list)}")
-                if len(stop_words) > 30:
-                    print(f"  ... and {len(stop_words) - 30} more")
+                words_list = sorted([sw.word for sw in stop_words])
+
+                # For German, show ALL words to check completeness
+                if lang == 'de':
+                    print(f"  All German stopwords:")
+                    for i in range(0, len(words_list), 10):
+                        chunk = words_list[i:i+10]
+                        print(f"    {', '.join(chunk)}")
+
+                    # Check for missing critical words
+                    critical_words = ['sehr', 'ihnen', 'diese', 'dieser', 'diesem', 'für']
+                    missing = [w for w in critical_words if w not in words_list]
+                    if missing:
+                        print(f"\n  ⚠️  Missing critical German stopwords: {', '.join(missing)}")
+                    else:
+                        print(f"\n  ✅ All critical German stopwords present")
+                else:
+                    # For other languages, just show sample
+                    print(f"  Sample: {', '.join(words_list[:30])}")
+                    if len(stop_words) > 30:
+                        print(f"  ... and {len(stop_words) - 30} more")
 
     finally:
         db.close()
@@ -465,16 +482,16 @@ def main():
     print("  BONIFATUS DMS - DATABASE INSPECTION TOOL")
     print("=" * 70)
 
-    # Check French language configuration
-    check_french_language_config()
+    # Check stopwords (focused on German)
+    check_stop_words()
 
-    # COMMENTED OUT - Uncomment to run full checks
+    # COMMENTED OUT - Uncomment to run other checks
+    # check_french_language_config()
     # check_migration_006()
     # check_category_standardization()
     # check_per_user_architecture()
     # check_admin_users()
     # check_categories_and_keywords()
-    # check_stop_words()
     # search_keyword("rechnung", "de")
     # search_keyword("invoice", "en")
     # search_keyword("volksbank", "de")
