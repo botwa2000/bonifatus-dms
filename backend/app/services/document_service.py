@@ -52,6 +52,60 @@ class DocumentService:
             logger.warning(f"Failed to get user language, defaulting to 'en': {e}")
             return 'en'
 
+    def _get_document_categories(self, document_id: UUID, user_language: str, session: Session) -> List[Dict[str, any]]:
+        """
+        Get all categories for a document from junction table
+        Returns list of category dicts with id, name, is_primary
+        """
+        from app.database.models import DocumentCategory
+        from app.schemas.document_schemas import CategoryInfo
+
+        try:
+            # Query all categories for this document through junction table
+            stmt = (
+                select(DocumentCategory, Category, CategoryTranslation)
+                .join(Category, Category.id == DocumentCategory.category_id)
+                .outerjoin(CategoryTranslation, and_(
+                    CategoryTranslation.category_id == Category.id,
+                    CategoryTranslation.language_code == user_language
+                ))
+                .where(DocumentCategory.document_id == document_id)
+                .order_by(DocumentCategory.is_primary.desc(), Category.reference_key)
+            )
+
+            results = session.execute(stmt).all()
+
+            categories = []
+            for doc_cat, category, category_translation in results:
+                # Use translated name if available, otherwise fallback to English
+                category_name = None
+                if category_translation and category_translation.name:
+                    category_name = category_translation.name
+                else:
+                    # Fallback to English translation
+                    en_translation = session.execute(
+                        select(CategoryTranslation).where(
+                            CategoryTranslation.category_id == category.id,
+                            CategoryTranslation.language_code == 'en'
+                        )
+                    ).scalar_one_or_none()
+                    if en_translation:
+                        category_name = en_translation.name
+                    else:
+                        category_name = category.reference_key  # Last resort
+
+                categories.append({
+                    "id": str(category.id),
+                    "name": category_name,
+                    "is_primary": doc_cat.is_primary
+                })
+
+            return categories
+
+        except Exception as e:
+            logger.error(f"Failed to get document categories: {e}")
+            return []
+
     def _parse_keywords_to_list(self, keywords_str: Optional[str]) -> Optional[list]:
         """Parse keywords string to list of KeywordItem dicts"""
         if not keywords_str:
@@ -380,10 +434,14 @@ class DocumentService:
             # Parse keywords
             parsed_keywords = self._parse_keywords_to_list(document.keywords)
 
+            # Get all categories for this document
+            all_categories = self._get_document_categories(document.id, user_language, session)
+
             logger.info(f"[GET_DOCUMENT DEBUG] Document {document_id}:")
             logger.info(f"  - title: {document.title}")
             logger.info(f"  - category_id (from junction table): {category.id if category else None}")
             logger.info(f"  - category_name: {category_name}")
+            logger.info(f"  - all_categories: {len(all_categories)} categories")
             logger.info(f"  - user_language: {user_language}")
             logger.info(f"  - keywords (raw): {document.keywords[:200] if document.keywords else 'None'}")
             logger.info(f"  - keywords (parsed count): {len(parsed_keywords) if parsed_keywords else 0}")
@@ -405,6 +463,7 @@ class DocumentService:
                 primary_language=document.primary_language,
                 category_id=str(category.id) if category else None,
                 category_name=category_name,
+                categories=all_categories,
                 web_view_link=None,
                 created_at=document.created_at,
                 updated_at=document.updated_at
@@ -458,11 +517,19 @@ class DocumentService:
 
             # Special handling for category_id - update junction table
             if 'category_id' in update_data and update_data['category_id'] is not None:
-                from app.database.models import DocumentCategory
+                from app.database.models import DocumentCategory, User
 
                 new_category_id = update_data['category_id']
+
+                # Get old primary category before making changes
+                old_primary_category = session.query(DocumentCategory).filter(
+                    DocumentCategory.document_id == doc_uuid,
+                    DocumentCategory.is_primary == True
+                ).first()
+                old_category_id = str(old_primary_category.category_id) if old_primary_category else None
+
                 logger.info(f"[UPDATE DEBUG] Updating category for document {document_id}")
-                logger.info(f"[UPDATE DEBUG] Old category_id: {document.category_id}")
+                logger.info(f"[UPDATE DEBUG] Old category_id: {old_category_id}")
                 logger.info(f"[UPDATE DEBUG] New category_id: {new_category_id}")
 
                 # Remove old category assignments
@@ -486,6 +553,42 @@ class DocumentService:
 
                     new_values['category_id'] = new_category_id
                     logger.info(f"[UPDATE DEBUG] ✅ Category updated in junction table and Document model")
+
+                    # Move file in Google Drive if category changed
+                    if old_category_id and old_category_id != new_category_id:
+                        logger.info(f"[DRIVE MOVE] Category changed, moving file in Google Drive")
+                        try:
+                            # Get user's refresh token and main folder
+                            user = session.get(User, user_uuid)
+                            if user and user.google_refresh_token:
+                                # Get new category info
+                                new_category = session.get(Category, new_category_uuid)
+                                if new_category:
+                                    # Get category folder ID
+                                    new_folder_id = drive_service.get_or_create_category_folder(
+                                        user.google_refresh_token,
+                                        new_category.name,
+                                        new_category.reference_key,
+                                        user.google_drive_folder_id
+                                    )
+
+                                    # Move file to new category folder
+                                    success = drive_service.move_document_to_folder(
+                                        user.google_refresh_token,
+                                        document.google_drive_file_id,
+                                        new_folder_id
+                                    )
+
+                                    if success:
+                                        logger.info(f"[DRIVE MOVE] ✅ File moved successfully to {new_category.name} folder")
+                                    else:
+                                        logger.warning(f"[DRIVE MOVE] ⚠️ Failed to move file in Drive")
+                            else:
+                                logger.warning(f"[DRIVE MOVE] ⚠️ User refresh token not available")
+                        except Exception as e:
+                            logger.error(f"[DRIVE MOVE] ❌ Error moving file in Drive: {e}")
+                            # Don't fail the update if Drive move fails
+
                 except ValueError:
                     logger.error(f"[UPDATE DEBUG] ❌ Invalid category ID format: {new_category_id}")
 
@@ -615,6 +718,9 @@ class DocumentService:
         """Search documents with filters and pagination"""
         session = db_manager.session_local()
         try:
+            # Get user's preferred language
+            user_language = self._get_user_language(user_id, session)
+
             page = search_request.page or await self._get_system_setting("default_documents_page_size", 20)
             page_size = search_request.page_size or await self._get_system_setting("default_documents_page_size", 20)
             sort_by = search_request.sort_by or await self._get_system_setting("default_documents_sort_field", "created_at")
@@ -692,6 +798,9 @@ class DocumentService:
                 elif category:
                     category_name = category.reference_key  # Fallback to reference key
 
+                # Get all categories for this document
+                all_categories = self._get_document_categories(document.id, user_language, session)
+
                 documents.append(DocumentResponse(
                     id=str(document.id),
                     title=document.title,
@@ -707,6 +816,7 @@ class DocumentService:
                     primary_language=document.primary_language,
                     category_id=str(category.id) if category else None,
                     category_name=category_name,
+                    categories=all_categories,
                     web_view_link=None,
                     created_at=document.created_at,
                     updated_at=document.updated_at

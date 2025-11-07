@@ -17,6 +17,12 @@ interface Category {
   color_hex: string
 }
 
+interface CategoryInfo {
+  id: string
+  name: string
+  is_primary: boolean
+}
+
 interface Document {
   id: string
   title: string
@@ -27,6 +33,7 @@ interface Document {
   processing_status: string
   category_id?: string
   category_name?: string
+  categories?: CategoryInfo[]
   created_at: string
   updated_at: string
 }
@@ -403,11 +410,26 @@ export default function DocumentsPage() {
                   )}
 
                   <div className="flex items-center justify-between mb-3">
-                    {doc.category_name && (
-                      <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
-                        {doc.category_name}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {doc.categories && doc.categories.length > 0 ? (
+                        doc.categories.map((cat) => (
+                          <span
+                            key={cat.id}
+                            className={`text-xs px-2 py-1 rounded ${
+                              cat.is_primary
+                                ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
+                                : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+                            }`}
+                          >
+                            {cat.name}
+                          </span>
+                        ))
+                      ) : doc.category_name ? (
+                        <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                          {doc.category_name}
+                        </span>
+                      ) : null}
+                    </div>
                     {getStatusBadge(doc.processing_status)}
                   </div>
 
@@ -525,14 +547,29 @@ export default function DocumentsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {doc.category_name ? (
-                          <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
-                            {doc.category_name}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-neutral-400 dark:text-neutral-500">Uncategorized</span>
-                        )}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {doc.categories && doc.categories.length > 0 ? (
+                            doc.categories.map((cat) => (
+                              <span
+                                key={cat.id}
+                                className={`text-sm px-2 py-1 rounded ${
+                                  cat.is_primary
+                                    ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
+                                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+                                }`}
+                              >
+                                {cat.name}
+                              </span>
+                            ))
+                          ) : doc.category_name ? (
+                            <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                              {doc.category_name}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-neutral-400 dark:text-neutral-500">Uncategorized</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                         {formatFileSize(doc.file_size)}

@@ -335,6 +335,22 @@ class MLLearningService:
                 logger.info("ML learning is disabled in configuration")
                 return False
 
+            # CRITICAL: Never learn keywords for "Other" category
+            # "Other" is a fallback category and should not accumulate keywords
+            from app.database.models import Category
+            primary_category = session.get(Category, primary_category_id)
+            if primary_category and primary_category.reference_key == 'OTH':
+                logger.info(f"[ML LEARNING] Skipping learning for 'Other' category (reference_key=OTH)")
+                return False
+
+            # Also skip if any secondary categories are "Other"
+            if secondary_category_ids:
+                for sec_cat_id in secondary_category_ids:
+                    sec_category = session.get(Category, sec_cat_id)
+                    if sec_category and sec_category.reference_key == 'OTH':
+                        logger.warning(f"[ML LEARNING] Skipping learning because 'Other' is in secondary categories")
+                        return False
+
             # Filter quality keywords
             quality_keywords = self._filter_quality_keywords(
                 document_keywords,

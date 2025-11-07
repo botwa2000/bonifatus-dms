@@ -24,6 +24,12 @@ interface FileAnalysisSuccess {
   analysis: {
     keywords?: Array<{word: string, count: number, relevance: number}>
     suggested_category_id: string | null
+    suggested_categories?: Array<{  // NEW: Multi-category support
+      category_id: string
+      category_name: string
+      confidence: number
+      matched_keywords: string[]
+    }>
     confidence: number
     detected_language?: string
     language_warning?: string | null
@@ -258,11 +264,18 @@ export default function BatchUploadPage() {
             }
           }
 
+          // NEW: Use multi-category suggestions if available, otherwise fall back to single category
+          const suggestedCategoryIds = r.analysis.suggested_categories && r.analysis.suggested_categories.length > 0
+            ? r.analysis.suggested_categories.map(cat => cat.category_id)
+            : (r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [])
+
+          const primaryCategoryId = suggestedCategoryIds.length > 0 ? suggestedCategoryIds[0] : null
+
           return {
             ...r,
             file: selectedFiles.find(f => f.name === r.original_filename)!,
-            selected_categories: r.analysis.suggested_category_id ? [r.analysis.suggested_category_id] : [],
-            primary_category: r.analysis.suggested_category_id,
+            selected_categories: suggestedCategoryIds,
+            primary_category: primaryCategoryId,
             confirmed_keywords: (r.analysis?.keywords && Array.isArray(r.analysis.keywords))
               ? r.analysis.keywords
                   .slice(0, 10)

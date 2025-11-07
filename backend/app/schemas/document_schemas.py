@@ -28,6 +28,13 @@ class KeywordItem(BaseModel):
     relevance: float = Field(default=1.0, description="Keyword relevance score")
 
 
+class CategoryInfo(BaseModel):
+    """Category assignment information"""
+    id: str = Field(..., description="Category ID")
+    name: str = Field(..., description="Category name")
+    is_primary: bool = Field(default=False, description="Is primary category")
+
+
 class DocumentResponse(BaseModel):
     """Response model for document information"""
     id: str = Field(..., description="Document ID")
@@ -42,8 +49,9 @@ class DocumentResponse(BaseModel):
     keywords: Optional[List[KeywordItem]] = Field(None, description="Extracted keywords")
     confidence_score: Optional[int] = Field(None, description="AI confidence score")
     primary_language: Optional[str] = Field(None, description="Primary detected language")
-    category_id: Optional[str] = Field(None, description="Assigned category ID")
-    category_name: Optional[str] = Field(None, description="Category name")
+    category_id: Optional[str] = Field(None, description="Assigned category ID (primary, backward compat)")
+    category_name: Optional[str] = Field(None, description="Category name (primary, backward compat)")
+    categories: Optional[List[CategoryInfo]] = Field(None, description="All assigned categories")
     web_view_link: Optional[str] = Field(None, description="Google Drive view link")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

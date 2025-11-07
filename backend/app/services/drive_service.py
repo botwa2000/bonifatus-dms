@@ -376,6 +376,52 @@ class DriveService:
             logger.error(f"Document deletion error: {e}")
             return False
 
+    def move_document_to_folder(
+        self,
+        refresh_token_encrypted: str,
+        drive_file_id: str,
+        new_folder_id: str
+    ) -> bool:
+        """
+        Move document to a different folder in Google Drive
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from user
+            drive_file_id: Google Drive file ID to move
+            new_folder_id: Target folder ID
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            service = self._get_drive_service(refresh_token_encrypted)
+
+            # Get current file metadata including parents
+            file = service.files().get(
+                fileId=drive_file_id,
+                fields='parents'
+            ).execute()
+
+            previous_parents = ",".join(file.get('parents', []))
+
+            # Move file to new folder (remove from old, add to new)
+            service.files().update(
+                fileId=drive_file_id,
+                addParents=new_folder_id,
+                removeParents=previous_parents,
+                fields='id, parents'
+            ).execute()
+
+            logger.info(f"Document moved successfully: {drive_file_id} to folder {new_folder_id}")
+            return True
+
+        except HttpError as e:
+            logger.error(f"Failed to move document: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Document move error: {e}")
+            return False
+
 
 # Singleton instance
 drive_service = DriveService()

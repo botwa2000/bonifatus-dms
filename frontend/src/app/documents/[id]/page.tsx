@@ -16,6 +16,12 @@ interface Category {
   color_hex: string
 }
 
+interface CategoryInfo {
+  id: string
+  name: string
+  is_primary: boolean
+}
+
 interface Document {
   id: string
   title: string
@@ -26,6 +32,7 @@ interface Document {
   processing_status: string
   category_id?: string
   category_name?: string
+  categories?: CategoryInfo[]
   created_at: string
   updated_at: string
   document_date?: string
@@ -357,10 +364,30 @@ export default function DocumentDetailPage() {
                   </div>
                 </div>
               ) : (
-                <div>
-                  <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100">
-                    {document.category_name || 'Uncategorized'}
-                  </span>
+                <div className="flex flex-wrap gap-2">
+                  {document.categories && document.categories.length > 0 ? (
+                    document.categories.map((cat) => (
+                      <span
+                        key={cat.id}
+                        className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
+                          cat.is_primary
+                            ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
+                            : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100'
+                        }`}
+                      >
+                        {cat.name}
+                        {cat.is_primary && <span className="ml-1 text-xs">(Primary)</span>}
+                      </span>
+                    ))
+                  ) : document.category_name ? (
+                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100">
+                      {document.category_name}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500">
+                      Uncategorized
+                    </span>
+                  )}
                 </div>
               )}
             </div>
