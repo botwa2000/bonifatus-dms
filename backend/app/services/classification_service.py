@@ -269,6 +269,73 @@ class ClassificationService:
             logger.error(f"Document classification failed: {e}")
             return []
 
+    def get_suggested_categories(
+        self,
+        classification_results: List[Tuple[UUID, str, float, List[str]]],
+        db: Session,
+        max_categories: int = 3
+    ) -> List[Tuple[UUID, str, float, List[str]]]:
+        """
+        Get all categories that match closely (within gap threshold)
+
+        When multiple categories have similar scores, return ALL of them
+        instead of rejecting to "Other". This allows multi-category assignment.
+
+        Args:
+            classification_results: Sorted list of classification results
+            db: Database session for loading thresholds
+            max_categories: Maximum number of categories to suggest (default 3)
+
+        Returns:
+            List of tuples (category_id, category_name, score, matched_keywords)
+            Empty list if no categories meet minimum confidence
+        """
+        logger.info(f"[CLASSIFICATION DEBUG] === Selecting categories (multi-category mode) ===")
+
+        if not classification_results:
+            logger.info(f"[CLASSIFICATION DEBUG] No classification results to evaluate")
+            return []
+
+        config = self.get_classification_config(db)
+        min_confidence = config['min_confidence']
+        gap_threshold = config['gap_threshold']
+
+        logger.info(f"[CLASSIFICATION DEBUG] Thresholds: min_confidence={min_confidence}, gap_threshold={gap_threshold}, max_categories={max_categories}")
+
+        # Get top category
+        top_category = classification_results[0]
+        top_score = top_category[2]
+        top_name = top_category[1]
+
+        logger.info(f"[CLASSIFICATION DEBUG] Top candidate: {top_name} with score {top_score:.3f}")
+
+        if top_score < min_confidence:
+            logger.info(f"[CLASSIFICATION DEBUG] REJECTED: Top score {top_score:.3f} below minimum confidence {min_confidence}")
+            return []
+
+        # Collect all categories within gap_threshold of top score
+        suggested = [top_category]
+
+        for i in range(1, min(len(classification_results), max_categories)):
+            category = classification_results[i]
+            score = category[2]
+            name = category[1]
+            gap = top_score - score
+
+            logger.info(f"[CLASSIFICATION DEBUG] Candidate #{i+1}: {name} with score {score:.3f}, gap={gap:.3f}")
+
+            if gap < gap_threshold:
+                # Within threshold - include this category
+                suggested.append(category)
+                logger.info(f"[CLASSIFICATION DEBUG] ✅ INCLUDED: {name} (gap {gap:.3f} < threshold {gap_threshold})")
+            else:
+                # Gap too large - stop looking
+                logger.info(f"[CLASSIFICATION DEBUG] ❌ EXCLUDED: {name} (gap {gap:.3f} >= threshold {gap_threshold})")
+                break
+
+        logger.info(f"[CLASSIFICATION DEBUG] Selected {len(suggested)} categories: {[c[1] for c in suggested]}")
+        return suggested
+
     def get_primary_category(
         self,
         classification_results: List[Tuple[UUID, str, float, List[str]]],
@@ -276,6 +343,9 @@ class ClassificationService:
     ) -> Optional[Tuple[UUID, str, float, List[str]]]:
         """
         Select primary category based on confidence thresholds
+
+        NEW BEHAVIOR: If multiple categories match closely, returns the top one
+        and logs that multi-category assignment should be used
 
         Args:
             classification_results: Sorted list of classification results
@@ -306,17 +376,12 @@ class ClassificationService:
             logger.info(f"[CLASSIFICATION DEBUG] REJECTED: Top score {top_score:.3f} below minimum confidence {min_confidence}")
             return None
 
-        if len(classification_results) > 1:
-            second_category = classification_results[1]
-            second_score = second_category[2]
-            second_name = second_category[1]
-            gap = top_score - second_score
+        # NEW: Check for multiple close matches (multi-category scenario)
+        close_matches = self.get_suggested_categories(classification_results, db)
 
-            logger.info(f"[CLASSIFICATION DEBUG] Second candidate: {second_name} with score {second_score:.3f}, gap={gap:.3f}")
-
-            if gap < gap_threshold:
-                logger.info(f"[CLASSIFICATION DEBUG] REJECTED: Gap {gap:.3f} below threshold {gap_threshold}, ambiguous classification")
-                return None
+        if len(close_matches) > 1:
+            logger.info(f"[CLASSIFICATION DEBUG] ⚠️  MULTI-CATEGORY MATCH: {len(close_matches)} categories within threshold")
+            logger.info(f"[CLASSIFICATION DEBUG] Returning primary: {top_name}, but document should be assigned to all {len(close_matches)} categories")
 
         logger.info(f"[CLASSIFICATION DEBUG] ACCEPTED: {top_name} as primary category")
         return top_category

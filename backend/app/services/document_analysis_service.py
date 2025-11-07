@@ -133,13 +133,38 @@ class DocumentAnalysisService:
             # Convert user_id string to UUID for classification service
             user_uuid = UUID(user_id) if user_id else None
 
-            # Classify using multi-language keywords
-            suggested_category = classification_service.suggest_category(
+            # Classify using multi-language keywords - get ALL close matches
+            classification_results = classification_service.classify_document(
                 document_keywords=keyword_strings,
                 db=db,
                 language=detected_language,
                 user_id=user_uuid
             )
+
+            # Get multiple suggested categories if they match closely
+            suggested_categories_list = classification_service.get_suggested_categories(
+                classification_results=classification_results,
+                db=db,
+                max_categories=3
+            )
+
+            # Get primary category (fallback to OTHER if needed)
+            suggested_category = None
+            if suggested_categories_list:
+                # Use the top category from multi-category matches
+                suggested_category = suggested_categories_list[0]
+                logger.info(f"[ANALYSIS DEBUG] Selected {len(suggested_categories_list)} categories for assignment")
+            else:
+                # No confident match - fallback to OTHER
+                logger.info(f"[ANALYSIS DEBUG] No confident matches, using fallback to OTHER")
+                suggested_category = classification_service.suggest_category(
+                    document_keywords=keyword_strings,
+                    db=db,
+                    language=detected_language,
+                    user_id=user_uuid,
+                    fallback_to_other=True
+                )
+                suggested_categories_list = [suggested_category] if suggested_category else []
 
             # Filter and validate all keywords before creating response (no arbitrary limit)
             validated_keywords = []
@@ -184,6 +209,7 @@ class DocumentAnalysisService:
                 'suggested_category_name': None,
                 'classification_confidence': None,
                 'matched_keywords': [],
+                'suggested_categories': [],  # NEW: All close-matching categories
                 'original_filename': file_name,
                 'file_info': {
                     'name': file_name,
@@ -198,13 +224,31 @@ class DocumentAnalysisService:
                 analysis_result['document_date_type'] = date_type
                 analysis_result['document_date_confidence'] = round(date_conf * 100, 1)
 
-            if suggested_category:
+            # Add all suggested categories (multi-category support)
+            if suggested_categories_list:
+                # Primary category (for backward compatibility)
                 cat_id, cat_name, confidence, matched = suggested_category
                 analysis_result['suggested_category_id'] = str(cat_id)
                 analysis_result['suggested_category_name'] = cat_name
                 analysis_result['classification_confidence'] = round(confidence * 100, 1)
                 analysis_result['matched_keywords'] = matched[:10]
-                logger.info(f"[ANALYSIS DEBUG] ✅ Suggested category: {cat_name} (confidence: {confidence:.1%}, matched: {len(matched)})")
+
+                # All suggested categories
+                analysis_result['suggested_categories'] = [
+                    {
+                        'category_id': str(cat[0]),
+                        'category_name': cat[1],
+                        'confidence': round(cat[2] * 100, 1),
+                        'matched_keywords': cat[3][:5]  # Top 5 matched keywords per category
+                    }
+                    for cat in suggested_categories_list
+                ]
+
+                if len(suggested_categories_list) > 1:
+                    logger.info(f"[ANALYSIS DEBUG] ✅ Suggested {len(suggested_categories_list)} categories (multi-match): {', '.join([c[1] for c in suggested_categories_list])}")
+                    logger.info(f"[ANALYSIS DEBUG] Primary: {cat_name} (confidence: {confidence:.1%}, matched: {len(matched)})")
+                else:
+                    logger.info(f"[ANALYSIS DEBUG] ✅ Suggested category: {cat_name} (confidence: {confidence:.1%}, matched: {len(matched)})")
             else:
                 logger.warning(f"[ANALYSIS DEBUG] ⚠️  No category suggested for document (this should never happen if fallback_to_other=True)")
 
