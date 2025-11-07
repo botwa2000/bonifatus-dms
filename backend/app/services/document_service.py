@@ -456,6 +456,43 @@ class DocumentService:
             update_data = update_request.dict(exclude_unset=True)
             new_values = {}
 
+            # Special handling for category_id - update junction table
+            if 'category_id' in update_data and update_data['category_id'] is not None:
+                from app.database.models import DocumentCategory
+
+                new_category_id = update_data['category_id']
+                logger.info(f"[UPDATE DEBUG] Updating category for document {document_id}")
+                logger.info(f"[UPDATE DEBUG] Old category_id: {document.category_id}")
+                logger.info(f"[UPDATE DEBUG] New category_id: {new_category_id}")
+
+                # Remove old category assignments
+                session.query(DocumentCategory).filter(
+                    DocumentCategory.document_id == doc_uuid
+                ).delete()
+
+                # Add new category assignment (as primary)
+                try:
+                    new_category_uuid = uuid.UUID(new_category_id)
+                    new_assignment = DocumentCategory(
+                        document_id=doc_uuid,
+                        category_id=new_category_uuid,
+                        is_primary=True,
+                        assigned_at=datetime.utcnow()
+                    )
+                    session.add(new_assignment)
+
+                    # Also update backward-compatibility field
+                    document.category_id = new_category_uuid
+
+                    new_values['category_id'] = new_category_id
+                    logger.info(f"[UPDATE DEBUG] ✅ Category updated in junction table and Document model")
+                except ValueError:
+                    logger.error(f"[UPDATE DEBUG] ❌ Invalid category ID format: {new_category_id}")
+
+                # Remove from update_data to avoid duplicate processing
+                del update_data['category_id']
+
+            # Handle other fields
             for field, value in update_data.items():
                 if hasattr(document, field) and value is not None:
                     # Special handling for keywords: convert list to JSON string
