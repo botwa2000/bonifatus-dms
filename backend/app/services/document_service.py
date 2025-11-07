@@ -8,6 +8,7 @@ import logging
 import json
 import mimetypes
 import uuid
+from uuid import UUID
 from typing import Optional, Dict, Any, List, BinaryIO
 from datetime import datetime
 from sqlalchemy.orm import Session
