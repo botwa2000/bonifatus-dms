@@ -22,7 +22,15 @@ import type { NextRequest } from 'next/server'
 // Protected routes that require authentication
 const PROTECTED_PATHS = ['/dashboard', '/documents', '/settings', '/categories', '/profile']
 
+// OAuth callback routes that should be accessible even if session expired
+// Backend API endpoints handle authentication, these routes just process redirects
+const OAUTH_CALLBACK_PATHS = ['/settings/drive/callback']
+
 function isProtectedRoute(pathname: string): boolean {
+  // Exclude OAuth callbacks from auth check
+  if (OAUTH_CALLBACK_PATHS.some(path => pathname.startsWith(path))) {
+    return false
+  }
   return PROTECTED_PATHS.some(path => pathname.startsWith(path))
 }
 
