@@ -79,6 +79,7 @@ class MLLearningService:
                 'ml_secondary_weight': 0.3,
                 'ml_correct_prediction_bonus': 0.2,
                 'ml_wrong_prediction_boost': 0.5,
+                'ml_wrong_prediction_penalty': 0.3,  # NEW: reduce weight in wrongly predicted category
                 'ml_low_confidence_correct_multiplier': 1.5,
                 'ml_high_confidence_wrong_multiplier': 1.3,
                 'ml_min_keywords_required': 3,
@@ -298,6 +299,110 @@ class MLLearningService:
 
             logger.debug(f"Created keyword '{keyword}' in category {category_id}: weight={new_weight:.2f}")
 
+    def _apply_negative_learning(
+        self,
+        wrong_category_id: UUID,
+        keywords: List[str],
+        language: str,
+        session: Session,
+        config: Dict
+    ) -> None:
+        """
+        Reduce weights for keywords in the wrongly predicted category
+
+        This prevents keywords from accumulating in wrong categories
+        """
+        from app.database.models import CategoryKeyword
+
+        penalty = config.get('ml_wrong_prediction_penalty', 0.3)
+
+        for keyword in keywords:
+            existing = session.execute(
+                select(CategoryKeyword).where(
+                    CategoryKeyword.category_id == wrong_category_id,
+                    CategoryKeyword.keyword == keyword,
+                    CategoryKeyword.language_code == language
+                )
+            ).scalar_one_or_none()
+
+            if existing:
+                # Reduce weight
+                new_weight = existing.weight - penalty
+                new_weight = max(config['ml_min_weight'], new_weight)
+
+                existing.weight = new_weight
+                logger.debug(f"[NEGATIVE LEARNING] Reduced '{keyword}' in wrong category: -{penalty:.2f} → {new_weight:.2f}")
+
+    def _filter_distinctive_keywords(
+        self,
+        keywords: List[str],
+        primary_category_id: UUID,
+        language: str,
+        session: Session,
+        config: Dict
+    ) -> List[str]:
+        """
+        Filter keywords to only those that are distinctive to the primary category
+
+        A keyword is NOT distinctive if:
+        - It already exists in multiple other categories with similar/higher weight
+        - It's a generic term that appears across many categories
+
+        Returns: List of distinctive keywords safe to learn
+        """
+        from app.database.models import CategoryKeyword
+        from sqlalchemy import func
+
+        distinctive = []
+        min_differential = config.get('ml_min_weight_differential', 0.3)
+
+        for keyword in keywords:
+            # Get all categories that have this keyword
+            other_categories = session.execute(
+                select(CategoryKeyword).where(
+                    CategoryKeyword.keyword == keyword,
+                    CategoryKeyword.language_code == language,
+                    CategoryKeyword.category_id != primary_category_id
+                )
+            ).scalars().all()
+
+            if not other_categories:
+                # Keyword doesn't exist in other categories - it's distinctive!
+                distinctive.append(keyword)
+                logger.debug(f"[DISTINCTIVE] '{keyword}': not in other categories ✓")
+                continue
+
+            # Check if keyword is too common (exists in many categories)
+            if len(other_categories) >= 3:
+                # Keyword appears in 3+ other categories - too generic
+                logger.debug(f"[NOT DISTINCTIVE] '{keyword}': appears in {len(other_categories)} other categories ✗")
+                continue
+
+            # Check weight in other categories
+            max_other_weight = max(kw.weight for kw in other_categories)
+
+            # Get current weight in primary category (if exists)
+            primary_kw = session.execute(
+                select(CategoryKeyword).where(
+                    CategoryKeyword.category_id == primary_category_id,
+                    CategoryKeyword.keyword == keyword,
+                    CategoryKeyword.language_code == language
+                )
+            ).scalar_one_or_none()
+
+            current_primary_weight = primary_kw.weight if primary_kw else 1.0  # Default weight for new keywords
+
+            # If keyword already has much higher weight elsewhere, don't learn it
+            if max_other_weight > (current_primary_weight + min_differential):
+                logger.debug(f"[NOT DISTINCTIVE] '{keyword}': stronger in other category ({max_other_weight:.2f} vs {current_primary_weight:.2f}) ✗")
+                continue
+
+            # Keyword is distinctive enough
+            distinctive.append(keyword)
+            logger.debug(f"[DISTINCTIVE] '{keyword}': acceptable weight differential ✓")
+
+        return distinctive
+
     def learn_from_classification(
         self,
         document_id: UUID,
@@ -364,10 +469,36 @@ class MLLearningService:
                 logger.info(f"Not enough quality keywords for learning: {len(quality_keywords)} < {min_required}")
                 return False
 
-            logger.info(f"Learning from {len(quality_keywords)} keywords across {1 + len(secondary_category_ids)} categories")
+            logger.info(f"Learning from {len(quality_keywords)} keywords for primary category only")
 
-            # Process primary category
-            for keyword in quality_keywords:
+            # NEGATIVE LEARNING: If AI predicted wrong category, reduce weights there
+            if ai_predicted_category and ai_predicted_category != primary_category_id:
+                logger.info(f"[ML LEARNING] AI predicted wrong category - applying negative learning")
+                self._apply_negative_learning(
+                    wrong_category_id=ai_predicted_category,
+                    keywords=quality_keywords,
+                    language=language,
+                    session=session,
+                    config=config
+                )
+
+            # Filter keywords to only distinctive ones
+            distinctive_keywords = self._filter_distinctive_keywords(
+                keywords=quality_keywords,
+                primary_category_id=primary_category_id,
+                language=language,
+                session=session,
+                config=config
+            )
+
+            logger.info(f"[ML LEARNING] Filtered to {len(distinctive_keywords)} distinctive keywords from {len(quality_keywords)} total")
+
+            if not distinctive_keywords:
+                logger.warning(f"[ML LEARNING] No distinctive keywords to learn - skipping")
+                return False
+
+            # Process primary category ONLY with distinctive keywords
+            for keyword in distinctive_keywords:
                 # Calculate weight adjustment
                 adjustment = self._calculate_weight_adjustment(
                     is_primary=True,
@@ -414,25 +545,10 @@ class MLLearningService:
                     if adjusted_weight != primary_kw.weight:
                         primary_kw.weight = adjusted_weight
 
-            # Process secondary categories (all get equal weight)
-            for secondary_id in secondary_category_ids:
-                for keyword in quality_keywords:
-                    adjustment = self._calculate_weight_adjustment(
-                        is_primary=False,
-                        ai_predicted_category=None,  # No AI feedback for secondary
-                        category_id=secondary_id,
-                        ai_confidence=None,
-                        config=config
-                    )
-
-                    self._apply_weight_update(
-                        secondary_id,
-                        keyword,
-                        language,
-                        adjustment,
-                        session,
-                        config
-                    )
+            # IMPORTANT: DO NOT learn keywords for secondary categories
+            # Secondary categories are metadata tags, not classification targets
+            # Learning keywords for them causes cross-contamination
+            logger.info(f"[ML LEARNING] Skipping keyword learning for {len(secondary_category_ids)} secondary categories (metadata only)")
 
             # Log learning event
             self._log_learning_event(
@@ -442,14 +558,14 @@ class MLLearningService:
                 secondary_category_ids=secondary_category_ids,
                 ai_predicted_category=ai_predicted_category,
                 ai_confidence=ai_confidence,
-                keywords_learned=quality_keywords,
+                keywords_learned=distinctive_keywords,  # Log only distinctive keywords learned
                 language=language,
                 session=session
             )
 
             session.commit()
 
-            logger.info(f"✓ Learning completed: {len(quality_keywords)} keywords learned across {1 + len(secondary_category_ids)} categories")
+            logger.info(f"✓ Learning completed: {len(distinctive_keywords)} distinctive keywords learned for primary category only")
             return True
 
         except Exception as e:
