@@ -176,21 +176,24 @@ class AuthService:
 
     async def get_current_user(self, token: str) -> User:
         """Get current user from JWT token"""
+        from sqlalchemy.orm import joinedload
+
         token_data = self.verify_token(token)
-        
+
         db = next(get_db())
         try:
-            user = db.query(User).filter(User.id == token_data.user_id).first()
-            
+            # Eagerly load tier relationship to avoid lazy loading issues
+            user = db.query(User).options(joinedload(User.tier)).filter(User.id == token_data.user_id).first()
+
             if user is None:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User not found",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             return user
-            
+
         finally:
             db.close()
 
