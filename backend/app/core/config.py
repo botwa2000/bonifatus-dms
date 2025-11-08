@@ -78,6 +78,17 @@ class TranslationSettings(BaseSettings):
         env_file = ".env"
 
 
+class ScannerSettings(BaseSettings):
+    """Security scanner configuration from environment variables"""
+
+    clamav_enabled: bool = Field(default=True, description="Enable ClamAV antivirus scanning")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
 
@@ -105,6 +116,7 @@ class Settings(BaseSettings):
     google: GoogleSettings = Field(default_factory=GoogleSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     translation: TranslationSettings = Field(default_factory=TranslationSettings)
+    scanner: ScannerSettings = Field(default_factory=ScannerSettings)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
