@@ -34,7 +34,7 @@ class GoogleSettings(BaseSettings):
     google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
     google_oauth_issuers: str = Field(default="https://accounts.google.com", description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
-    google_drive_folder_name: str = Field(default="Bonifatus_DMS", description="Google Drive folder name for documents")
+    google_drive_folder_name: str = Field(default="Bonifatus_DMS", env="GOOGLE_DRIVE_FOLDER_NAME", description="Google Drive folder name for documents (use different names for dev/prod)")
     google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
 
     class Config:
