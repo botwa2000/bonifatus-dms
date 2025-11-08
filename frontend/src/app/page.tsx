@@ -7,54 +7,56 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/auth-context'
+import AppHeader from '@/components/AppHeader'
 
 export default function HomePage() {
   const { user } = useAuth()
 
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-900">
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <div className="h-8 w-8 bg-admin-primary rounded-lg flex items-center justify-center">
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <span className="ml-3 text-xl font-bold text-neutral-900 dark:text-white">Bonifatus DMS</span>
-            </Link>
+      {/* Navigation - Use AppHeader for authenticated users, custom nav for guests */}
+      {user ? (
+        <AppHeader title="" showNav={true} />
+      ) : (
+        <nav className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <Link href="/" className="flex items-center">
+                <div className="relative h-10 w-40">
+                  <Image
+                    src="/logo_text.png"
+                    alt="Bonifatus DMS"
+                    fill
+                    className="object-contain object-left"
+                    priority
+                  />
+                </div>
+              </Link>
 
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Features</a>
-              <a href="#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">How It Works</a>
-              <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Pricing</a>
-              <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">About</Link>
-              <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Contact</Link>
-              {user ? (
-                <>
-                  <Link href="/dashboard" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Dashboard</Link>
-                  <Link href="/profile" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Profile</Link>
-                </>
-              ) : (
+              <div className="hidden md:flex items-center space-x-8">
+                <a href="#features" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Features</a>
+                <a href="#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">How It Works</a>
+                <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Pricing</a>
+                <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">About</Link>
+                <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Contact</Link>
                 <GoogleLoginButton size="sm">Sign In</GoogleLoginButton>
-              )}
-            </div>
+              </div>
 
-            <div className="md:hidden">
-              <button className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+              <div className="md:hidden">
+                <button className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      )}
 
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-900 py-20">

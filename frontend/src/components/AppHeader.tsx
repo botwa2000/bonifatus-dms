@@ -54,20 +54,21 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
           {/* Logo and Title */}
           <div className="flex items-center space-x-4">
             <Link href="/dashboard" className="flex items-center space-x-4">
-              <div className="relative h-8 w-8">
+              <div className="relative h-12 w-48">
                 <Image
-                  src="/favicon.ico"
+                  src="/logo_text.png"
                   alt="Bonifatus DMS"
                   fill
-                  className="object-contain"
+                  className="object-contain object-left"
+                  priority
                 />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">
-                  {title || 'Bonifatus DMS'}
-                </h1>
-                <p className="text-sm text-neutral-600">{subtitle || 'Document Management System'}</p>
-              </div>
+              {title && title !== 'Bonifatus DMS' && (
+                <div className="border-l border-neutral-300 pl-4">
+                  <h1 className="text-xl font-bold text-neutral-900">{title}</h1>
+                  {subtitle && <p className="text-sm text-neutral-600">{subtitle}</p>}
+                </div>
+              )}
             </Link>
           </div>
 

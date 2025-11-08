@@ -14,6 +14,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Bonifatus DMS',
   description: 'Professional Document Management System',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({
