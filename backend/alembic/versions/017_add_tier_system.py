@@ -1,7 +1,7 @@
 """add tier system with database-driven configuration
 
 Revision ID: 017_tier_system
-Revises: 016_add_unique_constraints
+Revises: 016_unique_constraints
 Create Date: 2025-11-08 15:00:00.000000
 
 Adds:
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 # revision identifiers, used by Alembic.
 revision = '017_tier_system'
-down_revision = '016_add_unique_constraints'
+down_revision = '016_unique_constraints'
 branch_labels = None
 depends_on = None
 

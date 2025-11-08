@@ -30,19 +30,23 @@ start_clamav_lazy() {
             echo "[ClamAV] Database exists."
         fi
 
+        # Create log directory if it doesn't exist
+        mkdir -p /var/log/clamav
+        chown clamav:clamav /var/log/clamav
+
         # Start daemon (always, after database is ready)
         echo "[ClamAV] Starting daemon..."
-        clamd --config-file=/etc/clamav/clamd.conf 2>&1 | tee -a /var/log/clamav/clamav.log &
-        CLAMD_PID=$!
+        # Start daemon in foreground, will daemonize itself
+        clamd --config-file=/etc/clamav/clamd.conf
 
         # Give daemon time to start
-        sleep 2
+        sleep 3
 
-        # Check if daemon started successfully
-        if kill -0 $CLAMD_PID 2>/dev/null; then
-            echo "[ClamAV] Daemon started successfully (PID: $CLAMD_PID)"
+        # Check if daemon is running by testing the socket
+        if clamdscan --ping 2>/dev/null; then
+            echo "[ClamAV] Daemon started successfully and is responsive"
         else
-            echo "[ClamAV] Daemon failed to start"
+            echo "[ClamAV] Warning: Daemon may not be fully started yet"
         fi
 
         # Update database in background (non-blocking)
@@ -84,9 +88,13 @@ else
         }
     fi
 
-    # Start ClamAV daemon
+    # Create log directory if it doesn't exist
+    mkdir -p /var/log/clamav
+    chown clamav:clamav /var/log/clamav
+
+    # Start ClamAV daemon (will daemonize itself)
     echo "[ClamAV] Starting daemon..."
-    clamd --config-file=/etc/clamav/clamd.conf &
+    clamd --config-file=/etc/clamav/clamd.conf
 
     # Wait for ClamAV to be ready (with timeout)
     echo "[ClamAV] Waiting for daemon to start..."
