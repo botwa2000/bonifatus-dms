@@ -31,7 +31,8 @@ class TokenResponse(BaseModel):
     email: str = Field(..., description="User email")
     full_name: str = Field(..., description="User full name")
     profile_picture: Optional[str] = Field(None, description="Profile picture URL")
-    tier: str = Field(..., description="User tier (free, trial, premium)")
+    tier: str = Field(..., description="User tier name")
+    tier_id: int = Field(..., description="User tier ID")
     is_active: bool = Field(default=True, description="User active status")
 
     class Config:
@@ -45,6 +46,7 @@ class TokenResponse(BaseModel):
                 "full_name": "John Doe",
                 "profile_picture": "https://example.com/avatar.jpg",
                 "tier": "free",
+                "tier_id": 0,
                 "is_active": True
             }
         }
@@ -68,8 +70,9 @@ class RefreshTokenResponse(BaseModel):
     token_type: str = Field(default="bearer", description="Token type")
     user_id: str = Field(..., description="User ID")
     email: str = Field(..., description="User email")
-    tier: str = Field(..., description="User tier")
-    
+    tier: str = Field(..., description="User tier name")
+    tier_id: int = Field(..., description="User tier ID")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -77,7 +80,8 @@ class RefreshTokenResponse(BaseModel):
                 "token_type": "bearer",
                 "user_id": "550e8400-e29b-41d4-a716-446655440000",
                 "email": "user@example.com",
-                "tier": "free"
+                "tier": "free",
+                "tier_id": 0
             }
         }
 
@@ -88,11 +92,14 @@ class UserResponse(BaseModel):
     email: str = Field(..., description="User email")
     full_name: str = Field(..., description="User full name")
     profile_picture: Optional[str] = Field(None, description="Profile picture URL")
-    tier: str = Field(..., description="User tier")
+    tier: str = Field(..., description="User tier name")
+    tier_id: int = Field(..., description="User tier ID")
     is_active: bool = Field(..., description="User active status")
+    is_admin: bool = Field(default=False, description="Admin status")
     last_login_at: Optional[str] = Field(None, description="Last login timestamp")
     created_at: str = Field(..., description="Account creation timestamp")
-    
+    updated_at: str = Field(..., description="Last update timestamp")
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -101,9 +108,12 @@ class UserResponse(BaseModel):
                 "full_name": "John Doe",
                 "profile_picture": "https://lh3.googleusercontent.com/...",
                 "tier": "free",
+                "tier_id": 0,
                 "is_active": True,
+                "is_admin": False,
                 "last_login_at": "2024-09-21T10:30:00Z",
-                "created_at": "2024-09-20T15:20:00Z"
+                "created_at": "2024-09-20T15:20:00Z",
+                "updated_at": "2024-09-21T08:15:00Z"
             }
         }
 

@@ -227,7 +227,7 @@ class AuthService:
                 hashed_password=hashed_password,
                 is_active=True,
                 is_admin=user_create.email in settings.security.admin_emails,
-                tier=settings.security.default_user_tier,
+                tier_id=100 if user_create.email in settings.security.admin_emails else 0,  # 100=admin, 0=free
                 preferred_doc_languages=["en"]  # Default to English
             )
             
@@ -301,13 +301,14 @@ class AuthService:
                     return None
                 
                 access_token = self.create_access_token(data={"sub": str(user.id)})
-                
+
                 return {
                     "access_token": access_token,
                     "token_type": "bearer",
                     "user_id": str(user.id),
                     "email": user.email,
-                    "tier": user.tier,
+                    "tier": user.tier.name if user.tier else "free",
+                    "tier_id": user.tier_id,
                     "expires_in": self.access_token_expire_minutes * 60
                 }
                 
@@ -401,13 +402,16 @@ class AuthService:
                     
                     is_new_user = False
                     if not user:
+                        # Determine tier based on admin status
+                        is_admin = email in settings.security.admin_emails
                         user = User(
                             email=email,
                             full_name=full_name,
                             google_id=google_id,
                             profile_picture=profile_picture,
                             is_active=True,
-                            tier=settings.security.default_user_tier,
+                            is_admin=is_admin,
+                            tier_id=100 if is_admin else 0,  # 100=admin, 0=free
                             preferred_doc_languages=["en"]  # Default to English
                         )
                         db.add(user)
@@ -450,7 +454,7 @@ class AuthService:
                     # Generate JWT tokens
                     access_token = self.create_access_token(data={"sub": str(user.id)})
                     refresh_token = self.create_refresh_token(data={"sub": str(user.id)})
-                    
+
                     return {
                         "access_token": access_token,
                         "refresh_token": session_info['refresh_token'],
@@ -459,7 +463,8 @@ class AuthService:
                         "email": user.email,
                         "full_name": user.full_name,
                         "profile_picture": user.profile_picture,
-                        "tier": user.tier,
+                        "tier": user.tier.name if user.tier else "free",
+                        "tier_id": user.tier_id,
                         "is_active": user.is_active,
                         "session_id": session_info['session_id'],
                         "expires_in": self.access_token_expire_minutes * 60

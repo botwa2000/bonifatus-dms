@@ -219,7 +219,7 @@ class CategoryService:
                         text=source_translation.name,
                         source_lang=source_lang,
                         target_lang=lang_code,
-                        user_tier=user.tier if user else None
+                        user_tier=user.tier.name if (user and user.tier) else None
                     )
 
                     translated_desc = None
@@ -228,7 +228,7 @@ class CategoryService:
                             text=source_translation.description,
                             source_lang=source_lang,
                             target_lang=lang_code,
-                            user_tier=user.tier if user else None
+                            user_tier=user.tier.name if (user and user.tier) else None
                         )
 
                     # Create translation data object

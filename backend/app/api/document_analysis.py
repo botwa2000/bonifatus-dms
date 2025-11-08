@@ -307,7 +307,7 @@ async def analyze_batch(
                 file_content=file_stream,
                 filename=first_file.filename,
                 user_id=str(current_user.id),
-                user_tier=current_user.tier,
+                user_tier=current_user.tier.name if current_user.tier else "free",
                 ip_address=ip_address,
                 session=session
             )

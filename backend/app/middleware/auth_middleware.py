@@ -70,14 +70,16 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 async def require_premium_user(current_user: User = Depends(get_current_active_user)) -> User:
     """Require user to have premium tier access"""
-    
-    if current_user.tier not in ["premium", "trial"]:
-        logger.warning(f"User {current_user.email} attempted premium access with tier: {current_user.tier}")
+
+    # tier_id: 0=Free, 1=Starter, 2=Pro, 100=Admin
+    if current_user.tier_id not in [2, 100]:  # Pro or Admin
+        tier_name = current_user.tier.name if current_user.tier else "unknown"
+        logger.warning(f"User {current_user.email} attempted premium access with tier: {tier_name}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Premium subscription required for this feature"
         )
-    
+
     return current_user
 
 

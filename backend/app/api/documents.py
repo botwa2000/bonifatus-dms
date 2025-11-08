@@ -74,7 +74,7 @@ async def upload_document(
         upload_result = await document_service.upload_document(
             user_id=str(current_user.id),
             user_email=current_user.email,
-            user_tier=current_user.tier,
+            user_tier=current_user.tier.name if current_user.tier else "free",
             file_content=file_stream,
             filename=file.filename,
             category_ids=category_id_list,
@@ -576,7 +576,7 @@ async def get_storage_info(
     """
     try:
         storage_info = await document_service.get_storage_info(
-            str(current_user.id), current_user.tier
+            str(current_user.id), current_user.tier.name if current_user.tier else "free"
         )
 
         if not storage_info:

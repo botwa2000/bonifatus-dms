@@ -35,12 +35,13 @@ class UserProfileResponse(BaseModel):
     email: str = Field(..., description="User email")
     full_name: str = Field(..., description="User full name")
     profile_picture: Optional[str] = Field(None, description="Profile picture URL")
-    tier: str = Field(..., description="User tier")
+    tier: str = Field(..., description="User tier name")
+    tier_id: int = Field(..., description="User tier ID")
     is_active: bool = Field(..., description="User active status")
     last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
     created_at: datetime = Field(..., description="Account creation timestamp")
     updated_at: datetime = Field(..., description="Last profile update timestamp")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -49,6 +50,7 @@ class UserProfileResponse(BaseModel):
                 "full_name": "John Doe",
                 "profile_picture": "https://lh3.googleusercontent.com/...",
                 "tier": "free",
+                "tier_id": 0,
                 "is_active": True,
                 "last_login_at": "2024-09-21T10:30:00Z",
                 "created_at": "2024-09-20T15:20:00Z",
