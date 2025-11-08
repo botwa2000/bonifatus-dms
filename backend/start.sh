@@ -72,8 +72,12 @@ should_lazy_load_clamav() {
     return 1  # false - load synchronously
 }
 
+# Check if ClamAV should be disabled entirely (e.g., dev environment)
+if [ "${CLAMAV_ENABLED}" = "false" ]; then
+    echo "[ClamAV] DISABLED - Skipping malware scanner initialization"
+    echo "[ClamAV] Set CLAMAV_ENABLED=true in .env to enable"
 # Determine ClamAV loading strategy
-if should_lazy_load_clamav; then
+elif should_lazy_load_clamav; then
     echo "[Startup] Using LAZY LOADING strategy for ClamAV (fast startup)"
     start_clamav_lazy
 else
