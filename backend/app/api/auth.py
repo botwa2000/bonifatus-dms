@@ -122,8 +122,9 @@ async def google_oauth_login(request: Request):
 )
 async def google_oauth_callback_redirect(
     request: Request,
-    code: str,
-    state: str
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None
 ):
     """
     Industry-standard OAuth callback endpoint (GET with redirect)
@@ -141,6 +142,13 @@ async def google_oauth_callback_redirect(
     4. User redirected to dashboard with cookies set
     """
     try:
+        # Handle OAuth cancellation or errors from Google
+        if error or not code:
+            logger.info(f"OAuth flow cancelled or failed: error={error}, code_present={bool(code)}")
+            # Redirect to homepage instead of showing error
+            redirect_url = f"{settings.app.app_frontend_url}/"
+            return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "unknown")
 

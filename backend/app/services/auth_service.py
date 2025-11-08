@@ -417,7 +417,13 @@ class AuthService:
                         user.google_id = google_id
                         user.profile_picture = profile_picture
                         user.full_name = full_name
-                        logger.info(f"Updating existing user: {email}")
+
+                        # Reactivate user if they were deactivated and are now authenticating again
+                        if not user.is_active:
+                            user.is_active = True
+                            logger.info(f"Reactivating previously deactivated user: {email}")
+                        else:
+                            logger.info(f"Updating existing user: {email}")
 
                     user.last_login_at = datetime.now(timezone.utc)
                     user.last_login_ip = ip_address
@@ -437,17 +443,10 @@ class AuthService:
                         session=db
                     )
 
-                    # Generate short-lived access token
-                    access_token = self.create_access_token(data={"sub": str(user.id)})
-
                     # Note: Google Drive connection is separate from authentication
                     # Users must explicitly connect Drive from Settings page
                     # Authentication OAuth only grants openid+email+profile scopes
 
-                    if not user.is_active:
-                        logger.warning(f"Inactive user attempted login: {email}")
-                        return None
-                    
                     # Generate JWT tokens
                     access_token = self.create_access_token(data={"sub": str(user.id)})
                     refresh_token = self.create_refresh_token(data={"sub": str(user.id)})
