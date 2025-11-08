@@ -350,37 +350,38 @@ class UserService:
             session.close()
 
     async def deactivate_user_account(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         deactivation_request: AccountDeactivationRequest,
         ip_address: str = None
     ) -> Optional[AccountDeactivationResponse]:
-        """Deactivate user account"""
+        """
+        Hard delete user account and all associated data
+
+        Deletes:
+        - All documents and their metadata (cascades via FK)
+        - All user settings
+        - All custom categories
+        - All sessions (cascades via FK)
+        - All audit logs for this user
+        - User record itself
+
+        Note: Google Drive files are NOT deleted - user maintains ownership
+        """
         session = db_manager.session_local()
         try:
+            from app.database.models import UserSetting, Category, AuditLog
+
             user = session.get(User, user_id)
             if not user:
                 return None
 
-            data_retention_days = await self._get_system_setting("data_retention_days", 30)
+            user_email = user.email
 
-            if not user.is_active:
-                return AccountDeactivationResponse(
-                    success=True,
-                    message="Account already deactivated",
-                    deactivated_at=user.updated_at,
-                    data_retention_days=data_retention_days
-                )
-
-            # Deactivate user
-            user.is_active = False
-            user.updated_at = datetime.utcnow()
-            session.commit()
-
-            # Log deactivation
+            # Log deletion before deleting (will be deleted with audit logs)
             await self._log_user_action(
-                user_id, "account_deactivation", "user", user_id,
-                {"is_active": True}, {"is_active": False},
+                user_id, "account_deletion_hard", "user", user_id,
+                {"is_active": user.is_active}, {"deleted": True},
                 ip_address, session,
                 extra_data={
                     "reason": deactivation_request.reason,
@@ -388,17 +389,33 @@ class UserService:
                 }
             )
 
-            logger.info(f"User account deactivated: {user.email}")
+            # 1. Delete user settings (not cascade)
+            session.query(UserSetting).filter(UserSetting.user_id == user_id).delete()
+            logger.info(f"Deleted user settings for {user_email}")
+
+            # 2. Delete custom categories created by user (not cascade)
+            session.query(Category).filter(Category.user_id == user_id).delete()
+            logger.info(f"Deleted custom categories for {user_email}")
+
+            # 3. Delete audit logs for this user (not cascade)
+            session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
+            logger.info(f"Deleted audit logs for {user_email}")
+
+            # 4. Delete user record (cascades to documents, sessions, etc.)
+            session.delete(user)
+            session.commit()
+
+            logger.info(f"User account HARD DELETED: {user_email}")
 
             return AccountDeactivationResponse(
                 success=True,
-                message="Account deactivated successfully",
-                deactivated_at=user.updated_at,
-                data_retention_days=data_retention_days
+                message="Account and all data permanently deleted",
+                deactivated_at=datetime.utcnow(),
+                data_retention_days=0  # No retention - immediate deletion
             )
 
         except Exception as e:
-            logger.error(f"Failed to deactivate user account {user_id}: {e}")
+            logger.error(f"Failed to delete user account {user_id}: {e}")
             session.rollback()
             return None
         finally:

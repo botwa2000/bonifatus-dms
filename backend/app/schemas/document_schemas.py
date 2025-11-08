@@ -61,7 +61,8 @@ class DocumentUpdateRequest(BaseModel):
     """Request model for updating document metadata"""
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="Document title")
     description: Optional[str] = Field(None, max_length=1000, description="Document description")
-    category_id: Optional[str] = Field(None, description="Category ID")
+    category_id: Optional[str] = Field(None, description="Primary category ID (backward compat)")
+    category_ids: Optional[List[str]] = Field(None, min_items=1, description="All category IDs (first is primary)")
     keywords: Optional[List[str]] = Field(None, description="Document keywords")
 
     @validator('title')

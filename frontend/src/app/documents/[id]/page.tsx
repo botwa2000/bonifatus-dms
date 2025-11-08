@@ -53,7 +53,8 @@ export default function DocumentDetailPage() {
 
   // Editing states
   const [isEditingCategory, setIsEditingCategory] = useState(false)
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [primaryCategoryId, setPrimaryCategoryId] = useState<string>('')
   const [isEditingKeywords, setIsEditingKeywords] = useState(false)
   const [editedKeywords, setEditedKeywords] = useState<string[]>([])
   const [newKeyword, setNewKeyword] = useState('')
@@ -92,7 +93,22 @@ export default function DocumentDetailPage() {
       console.log('[DOCUMENT DETAIL] category_name:', data.category_name)
 
       setDocument(data)
-      setSelectedCategoryId(data.category_id || '')
+
+      // Set selected categories from the categories array
+      if (data.categories && data.categories.length > 0) {
+        const catIds = data.categories.map(c => c.id)
+        const primaryCat = data.categories.find(c => c.is_primary)
+        setSelectedCategoryIds(catIds)
+        setPrimaryCategoryId(primaryCat?.id || catIds[0] || '')
+      } else if (data.category_id) {
+        // Fallback to backward compat field
+        setSelectedCategoryIds([data.category_id])
+        setPrimaryCategoryId(data.category_id)
+      } else {
+        setSelectedCategoryIds([])
+        setPrimaryCategoryId('')
+      }
+
       setEditedKeywords(data.keywords?.map(k => k.keyword) || [])
     } catch (err) {
       setError('Failed to load document')
@@ -114,21 +130,37 @@ export default function DocumentDetailPage() {
   const handleSaveCategory = async () => {
     if (!document) return
 
+    if (selectedCategoryIds.length === 0) {
+      setError('Please select at least one category')
+      return
+    }
+
+    if (!primaryCategoryId || !selectedCategoryIds.includes(primaryCategoryId)) {
+      setError('Please select a primary category from the selected categories')
+      return
+    }
+
     try {
       setIsSaving(true)
       setError(null)
 
+      // Put primary category first in the array
+      const orderedCategoryIds = [
+        primaryCategoryId,
+        ...selectedCategoryIds.filter(id => id !== primaryCategoryId)
+      ]
+
       await apiClient.put(
         `/api/v1/documents/${documentId}`,
-        { category_id: selectedCategoryId },
+        { category_ids: orderedCategoryIds },
         true
       )
 
-      setSuccess('Category updated successfully')
+      setSuccess('Categories updated successfully')
       setIsEditingCategory(false)
       await loadDocument()
     } catch (err) {
-      setError('Failed to update category')
+      setError('Failed to update categories')
       console.error(err)
     } finally {
       setIsSaving(false)
@@ -183,6 +215,35 @@ export default function DocumentDetailPage() {
       setError('Failed to delete document')
       console.error(err)
       setDeletingDocument(false)
+    }
+  }
+
+  const toggleCategorySelection = (categoryId: string) => {
+    if (selectedCategoryIds.includes(categoryId)) {
+      // Deselecting - remove from array
+      const newSelection = selectedCategoryIds.filter(id => id !== categoryId)
+      setSelectedCategoryIds(newSelection)
+
+      // If deselecting the primary category, set new primary to first remaining
+      if (categoryId === primaryCategoryId) {
+        setPrimaryCategoryId(newSelection[0] || '')
+      }
+    } else {
+      // Selecting - add to array
+      const newSelection = [...selectedCategoryIds, categoryId]
+      setSelectedCategoryIds(newSelection)
+
+      // If this is the first category, make it primary
+      if (newSelection.length === 1) {
+        setPrimaryCategoryId(categoryId)
+      }
+    }
+  }
+
+  const setPrimaryCategorySelection = (categoryId: string) => {
+    // Only allow setting primary if category is selected
+    if (selectedCategoryIds.includes(categoryId)) {
+      setPrimaryCategoryId(categoryId)
     }
   }
 
@@ -335,20 +396,70 @@ export default function DocumentDetailPage() {
 
               {isEditingCategory ? (
                 <div className="space-y-4">
-                  <select
-                    value={selectedCategoryId}
-                    onChange={(e) => setSelectedCategoryId(e.target.value)}
-                    className="w-full rounded-md border border-neutral-300 px-3 py-2 focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
-                  >
-                    <option value="">Uncategorized</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
+                      Select one or more categories. Click the radio button to set the primary category.
+                    </p>
+                    {categories.length === 0 ? (
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400">No categories available</p>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {categories.map(cat => {
+                          const isSelected = selectedCategoryIds.includes(cat.id)
+                          const isPrimary = cat.id === primaryCategoryId
+
+                          return (
+                            <div
+                              key={cat.id}
+                              className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                                isSelected
+                                  ? 'border-admin-primary bg-admin-primary/5 dark:bg-admin-primary/10'
+                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  id={`cat-${cat.id}`}
+                                  checked={isSelected}
+                                  onChange={() => toggleCategorySelection(cat.id)}
+                                  className="h-4 w-4 rounded border-neutral-300 text-admin-primary focus:ring-admin-primary"
+                                />
+                                <label
+                                  htmlFor={`cat-${cat.id}`}
+                                  className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100 cursor-pointer"
+                                >
+                                  {cat.name}
+                                </label>
+                              </div>
+                              {isSelected && (
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="radio"
+                                    id={`primary-${cat.id}`}
+                                    name="primary-category"
+                                    checked={isPrimary}
+                                    onChange={() => setPrimaryCategorySelection(cat.id)}
+                                    className="h-4 w-4 border-neutral-300 text-admin-primary focus:ring-admin-primary"
+                                  />
+                                  <label
+                                    htmlFor={`primary-${cat.id}`}
+                                    className="text-xs text-neutral-600 dark:text-neutral-400 cursor-pointer"
+                                  >
+                                    Primary
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex space-x-2">
                     <Button
                       onClick={handleSaveCategory}
-                      disabled={isSaving}
+                      disabled={isSaving || selectedCategoryIds.length === 0}
                     >
                       {isSaving ? 'Saving...' : 'Save'}
                     </Button>
@@ -356,7 +467,19 @@ export default function DocumentDetailPage() {
                       variant="secondary"
                       onClick={() => {
                         setIsEditingCategory(false)
-                        setSelectedCategoryId(document.category_id || '')
+                        // Restore original values
+                        if (document.categories && document.categories.length > 0) {
+                          const catIds = document.categories.map(c => c.id)
+                          const primaryCat = document.categories.find(c => c.is_primary)
+                          setSelectedCategoryIds(catIds)
+                          setPrimaryCategoryId(primaryCat?.id || catIds[0] || '')
+                        } else if (document.category_id) {
+                          setSelectedCategoryIds([document.category_id])
+                          setPrimaryCategoryId(document.category_id)
+                        } else {
+                          setSelectedCategoryIds([])
+                          setPrimaryCategoryId('')
+                        }
                       }}
                     >
                       Cancel

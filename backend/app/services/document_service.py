@@ -516,54 +516,66 @@ class DocumentService:
             update_data = update_request.dict(exclude_unset=True)
             new_values = {}
 
-            # Special handling for category_id - update junction table
-            if 'category_id' in update_data and update_data['category_id'] is not None:
-                from app.database.models import DocumentCategory, User
+            # Special handling for categories - update junction table
+            # Support both category_ids (new) and category_id (backward compat)
+            category_ids_to_set = None
+            if 'category_ids' in update_data and update_data['category_ids']:
+                category_ids_to_set = update_data['category_ids']
+                del update_data['category_ids']
+            elif 'category_id' in update_data and update_data['category_id'] is not None:
+                category_ids_to_set = [update_data['category_id']]
+                del update_data['category_id']
 
-                new_category_id = update_data['category_id']
+            if category_ids_to_set:
+                from app.database.models import DocumentCategory, User
 
                 # Get old primary category before making changes
                 old_primary_category = session.query(DocumentCategory).filter(
                     DocumentCategory.document_id == doc_uuid,
                     DocumentCategory.is_primary == True
                 ).first()
-                old_category_id = str(old_primary_category.category_id) if old_primary_category else None
+                old_primary_id = str(old_primary_category.category_id) if old_primary_category else None
 
-                logger.info(f"[UPDATE DEBUG] Updating category for document {document_id}")
-                logger.info(f"[UPDATE DEBUG] Old category_id: {old_category_id}")
-                logger.info(f"[UPDATE DEBUG] New category_id: {new_category_id}")
+                logger.info(f"[UPDATE DEBUG] Updating categories for document {document_id}")
+                logger.info(f"[UPDATE DEBUG] Old primary category: {old_primary_id}")
+                logger.info(f"[UPDATE DEBUG] New categories: {category_ids_to_set}")
 
                 # Remove old category assignments
                 session.query(DocumentCategory).filter(
                     DocumentCategory.document_id == doc_uuid
                 ).delete()
 
-                # Add new category assignment (as primary)
+                # Add new category assignments (first is primary)
                 try:
-                    new_category_uuid = uuid.UUID(new_category_id)
-                    new_assignment = DocumentCategory(
-                        document_id=doc_uuid,
-                        category_id=new_category_uuid,
-                        is_primary=True,
-                        assigned_at=datetime.utcnow()
-                    )
-                    session.add(new_assignment)
+                    for idx, cat_id in enumerate(category_ids_to_set):
+                        cat_uuid = uuid.UUID(cat_id)
+                        is_primary = (idx == 0)
 
-                    # Also update backward-compatibility field
-                    document.category_id = new_category_uuid
+                        new_assignment = DocumentCategory(
+                            document_id=doc_uuid,
+                            category_id=cat_uuid,
+                            is_primary=is_primary,
+                            assigned_at=datetime.utcnow()
+                        )
+                        session.add(new_assignment)
 
-                    new_values['category_id'] = new_category_id
-                    logger.info(f"[UPDATE DEBUG] ✅ Category updated in junction table and Document model")
+                        if is_primary:
+                            # Update backward-compatibility field
+                            document.category_id = cat_uuid
+                            new_primary_id = cat_id
 
-                    # Move file in Google Drive if category changed
-                    if old_category_id and old_category_id != new_category_id:
-                        logger.info(f"[DRIVE MOVE] Category changed, moving file in Google Drive")
+                    new_values['category_ids'] = category_ids_to_set
+                    logger.info(f"[UPDATE DEBUG] ✅ Categories updated: {len(category_ids_to_set)} assigned")
+
+                    # Move file in Google Drive if primary category changed
+                    if old_primary_id and old_primary_id != new_primary_id:
+                        logger.info(f"[DRIVE MOVE] Primary category changed, moving file in Google Drive")
                         try:
                             # Get user's refresh token and main folder
                             user = session.get(User, user_uuid)
                             if user and user.google_refresh_token:
-                                # Get new category info
-                                new_category = session.get(Category, new_category_uuid)
+                                # Get new primary category info
+                                new_category = session.get(Category, uuid.UUID(new_primary_id))
                                 if new_category:
                                     # Get category folder ID
                                     new_folder_id = drive_service.get_or_create_category_folder(
@@ -581,20 +593,16 @@ class DocumentService:
                                     )
 
                                     if success:
-                                        logger.info(f"[DRIVE MOVE] ✅ File moved successfully to {new_category.name} folder")
+                                        logger.info(f"[DRIVE MOVE] ✅ File moved to {new_category.name} folder")
                                     else:
                                         logger.warning(f"[DRIVE MOVE] ⚠️ Failed to move file in Drive")
                             else:
                                 logger.warning(f"[DRIVE MOVE] ⚠️ User refresh token not available")
                         except Exception as e:
                             logger.error(f"[DRIVE MOVE] ❌ Error moving file in Drive: {e}")
-                            # Don't fail the update if Drive move fails
 
-                except ValueError:
-                    logger.error(f"[UPDATE DEBUG] ❌ Invalid category ID format: {new_category_id}")
-
-                # Remove from update_data to avoid duplicate processing
-                del update_data['category_id']
+                except ValueError as e:
+                    logger.error(f"[UPDATE DEBUG] ❌ Invalid category ID format: {e}")
 
             # Handle other fields
             for field, value in update_data.items():
@@ -759,13 +767,17 @@ class DocumentService:
                 # Filter by documents that have this category using EXISTS subquery
                 # This avoids joining document_categories twice
                 from sqlalchemy.sql import exists
-                category_filter = exists().where(
-                    and_(
-                        DocumentCategory.document_id == Document.id,
-                        DocumentCategory.category_id == search_request.category_id
+                try:
+                    category_uuid = uuid.UUID(search_request.category_id)
+                    category_filter = exists().where(
+                        and_(
+                            DocumentCategory.document_id == Document.id,
+                            DocumentCategory.category_id == category_uuid
+                        )
                     )
-                )
-                base_query = base_query.where(category_filter)
+                    base_query = base_query.where(category_filter)
+                except ValueError:
+                    logger.warning(f"Invalid category_id format: {search_request.category_id}")
 
             if search_request.language:
                 base_query = base_query.where(Document.primary_language == search_request.language)
