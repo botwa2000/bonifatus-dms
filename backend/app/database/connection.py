@@ -91,6 +91,10 @@ class DatabaseManager:
         session = self.session_local()
         try:
             yield session
+        except Exception:
+            # Rollback on any exception to prevent "transaction is aborted" errors
+            session.rollback()
+            raise
         finally:
             session.close()
 
