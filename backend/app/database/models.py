@@ -23,6 +23,42 @@ class TimestampMixin:
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class TierPlan(Base, TimestampMixin):
+    """Subscription tier plans with configurable features and pricing"""
+    __tablename__ = "tier_plans"
+
+    id = Column(Integer, primary_key=True)  # 0=Free, 1=Starter, 2=Pro, 100=Admin
+    name = Column(String(50), nullable=False, unique=True)
+    display_name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Pricing (stored in cents, e.g., 999 = $9.99)
+    price_monthly_cents = Column(Integer, nullable=False, server_default='0')
+    price_yearly_cents = Column(Integer, nullable=False, server_default='0')
+    currency = Column(String(3), nullable=False, server_default='USD')
+
+    # Storage limits
+    storage_quota_bytes = Column(sa.BigInteger, nullable=False)
+    max_file_size_bytes = Column(sa.BigInteger, nullable=False)
+    max_documents = Column(Integer, nullable=True)  # NULL = unlimited
+
+    # Feature flags
+    bulk_operations_enabled = Column(Boolean, nullable=False, server_default='false')
+    api_access_enabled = Column(Boolean, nullable=False, server_default='false')
+    priority_support = Column(Boolean, nullable=False, server_default='false')
+    custom_categories_limit = Column(Integer, nullable=True)  # NULL = unlimited
+
+    # Display
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, server_default='true')
+    is_public = Column(Boolean, nullable=False, server_default='true')  # Show on pricing page
+
+    __table_args__ = (
+        Index('idx_tier_active', 'is_active', 'sort_order'),
+        Index('idx_tier_public', 'is_public'),
+    )
+
+
 class User(Base, TimestampMixin):
     """User account with Google OAuth integration"""
     __tablename__ = "users"
@@ -32,7 +68,7 @@ class User(Base, TimestampMixin):
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
     profile_picture = Column(Text, nullable=True)
-    tier = Column(String(20), nullable=False, default="free")
+    tier_id = Column(Integer, ForeignKey("tier_plans.id"), nullable=False, server_default='0')
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     admin_role = Column(String(50), nullable=True)
@@ -51,6 +87,7 @@ class User(Base, TimestampMixin):
     account_locked_until = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
+    tier = relationship("TierPlan", foreign_keys=[tier_id])
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     documents = relationship("Document", foreign_keys="[Document.user_id]", back_populates="user", cascade="all, delete-orphan")
     user_settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
@@ -59,7 +96,7 @@ class User(Base, TimestampMixin):
     __table_args__ = (
         Index('idx_user_google_id', 'google_id'),
         Index('idx_user_email', 'email'),
-        Index('idx_user_tier', 'tier'),
+        Index('idx_user_tier_id', 'tier_id'),
     )
 
 
@@ -515,15 +552,18 @@ class UserStorageQuota(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
-    tier = Column(String(20), nullable=False)
+    tier_id = Column(Integer, ForeignKey("tier_plans.id"), nullable=False)
     total_quota_bytes = Column(sa.BigInteger, nullable=False)
     used_bytes = Column(sa.BigInteger, nullable=False, server_default='0')
     document_count = Column(Integer, nullable=False, server_default='0')
     largest_file_bytes = Column(sa.BigInteger, nullable=False, server_default='0')
     last_calculated_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Relationships
+    tier = relationship("TierPlan", foreign_keys=[tier_id])
+
     __table_args__ = (
-        Index('idx_user_quota_tier', 'tier'),
+        Index('idx_user_quota_tier', 'tier_id'),
     )
 
 
