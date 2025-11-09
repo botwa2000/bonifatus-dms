@@ -45,6 +45,7 @@ function DriveCallbackContent() {
 
       // Call backend to complete OAuth flow
       try {
+        console.log('[Drive Callback DEBUG] Calling backend /users/drive/callback with code and state...')
         const result = await apiClient.post<{ success: boolean; message: string }>(
           '/api/v1/users/drive/callback',
           undefined,
@@ -52,36 +53,50 @@ function DriveCallbackContent() {
           { params: { code, state } }
         )
 
+        console.log('[Drive Callback DEBUG] Backend response:', result)
+
         if (result.success) {
+          console.log('[Drive Callback DEBUG] ✅ Drive connection successful, now refreshing auth tokens...')
           // Refresh auth tokens to prevent logout after Drive connection
           // Drive OAuth flow can take time, and access token might be close to expiring
           try {
-            await apiClient.post('/api/v1/auth/refresh', {}, true)
+            console.log('[Drive Callback DEBUG] Calling /auth/refresh...')
+            const refreshResponse = await apiClient.post('/api/v1/auth/refresh', {}, true)
+            console.log('[Drive Callback DEBUG] ✅ Refresh response:', refreshResponse)
+            console.log('[Drive Callback DEBUG] Auth tokens refreshed successfully')
             if (shouldLog('debug')) {
               console.log('[Drive Callback] Auth tokens refreshed successfully')
             }
           } catch (refreshError) {
+            console.error('[Drive Callback DEBUG] ❌ Token refresh failed:', refreshError)
             if (shouldLog('error')) {
               console.error('[Drive Callback] Token refresh failed:', refreshError)
             }
             // Continue anyway - user might still be logged in with existing token
           }
 
+          console.log('[Drive Callback DEBUG] Setting success status and redirecting to /settings in 2s...')
           setStatus('success')
           setMessage('Google Drive connected successfully!')
-          setTimeout(() => router.push('/settings'), 2000)
+          setTimeout(() => {
+            console.log('[Drive Callback DEBUG] Executing router.push to /settings')
+            router.push('/settings')
+          }, 2000)
         } else {
+          console.error('[Drive Callback DEBUG] ❌ Drive connection failed:', result.message)
           setStatus('error')
           setMessage(result.message || 'Failed to connect Drive')
           setTimeout(() => router.push('/settings'), 3000)
         }
       } catch (error) {
+        console.error('[Drive Callback DEBUG] ❌ Exception caught:', error)
         if (shouldLog('error')) {
           console.error('[Drive Callback] API error:', error)
         }
         setStatus('error')
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
         setMessage(errorMessage)
+        console.log('[Drive Callback DEBUG] Redirecting to /settings in 3s after error')
         setTimeout(() => router.push('/settings'), 3000)
       }
     }

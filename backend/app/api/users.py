@@ -475,12 +475,20 @@ async def drive_oauth_callback(
     Exchanges OAuth code for tokens and saves refresh token for Drive API access
     """
     try:
+        logger.info(f"[DRIVE CALLBACK DEBUG] === Starting Drive OAuth callback ===")
+        logger.info(f"[DRIVE CALLBACK DEBUG] User: {current_user.email}")
+        logger.info(f"[DRIVE CALLBACK DEBUG] State: {state}, Expected: {str(current_user.id)}")
+        logger.info(f"[DRIVE CALLBACK DEBUG] Code present: {bool(code)}")
+
         # Verify state matches user ID
         if state != str(current_user.id):
+            logger.error(f"[DRIVE CALLBACK DEBUG] ❌ State mismatch!")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid OAuth state"
             )
+
+        logger.info(f"[DRIVE CALLBACK DEBUG] ✅ State verified, exchanging code for tokens...")
 
         # Exchange code for tokens
         from google.oauth2.credentials import Credentials
@@ -521,6 +529,7 @@ async def drive_oauth_callback(
             user.drive_permissions_granted_at = datetime.now(timezone.utc)
             session.commit()
 
+            logger.info(f"[DRIVE CALLBACK DEBUG] ✅ Drive token saved to database")
             logger.info(f"Drive connected successfully for user: {current_user.email}")
 
             # Initialize folder structure in Google Drive
@@ -529,11 +538,15 @@ async def drive_oauth_callback(
                     refresh_token_encrypted=encrypted_token,
                     session=session
                 )
+                logger.info(f"[DRIVE CALLBACK DEBUG] ✅ Initialized {len(folder_map)} folders in Drive")
                 logger.info(f"Initialized {len(folder_map)} folders in Drive for user: {current_user.email}")
             except Exception as folder_error:
+                logger.error(f"[DRIVE CALLBACK DEBUG] ❌ Failed to initialize Drive folders: {folder_error}")
                 logger.error(f"Failed to initialize Drive folders: {folder_error}")
                 # Don't fail the connection if folder creation fails
                 # User can manually create folders or we can retry later
+
+            logger.info(f"[DRIVE CALLBACK DEBUG] ✅ Returning success response to frontend")
 
             return {
                 "success": True,

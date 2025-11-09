@@ -329,19 +329,25 @@ async def refresh_token(
                     detail="Refresh token required"
                 )
 
+        logger.info(f"[REFRESH DEBUG] Starting token refresh from IP: {ip_address}")
+        logger.info(f"[REFRESH DEBUG] Refresh token source: {'body' if refresh_request.refresh_token else 'cookie'}")
+        logger.info(f"[REFRESH DEBUG] User agent: {user_agent}")
+
         refresh_result = await auth_service.refresh_access_token(
             refresh_token_value,
             ip_address,
             user_agent
         )
-        
+
         if not refresh_result:
-            logger.warning(f"Token refresh failed from IP: {ip_address}")
+            logger.warning(f"[REFRESH DEBUG] ❌ Token refresh FAILED from IP: {ip_address}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired refresh token"
             )
-        
+
+        logger.info(f"[REFRESH DEBUG] ✅ Token refresh successful for user: {refresh_result.get('email')}")
+
         # Set new access token in httpOnly cookie
         response.set_cookie(
             key="access_token",
@@ -353,9 +359,10 @@ async def refresh_token(
             max_age=900,  # 15 minutes
             path="/"
         )
-        
-        logger.info(f"Access token refreshed for user from IP: {ip_address}")
-        
+
+        logger.info(f"[REFRESH DEBUG] ✅ Access token cookie SET with domain=.bonidoc.com, max_age=900, httponly=True")
+        logger.info(f"[REFRESH DEBUG] Access token refreshed for user {refresh_result.get('email')} from IP: {ip_address}")
+
         return RefreshTokenResponse(**refresh_result)
         
     except HTTPException:
