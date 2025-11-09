@@ -55,22 +55,19 @@ export default function SettingsPage() {
     setMounted(true)
   }, [])
 
-  // Load user data on mount
+  // Load user data on mount for display purposes
   useEffect(() => {
     loadUser()
   }, [loadUser])
 
+  // Load settings on mount
+  // Security note: Middleware already protects this route (cookie check)
+  // Backend API endpoints validate JWT on every call (actual security layer)
+  // No need for redundant frontend auth check that causes race conditions
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login')
-    }
-  }, [isAuthenticated, isLoading, router])
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadSettings()
-    }
-  }, [isAuthenticated])
+    loadSettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const loadSettings = async () => {
     if (shouldLog('debug')) console.log('[SETTINGS DEBUG] === Loading Settings Page ===')
