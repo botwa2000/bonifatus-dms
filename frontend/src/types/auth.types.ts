@@ -10,6 +10,7 @@ export interface User {
   updated_at: string
   last_login?: string
   is_active: boolean
+  is_admin: boolean
 }
 
 export interface TrialInfo {
