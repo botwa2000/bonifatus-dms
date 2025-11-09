@@ -54,8 +54,8 @@ class TokenResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     """Request model for token refresh"""
-    refresh_token: str = Field(..., description="JWT refresh token")
-    
+    refresh_token: Optional[str] = Field(None, description="JWT refresh token (optional if provided in cookie)")
+
     class Config:
         json_schema_extra = {
             "example": {

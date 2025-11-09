@@ -303,18 +303,34 @@ async def refresh_token(
 ) -> RefreshTokenResponse:
     """
     Refresh JWT access token using refresh token
-    
+
     Returns new access token with updated expiry time.
     Refresh tokens are long-lived and used to obtain new access tokens
     without requiring user to re-authenticate.
     Sets new access token in httpOnly cookie.
+
+    Refresh token can be provided either:
+    1. In request body (for API clients)
+    2. In httpOnly cookie (for browser clients)
     """
     try:
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "unknown")
-        
+
+        # Get refresh token from body or cookie
+        refresh_token_value = refresh_request.refresh_token
+        if not refresh_token_value:
+            # Try to get from cookie
+            refresh_token_value = request.cookies.get("refresh_token")
+            if not refresh_token_value:
+                logger.warning(f"Refresh token missing from both body and cookie, IP: {ip_address}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Refresh token required"
+                )
+
         refresh_result = await auth_service.refresh_access_token(
-            refresh_request.refresh_token,
+            refresh_token_value,
             ip_address,
             user_agent
         )
