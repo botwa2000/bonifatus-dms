@@ -63,7 +63,7 @@ interface ClamAVHealth {
 }
 
 export default function AdminDashboard() {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
 
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -77,12 +77,12 @@ export default function AdminDashboard() {
 
   // Check admin access
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isLoading && !user) {
       router.push('/login')
       return
     }
 
-    if (!loading && user && !user.is_admin) {
+    if (!isLoading && user && !user.is_admin) {
       router.push('/dashboard')
       return
     }
@@ -90,7 +90,7 @@ export default function AdminDashboard() {
     if (user && user.is_admin) {
       loadData()
     }
-  }, [user, loading, router])
+  }, [user, isLoading, router])
 
   const loadData = async () => {
     try {
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
     return `€${(cents / 100).toFixed(2)}`
   }
 
-  if (loading || !user) {
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
         <AppHeader title="Admin Dashboard" />
