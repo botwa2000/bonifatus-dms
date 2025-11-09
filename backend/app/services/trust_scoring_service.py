@@ -115,7 +115,7 @@ class TrustScoringService:
                 SELECT
                     email,
                     created_at,
-                    tier,
+                    tier_id,
                     is_active
                 FROM users
                 WHERE id = :user_id
@@ -129,7 +129,7 @@ class TrustScoringService:
         return {
             'email': result[0],
             'created_at': result[1],
-            'tier': result[2],
+            'tier_id': result[2],
             'is_active': result[3]
         }
     
