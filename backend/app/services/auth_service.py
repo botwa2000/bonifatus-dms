@@ -271,23 +271,25 @@ class AuthService:
             logger.info(f"All sessions revoked for user {user_id}")
 
     async def refresh_access_token(
-        self, 
-        refresh_token: str, 
-        ip_address: str
+        self,
+        refresh_token: str,
+        ip_address: str,
+        user_agent: str = "unknown"
     ) -> Optional[Dict[str, Any]]:
         """
         Generate new access token using refresh token
-        
+
         Args:
             refresh_token: Refresh token from client
             ip_address: Client IP address
-            
+            user_agent: Client user agent for security tracking
+
         Returns:
             Dict with new access_token and user info, or None if invalid
         """
         try:
             session_info = await session_service.validate_session(refresh_token)
-            
+
             if not session_info:
                 logger.warning(f"Invalid refresh token from IP: {ip_address}")
                 return None
