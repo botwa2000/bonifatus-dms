@@ -482,19 +482,11 @@ def main():
     print("  BONIFATUS DMS - DATABASE INSPECTION TOOL")
     print("=" * 70)
 
-    # Check stopwords (focused on German)
-    check_stop_words()
+    # Check categories and their keywords
+    check_categories_and_keywords()
 
-    # COMMENTED OUT - Uncomment to run other checks
-    # check_french_language_config()
-    # check_migration_006()
-    # check_category_standardization()
-    # check_per_user_architecture()
-    # check_admin_users()
-    # check_categories_and_keywords()
-    # search_keyword("rechnung", "de")
-    # search_keyword("invoice", "en")
-    # search_keyword("volksbank", "de")
+    # Search for invoice-related keywords
+    search_keyword("rechnung", "de")
 
     print("\n" + "=" * 70)
     print("  INSPECTION COMPLETE")

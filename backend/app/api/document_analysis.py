@@ -308,7 +308,8 @@ async def analyze_batch(
             )
 
         # TIER ENFORCEMENT: Check bulk operations for multi-file uploads
-        if len(files) > 1:
+        # Admin users bypass all tier restrictions
+        if len(files) > 1 and not current_user.is_admin:
             has_bulk_ops = await tier_service.check_feature_access(
                 user_id=str(current_user.id),
                 feature='bulk_operations',
@@ -321,19 +322,22 @@ async def analyze_batch(
                 )
 
         # TIER ENFORCEMENT: Check document count limit
-        try:
-            await tier_service.check_document_count_limit(
-                user_id=str(current_user.id),
-                session=session,
-                raise_on_exceed=True
-            )
-        except TierLimitExceeded as e:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"{e.message}. Please upgrade your plan or delete some documents."
-            )
+        # Admin users bypass document count limits
+        if not current_user.is_admin:
+            try:
+                await tier_service.check_document_count_limit(
+                    user_id=str(current_user.id),
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan or delete some documents."
+                )
 
         # TIER ENFORCEMENT: Check storage quota for all files
+        # Admin users bypass storage quota limits
         total_size = 0
         file_sizes = []
         for file in files:
@@ -343,18 +347,19 @@ async def analyze_batch(
             file_sizes.append(size)
             total_size += size
 
-        try:
-            await tier_service.check_storage_quota(
-                user_id=str(current_user.id),
-                file_size_bytes=total_size,
-                session=session,
-                raise_on_exceed=True
-            )
-        except TierLimitExceeded as e:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"{e.message}. Please upgrade your plan or delete some documents to free up space."
-            )
+        if not current_user.is_admin:
+            try:
+                await tier_service.check_storage_quota(
+                    user_id=str(current_user.id),
+                    file_size_bytes=total_size,
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan or delete some documents to free up space."
+                )
 
         # Validate first file to check trust score and CAPTCHA requirement
         if files:

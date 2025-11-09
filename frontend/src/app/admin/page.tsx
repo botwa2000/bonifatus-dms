@@ -102,11 +102,11 @@ export default function AdminDashboard() {
       setLoadingData(true)
 
       // Load stats
-      const statsData = await apiClient.get<SystemStats>('/admin/stats')
+      const statsData = await apiClient.get<SystemStats>('/api/v1/admin/stats')
       setStats(statsData)
 
       // Load users
-      const usersData = await apiClient.get<{ users: User[] }>('/admin/users', false, {
+      const usersData = await apiClient.get<{ users: User[] }>('/api/v1/admin/users', false, {
         params: {
           page: '1',
           page_size: '100'
@@ -115,11 +115,11 @@ export default function AdminDashboard() {
       setUsers(usersData.users)
 
       // Load tiers
-      const tiersData = await apiClient.get<{ tiers: TierPlan[] }>('/admin/tiers')
+      const tiersData = await apiClient.get<{ tiers: TierPlan[] }>('/api/v1/admin/tiers')
       setTiers(tiersData.tiers)
 
       // Load ClamAV health
-      const healthData = await apiClient.get<ClamAVHealth>('/admin/health/clamav')
+      const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
 
     } catch (error) {
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
 
   const checkClamavHealth = async () => {
     try {
-      const healthData = await apiClient.get<ClamAVHealth>('/admin/health/clamav')
+      const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
     } catch (error) {
       console.error('Failed to check ClamAV health:', error)
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
   const restartClamav = async () => {
     try {
       setRestartingClamav(true)
-      const result = await apiClient.post<{ success: boolean; error?: string }>('/admin/health/clamav/restart', {})
+      const result = await apiClient.post<{ success: boolean; error?: string }>('/api/v1/admin/health/clamav/restart', {})
 
       if (result.success) {
         alert('ClamAV restarted successfully!')
@@ -161,7 +161,7 @@ export default function AdminDashboard() {
 
   const updateTier = async (tierId: number, updates: Partial<TierPlan>) => {
     try {
-      await apiClient.patch(`/admin/tiers/${tierId}`, updates)
+      await apiClient.patch(`/api/v1/admin/tiers/${tierId}`, updates)
       await loadData()
       setEditingTier(null)
     } catch (error) {
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
 
   const updateUserTier = async (userId: string, newTierId: number) => {
     try {
-      await apiClient.patch(`/admin/users/${userId}/tier`, { tier_id: newTierId })
+      await apiClient.patch(`/api/v1/admin/users/${userId}/tier`, { tier_id: newTierId })
       await loadData()
     } catch (error) {
       console.error('Failed to update user tier:', error)

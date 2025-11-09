@@ -12,6 +12,8 @@ interface ApiClientConfig {
 export class ApiClient {
   private readonly config: ApiClientConfig
   private requestCounter = 0
+  private isRefreshing = false
+  private refreshPromise: Promise<boolean> | null = null
 
   constructor() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -119,6 +121,21 @@ export class ApiClient {
 
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
+
+          // Handle 401 errors with automatic token refresh (except for refresh endpoint itself)
+          if (response.status === 401 && !endpoint.includes('/auth/refresh') && requireAuth) {
+            const refreshed = await this.refreshToken()
+            if (refreshed) {
+              // Token refreshed successfully, retry the request once
+              lastError = error
+              continue
+            }
+            // Refresh failed, redirect to login
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login'
+            }
+            throw error
+          }
 
           if (this.shouldRetry(response.status, attempt, maxRetries)) {
             lastError = error
@@ -274,6 +291,45 @@ export class ApiClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private async refreshToken(): Promise<boolean> {
+    // If a refresh is already in progress, wait for it
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise
+    }
+
+    this.isRefreshing = true
+    this.refreshPromise = (async () => {
+      try {
+        const url = `${this.config.baseURL}/api/v1/auth/refresh`
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include', // Send refresh token cookie
+          body: JSON.stringify({}) // Empty body, token comes from cookie
+        })
+
+        if (response.ok) {
+          console.log('[API Client] Token refreshed successfully')
+          return true
+        }
+
+        console.warn('[API Client] Token refresh failed:', response.status)
+        return false
+      } catch (error) {
+        console.error('[API Client] Token refresh error:', error)
+        return false
+      } finally {
+        this.isRefreshing = false
+        this.refreshPromise = null
+      }
+    })()
+
+    return this.refreshPromise
   }
 }
 
