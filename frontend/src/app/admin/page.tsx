@@ -134,7 +134,7 @@ export default function AdminDashboard() {
   const restartClamav = async () => {
     try {
       setRestartingClamav(true)
-      const result = await apiClient.post<any>('/admin/health/clamav/restart', {})
+      const result = await apiClient.post<{ success: boolean; error?: string }>('/admin/health/clamav/restart', {})
 
       if (result.success) {
         alert('ClamAV restarted successfully!')
