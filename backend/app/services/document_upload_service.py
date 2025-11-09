@@ -82,6 +82,12 @@ class DocumentUploadService:
             mime_type = temp_data['mime_type']
             analysis_result = temp_data['analysis_result']
 
+            # Use detected language from analysis result (more accurate than user preference)
+            detected_language = analysis_result.get('detected_language', language_code)
+            if detected_language:
+                language_code = detected_language
+                logger.info(f"[UPLOAD DEBUG] Using detected language: {language_code}")
+
             # Determine primary category first to get category code for filename
             if primary_category_id:
                 if primary_category_id not in category_ids:
@@ -239,6 +245,7 @@ class DocumentUploadService:
                 google_drive_file_id=drive_result['drive_file_id'],
                 web_view_link=drive_result.get('web_view_link'),
                 primary_language=language_code,
+                extracted_text=analysis_result.get('extracted_text'),
                 keywords=keywords_json,
                 processing_status='completed',
                 document_date=doc_date_value,
