@@ -63,7 +63,7 @@ interface ClamAVHealth {
 }
 
 export default function AdminDashboard() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, loadUser } = useAuth()
   const router = useRouter()
 
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -74,6 +74,11 @@ export default function AdminDashboard() {
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [restartingClamav, setRestartingClamav] = useState(false)
+
+  // Load user on mount to ensure fresh data
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   // Check admin access
   useEffect(() => {

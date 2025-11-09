@@ -122,6 +122,16 @@ class TierService:
             TierLimitExceeded: If raise_on_exceed=True and quota exceeded
         """
         try:
+            # Check if user is admin - admins have unlimited storage
+            result = session.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if user and user.is_admin:
+                logger.debug(f"Admin user {user_id} bypassing storage quota check")
+                return True
+
             # Get user's tier
             tier = await self.get_user_tier(user_id, session)
             if not tier:
@@ -191,6 +201,16 @@ class TierService:
             True if can upload more, False otherwise
         """
         try:
+            # Check if user is admin - admins have unlimited documents
+            result = session.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if user and user.is_admin:
+                logger.debug(f"Admin user {user_id} bypassing document count limit check")
+                return True
+
             # Get user's tier
             tier = await self.get_user_tier(user_id, session)
             if not tier:
@@ -242,6 +262,16 @@ class TierService:
             True if feature is enabled for user's tier, False otherwise
         """
         try:
+            # Check if user is admin - admins have all features
+            result = session.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if user and user.is_admin:
+                logger.debug(f"Admin user {user_id} granted feature access: {feature}")
+                return True
+
             tier = await self.get_user_tier(user_id, session)
             if not tier:
                 return False
