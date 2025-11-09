@@ -101,9 +101,11 @@ export default function AdminDashboard() {
       setStats(statsData)
 
       // Load users
-      const usersData = await apiClient.get<{ users: User[] }>('/admin/users', {
-        page: 1,
-        page_size: 100
+      const usersData = await apiClient.get<{ users: User[] }>('/admin/users', false, {
+        params: {
+          page: '1',
+          page_size: '100'
+        }
       })
       setUsers(usersData.users)
 
