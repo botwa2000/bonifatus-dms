@@ -21,6 +21,7 @@ from app.middleware.auth_middleware import get_current_active_user, get_client_i
 from app.services.category_service import category_service
 from app.services.config_service import config_service
 from app.services.user_service import user_service
+from app.services.tier_service import tier_service, TierLimitExceeded
 
 import io
 from app.services.file_validation_service import file_validation_service
@@ -240,11 +241,20 @@ async def confirm_upload(
             session=session
         )
 
+        # Update storage quota after successful upload
+        file_size = len(temp_data['file_content'])
+        await tier_service.update_storage_usage(
+            user_id=str(current_user.id),
+            file_size_bytes=file_size,
+            session=session,
+            increment=True
+        )
+
         # Remove from temporary storage
         del temp_storage[confirm_request.temp_id]
-        
-        logger.info(f"Document uploaded: {result['document_id']}")
-        
+
+        logger.info(f"Document uploaded: {result['document_id']}, size: {file_size} bytes")
+
         return result
         
     except HTTPException:
@@ -290,13 +300,62 @@ async def analyze_batch(
         
         # Validate batch size
         max_batch_size = await config_service.get_setting('max_batch_upload_size', 10, session)
-        
+
         if len(files) > max_batch_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Batch size exceeds maximum of {max_batch_size} files"
             )
-        
+
+        # TIER ENFORCEMENT: Check bulk operations for multi-file uploads
+        if len(files) > 1:
+            has_bulk_ops = await tier_service.check_feature_access(
+                user_id=str(current_user.id),
+                feature='bulk_operations',
+                session=session
+            )
+            if not has_bulk_ops:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bulk upload requires Starter plan or higher. Please upgrade or upload files one at a time."
+                )
+
+        # TIER ENFORCEMENT: Check document count limit
+        try:
+            await tier_service.check_document_count_limit(
+                user_id=str(current_user.id),
+                session=session,
+                raise_on_exceed=True
+            )
+        except TierLimitExceeded as e:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{e.message}. Please upgrade your plan or delete some documents."
+            )
+
+        # TIER ENFORCEMENT: Check storage quota for all files
+        total_size = 0
+        file_sizes = []
+        for file in files:
+            await file.seek(0, 2)  # Seek to end
+            size = await file.tell()
+            await file.seek(0)  # Reset to beginning
+            file_sizes.append(size)
+            total_size += size
+
+        try:
+            await tier_service.check_storage_quota(
+                user_id=str(current_user.id),
+                file_size_bytes=total_size,
+                session=session,
+                raise_on_exceed=True
+            )
+        except TierLimitExceeded as e:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{e.message}. Please upgrade your plan or delete some documents to free up space."
+            )
+
         # Validate first file to check trust score and CAPTCHA requirement
         if files:
             first_file = files[0]

@@ -85,9 +85,18 @@ def build_allowed_origins(cors_config: str) -> list[str]:
     for origin in base_origins:
         allowed_origins.append(origin)
         # Add api subdomain variant if not already present
-        if "://" in origin and "api." not in origin:
+        if "://" in origin and "api" not in origin.split("://")[1].split(".")[0]:
             parts = origin.split("://")
-            allowed_origins.append(f"{parts[0]}://api.{parts[1]}")
+            domain = parts[1]
+
+            # Handle dev subdomain: dev.bonidoc.com -> api-dev.bonidoc.com
+            if domain.startswith("dev."):
+                api_origin = f"{parts[0]}://api-{domain}"
+            # Handle main domain: bonidoc.com -> api.bonidoc.com
+            else:
+                api_origin = f"{parts[0]}://api.{domain}"
+
+            allowed_origins.append(api_origin)
 
     return allowed_origins
 
@@ -216,6 +225,7 @@ async def root():
 # Include routers - all prefixes defined in router files
 routers = [
     ("app.api.auth", "Auth"),
+    ("app.api.admin", "Admin"),
     ("app.api.users", "Users"),
     ("app.api.settings", "Settings"),
     ("app.api.categories", "Categories"),

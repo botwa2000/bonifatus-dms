@@ -17,6 +17,7 @@ from sqlalchemy import select, func, text, and_, or_
 from app.database.models import Document, Category, DocumentCategory, CategoryTranslation, User, AuditLog, SystemSetting, UserSetting
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
+from app.services.tier_service import tier_service
 from app.schemas.document_schemas import (
     DocumentUploadResponse, DocumentResponse, DocumentUpdateRequest,
     DocumentListResponse, DocumentSearchRequest, DocumentStorageInfo,
@@ -699,10 +700,22 @@ class DocumentService:
                 "google_drive_file_id": document.google_drive_file_id
             }
 
+            # Store file size before deletion for quota update
+            file_size = document.file_size
+
             logger.info(f"[DELETE DEBUG] Deleting document from database...")
             session.delete(document)
             session.commit()
             logger.info(f"[DELETE DEBUG] ✅ Document deleted from database")
+
+            # Update storage quota after successful deletion
+            await tier_service.update_storage_usage(
+                user_id=user_id,
+                file_size_bytes=file_size,
+                session=session,
+                increment=False  # Decrement storage
+            )
+            logger.info(f"[DELETE DEBUG] Storage quota updated: -{file_size} bytes")
 
             await self._log_document_action(
                 user_id, "document_delete", "document", document_id,
