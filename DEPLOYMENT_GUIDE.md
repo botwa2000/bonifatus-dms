@@ -1118,8 +1118,49 @@ services:
 | **API URL** | `https://api.bonidoc.com` | `https://api-dev.bonidoc.com` |
 | **Database** | `bonifatus_dms` | `bonifatus_dms_dev` |
 | **Debug Mode** | `false` | `true` |
+| **ClamAV** | Enabled | Disabled (CLAMAV_ENABLED=false) |
+| **IP Whitelist** | None (public) | Yes (specific IPs only) |
+| **CORS Origins** | `bonidoc.com` | `dev.bonidoc.com` |
 
 **⚠️ CRITICAL:** If you see container name conflicts during deployment, the docker-compose.yml was not configured correctly. The `-dev` suffix on container names is MANDATORY to prevent conflicts with production containers.
+
+**Keeping Dev and Prod in Sync:**
+
+Both environments run identical code but with different configurations. To sync:
+
+```bash
+# Sync code to both environments (after git push)
+ssh root@91.99.212.17
+
+# Update production
+cd /opt/bonifatus-dms
+git pull origin main
+docker compose build
+docker compose up -d
+
+# Update development
+cd /opt/bonifatus-dms-dev
+git pull origin main
+docker compose build
+docker compose up -d
+
+# Verify both are in sync
+curl -s https://api.bonidoc.com/health | grep environment    # Should show "production"
+curl -s https://api-dev.bonidoc.com/health | grep environment # Should show "development"
+```
+
+**⚠️ Environment-Specific Files (NEVER SYNC):**
+- `.env` files contain environment-specific secrets and settings
+- `docker-compose.yml` files contain environment-specific ports/names
+- Database contents are separate (prod data ≠ dev data)
+- Nginx config for dev includes IP whitelist
+
+**Common Sync Issues:**
+
+1. **Frontend calling wrong API** → Rebuild frontend with `--no-cache`
+2. **CORS errors** → Check `APP_CORS_ORIGINS` in `.env` matches frontend URL
+3. **Container name conflicts** → Verify `-dev` suffix in dev docker-compose.yml
+4. **Database connection errors** → Check pg_hba.conf has entry for dev network (172.21.0.0/16)
 
 **Step 1: Deploy code changes to dev**
 
