@@ -1042,10 +1042,84 @@ docker exec bonifatus-backend alembic current
 Development environment is isolated from production with:
 - Separate database (`bonifatus_dms_dev`)
 - Different ports (3001/8081/5001)
+- Different container names (with `-dev` suffix)
 - Debug logs enabled
 - Clean test data
 
 **⚠️ IMPORTANT:** Always test features on dev first before deploying to production!
+
+**Critical Configuration - Dev docker-compose.yml**
+
+The dev environment MUST have these specific settings to avoid conflicts with production:
+
+```yaml
+services:
+  backend:
+    build: ./backend
+    container_name: bonifatus-backend-dev    # ⚠️ MUST have -dev suffix
+    ports:
+      - "8081:8080"                          # ⚠️ External port 8081 (not 8080)
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com  # ⚠️ MUST use dev API
+    container_name: bonifatus-frontend-dev   # ⚠️ MUST have -dev suffix
+    ports:
+      - "3001:3000"                          # ⚠️ External port 3001 (not 3000)
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: bonifatus-translator-dev # ⚠️ MUST have -dev suffix
+    restart: unless-stopped
+    user: "0:0"
+    ports:
+      - "127.0.0.1:5001:5000"                # ⚠️ External port 5001 (not 5000)
+    environment:
+      - LT_HOST=0.0.0.0
+      - LT_PORT=5000
+      - LT_CHAR_LIMIT=5000
+      - LT_LOAD_ONLY=en,de,ru,fr
+    volumes:
+      - ./translator-data:/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/languages"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+```
+
+**Key Differences from Production:**
+
+| Setting | Production | Development |
+|---------|-----------|-------------|
+| **Container Names** | `bonifatus-backend` | `bonifatus-backend-dev` |
+| | `bonifatus-frontend` | `bonifatus-frontend-dev` |
+| | `bonifatus-translator` | `bonifatus-translator-dev` |
+| **Backend Port** | 8080 | 8081 |
+| **Frontend Port** | 3000 | 3001 |
+| **Translator Port** | 5000 | 5001 |
+| **API URL** | `https://api.bonidoc.com` | `https://api-dev.bonidoc.com` |
+| **Database** | `bonifatus_dms` | `bonifatus_dms_dev` |
+| **Debug Mode** | `false` | `true` |
+
+**⚠️ CRITICAL:** If you see container name conflicts during deployment, the docker-compose.yml was not configured correctly. The `-dev` suffix on container names is MANDATORY to prevent conflicts with production containers.
 
 **Step 1: Deploy code changes to dev**
 
@@ -1066,6 +1140,21 @@ docker compose up -d
 
 # Check status
 docker compose ps
+```
+
+**⚠️ If frontend is calling wrong API (CORS errors):**
+
+If you see CORS errors like "Access to fetch at 'https://api.bonidoc.com' from origin 'https://dev.bonidoc.com' has been blocked", the frontend was built with wrong API URL. Rebuild with:
+
+```bash
+cd /opt/bonifatus-dms-dev
+
+# Force rebuild frontend with correct API URL
+docker compose build frontend --no-cache
+docker compose up -d frontend
+
+# Verify it's calling dev API (should show api-dev.bonidoc.com)
+curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
 ```
 
 **Step 2: Verify dev deployment**

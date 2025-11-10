@@ -341,8 +341,9 @@ async def analyze_batch(
         total_size = 0
         file_sizes = []
         for file in files:
-            await file.seek(0, 2)  # Seek to end
-            size = await file.tell()
+            # Read file to get size, then reset position
+            content = await file.read()
+            size = len(content)
             await file.seek(0)  # Reset to beginning
             file_sizes.append(size)
             total_size += size
