@@ -10,11 +10,11 @@ echo "=== Bonifatus DMS Backend - Production Startup ==="
 export MALLOC_ARENA_MAX=2  # Reduce memory fragmentation
 export PYTHONMALLOC=malloc  # Use system malloc for better memory control
 
-# Function to start ClamAV in background (lazy loading)
+# Function to start ClamAV with keepalive monitoring
 start_clamav_lazy() {
-    echo "[ClamAV] Initializing in background (lazy mode)..."
+    echo "[ClamAV] Initializing in background (lazy mode with keepalive)..."
 
-    # Always start in a single background process
+    # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
         # Update database if needed
@@ -34,27 +34,43 @@ start_clamav_lazy() {
         mkdir -p /var/log/clamav
         chown clamav:clamav /var/log/clamav
 
-        # Start daemon (always, after database is ready)
-        echo "[ClamAV] Starting daemon..."
-        # Start daemon in foreground, will daemonize itself
-        clamd --config-file=/etc/clamav/clamd.conf
+        # Keepalive loop - restart clamd if it dies
+        while true; do
+            echo "[ClamAV] Starting daemon..."
+            # Start daemon in foreground, will daemonize itself
+            clamd --config-file=/etc/clamav/clamd.conf
 
-        # Give daemon time to start
-        sleep 3
+            # Give daemon time to start
+            sleep 5
 
-        # Check if daemon is running by testing the socket
-        if clamdscan --ping 2>/dev/null; then
-            echo "[ClamAV] Daemon started successfully and is responsive"
-        else
-            echo "[ClamAV] Warning: Daemon may not be fully started yet"
-        fi
+            # Check if daemon is running
+            if clamdscan --ping 2>/dev/null; then
+                echo "[ClamAV] Daemon started successfully and is responsive"
 
-        # Update database in background (non-blocking)
-        sleep 3
-        freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || true
+                # Update database in background (first time only)
+                if [ ! -f /var/lib/clamav/.updated ]; then
+                    freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || true
+                    touch /var/lib/clamav/.updated
+                fi
+
+                # Monitor loop - check every 30 seconds if daemon is still alive
+                while true; do
+                    sleep 30
+                    if ! clamdscan --ping 2>/dev/null; then
+                        echo "[ClamAV] Daemon stopped responding - restarting..."
+                        pkill -9 clamd 2>/dev/null || true
+                        sleep 2
+                        break  # Break inner loop to restart daemon
+                    fi
+                done
+            else
+                echo "[ClamAV] Warning: Daemon failed to start, retrying in 10 seconds..."
+                sleep 10
+            fi
+        done
     ) &
 
-    echo "[ClamAV] Background initialization started (non-blocking)"
+    echo "[ClamAV] Background initialization started with keepalive monitoring"
 }
 
 # Function to check if we should use lazy loading

@@ -490,7 +490,7 @@ export default function AdminDashboard() {
                             type="number"
                             step="0.01"
                             defaultValue={tier.price_monthly_cents / 100}
-                            onChange={(e) => setEditingTier({ ...tier, price_monthly_cents: Math.round(parseFloat(e.target.value) * 100) })}
+                            onChange={(e) => setEditingTier({ ...editingTier, price_monthly_cents: Math.round(parseFloat(e.target.value) * 100) })}
                             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                           />
                         </div>
@@ -502,7 +502,7 @@ export default function AdminDashboard() {
                             <input
                               type="number"
                               value={bytesToUnit(editingTier.storage_quota_bytes, storageUnit)}
-                              onChange={(e) => setEditingTier({ ...tier, storage_quota_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit) })}
+                              onChange={(e) => setEditingTier({ ...editingTier, storage_quota_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit) })}
                               className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                             />
                             <select
@@ -524,7 +524,7 @@ export default function AdminDashboard() {
                             <input
                               type="number"
                               value={bytesToUnit(editingTier.max_file_size_bytes, fileSizeUnit)}
-                              onChange={(e) => setEditingTier({ ...tier, max_file_size_bytes: unitToBytes(parseFloat(e.target.value) || 0, fileSizeUnit) })}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_file_size_bytes: unitToBytes(parseFloat(e.target.value) || 0, fileSizeUnit) })}
                               className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                             />
                             <select
@@ -543,7 +543,7 @@ export default function AdminDashboard() {
                             <input
                               type="checkbox"
                               checked={editingTier.max_documents === null}
-                              onChange={(e) => setEditingTier({ ...tier, max_documents: e.target.checked ? null : 100 })}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_documents: e.target.checked ? null : 100 })}
                               className="rounded"
                             />
                             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Documents</span>
@@ -552,7 +552,7 @@ export default function AdminDashboard() {
                             <input
                               type="number"
                               value={editingTier.max_documents}
-                              onChange={(e) => setEditingTier({ ...tier, max_documents: parseInt(e.target.value) || 0 })}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_documents: parseInt(e.target.value) || 0 })}
                               className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                             />
                           )}
@@ -562,7 +562,7 @@ export default function AdminDashboard() {
                             <input
                               type="checkbox"
                               checked={editingTier.max_batch_upload_size === null}
-                              onChange={(e) => setEditingTier({ ...tier, max_batch_upload_size: e.target.checked ? null : 10 })}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_batch_upload_size: e.target.checked ? null : 10 })}
                               className="rounded"
                             />
                             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Batch Size</span>
@@ -571,7 +571,7 @@ export default function AdminDashboard() {
                             <input
                               type="number"
                               value={editingTier.max_batch_upload_size}
-                              onChange={(e) => setEditingTier({ ...tier, max_batch_upload_size: parseInt(e.target.value) || 0 })}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_batch_upload_size: parseInt(e.target.value) || 0 })}
                               placeholder="Max files per batch"
                               className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                             />
@@ -583,7 +583,7 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             checked={editingTier.bulk_operations_enabled}
-                            onChange={(e) => setEditingTier({ ...tier, bulk_operations_enabled: e.target.checked })}
+                            onChange={(e) => setEditingTier({ ...editingTier, bulk_operations_enabled: e.target.checked })}
                             className="rounded"
                           />
                           <span className="text-sm text-neutral-700 dark:text-neutral-300">Bulk Operations</span>
@@ -592,7 +592,7 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             checked={editingTier.is_active}
-                            onChange={(e) => setEditingTier({ ...tier, is_active: e.target.checked })}
+                            onChange={(e) => setEditingTier({ ...editingTier, is_active: e.target.checked })}
                             className="rounded"
                           />
                           <span className="text-sm text-neutral-700 dark:text-neutral-300">Active</span>

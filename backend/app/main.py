@@ -46,7 +46,28 @@ async def lifespan(app: FastAPI):
         logger.info("Rate limit service initialized")
     except Exception as e:
         logger.warning(f"Rate limit service initialization failed: {e}")
-    
+
+    # Start ClamAV auto-restart monitoring
+    try:
+        from app.services.clamav_health_service import clamav_health_service
+        import asyncio
+
+        async def clamav_health_monitor():
+            """Background task to monitor and auto-restart ClamAV"""
+            while True:
+                try:
+                    await asyncio.sleep(60)  # Check every 60 seconds
+                    result = await clamav_health_service.auto_restart_if_needed()
+                    if result.get('auto_restart_attempted'):
+                        logger.warning(f"ClamAV auto-restart triggered: {result}")
+                except Exception as e:
+                    logger.error(f"ClamAV health monitor error: {e}")
+
+        asyncio.create_task(clamav_health_monitor())
+        logger.info("ClamAV auto-restart monitor initialized (checks every 60s)")
+    except Exception as e:
+        logger.warning(f"ClamAV monitor initialization failed: {e}")
+
     logger.info("Application startup completed successfully")
     
     yield

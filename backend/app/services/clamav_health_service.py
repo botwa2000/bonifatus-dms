@@ -121,7 +121,7 @@ class ClamAVHealthService:
 
     async def restart_service(self) -> Dict:
         """
-        Attempt to restart ClamAV daemon
+        Attempt to restart ClamAV daemon (Docker-compatible)
 
         Returns:
             Dictionary with restart operation result
@@ -151,44 +151,59 @@ class ClamAVHealthService:
         logger.info(f"Attempting to restart ClamAV daemon (attempt {self._restart_attempts}/{self._max_restart_attempts})")
 
         try:
-            # Try systemctl restart (systemd)
+            # Docker environment: Kill existing clamd processes and start fresh
+            logger.info("Stopping existing clamd processes...")
+
+            # Kill any existing clamd processes
+            try:
+                subprocess.run(
+                    ['pkill', '-9', 'clamd'],
+                    capture_output=True,
+                    timeout=5
+                )
+                logger.info("Killed existing clamd processes")
+                time.sleep(1)
+            except Exception as e:
+                logger.debug(f"No existing clamd processes to kill: {e}")
+
+            # Start fresh clamd daemon
+            logger.info("Starting fresh clamd daemon...")
             result = subprocess.run(
-                ['systemctl', 'restart', 'clamav-daemon'],
+                ['clamd', '--config-file=/etc/clamav/clamd.conf'],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=10
             )
 
-            if result.returncode == 0:
-                logger.info("ClamAV daemon restarted successfully via systemctl")
+            # clamd daemonizes itself, so returncode might not indicate success
+            logger.info(f"Clamd start command completed with code {result.returncode}")
 
-                # Wait for service to come up
-                time.sleep(3)
+            # Wait for service to come up
+            logger.info("Waiting for ClamAV to become available...")
+            time.sleep(5)
 
-                # Verify restart
+            # Verify restart with retries
+            for retry in range(3):
                 health = await self.check_health()
-
                 if health['available']:
+                    logger.info(f"ClamAV restarted successfully on retry {retry + 1}")
                     return {
                         'success': True,
                         'message': 'ClamAV daemon restarted successfully',
-                        'method': 'systemctl',
+                        'method': 'direct-clamd',
                         'attempts': self._restart_attempts,
                         'health': health
                     }
-                else:
-                    return {
-                        'success': False,
-                        'error': 'Service restarted but health check failed',
-                        'attempts': self._restart_attempts,
-                        'health': health
-                    }
-            else:
-                error_msg = result.stderr.strip()
-                logger.error(f"Systemctl restart failed: {error_msg}")
+                time.sleep(2)
 
-                # Try alternative restart methods
-                return await self._try_alternative_restart()
+            # If we get here, restart command ran but health check failed
+            health = await self.check_health()
+            return {
+                'success': False,
+                'error': 'ClamAV start command executed but daemon not responding',
+                'attempts': self._restart_attempts,
+                'health': health
+            }
 
         except subprocess.TimeoutExpired:
             logger.error("ClamAV restart timed out")
@@ -197,9 +212,6 @@ class ClamAVHealthService:
                 'error': 'Restart command timed out',
                 'attempts': self._restart_attempts
             }
-        except FileNotFoundError:
-            logger.warning("systemctl not found, trying alternative methods")
-            return await self._try_alternative_restart()
         except Exception as e:
             logger.error(f"ClamAV restart error: {e}")
             return {
@@ -271,6 +283,51 @@ class ClamAVHealthService:
         """Manually reset restart attempt counter"""
         self._restart_attempts = 0
         logger.info("ClamAV restart counter manually reset")
+
+    async def auto_restart_if_needed(self) -> Dict:
+        """
+        Check health and auto-restart if ClamAV is down
+
+        This is called periodically by a background task.
+        Returns health status and restart action taken.
+        """
+        health = await self.check_health()
+
+        if not health['available'] and health['status'] == 'unavailable':
+            logger.warning(f"ClamAV is down - attempting auto-restart (attempts: {self._restart_attempts})")
+
+            # Only auto-restart if we haven't exceeded max attempts
+            if self._restart_attempts < self._max_restart_attempts:
+                # Check if enough time has passed since last restart
+                if self._last_restart_attempt:
+                    time_since_last = datetime.utcnow() - self._last_restart_attempt
+                    if time_since_last < self._restart_cooldown:
+                        logger.debug(f"Auto-restart skipped - cooldown period active")
+                        return {
+                            'health': health,
+                            'auto_restart_attempted': False,
+                            'reason': 'cooldown_active'
+                        }
+
+                restart_result = await self.restart_service()
+                return {
+                    'health': health,
+                    'auto_restart_attempted': True,
+                    'restart_result': restart_result
+                }
+            else:
+                logger.error(f"ClamAV auto-restart disabled - max attempts ({self._max_restart_attempts}) reached")
+                return {
+                    'health': health,
+                    'auto_restart_attempted': False,
+                    'reason': 'max_attempts_reached'
+                }
+
+        return {
+            'health': health,
+            'auto_restart_attempted': False,
+            'reason': 'service_healthy' if health['available'] else 'unknown'
+        }
 
 
 # Global service instance
