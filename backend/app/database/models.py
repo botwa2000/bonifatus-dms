@@ -47,6 +47,7 @@ class TierPlan(Base, TimestampMixin):
     api_access_enabled = Column(Boolean, nullable=False, server_default='false')
     priority_support = Column(Boolean, nullable=False, server_default='false')
     custom_categories_limit = Column(Integer, nullable=True)  # NULL = unlimited
+    max_batch_upload_size = Column(Integer, nullable=True, server_default='10')  # NULL = use system default
 
     # Display
     sort_order = Column(Integer, nullable=False, default=0)

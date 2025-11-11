@@ -297,15 +297,18 @@ async def analyze_batch(
     """
     try:
         ip_address = get_client_ip(request)
-        
-        # Validate batch size
-        max_batch_size = await config_service.get_setting('max_batch_upload_size', 10, session)
 
-        if len(files) > max_batch_size:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Batch size exceeds maximum of {max_batch_size} files"
-            )
+        # Validate batch size based on user's tier
+        # Admin users have unlimited batch size
+        if not current_user.is_admin:
+            tier = await tier_service.get_user_tier(str(current_user.id), session)
+            max_batch_size = tier.max_batch_upload_size if tier and tier.max_batch_upload_size else 10
+
+            if len(files) > max_batch_size:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Batch size exceeds maximum of {max_batch_size} files for your tier. Please upgrade or upload fewer files."
+                )
 
         # TIER ENFORCEMENT: Check bulk operations for multi-file uploads
         # Admin users bypass all tier restrictions

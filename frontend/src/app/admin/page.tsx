@@ -47,6 +47,7 @@ interface TierPlan {
   storage_quota_bytes: number
   max_file_size_bytes: number
   max_documents: number | null
+  max_batch_upload_size: number | null
   bulk_operations_enabled: boolean
   is_active: boolean
 }
@@ -74,6 +75,15 @@ export default function AdminDashboard() {
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [restartingClamav, setRestartingClamav] = useState(false)
+
+  // User search and sorting
+  const [userSearch, setUserSearch] = useState('')
+  const [userSortField, setUserSortField] = useState<'email' | 'full_name' | 'tier_name' | 'created_at'>('created_at')
+  const [userSortDirection, setUserSortDirection] = useState<'asc' | 'desc'>('desc')
+
+  // Tier editing with unit selector
+  const [storageUnit, setStorageUnit] = useState<'bytes' | 'MB' | 'GB'>('GB')
+  const [fileSizeUnit, setFileSizeUnit] = useState<'bytes' | 'MB' | 'GB'>('MB')
 
   // Load user on mount to ensure fresh data
   useEffect(() => {
@@ -190,6 +200,46 @@ export default function AdminDashboard() {
 
   const formatPrice = (cents: number) => {
     return `€${(cents / 100).toFixed(2)}`
+  }
+
+  // Unit conversion helpers
+  const bytesToUnit = (bytes: number, unit: 'bytes' | 'MB' | 'GB'): number => {
+    if (unit === 'bytes') return bytes
+    if (unit === 'MB') return bytes / (1024 * 1024)
+    return bytes / (1024 * 1024 * 1024)
+  }
+
+  const unitToBytes = (value: number, unit: 'bytes' | 'MB' | 'GB'): number => {
+    if (unit === 'bytes') return value
+    if (unit === 'MB') return value * 1024 * 1024
+    return value * 1024 * 1024 * 1024
+  }
+
+  // Filter and sort users
+  const filteredAndSortedUsers = users
+    .filter(u => {
+      if (!userSearch) return true
+      const search = userSearch.toLowerCase()
+      return (
+        u.email.toLowerCase().includes(search) ||
+        u.full_name.toLowerCase().includes(search)
+      )
+    })
+    .sort((a, b) => {
+      const direction = userSortDirection === 'asc' ? 1 : -1
+      if (userSortField === 'created_at') {
+        return direction * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      }
+      return direction * String(a[userSortField]).localeCompare(String(b[userSortField]))
+    })
+
+  const toggleSort = (field: typeof userSortField) => {
+    if (userSortField === field) {
+      setUserSortDirection(userSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setUserSortField(field)
+      setUserSortDirection('asc')
+    }
   }
 
   if (isLoading || !user) {
@@ -332,13 +382,39 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader title="User Management" />
             <CardContent>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                />
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-neutral-100 dark:bg-neutral-800">
                     <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Email</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Name</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Tier</th>
+                      <th
+                        onClick={() => toggleSort('email')}
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                      >
+                        Email {userSortField === 'email' && (userSortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th
+                        onClick={() => toggleSort('full_name')}
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                      >
+                        Name {userSortField === 'full_name' && (userSortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th
+                        onClick={() => toggleSort('tier_name')}
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                      >
+                        Tier {userSortField === 'tier_name' && (userSortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Documents</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Storage</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Status</th>
@@ -346,7 +422,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user) => (
+                    {filteredAndSortedUsers.map((user) => (
                       <tr key={user.id} className="border-t border-neutral-200 dark:border-neutral-700">
                         <td className="px-4 py-3 text-sm text-neutral-900 dark:text-white">{user.email}</td>
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.full_name}</td>
@@ -408,48 +484,98 @@ export default function AdminDashboard() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Monthly Price (cents)
+                            Monthly Price (€)
                           </label>
                           <input
                             type="number"
-                            defaultValue={tier.price_monthly_cents}
-                            onChange={(e) => setEditingTier({ ...tier, price_monthly_cents: parseInt(e.target.value) })}
+                            step="0.01"
+                            defaultValue={tier.price_monthly_cents / 100}
+                            onChange={(e) => setEditingTier({ ...tier, price_monthly_cents: Math.round(parseFloat(e.target.value) * 100) })}
                             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                           />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Storage Quota (bytes)
+                            Storage Quota
                           </label>
-                          <input
-                            type="number"
-                            defaultValue={tier.storage_quota_bytes}
-                            onChange={(e) => setEditingTier({ ...tier, storage_quota_bytes: parseInt(e.target.value) })}
-                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={bytesToUnit(editingTier.storage_quota_bytes, storageUnit)}
+                              onChange={(e) => setEditingTier({ ...tier, storage_quota_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit) })}
+                              className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                            <select
+                              value={storageUnit}
+                              onChange={(e) => setStorageUnit(e.target.value as typeof storageUnit)}
+                              className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            >
+                              <option value="bytes">Bytes</option>
+                              <option value="MB">MB</option>
+                              <option value="GB">GB</option>
+                            </select>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Max File Size (bytes)
+                            Max File Size
                           </label>
-                          <input
-                            type="number"
-                            defaultValue={tier.max_file_size_bytes}
-                            onChange={(e) => setEditingTier({ ...tier, max_file_size_bytes: parseInt(e.target.value) })}
-                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={bytesToUnit(editingTier.max_file_size_bytes, fileSizeUnit)}
+                              onChange={(e) => setEditingTier({ ...tier, max_file_size_bytes: unitToBytes(parseFloat(e.target.value) || 0, fileSizeUnit) })}
+                              className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                            <select
+                              value={fileSizeUnit}
+                              onChange={(e) => setFileSizeUnit(e.target.value as typeof fileSizeUnit)}
+                              className="px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            >
+                              <option value="bytes">Bytes</option>
+                              <option value="MB">MB</option>
+                              <option value="GB">GB</option>
+                            </select>
+                          </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Max Documents (null = unlimited)
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.max_documents === null}
+                              onChange={(e) => setEditingTier({ ...tier, max_documents: e.target.checked ? null : 100 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Documents</span>
                           </label>
-                          <input
-                            type="number"
-                            defaultValue={tier.max_documents || ''}
-                            placeholder="unlimited"
-                            onChange={(e) => setEditingTier({ ...tier, max_documents: e.target.value ? parseInt(e.target.value) : null })}
-                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
-                          />
+                          {editingTier.max_documents !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.max_documents}
+                              onChange={(e) => setEditingTier({ ...tier, max_documents: parseInt(e.target.value) || 0 })}
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.max_batch_upload_size === null}
+                              onChange={(e) => setEditingTier({ ...tier, max_batch_upload_size: e.target.checked ? null : 10 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Batch Size</span>
+                          </label>
+                          {editingTier.max_batch_upload_size !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.max_batch_upload_size}
+                              onChange={(e) => setEditingTier({ ...tier, max_batch_upload_size: parseInt(e.target.value) || 0 })}
+                              placeholder="Max files per batch"
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-4">
@@ -501,6 +627,12 @@ export default function AdminDashboard() {
                         <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Documents</div>
                         <div className="text-sm font-medium text-neutral-900 dark:text-white">
                           {tier.max_documents || 'Unlimited'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Batch Upload</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {tier.max_batch_upload_size || 'Unlimited'} files
                         </div>
                       </div>
                       <div>
