@@ -59,7 +59,7 @@ export default function HomePage() {
       )}
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-900 py-20">
+      <section className="bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-900 dark:to-neutral-900 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl font-bold text-neutral-900 dark:text-white mb-6">
@@ -110,7 +110,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-white dark:bg-neutral-900">
+      <section id="features" className="py-12 bg-white dark:bg-neutral-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-4">
