@@ -7,7 +7,7 @@ Handles asynchronous batch document processing with real-time progress tracking
 import logging
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
@@ -162,13 +162,24 @@ class BatchProcessorService:
                         user_id=user_id
                     )
 
+                    # Generate temporary ID and store file (like sync endpoint)
+                    from app.api.document_analysis import temp_storage
+                    temp_id = str(uuid.uuid4())
+
+                    temp_storage[temp_id] = {
+                        'file_content': file_data['content'],
+                        'file_name': file_data['filename'],
+                        'mime_type': file_data['mime_type'],
+                        'user_id': user_id,
+                        'expires_at': datetime.utcnow() + timedelta(hours=24),
+                        'analysis_result': analysis_result
+                    }
+
                     results.append({
                         'success': True,
+                        'temp_id': temp_id,
                         'original_filename': file_data['filename'],
-                        'document_id': analysis_result['temp_id'],
-                        'title': analysis_result['title'],
-                        'category': analysis_result.get('category'),
-                        'language': analysis_result.get('language')
+                        'analysis': analysis_result
                     })
 
                     batch.successful_files += 1
