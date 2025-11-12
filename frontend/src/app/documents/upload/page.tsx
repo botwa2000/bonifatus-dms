@@ -70,6 +70,14 @@ export default function BatchUploadPage() {
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
   const [maxFilenameLength, setMaxFilenameLength] = useState(200)
 
+  // Async batch processing state
+  const [batchId, setBatchId] = useState<string | null>(null)
+  const [batchProgress, setBatchProgress] = useState<{
+    processed: number
+    total: number
+    currentFile: string | null
+  } | null>(null)
+
   // Load user data on mount
   useEffect(() => {
     loadUser()
@@ -140,6 +148,63 @@ export default function BatchUploadPage() {
     e.stopPropagation()
   }
 
+  // Poll batch status until completion
+  const pollBatchStatus = async (batchId: string): Promise<any> => {
+    const pollInterval = 2000 // 2 seconds
+    const maxAttempts = 300 // 10 minutes maximum
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const statusResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/batch-status/${batchId}`,
+          {
+            method: 'GET',
+            credentials: 'include'
+          }
+        )
+
+        if (!statusResponse.ok) {
+          throw new Error(`Failed to get batch status: ${statusResponse.statusText}`)
+        }
+
+        const status = await statusResponse.json()
+
+        // Update progress
+        setBatchProgress({
+          processed: status.processed_files || 0,
+          total: status.total_files || selectedFiles.length,
+          currentFile: status.current_file_name || null
+        })
+
+        console.log(`[Batch ${batchId}] Status: ${status.status}, Progress: ${status.processed_files}/${status.total_files}`)
+
+        // Check if batch is complete
+        if (status.status === 'completed') {
+          console.log(`[Batch ${batchId}] Processing completed`)
+          return {
+            total_files: status.total_files,
+            successful: status.successful_files,
+            results: status.results || []
+          }
+        }
+
+        // Check if batch failed
+        if (status.status === 'failed') {
+          throw new Error(status.error_message || 'Batch processing failed')
+        }
+
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+
+      } catch (error) {
+        console.error(`[Batch ${batchId}] Polling error:`, error)
+        throw error
+      }
+    }
+
+    throw new Error('Batch processing timeout - exceeded maximum wait time')
+  }
+
   const handleAnalyzeBatch = async () => {
     if (selectedFiles.length === 0) {
       setMessage({type: 'error', text: 'Please select files first'})
@@ -149,6 +214,7 @@ export default function BatchUploadPage() {
     setAnalyzing(true)
     setAnalysisComplete(false)
     setMessage(null)
+    setBatchProgress({ processed: 0, total: selectedFiles.length, currentFile: null })
 
     try {
       const formData = new FormData()
@@ -156,9 +222,10 @@ export default function BatchUploadPage() {
         formData.append('files', file)
       })
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/analyze-batch`, {
+      // Use async endpoint - returns immediately with batch_id
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/analyze-batch-async`, {
         method: 'POST',
-        credentials: 'include',  // Send httpOnly cookies
+        credentials: 'include',
         body: formData
       })
 
@@ -216,7 +283,14 @@ export default function BatchUploadPage() {
         throw new Error(errorDetail)
       }
 
-      const result = await response.json()
+      const initialResult = await response.json()
+
+      // Get batch_id from async response
+      const batchIdFromResponse = initialResult.batch_id
+      setBatchId(batchIdFromResponse)
+
+      // Poll for batch status until completion
+      const result = await pollBatchStatus(batchIdFromResponse)
 
       // Filter out failed analyses and show errors
       const failedFiles = result.results.filter((r: FileAnalysisResult): r is FileAnalysisFailure => !r.success)
@@ -473,6 +547,8 @@ export default function BatchUploadPage() {
               <DocumentAnalysisProgress
                 fileCount={selectedFiles.length}
                 onComplete={analysisComplete}
+                currentFileIndex={batchProgress?.processed || 0}
+                currentFileName={batchProgress?.currentFile || null}
               />
             ) : uploadStates.length === 0 ? (
               <>

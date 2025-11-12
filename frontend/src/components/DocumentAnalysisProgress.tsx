@@ -7,6 +7,8 @@ import { designTokens } from '@/design/themes/tokens'
 interface DocumentAnalysisProgressProps {
   fileCount: number
   onComplete?: boolean  // Signal from parent when API call actually completes
+  currentFileIndex?: number  // Which file is currently being processed (1-based)
+  currentFileName?: string | null  // Name of current file being processed
 }
 
 type Phase = 'security' | 'analysis' | 'complete'
@@ -33,7 +35,7 @@ const PHASES = [
   },
 ]
 
-export function DocumentAnalysisProgress({ fileCount, onComplete }: DocumentAnalysisProgressProps) {
+export function DocumentAnalysisProgress({ fileCount, onComplete, currentFileIndex, currentFileName }: DocumentAnalysisProgressProps) {
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0)
   const [phaseProgress, setPhaseProgress] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
@@ -132,8 +134,22 @@ export function DocumentAnalysisProgress({ fileCount, onComplete }: DocumentAnal
           className="text-base font-semibold"
           style={{ color: designTokens.colors.neutral[700] }}
         >
-          Processing {fileCount} {fileCount === 1 ? 'document' : 'documents'}
+          {currentFileIndex && currentFileIndex > 0 ? (
+            <>Processing document {currentFileIndex} of {fileCount}</>
+          ) : (
+            <>Processing {fileCount} {fileCount === 1 ? 'document' : 'documents'}</>
+          )}
         </p>
+
+        {currentFileName && (
+          <p
+            className="text-sm font-medium truncate max-w-md"
+            style={{ color: designTokens.colors.neutral[600] }}
+            title={currentFileName}
+          >
+            {currentFileName}
+          </p>
+        )}
 
         <p
           className="text-xs font-mono"
