@@ -6,6 +6,7 @@
 
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
@@ -13,8 +14,66 @@ import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/auth-context'
 import AppHeader from '@/components/AppHeader'
 
+interface TierPlan {
+  id: number
+  name: string
+  display_name: string
+  description: string | null
+  price_monthly_cents: number
+  price_yearly_cents: number
+  currency: string
+  storage_quota_bytes: number
+  max_file_size_bytes: number
+  max_documents: number | null
+  max_batch_upload_size: number | null
+  bulk_operations_enabled: boolean
+  api_access_enabled: boolean
+  priority_support: boolean
+  custom_categories_limit: number | null
+}
+
 export default function HomePage() {
   const { user } = useAuth()
+  const [tiers, setTiers] = useState<TierPlan[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch tier plans on component mount
+  useEffect(() => {
+    const fetchTiers = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/tiers/public`)
+        if (response.ok) {
+          const data = await response.json()
+          setTiers(data.tiers || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch tier plans:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTiers()
+  }, [])
+
+  // Helper function to format price
+  const formatPrice = (cents: number): string => {
+    return (cents / 100).toFixed(2)
+  }
+
+  // Helper function to format storage size
+  const formatStorage = (bytes: number): string => {
+    const gb = bytes / (1024 * 1024 * 1024)
+    const mb = bytes / (1024 * 1024)
+
+    if (gb >= 1) {
+      return `${gb.toFixed(0)} GB`
+    } else if (mb >= 1) {
+      return `${mb.toFixed(0)} MB`
+    } else {
+      return `${bytes} bytes`
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-900">

@@ -356,3 +356,55 @@ async def get_all_localizations() -> Dict[str, LocalizationResponse]:
         )
     finally:
         session.close()
+
+
+@router.get("/tiers/public")
+async def get_public_tier_plans():
+    """
+    Get public tier plans for pricing page
+
+    Returns all active and public tier plans with pricing and limits.
+    This endpoint is unauthenticated and used for the homepage/pricing page.
+    """
+    session = db_manager.session_local()
+    try:
+        from app.database.models import TierPlan
+
+        result = session.execute(
+            select(TierPlan).where(
+                TierPlan.is_active == True,
+                TierPlan.is_public == True
+            ).order_by(TierPlan.sort_order)
+        )
+        tiers = result.scalars().all()
+
+        tier_list = []
+        for tier in tiers:
+            tier_list.append({
+                'id': tier.id,
+                'name': tier.name,
+                'display_name': tier.display_name,
+                'description': tier.description,
+                'price_monthly_cents': tier.price_monthly_cents,
+                'price_yearly_cents': tier.price_yearly_cents,
+                'currency': tier.currency,
+                'storage_quota_bytes': tier.storage_quota_bytes,
+                'max_file_size_bytes': tier.max_file_size_bytes,
+                'max_documents': tier.max_documents,
+                'max_batch_upload_size': tier.max_batch_upload_size,
+                'bulk_operations_enabled': tier.bulk_operations_enabled,
+                'api_access_enabled': tier.api_access_enabled,
+                'priority_support': tier.priority_support,
+                'custom_categories_limit': tier.custom_categories_limit
+            })
+
+        return {'tiers': tier_list}
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve public tier plans: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to retrieve tier plans"
+        )
+    finally:
+        session.close()
