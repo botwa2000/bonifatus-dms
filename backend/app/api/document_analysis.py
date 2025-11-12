@@ -633,7 +633,7 @@ async def analyze_batch_async(
                     detail="Bulk upload requires Starter plan or higher"
                 )
 
-        # Verify user has categories BEFORE reading files
+        # Verify user has categories BEFORE processing
         categories_response = await category_service.list_categories(
             user_id=str(current_user.id),
             user_language='en',
@@ -655,19 +655,43 @@ async def analyze_batch_async(
                 raise_on_exceed=True
             )
 
-        # Prepare files data and calculate total size in ONE pass
-        files_data = []
+        # Create batch record first to get batch_id
+        batch_id = await batch_processor_service.create_batch(
+            user_id=str(current_user.id),
+            total_files=len(files),
+            session=session
+        )
+
+        # Stream files to temporary disk storage
+        import os
+        import aiofiles
+        from pathlib import Path
+
+        temp_dir = Path(f"/app/temp/batches/{batch_id}")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        file_paths = []
         total_size = 0
-        for file in files:
-            content = await file.read()
-            total_size += len(content)
-            files_data.append({
-                'content': content,
-                'filename': file.filename,
-                'mime_type': file.content_type
+
+        for idx, file in enumerate(files):
+            # Generate safe filename
+            safe_filename = f"{idx}_{file.filename}"
+            file_path = temp_dir / safe_filename
+
+            # Stream file to disk
+            async with aiofiles.open(file_path, 'wb') as f:
+                content = await file.read()
+                await f.write(content)
+                total_size += len(content)
+
+            file_paths.append({
+                'path': str(file_path),
+                'original_filename': file.filename,
+                'mime_type': file.content_type,
+                'size': len(content)
             })
 
-        # Check storage quota AFTER reading files (but still before processing)
+        # Check storage quota AFTER calculating total size
         if not current_user.is_admin:
             await tier_service.check_storage_quota(
                 user_id=str(current_user.id),
@@ -676,26 +700,19 @@ async def analyze_batch_async(
                 raise_on_exceed=True
             )
 
-        # Create batch in database
-        batch_id = await batch_processor_service.create_batch(
-            user_id=str(current_user.id),
-            total_files=len(files_data),
-            session=session
-        )
-
-        # Start background processing (non-blocking)
+        # Start background processing with file paths (non-blocking)
         await batch_processor_service.start_batch_processing(
             batch_id=batch_id,
-            files_data=files_data,
+            file_paths=file_paths,
             user_id=str(current_user.id)
         )
 
-        logger.info(f"Async batch {batch_id} created with {len(files_data)} files")
+        logger.info(f"Async batch {batch_id} created with {len(file_paths)} files")
 
         return {
             'batch_id': batch_id,
             'status': 'pending',
-            'total_files': len(files_data),
+            'total_files': len(file_paths),
             'message': 'Batch processing started. Use /batch-status/{batch_id} to check progress.'
         }
 

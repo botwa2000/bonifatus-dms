@@ -67,7 +67,7 @@ class BatchProcessorService:
     async def start_batch_processing(
         self,
         batch_id: str,
-        files_data: List[Dict],
+        file_paths: List[Dict],
         user_id: str
     ):
         """
@@ -75,11 +75,11 @@ class BatchProcessorService:
 
         Args:
             batch_id: UUID of the batch
-            files_data: List of {content, filename, mime_type}
+            file_paths: List of {path, original_filename, mime_type, size}
             user_id: User ID for the batch
         """
         task = asyncio.create_task(
-            self._process_batch(batch_id, files_data, user_id)
+            self._process_batch(batch_id, file_paths, user_id)
         )
         self._processing_batches[batch_id] = task
 
@@ -88,13 +88,19 @@ class BatchProcessorService:
     async def _process_batch(
         self,
         batch_id: str,
-        files_data: List[Dict],
+        file_paths: List[Dict],
         user_id: str
     ):
         """
         Background task to process all files in a batch
+        Reads files from disk paths
         """
         session = db_manager.session_local()
+        import aiofiles
+        import hashlib
+        from pathlib import Path
+        from app.database.models import Document
+        from sqlalchemy import and_
 
         try:
             # Update batch status to processing
@@ -112,22 +118,26 @@ class BatchProcessorService:
 
             results = []
 
-            # Process each file
-            for idx, file_data in enumerate(files_data):
+            # Process each file from disk
+            for idx, file_info in enumerate(file_paths):
+                file_path = file_info['path']
+                original_filename = file_info['original_filename']
+                mime_type = file_info['mime_type']
+
                 try:
                     # Update current progress
                     batch.current_file_index = idx + 1
-                    batch.current_file_name = file_data['filename']
+                    batch.current_file_name = original_filename
                     session.commit()
 
-                    logger.info(f"[Batch {batch_id}] Processing file {idx+1}/{len(files_data)}: {file_data['filename']}")
+                    logger.info(f"[Batch {batch_id}] Processing file {idx+1}/{len(file_paths)}: {original_filename}")
+
+                    # Read file from disk
+                    async with aiofiles.open(file_path, 'rb') as f:
+                        file_content = await f.read()
 
                     # Check for duplicates
-                    import hashlib
-                    from app.database.models import Document
-                    from sqlalchemy import and_
-
-                    file_hash = hashlib.sha256(file_data['content']).hexdigest()
+                    file_hash = hashlib.sha256(file_content).hexdigest()
                     duplicate = session.query(Document).filter(
                         and_(
                             Document.file_hash == file_hash,
@@ -137,10 +147,10 @@ class BatchProcessorService:
                     ).first()
 
                     if duplicate:
-                        logger.warning(f"[Batch {batch_id}] Duplicate found: {file_data['filename']}")
+                        logger.warning(f"[Batch {batch_id}] Duplicate found: {original_filename}")
                         results.append({
                             'success': False,
-                            'original_filename': file_data['filename'],
+                            'original_filename': original_filename,
                             'error': f"This document has already been uploaded as '{duplicate.title}' on {duplicate.created_at.strftime('%Y-%m-%d')}",
                             'duplicate_of': {
                                 'id': str(duplicate.id),
@@ -155,21 +165,21 @@ class BatchProcessorService:
 
                     # Analyze document
                     analysis_result = await document_analysis_service.analyze_document(
-                        file_content=file_data['content'],
-                        file_name=file_data['filename'],
-                        mime_type=file_data['mime_type'],
+                        file_content=file_content,
+                        file_name=original_filename,
+                        mime_type=mime_type,
                         db=session,
                         user_id=user_id
                     )
 
-                    # Generate temporary ID and store file (like sync endpoint)
+                    # Generate temporary ID and store file
                     from app.api.document_analysis import temp_storage
                     temp_id = str(uuid.uuid4())
 
                     temp_storage[temp_id] = {
-                        'file_content': file_data['content'],
-                        'file_name': file_data['filename'],
-                        'mime_type': file_data['mime_type'],
+                        'file_content': file_content,
+                        'file_name': original_filename,
+                        'mime_type': mime_type,
                         'user_id': user_id,
                         'expires_at': datetime.utcnow() + timedelta(hours=24),
                         'analysis_result': analysis_result
@@ -178,20 +188,20 @@ class BatchProcessorService:
                     results.append({
                         'success': True,
                         'temp_id': temp_id,
-                        'original_filename': file_data['filename'],
+                        'original_filename': original_filename,
                         'analysis': analysis_result
                     })
 
                     batch.successful_files += 1
                     batch.processed_files += 1
 
-                    logger.info(f"[Batch {batch_id}] Successfully processed: {file_data['filename']}")
+                    logger.info(f"[Batch {batch_id}] Successfully processed: {original_filename}")
 
                 except Exception as e:
-                    logger.error(f"[Batch {batch_id}] Error processing {file_data['filename']}: {e}")
+                    logger.error(f"[Batch {batch_id}] Error processing {original_filename}: {e}")
                     results.append({
                         'success': False,
-                        'original_filename': file_data['filename'],
+                        'original_filename': original_filename,
                         'error': str(e)
                     })
                     batch.failed_files += 1
@@ -206,6 +216,16 @@ class BatchProcessorService:
             batch.completed_at = datetime.utcnow()
             batch.current_file_name = None
             session.commit()
+
+            # Cleanup: Delete temp files from disk
+            try:
+                import shutil
+                temp_batch_dir = Path(f"/app/temp/batches/{batch_id}")
+                if temp_batch_dir.exists():
+                    shutil.rmtree(temp_batch_dir)
+                    logger.info(f"[Batch {batch_id}] Cleaned up temp files")
+            except Exception as e:
+                logger.error(f"[Batch {batch_id}] Error cleaning up temp files: {e}")
 
             logger.info(f"[Batch {batch_id}] Completed: {batch.successful_files}/{batch.total_files} successful")
 
