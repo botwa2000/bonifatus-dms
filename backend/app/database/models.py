@@ -464,7 +464,7 @@ class DocumentDate(Base, TimestampMixin):
 # ============================================================================
 
 class UploadBatch(Base, TimestampMixin):
-    """Batch upload tracking"""
+    """Batch upload tracking with async processing support"""
     __tablename__ = "upload_batches"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -473,11 +473,17 @@ class UploadBatch(Base, TimestampMixin):
     processed_files = Column(Integer, nullable=False, server_default='0')
     successful_files = Column(Integer, nullable=False, server_default='0')
     failed_files = Column(Integer, nullable=False, server_default='0')
-    status = Column(String(50), nullable=False, server_default='processing')
+    status = Column(String(50), nullable=False, server_default='pending')  # 'pending', 'processing', 'completed', 'failed'
+    current_file_index = Column(Integer, nullable=False, server_default='0')
+    current_file_name = Column(String(500), nullable=True)
+    results = Column(JSONB, nullable=True)  # Array of {filename, success, error, document_id}
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index('idx_upload_batches_user', 'user_id', 'created_at'),
+        Index('idx_upload_batches_status', 'status', 'created_at'),
     )
 
 

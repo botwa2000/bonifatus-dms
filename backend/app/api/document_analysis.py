@@ -22,6 +22,7 @@ from app.services.category_service import category_service
 from app.services.config_service import config_service
 from app.services.user_service import user_service
 from app.services.tier_service import tier_service, TierLimitExceeded
+from app.services.batch_processor_service import batch_processor_service
 
 import io
 from app.services.file_validation_service import file_validation_service
@@ -580,7 +581,7 @@ async def analyze_batch(
         logger.info(f"Batch analysis completed: {batch_id} ({response_data['successful']}/{response_data['total_files']} successful)")
         
         return response_data
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -588,4 +589,157 @@ async def analyze_batch(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch analysis failed: {str(e)}"
+        )
+
+
+@router.post("/analyze-batch-async")
+async def analyze_batch_async(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    captcha_token: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Analyze multiple documents asynchronously with progress tracking
+
+    Returns immediately with batch_id, processes files in background.
+    Use /batch-status/{batch_id} to poll for progress.
+    """
+    try:
+        ip_address = get_client_ip(request)
+
+        # Validate batch size based on user's tier
+        if not current_user.is_admin:
+            tier = await tier_service.get_user_tier(str(current_user.id), session)
+            max_batch_size = tier.max_batch_upload_size if tier and tier.max_batch_upload_size else 10
+
+            if len(files) > max_batch_size:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Batch size exceeds maximum of {max_batch_size} files for your tier"
+                )
+
+        # TIER ENFORCEMENT: Check bulk operations
+        if len(files) > 1 and not current_user.is_admin:
+            has_bulk_ops = await tier_service.check_feature_access(
+                user_id=str(current_user.id),
+                feature='bulk_operations',
+                session=session
+            )
+            if not has_bulk_ops:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bulk upload requires Starter plan or higher"
+                )
+
+        # Check document count and storage limits
+        if not current_user.is_admin:
+            await tier_service.check_document_count_limit(
+                user_id=str(current_user.id),
+                session=session,
+                raise_on_exceed=True
+            )
+
+            total_size = sum(len(await file.read()) for file in files)
+            for file in files:
+                await file.seek(0)
+
+            await tier_service.check_storage_quota(
+                user_id=str(current_user.id),
+                file_size_bytes=total_size,
+                session=session,
+                raise_on_exceed=True
+            )
+
+        # Verify user has categories
+        categories_response = await category_service.list_categories(
+            user_id=str(current_user.id),
+            user_language='en',
+            include_system=True,
+            include_documents_count=False
+        )
+
+        if not categories_response.categories:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No categories found. Please create categories first."
+            )
+
+        # Prepare files data
+        files_data = []
+        for file in files:
+            content = await file.read()
+            files_data.append({
+                'content': content,
+                'filename': file.filename,
+                'mime_type': file.content_type
+            })
+
+        # Create batch in database
+        batch_id = await batch_processor_service.create_batch(
+            user_id=str(current_user.id),
+            total_files=len(files_data),
+            session=session
+        )
+
+        # Start background processing (non-blocking)
+        await batch_processor_service.start_batch_processing(
+            batch_id=batch_id,
+            files_data=files_data,
+            user_id=str(current_user.id)
+        )
+
+        logger.info(f"Async batch {batch_id} created with {len(files_data)} files")
+
+        return {
+            'batch_id': batch_id,
+            'status': 'pending',
+            'total_files': len(files_data),
+            'message': 'Batch processing started. Use /batch-status/{batch_id} to check progress.'
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Async batch creation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.get("/batch-status/{batch_id}")
+async def get_batch_status(
+    batch_id: str,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Get current status and progress of a batch processing job
+
+    Poll this endpoint to track real-time progress.
+    """
+    try:
+        status_data = await batch_processor_service.get_batch_status(
+            batch_id=batch_id,
+            user_id=str(current_user.id),
+            session=session
+        )
+
+        if not status_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Batch not found"
+            )
+
+        return status_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting batch status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
