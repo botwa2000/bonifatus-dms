@@ -129,10 +129,17 @@ export function DocumentAnalysisProgress({ fileCount, onComplete }: DocumentAnal
         </p>
 
         <p
+          className="text-base font-semibold"
+          style={{ color: designTokens.colors.neutral[700] }}
+        >
+          Processing {fileCount} {fileCount === 1 ? 'document' : 'documents'}
+        </p>
+
+        <p
           className="text-xs font-mono"
           style={{ color: designTokens.colors.neutral[500] }}
         >
-          Processing {fileCount} {fileCount === 1 ? 'file' : 'files'} • {formatTime(elapsedTime)}
+          Elapsed time: {formatTime(elapsedTime)}
         </p>
       </div>
 

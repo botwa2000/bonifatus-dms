@@ -35,6 +35,7 @@ class TierPlanUpdate(BaseModel):
     storage_quota_bytes: Optional[int] = Field(None, description="Storage limit in bytes")
     max_file_size_bytes: Optional[int] = Field(None, description="Max individual file size")
     max_documents: Optional[int] = Field(None, description="Max document count, null for unlimited")
+    max_batch_upload_size: Optional[int] = Field(None, description="Max files per batch upload, null for unlimited")
     bulk_operations_enabled: Optional[bool] = None
     api_access_enabled: Optional[bool] = None
     priority_support: Optional[bool] = None
