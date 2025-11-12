@@ -71,7 +71,6 @@ export default function BatchUploadPage() {
   const [maxFilenameLength, setMaxFilenameLength] = useState(200)
 
   // Async batch processing state
-  const [batchId, setBatchId] = useState<string | null>(null)
   const [batchProgress, setBatchProgress] = useState<{
     processed: number
     total: number
@@ -149,7 +148,7 @@ export default function BatchUploadPage() {
   }
 
   // Poll batch status until completion
-  const pollBatchStatus = async (batchId: string): Promise<any> => {
+  const pollBatchStatus = async (batchId: string): Promise<{ total_files: number; successful: number; results: FileAnalysisResult[] }> => {
     const pollInterval = 2000 // 2 seconds
     const maxAttempts = 300 // 10 minutes maximum
 
@@ -285,12 +284,8 @@ export default function BatchUploadPage() {
 
       const initialResult = await response.json()
 
-      // Get batch_id from async response
-      const batchIdFromResponse = initialResult.batch_id
-      setBatchId(batchIdFromResponse)
-
-      // Poll for batch status until completion
-      const result = await pollBatchStatus(batchIdFromResponse)
+      // Get batch_id from async response and poll for status until completion
+      const result = await pollBatchStatus(initialResult.batch_id)
 
       // Filter out failed analyses and show errors
       const failedFiles = result.results.filter((r: FileAnalysisResult): r is FileAnalysisFailure => !r.success)
