@@ -633,26 +633,7 @@ async def analyze_batch_async(
                     detail="Bulk upload requires Starter plan or higher"
                 )
 
-        # Check document count and storage limits
-        if not current_user.is_admin:
-            await tier_service.check_document_count_limit(
-                user_id=str(current_user.id),
-                session=session,
-                raise_on_exceed=True
-            )
-
-            total_size = sum(len(await file.read()) for file in files)
-            for file in files:
-                await file.seek(0)
-
-            await tier_service.check_storage_quota(
-                user_id=str(current_user.id),
-                file_size_bytes=total_size,
-                session=session,
-                raise_on_exceed=True
-            )
-
-        # Verify user has categories
+        # Verify user has categories BEFORE reading files
         categories_response = await category_service.list_categories(
             user_id=str(current_user.id),
             user_language='en',
@@ -666,15 +647,34 @@ async def analyze_batch_async(
                 detail="No categories found. Please create categories first."
             )
 
-        # Prepare files data
+        # Check document count limit
+        if not current_user.is_admin:
+            await tier_service.check_document_count_limit(
+                user_id=str(current_user.id),
+                session=session,
+                raise_on_exceed=True
+            )
+
+        # Prepare files data and calculate total size in ONE pass
         files_data = []
+        total_size = 0
         for file in files:
             content = await file.read()
+            total_size += len(content)
             files_data.append({
                 'content': content,
                 'filename': file.filename,
                 'mime_type': file.content_type
             })
+
+        # Check storage quota AFTER reading files (but still before processing)
+        if not current_user.is_admin:
+            await tier_service.check_storage_quota(
+                user_id=str(current_user.id),
+                file_size_bytes=total_size,
+                session=session,
+                raise_on_exceed=True
+            )
 
         # Create batch in database
         batch_id = await batch_processor_service.create_batch(

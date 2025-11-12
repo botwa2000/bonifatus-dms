@@ -256,6 +256,7 @@ async def list_tier_plans(
                 "storage_quota_bytes": tier.storage_quota_bytes,
                 "max_file_size_bytes": tier.max_file_size_bytes,
                 "max_documents": tier.max_documents,
+                "max_batch_upload_size": tier.max_batch_upload_size,
                 "bulk_operations_enabled": tier.bulk_operations_enabled,
                 "api_access_enabled": tier.api_access_enabled,
                 "priority_support": tier.priority_support,

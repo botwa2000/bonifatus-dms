@@ -358,190 +358,154 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Free Tier */}
-            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 p-8">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Free</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€0</span>
-                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
-                </div>
-                <p className="text-neutral-600 dark:text-neutral-400">Perfect for trying it out</p>
+            {loading ? (
+              <div className="col-span-3 text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+                <p className="mt-4 text-neutral-600 dark:text-neutral-400">Loading pricing plans...</p>
               </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>50 pages/month</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>500 MB</strong> storage limit</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">1 user</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">AI-powered categorization</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Multilingual document analysis</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">One-by-one processing</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Your Google Drive</span>
-                </li>
-              </ul>
-              <GoogleLoginButton className="w-full" variant="secondary">
-                Start Free
-              </GoogleLoginButton>
-              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
-                Risk-free • Cancel anytime
-              </p>
-            </div>
+            ) : tiers.length === 0 ? (
+              <div className="col-span-3 text-center py-12">
+                <p className="text-neutral-600 dark:text-neutral-400">No pricing plans available</p>
+              </div>
+            ) : (
+              tiers.map((tier) => {
+                const isPro = tier.id === 2
+                const isFree = tier.id === 0
+                const isStarter = tier.id === 1
+                const storageDisplay = tier.storage_quota_bytes >= 1000000000000 || tier.storage_quota_bytes === null
+                  ? 'Unlimited'
+                  : formatStorage(tier.storage_quota_bytes)
+                const documentsDisplay = tier.max_documents === null
+                  ? 'Unlimited documents'
+                  : `${tier.max_documents} documents/month`
 
-            {/* Starter Tier */}
-            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 p-8">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Starter</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€2.99</span>
-                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
-                </div>
-                <p className="text-neutral-600 dark:text-neutral-400">For light personal use</p>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>250 pages/month</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>Unlimited</strong> storage</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">1 user</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Bulk processing</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Multilingual analysis</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Your Google Drive</span>
-                </li>
-              </ul>
-              <GoogleLoginButton className="w-full" variant="secondary">
-                Get Started
-              </GoogleLoginButton>
-              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
-                Risk-free • Cancel anytime
-              </p>
-            </div>
+                return (
+                  <div
+                    key={tier.id}
+                    className={`bg-white dark:bg-neutral-900 rounded-xl p-8 relative ${
+                      isPro
+                        ? 'border-2 border-orange-500 opacity-75'
+                        : 'border border-neutral-200 dark:border-neutral-700'
+                    }`}
+                  >
+                    {isPro && (
+                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+                          Coming Soon
+                        </span>
+                      </div>
+                    )}
 
-            {/* Professional Tier */}
-            <div className="bg-white dark:bg-neutral-900 rounded-xl border-2 border-orange-500 p-8 relative opacity-75">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Coming Soon
-                </span>
-              </div>
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Professional</h3>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold text-neutral-900 dark:text-white">€7.99</span>
-                  <span className="text-neutral-600 dark:text-neutral-400">/month</span>
-                </div>
-                <p className="text-neutral-600 dark:text-neutral-400">For professionals & teams</p>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>1,500 pages/month</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>Unlimited</strong> storage</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>Unlimited users</strong></span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Bulk processing</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300">Multilingual analysis</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Email-to-process</strong> (forward docs)</span>
-                </li>
-                <li className="flex items-start">
-                  <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-neutral-700 dark:text-neutral-300"><strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box</span>
-                </li>
-              </ul>
-              <Button className="w-full" variant="secondary" disabled>
-                Coming Soon
-              </Button>
-              <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
-                Risk-free • Cancel anytime
-              </p>
-            </div>
+                    <div className="text-center mb-8">
+                      <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
+                        {tier.display_name}
+                      </h3>
+                      <div className="mb-4">
+                        <span className="text-3xl font-bold text-neutral-900 dark:text-white">
+                          {tier.currency === 'EUR' ? '€' : '$'}{formatPrice(tier.price_monthly_cents)}
+                        </span>
+                        <span className="text-neutral-600 dark:text-neutral-400">/month</span>
+                      </div>
+                      <p className="text-neutral-600 dark:text-neutral-400">
+                        {tier.description || (isFree ? 'Perfect for trying it out' : isStarter ? 'For light personal use' : 'For professionals & teams')}
+                      </p>
+                    </div>
+
+                    <ul className="space-y-3 mb-8">
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          <strong>{documentsDisplay}</strong>
+                        </span>
+                      </li>
+
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          <strong>{storageDisplay}</strong> storage{storageDisplay !== 'Unlimited' ? ' limit' : ''}
+                        </span>
+                      </li>
+
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          {isPro ? 'Unlimited users' : '1 user'}
+                        </span>
+                      </li>
+
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          {tier.bulk_operations_enabled ? <strong>✨ Bulk processing</strong> : 'AI-powered categorization'}
+                        </span>
+                      </li>
+
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          Multilingual {tier.bulk_operations_enabled ? 'analysis' : 'document analysis'}
+                        </span>
+                      </li>
+
+                      {isFree && (
+                        <li className="flex items-start">
+                          <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-neutral-700 dark:text-neutral-300">One-by-one processing</span>
+                        </li>
+                      )}
+
+                      <li className="flex items-start">
+                        <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          {isPro ? <strong>✨ Email-to-process</strong> : 'Your Google Drive'}
+                        </span>
+                      </li>
+
+                      {isPro && (
+                        <li className="flex items-start">
+                          <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-neutral-700 dark:text-neutral-300">
+                            <strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box
+                          </span>
+                        </li>
+                      )}
+                    </ul>
+
+                    {isPro ? (
+                      <Button className="w-full" variant="secondary" disabled>
+                        Coming Soon
+                      </Button>
+                    ) : (
+                      <GoogleLoginButton className="w-full" variant="secondary">
+                        {isFree ? 'Start Free' : 'Get Started'}
+                      </GoogleLoginButton>
+                    )}
+
+                    {!isPro && (
+                      <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                        Risk-free • Cancel anytime
+                      </p>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
 
           <div className="mt-12 text-center space-y-3">
