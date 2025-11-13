@@ -172,18 +172,25 @@ class BatchProcessorService:
                         user_id=user_id
                     )
 
-                    # Generate temporary ID and store file
-                    from app.api.document_analysis import temp_storage
+                    # Generate temporary ID and store metadata on disk (NOT in memory)
                     temp_id = str(uuid.uuid4())
+                    temp_metadata_path = Path(f"/app/temp/batches/{batch_id}/{temp_id}.json")
 
-                    temp_storage[temp_id] = {
-                        'file_content': file_content,
+                    # Save metadata to disk with file path reference
+                    import json
+                    metadata = {
+                        'temp_id': temp_id,
+                        'file_path': file_path,  # Keep reference to file on disk
                         'file_name': original_filename,
                         'mime_type': mime_type,
                         'user_id': user_id,
-                        'expires_at': datetime.utcnow() + timedelta(hours=24),
+                        'batch_id': batch_id,
+                        'expires_at': (datetime.utcnow() + timedelta(hours=1)).isoformat(),  # 1 hour expiration
                         'analysis_result': analysis_result
                     }
+
+                    async with aiofiles.open(temp_metadata_path, 'w') as f:
+                        await f.write(json.dumps(metadata))
 
                     results.append({
                         'success': True,
@@ -217,15 +224,11 @@ class BatchProcessorService:
             batch.current_file_name = None
             session.commit()
 
-            # Cleanup: Delete temp files from disk
-            try:
-                import shutil
-                temp_batch_dir = Path(f"/app/temp/batches/{batch_id}")
-                if temp_batch_dir.exists():
-                    shutil.rmtree(temp_batch_dir)
-                    logger.info(f"[Batch {batch_id}] Cleaned up temp files")
-            except Exception as e:
-                logger.error(f"[Batch {batch_id}] Error cleaning up temp files: {e}")
+            # DO NOT cleanup temp files immediately - they're needed for confirm-upload
+            # Files are cleaned up either:
+            # 1. Immediately when user confirms upload
+            # 2. After 1 hour if not confirmed (auto-cleanup)
+            logger.info(f"[Batch {batch_id}] Temp files preserved for confirmation (expire in 1 hour)")
 
             logger.info(f"[Batch {batch_id}] Completed: {batch.successful_files}/{batch.total_files} successful")
 

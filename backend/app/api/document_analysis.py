@@ -191,26 +191,56 @@ async def confirm_upload(
     """
     Confirm upload after user review and store document permanently
     """
-    try:
-        # Check if temp file exists
-        if confirm_request.temp_id not in temp_storage:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Analysis result not found or expired"
-            )
+    import json
+    import aiofiles
+    import glob
+    from pathlib import Path
 
-        temp_data = temp_storage[confirm_request.temp_id]
-        
+    try:
+        # Check in-memory storage first (single file uploads)
+        if confirm_request.temp_id in temp_storage:
+            temp_data = temp_storage[confirm_request.temp_id]
+        else:
+            # Check on disk for batch uploads
+            metadata_files = glob.glob(f"/app/temp/batches/*/{confirm_request.temp_id}.json")
+
+            if not metadata_files:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Analysis result not found or expired"
+                )
+
+            # Read metadata from disk
+            metadata_path = Path(metadata_files[0])
+            async with aiofiles.open(metadata_path, 'r') as f:
+                metadata = json.loads(await f.read())
+
+            # Read file content from disk
+            file_path = metadata['file_path']
+            async with aiofiles.open(file_path, 'rb') as f:
+                file_content = await f.read()
+
+            # Reconstruct temp_data structure
+            temp_data = {
+                'file_content': file_content,
+                'file_name': metadata['file_name'],
+                'mime_type': metadata['mime_type'],
+                'user_id': metadata['user_id'],
+                'expires_at': datetime.fromisoformat(metadata['expires_at']),
+                'analysis_result': metadata['analysis_result']
+            }
+
         # Verify ownership
         if temp_data['user_id'] != str(current_user.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to confirm this upload"
             )
-        
+
         # Check expiration
         if datetime.utcnow() > temp_data['expires_at']:
-            del temp_storage[confirm_request.temp_id]
+            if confirm_request.temp_id in temp_storage:
+                del temp_storage[confirm_request.temp_id]
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="Analysis result has expired"
@@ -251,8 +281,36 @@ async def confirm_upload(
             increment=True
         )
 
-        # Remove from temporary storage
-        del temp_storage[confirm_request.temp_id]
+        # Clean up temp storage immediately after successful confirmation
+        if confirm_request.temp_id in temp_storage:
+            # Single file upload - remove from memory
+            del temp_storage[confirm_request.temp_id]
+        else:
+            # Batch upload - delete temp files from disk
+            import glob
+            import os
+            from pathlib import Path
+
+            # Find and delete metadata file
+            metadata_files = glob.glob(f"/app/temp/batches/*/{confirm_request.temp_id}.json")
+            for metadata_file in metadata_files:
+                try:
+                    # Get batch_id from path to potentially cleanup entire batch directory
+                    batch_dir = Path(metadata_file).parent
+
+                    # Delete metadata file
+                    os.remove(metadata_file)
+                    logger.info(f"Deleted temp metadata: {metadata_file}")
+
+                    # Check if this was the last file in the batch
+                    remaining_files = list(batch_dir.glob("*"))
+                    if not remaining_files:
+                        # All files confirmed, delete entire batch directory
+                        import shutil
+                        shutil.rmtree(batch_dir)
+                        logger.info(f"Deleted empty batch directory: {batch_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file {metadata_file}: {e}")
 
         logger.info(f"Document uploaded: {result['document_id']}, size: {file_size} bytes")
 

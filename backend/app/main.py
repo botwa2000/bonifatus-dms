@@ -68,6 +68,57 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ClamAV monitor initialization failed: {e}")
 
+    # Start expired temp files cleanup task
+    try:
+        import asyncio
+        from pathlib import Path
+        from datetime import datetime
+        import json
+        import shutil
+
+        async def temp_files_cleanup():
+            """Background task to cleanup expired temp files"""
+            while True:
+                try:
+                    await asyncio.sleep(300)  # Check every 5 minutes
+
+                    batch_dir = Path("/app/temp/batches")
+                    if not batch_dir.exists():
+                        continue
+
+                    deleted_count = 0
+                    # Iterate through all batch directories
+                    for batch_folder in batch_dir.iterdir():
+                        if not batch_folder.is_dir():
+                            continue
+
+                        # Check all metadata files in this batch
+                        for metadata_file in batch_folder.glob("*.json"):
+                            try:
+                                with open(metadata_file, 'r') as f:
+                                    metadata = json.load(f)
+
+                                expires_at = datetime.fromisoformat(metadata['expires_at'])
+                                if datetime.utcnow() > expires_at:
+                                    # Delete the entire batch directory if expired
+                                    shutil.rmtree(batch_folder)
+                                    deleted_count += 1
+                                    logger.info(f"Deleted expired batch: {batch_folder.name}")
+                                    break  # Batch deleted, no need to check other files
+                            except Exception as e:
+                                logger.warning(f"Error checking temp file {metadata_file}: {e}")
+
+                    if deleted_count > 0:
+                        logger.info(f"Cleaned up {deleted_count} expired temp batch(es)")
+
+                except Exception as e:
+                    logger.error(f"Temp files cleanup error: {e}")
+
+        asyncio.create_task(temp_files_cleanup())
+        logger.info("Temp files cleanup task initialized (runs every 5 minutes)")
+    except Exception as e:
+        logger.warning(f"Temp files cleanup initialization failed: {e}")
+
     logger.info("Application startup completed successfully")
     
     yield
