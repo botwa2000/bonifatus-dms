@@ -1153,7 +1153,7 @@ curl -s https://api-dev.bonidoc.com/health | grep environment # Should show "dev
 - `.env` files contain environment-specific secrets and settings
 - `docker-compose.yml` files contain environment-specific ports/names
 - Database contents are separate (prod data ≠ dev data)
-- Nginx config for dev includes IP whitelist
+- **Nginx config for dev includes IP whitelist (see §8.2b)**
 
 **Common Sync Issues:**
 

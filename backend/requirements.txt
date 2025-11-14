@@ -33,5 +33,5 @@ opencv-python-headless==4.8.1.78
 # Language Detection
 fasttext-langdetect==1.0.5
 lingua-language-detector==2.0.2
-pyhunspell==0.5.5
+# Hunspell: Using system command via subprocess (no Python binding needed)
 clamd==1.0.2

@@ -7,13 +7,13 @@ Language support loaded dynamically from system_settings
 import io
 import logging
 import re
-from typing import Optional, Tuple, Dict
+import subprocess
+from typing import Optional, Tuple, Dict, Set
 from PIL import Image
 import pytesseract
 import cv2
 import numpy as np
 import fitz  # PyMuPDF
-import hunspell
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,6 @@ class OCRService:
     def __init__(self):
         """Initialize OCR service"""
         self._language_cache: Optional[Dict[str, str]] = None
-        self._spell_checkers: Dict[str, hunspell.HunSpell] = {}
         try:
             pytesseract.get_tesseract_version()
             logger.info("Tesseract OCR initialized successfully")
@@ -67,41 +66,59 @@ class OCRService:
         """Clear cached language mappings (useful after database updates)"""
         self._language_cache = None
 
-    def get_spell_checker(self, language: str) -> hunspell.HunSpell:
+    def check_spelling(self, words: Set[str], language: str = 'en') -> Set[str]:
         """
-        Get or create Hunspell spell checker for a language
-        Caches spell checkers for performance
+        Check spelling of words using system Hunspell command
 
         Args:
+            words: Set of words to check
             language: Language code (en, de, ru, fr)
 
         Returns:
-            HunSpell instance
+            Set of misspelled words
         """
-        # Map language codes to Hunspell dictionary paths
-        # Hunspell dictionaries are typically in /usr/share/hunspell/
+        # Map language codes to Hunspell dictionary codes
         dict_map = {
-            'en': '/usr/share/hunspell/en_US',
-            'de': '/usr/share/hunspell/de_DE',
-            'ru': '/usr/share/hunspell/ru_RU',
-            'fr': '/usr/share/hunspell/fr'
+            'en': 'en_US',
+            'de': 'de_DE',
+            'ru': 'ru_RU',
+            'fr': 'fr'
         }
 
-        dict_path = dict_map.get(language, '/usr/share/hunspell/en_US')
+        dict_code = dict_map.get(language, 'en_US')
+        misspelled = set()
 
-        if language not in self._spell_checkers:
-            try:
-                self._spell_checkers[language] = hunspell.HunSpell(f"{dict_path}.dic", f"{dict_path}.aff")
-                logger.debug(f"Initialized Hunspell spell checker for language: {language} ({dict_path})")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Hunspell for {language}, using 'en': {e}")
-                try:
-                    self._spell_checkers[language] = hunspell.HunSpell('/usr/share/hunspell/en_US.dic', '/usr/share/hunspell/en_US.aff')
-                except Exception as fallback_error:
-                    logger.error(f"Failed to initialize fallback English Hunspell: {fallback_error}")
-                    raise
+        try:
+            # Call hunspell with pipe mode for batch checking
+            # -d specifies dictionary, -l lists only misspelled words
+            process = subprocess.Popen(
+                ['hunspell', '-d', dict_code, '-l'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
 
-        return self._spell_checkers[language]
+            # Send all words to hunspell
+            input_text = '\n'.join(words)
+            stdout, stderr = process.communicate(input=input_text, timeout=5)
+
+            # hunspell -l outputs one misspelled word per line
+            if process.returncode == 0:
+                misspelled = set(stdout.strip().split('\n')) if stdout.strip() else set()
+                logger.debug(f"Hunspell checked {len(words)} words, found {len(misspelled)} misspelled (lang: {language})")
+            else:
+                logger.warning(f"Hunspell returned non-zero exit code: {process.returncode}, stderr: {stderr}")
+
+        except FileNotFoundError:
+            logger.error("Hunspell command not found - spell checking disabled")
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Hunspell timeout checking {len(words)} words")
+            process.kill()
+        except Exception as e:
+            logger.warning(f"Hunspell spell check failed: {e}")
+
+        return misspelled
 
     def assess_text_quality(self, text: str, language: str = 'en') -> Tuple[float, Dict[str, float]]:
         """
@@ -151,14 +168,10 @@ class OCRService:
         sample_words = set(words[:sample_size])  # Use set to avoid duplicates
 
         try:
-            spell = self.get_spell_checker(language)
+            # Use new check_spelling API that takes a set of words and returns misspelled ones
+            misspelled_words = self.check_spelling(sample_words, language)
 
-            # Hunspell API: spell.spell(word) returns True if word is correct
-            misspelled_count = 0
-            for word in sample_words:
-                if not spell.spell(word):
-                    misspelled_count += 1
-
+            misspelled_count = len(misspelled_words)
             error_rate = misspelled_count / len(sample_words) if sample_words else 1.0
             metrics['spelling_error_rate'] = error_rate
             metrics['total_words_checked'] = len(sample_words)

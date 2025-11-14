@@ -254,24 +254,20 @@ class KeywordExtractionService:
             # Remove obvious OCR garbage that aren't real words
             try:
                 from app.services.ocr_service import ocr_service
-                spell = ocr_service.get_spell_checker(language)
+
+                # Call new check_spelling API with set of unique tokens
+                unique_tokens = set(filtered_tokens)
+                misspelled = ocr_service.check_spelling(unique_tokens, language)
 
                 spell_filtered_tokens = []
                 ocr_garbage_count = 0
-
-                # Build a cache of spell check results for unique tokens
-                unique_tokens = set(filtered_tokens)
-                spell_cache = {}
-                for token in unique_tokens:
-                    # Hunspell API: spell.spell(word) returns True if word is correct
-                    spell_cache[token] = spell.spell(token)
 
                 for token in filtered_tokens:
                     # Always preserve category keywords (even if "misspelled")
                     if token in category_keywords_set:
                         spell_filtered_tokens.append(token)
-                    # Keep words that spell checker recognizes as correct
-                    elif spell_cache.get(token, False):
+                    # Keep words NOT in misspelled set
+                    elif token not in misspelled:
                         spell_filtered_tokens.append(token)
                     # Also keep if it appears frequently (likely domain-specific term)
                     elif filtered_tokens.count(token) >= min_frequency * 2:
