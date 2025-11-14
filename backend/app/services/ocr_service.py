@@ -449,18 +449,56 @@ class OCRService:
                 mat = fitz.Matrix(zoom, zoom)
 
                 for i in range(pages_to_process):
-                    logger.debug(f"OCR processing page {i+1}/{pages_to_process}")
+                    logger.info(f"[OCR DEBUG] Processing page {i+1}/{pages_to_process}")
 
                     page = doc[i]
 
-                    # Render page to image
-                    pix = page.get_pixmap(matrix=mat)
+                    # Check for embedded images (direct extraction preserves quality)
+                    images = page.get_images()
 
-                    # Convert to PIL Image
-                    image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    if images:
+                        # PDF has embedded image - analyze quality
+                        xref = images[0][0]
+                        base_image = doc.extract_image(xref)
 
-                    # Run OCR with preprocessing
-                    page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=True)
+                        # Get page dimensions in inches
+                        page_rect = page.rect
+                        page_width_inches = page_rect.width / 72
+                        page_height_inches = page_rect.height / 72
+
+                        # Calculate DPI
+                        dpi_x = base_image['width'] / page_width_inches
+                        dpi_y = base_image['height'] / page_height_inches
+
+                        logger.info(f"[OCR DEBUG] Embedded image found:")
+                        logger.info(f"[OCR DEBUG]   - Resolution: {base_image['width']}x{base_image['height']} pixels")
+                        logger.info(f"[OCR DEBUG]   - Page size: {page_width_inches:.2f}x{page_height_inches:.2f} inches")
+                        logger.info(f"[OCR DEBUG]   - Effective DPI: {dpi_x:.0f}x{dpi_y:.0f}")
+                        logger.info(f"[OCR DEBUG]   - Format: {base_image['ext']}")
+                        logger.info(f"[OCR DEBUG]   - Size: {len(base_image['image']) / 1024:.1f} KB")
+
+                        # Quality-based extraction decision
+                        if dpi_x >= 200 and dpi_y >= 200:
+                            # High-quality scan - extract directly without preprocessing
+                            logger.info(f"[OCR DEBUG] ✅ HIGH QUALITY ({dpi_x:.0f} DPI) - Extracting image directly (no preprocessing)")
+                            import io
+                            image = Image.open(io.BytesIO(base_image['image']))
+                            page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=False)
+                            logger.info(f"[OCR DEBUG] Direct extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                        else:
+                            # Low-quality scan - render and preprocess
+                            logger.info(f"[OCR DEBUG] ⚠️ LOW QUALITY ({dpi_x:.0f} DPI) - Rendering page with preprocessing")
+                            pix = page.get_pixmap(matrix=mat)
+                            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=True)
+                            logger.info(f"[OCR DEBUG] Preprocessed extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                    else:
+                        # No embedded images - render page
+                        logger.info(f"[OCR DEBUG] No embedded images - rendering page at 300 DPI")
+                        pix = page.get_pixmap(matrix=mat)
+                        image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=True)
+                        logger.info(f"[OCR DEBUG] Rendered extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
 
                     if page_text:
                         text_parts.append(page_text)
