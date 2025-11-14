@@ -47,10 +47,21 @@ class DocumentAnalysisService:
             Analysis result with keywords, language, suggested category, date
         """
         try:
+            # Get user's preferred document languages BEFORE OCR to use as language hint
+            # This is critical for scanned PDFs where Tesseract needs the correct language upfront
+            language_hint = 'en'  # Default fallback
+            if user_id:
+                from app.database.models import User
+                user = db.get(User, UUID(user_id))
+                if user and user.preferred_doc_languages and len(user.preferred_doc_languages) > 0:
+                    language_hint = user.preferred_doc_languages[0]
+                    logger.info(f"[OCR LANG HINT] Using user's first preferred language as hint: {language_hint}")
+
             extracted_text, ocr_confidence = ocr_service.extract_text(
                 file_content,
                 mime_type,
-                db
+                db,
+                language=language_hint  # Pass language hint for scanned PDFs
             )
 
             if not extracted_text or len(extracted_text.strip()) < 10:
