@@ -176,8 +176,8 @@ class KeywordExtractionService:
         text: str,
         db: Session,
         language: str = 'en',
-        max_keywords: int = 1000,
-        min_frequency: int = 1,
+        max_keywords: int = 50,
+        min_frequency: int = 2,
         user_id: str = None,
         stopwords: set = None
     ) -> List[Tuple[str, int, float]]:
@@ -246,9 +246,40 @@ class KeywordExtractionService:
                     # Keep non-stopword
                     filtered_tokens.append(token)
 
-            logger.info(f"[KEYWORD EXTRACTION] After filtering: {len(filtered_tokens)} tokens (preserved {len(preserved_category_keywords)} category keywords)")
+            logger.info(f"[KEYWORD EXTRACTION] After stopword filtering: {len(filtered_tokens)} tokens (preserved {len(preserved_category_keywords)} category keywords)")
             if preserved_category_keywords:
                 logger.info(f"[KEYWORD EXTRACTION] Preserved category keywords found in text: {', '.join(preserved_category_keywords)}")
+
+            # STEP 3.5: Spell check filter (preserve category keywords)
+            # Remove obvious OCR garbage that aren't real words
+            try:
+                from app.services.ocr_service import ocr_service
+                spell = ocr_service.get_spell_checker(language)
+
+                spell_filtered_tokens = []
+                ocr_garbage_count = 0
+
+                # Sample check to avoid performance hit (check up to 200 unique words)
+                unique_tokens = list(set(filtered_tokens))[:200]
+                misspelled = spell.unknown(unique_tokens)
+
+                for token in filtered_tokens:
+                    # Always preserve category keywords (even if "misspelled")
+                    if token in category_keywords_set:
+                        spell_filtered_tokens.append(token)
+                    # Keep words that spell checker recognizes
+                    elif token not in misspelled:
+                        spell_filtered_tokens.append(token)
+                    # Also keep if it appears frequently (likely domain-specific term)
+                    elif filtered_tokens.count(token) >= min_frequency * 2:
+                        spell_filtered_tokens.append(token)
+                    else:
+                        ocr_garbage_count += 1
+
+                filtered_tokens = spell_filtered_tokens
+                logger.info(f"[KEYWORD EXTRACTION] After spell check: {len(filtered_tokens)} tokens (removed {ocr_garbage_count} OCR garbage words)")
+            except Exception as e:
+                logger.warning(f"[KEYWORD EXTRACTION] Spell check failed, continuing without it: {e}")
 
             if not filtered_tokens:
                 logger.warning("No keywords after filtering")

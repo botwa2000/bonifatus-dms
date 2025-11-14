@@ -117,7 +117,8 @@ class DocumentAnalysisService:
                 db=db,
                 language=detected_language,
                 stopwords=combined_stopwords,
-                max_keywords=1000,  # No artificial limit - let frequency and relevance determine quality
+                max_keywords=50,  # Reasonable limit to prevent OCR garbage overload
+                min_frequency=2,  # Filter out rare OCR errors that appear only once
                 user_id=user_id
             )
 
