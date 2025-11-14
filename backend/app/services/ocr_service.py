@@ -316,17 +316,17 @@ class OCRService:
 
     def is_scanned_pdf(self, pdf_file: bytes, language: str = 'en') -> Tuple[bool, float]:
         """
-        Detect if a PDF is scanned (image-based) or native text
-        Also returns text quality score if text is found
+        Detect if a PDF is scanned (image-based) or native text using PDF STRUCTURE analysis
+        This is language-agnostic and more reliable than spell-checking
 
         Args:
             pdf_file: PDF file as bytes
-            language: Language code for spell checking
+            language: Language code (unused, kept for API compatibility)
 
         Returns:
-            Tuple of (is_scanned, text_quality_score)
-            is_scanned: True if PDF is scanned/poor quality, False if it contains good native text
-            text_quality_score: Quality score of extracted text (0.0-1.0)
+            Tuple of (is_scanned, confidence_score)
+            is_scanned: True if PDF is scanned/image-only, False if it contains native text
+            confidence_score: Confidence in the decision (0.0-1.0)
         """
         try:
             doc = fitz.open(stream=pdf_file, filetype="pdf")
@@ -335,31 +335,59 @@ class OCRService:
                 doc.close()
                 return True, 0.0
 
-            # Extract text from first page
             first_page = doc[0]
+
+            # METHOD 1: Check for embedded fonts (native text PDFs always have fonts)
+            try:
+                font_list = doc.get_page_fonts(0)
+                font_count = len(font_list)
+            except:
+                font_count = 0
+
+            # METHOD 2: Get text blocks (native PDFs have structured text blocks)
+            text_blocks = first_page.get_text("blocks")
+            text_block_count = len([b for b in text_blocks if len(b[4].strip()) > 0])
+
+            # METHOD 3: Extract raw text
             text = first_page.get_text().strip()
+            text_length = len(text)
+
+            # METHOD 4: Check for images (scanned PDFs are usually 1 full-page image)
+            image_list = first_page.get_images()
+            image_count = len(image_list)
+
             doc.close()
 
-            if len(text) < 50:
-                logger.debug("PDF appears to be scanned (< 50 chars)")
-                return True, 0.0
+            # DECISION LOGIC (structure-based, language-agnostic)
+            # =========================================================
 
-            # Assess text quality with spell checking
-            quality_score, metrics = self.assess_text_quality(text, language)
+            # Case 1: Definitely NATIVE text PDF
+            if font_count > 0 and text_block_count > 3:
+                logger.info(f"PDF is NATIVE TEXT: {font_count} fonts, {text_block_count} text blocks, {text_length} chars")
+                return False, 1.0
 
-            logger.info(f"PDF text quality: {quality_score:.2f} (spelling errors: {metrics.get('spelling_error_rate', 0):.1%})")
+            # Case 2: Substantial text present (>200 chars) = likely native
+            if text_length >= 200:
+                logger.info(f"PDF has substantial text ({text_length} chars), treating as native")
+                return False, 0.9
 
-            # Two-stage decision:
-            # Stage 1: High quality (>0.85) - use embedded text (fast path)
-            # Stage 2: Medium quality (0.6-0.85) - could go either way, use embedded for speed
-            # Stage 3: Low quality (<0.6) - re-OCR for better results
+            # Case 3: Definitely SCANNED (no fonts, no text, but has images)
+            if font_count == 0 and text_block_count == 0 and image_count > 0:
+                logger.info(f"PDF is SCANNED: no fonts, no text blocks, {image_count} images")
+                return True, 1.0
 
-            if quality_score < 0.6:
-                logger.info(f"PDF has poor text quality ({quality_score:.2f}), will re-OCR")
-                return True, quality_score
+            # Case 4: Very little text (<50 chars) = likely scanned
+            if text_length < 50:
+                logger.info(f"PDF appears scanned: only {text_length} chars of text")
+                return True, 0.8
 
-            logger.info(f"PDF has acceptable text quality ({quality_score:.2f}), using embedded text")
-            return False, quality_score
+            # Case 5: Ambiguous (has some text but no fonts) = check text amount
+            if text_length >= 100:
+                logger.info(f"PDF has moderate text ({text_length} chars), treating as native")
+                return False, 0.7
+            else:
+                logger.info(f"PDF has little text ({text_length} chars), will re-OCR")
+                return True, 0.6
 
         except Exception as e:
             logger.warning(f"Could not determine if PDF is scanned: {e}")

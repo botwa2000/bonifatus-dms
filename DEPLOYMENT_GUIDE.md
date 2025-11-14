@@ -54,7 +54,12 @@ BoniDoc is a privacy-first document management system combining secure storage, 
 - Two-stage processing: PyMuPDF (native text) + Tesseract (scanned PDFs)
 - Automatic language detection (EN/DE/RU/FR) with 3-pass accuracy
 - Keyword extraction via frequency analysis + stop word filtering
-- Intelligent quality detection (auto-switch to Tesseract if confidence < threshold)
+- Structure-based PDF detection: Analyzes PDF structure (fonts, text blocks, images) to determine if document is native text or scanned image
+  - Language-agnostic approach (works for all languages without false positives)
+  - Avoids misclassification of technical terms, abbreviations, and proper nouns
+- Spell-checking validation: Post-OCR quality check using Hunspell dictionaries (en_US, de_DE, ru_RU, fr_FR) to verify extracted text quality
+  - Located in `/usr/share/hunspell/` on backend container
+  - Used only after OCR completes, not for scanned detection
 
 **Multi-Language Support**
 - Full UI in English, German, Russian, French
@@ -1734,7 +1739,8 @@ server {
 
 - PyMuPDF for native PDF text extraction
 - Tesseract for scanned/image PDFs
-- Intelligent quality detection (auto-switch if confidence < threshold)
+- Structure-based PDF detection: Analyzes embedded fonts, text blocks, and images to determine if PDF is native or scanned (language-agnostic, prevents false positives)
+- Spell-checking validation: Post-OCR quality check using Hunspell dictionaries (en_US, de_DE, ru_RU, fr_FR)
 - Image preprocessing (rotation, deskewing)
 - Language detection (3-pass for accuracy)
 - Keyword extraction (frequency + stop word filtering)
