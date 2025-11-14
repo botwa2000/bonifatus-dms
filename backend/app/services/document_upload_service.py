@@ -396,6 +396,12 @@ class DocumentUploadService:
 
         # Clean original filename (remove extension and special chars)
         clean_name = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+
+        # Transliterate Unicode characters to ASCII (ä→a, ü→u, ö→o, ß→ss, etc.)
+        import unicodedata
+        clean_name = unicodedata.normalize('NFKD', clean_name)
+        clean_name = clean_name.encode('ascii', 'ignore').decode('ascii')
+
         clean_name = re.sub(r'[^\w\s-]', '', clean_name)
         clean_name = re.sub(r'\s+', '_', clean_name.strip())
 
