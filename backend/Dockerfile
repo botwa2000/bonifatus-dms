@@ -16,7 +16,7 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r bonifatus && useradd -r -g bonifatus bonifatus
 
-# Install system dependencies including Tesseract OCR and ClamAV
+# Install system dependencies including Tesseract OCR, Hunspell, and ClamAV
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
@@ -36,6 +36,12 @@ RUN apt-get update \
         libxrender1 \
         libgomp1 \
         libgl1 \
+        hunspell \
+        libhunspell-dev \
+        hunspell-en-us \
+        hunspell-de-de \
+        hunspell-ru \
+        hunspell-fr \
         clamav \
         clamav-daemon \
         clamav-freshclam \

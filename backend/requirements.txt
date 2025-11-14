@@ -33,5 +33,5 @@ opencv-python-headless==4.8.1.78
 # Language Detection
 fasttext-langdetect==1.0.5
 lingua-language-detector==2.0.2
-pyspellchecker==0.8.1
+pyhunspell==0.5.5
 clamd==1.0.2

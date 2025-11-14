@@ -259,16 +259,19 @@ class KeywordExtractionService:
                 spell_filtered_tokens = []
                 ocr_garbage_count = 0
 
-                # Sample check to avoid performance hit (check up to 200 unique words)
-                unique_tokens = list(set(filtered_tokens))[:200]
-                misspelled = spell.unknown(unique_tokens)
+                # Build a cache of spell check results for unique tokens
+                unique_tokens = set(filtered_tokens)
+                spell_cache = {}
+                for token in unique_tokens:
+                    # Hunspell API: spell.spell(word) returns True if word is correct
+                    spell_cache[token] = spell.spell(token)
 
                 for token in filtered_tokens:
                     # Always preserve category keywords (even if "misspelled")
                     if token in category_keywords_set:
                         spell_filtered_tokens.append(token)
-                    # Keep words that spell checker recognizes
-                    elif token not in misspelled:
+                    # Keep words that spell checker recognizes as correct
+                    elif spell_cache.get(token, False):
                         spell_filtered_tokens.append(token)
                     # Also keep if it appears frequently (likely domain-specific term)
                     elif filtered_tokens.count(token) >= min_frequency * 2:

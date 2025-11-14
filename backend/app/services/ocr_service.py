@@ -13,7 +13,7 @@ import pytesseract
 import cv2
 import numpy as np
 import fitz  # PyMuPDF
-from spellchecker import SpellChecker
+import hunspell
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class OCRService:
     def __init__(self):
         """Initialize OCR service"""
         self._language_cache: Optional[Dict[str, str]] = None
-        self._spell_checkers: Dict[str, SpellChecker] = {}
+        self._spell_checkers: Dict[str, hunspell.HunSpell] = {}
         try:
             pytesseract.get_tesseract_version()
             logger.info("Tesseract OCR initialized successfully")
@@ -67,39 +67,41 @@ class OCRService:
         """Clear cached language mappings (useful after database updates)"""
         self._language_cache = None
 
-    def get_spell_checker(self, language: str) -> SpellChecker:
+    def get_spell_checker(self, language: str) -> hunspell.HunSpell:
         """
-        Get or create spell checker for a language
+        Get or create Hunspell spell checker for a language
         Caches spell checkers for performance
 
         Args:
-            language: Language code (en, de, ru)
+            language: Language code (en, de, ru, fr)
 
         Returns:
-            SpellChecker instance
+            HunSpell instance
         """
-        # Map language codes to pyspellchecker codes
-        lang_map = {
-            'en': 'en',
-            'de': 'de',
-            'ru': 'ru',
-            'es': 'es',
-            'fr': 'fr',
-            'pt': 'pt',
-            'it': 'it'
+        # Map language codes to Hunspell dictionary paths
+        # Hunspell dictionaries are typically in /usr/share/hunspell/
+        dict_map = {
+            'en': '/usr/share/hunspell/en_US',
+            'de': '/usr/share/hunspell/de_DE',
+            'ru': '/usr/share/hunspell/ru_RU',
+            'fr': '/usr/share/hunspell/fr'
         }
 
-        spell_lang = lang_map.get(language, 'en')
+        dict_path = dict_map.get(language, '/usr/share/hunspell/en_US')
 
-        if spell_lang not in self._spell_checkers:
+        if language not in self._spell_checkers:
             try:
-                self._spell_checkers[spell_lang] = SpellChecker(language=spell_lang)
-                logger.debug(f"Initialized spell checker for language: {spell_lang}")
+                self._spell_checkers[language] = hunspell.HunSpell(f"{dict_path}.dic", f"{dict_path}.aff")
+                logger.debug(f"Initialized Hunspell spell checker for language: {language} ({dict_path})")
             except Exception as e:
-                logger.warning(f"Failed to initialize spell checker for {spell_lang}, using 'en': {e}")
-                self._spell_checkers[spell_lang] = SpellChecker(language='en')
+                logger.warning(f"Failed to initialize Hunspell for {language}, using 'en': {e}")
+                try:
+                    self._spell_checkers[language] = hunspell.HunSpell('/usr/share/hunspell/en_US.dic', '/usr/share/hunspell/en_US.aff')
+                except Exception as fallback_error:
+                    logger.error(f"Failed to initialize fallback English Hunspell: {fallback_error}")
+                    raise
 
-        return self._spell_checkers[spell_lang]
+        return self._spell_checkers[language]
 
     def assess_text_quality(self, text: str, language: str = 'en') -> Tuple[float, Dict[str, float]]:
         """
@@ -150,12 +152,17 @@ class OCRService:
 
         try:
             spell = self.get_spell_checker(language)
-            misspelled = spell.unknown(sample_words)
 
-            error_rate = len(misspelled) / len(sample_words) if sample_words else 1.0
+            # Hunspell API: spell.spell(word) returns True if word is correct
+            misspelled_count = 0
+            for word in sample_words:
+                if not spell.spell(word):
+                    misspelled_count += 1
+
+            error_rate = misspelled_count / len(sample_words) if sample_words else 1.0
             metrics['spelling_error_rate'] = error_rate
             metrics['total_words_checked'] = len(sample_words)
-            metrics['misspelled_words'] = len(misspelled)
+            metrics['misspelled_words'] = misspelled_count
 
             # Quality score based on spelling accuracy
             # < 15% errors = excellent (0.95-1.0)
