@@ -42,7 +42,13 @@ class TierService:
                 (datetime.utcnow() - self._cache_timestamp).total_seconds() > self._cache_ttl_seconds):
                 await self._refresh_tier_cache(session)
 
-            return self._tier_cache.get(tier_id)
+            cached_tier = self._tier_cache.get(tier_id)
+            if cached_tier is None:
+                return None
+
+            # Merge cached object into current session to avoid "not bound to Session" errors
+            # This allows SQLAlchemy to access lazy-loaded attributes
+            return session.merge(cached_tier)
 
         except Exception as e:
             logger.error(f"Failed to get tier plan {tier_id}: {e}")

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
-import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox, Spinner } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
 import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
 import AppHeader from '@/components/AppHeader'
@@ -213,7 +213,8 @@ export default function BatchUploadPage() {
     setAnalyzing(true)
     setAnalysisComplete(false)
     setMessage(null)
-    setBatchProgress({ processed: 0, total: selectedFiles.length, currentFile: null })
+    // Initialize progress immediately to show upload feedback
+    setBatchProgress({ processed: 0, total: selectedFiles.length, currentFile: 'Uploading files...' })
 
     try {
       const formData = new FormData()
@@ -501,15 +502,47 @@ export default function BatchUploadPage() {
 
       const results = await Promise.all(uploads)
       const successful = results.filter(r => r.ok).length
+      const failed = uploadStates.length - successful
 
-      setMessage({
-        type: 'success',
-        text: `Uploaded ${successful}/${uploadStates.length} documents successfully!`
-      })
+      // Check for failures
+      if (failed > 0) {
+        // Get error details for failed uploads
+        const errors: string[] = []
+        for (let i = 0; i < results.length; i++) {
+          if (!results[i].ok) {
+            try {
+              const errorData = await results[i].json()
+              const errorMsg = errorData.detail || errorData.message || results[i].statusText
+              errors.push(`${uploadStates[i].original_filename}: ${errorMsg}`)
+            } catch {
+              errors.push(`${uploadStates[i].original_filename}: ${results[i].statusText}`)
+            }
+          }
+        }
 
-      setTimeout(() => {
-        router.push('/documents')
-      }, 2000)
+        setMessage({
+          type: 'error',
+          text: failed === uploadStates.length
+            ? `All uploads failed: ${errors.join('; ')}`
+            : `Partial upload: ${successful} succeeded, ${failed} failed. Errors: ${errors.join('; ')}`
+        })
+
+        // Don't redirect if any uploads failed
+        if (successful === 0) return
+      } else {
+        // All uploads succeeded
+        setMessage({
+          type: 'success',
+          text: `Uploaded ${successful}/${uploadStates.length} documents successfully!`
+        })
+      }
+
+      // Only redirect if at least one upload succeeded
+      if (successful > 0) {
+        setTimeout(() => {
+          router.push('/documents')
+        }, 2000)
+      }
 
     } catch (error) {
       console.error('Batch upload error:', error)
@@ -611,7 +644,12 @@ export default function BatchUploadPage() {
                   disabled={selectedFiles.length === 0 || analyzing}
                   className="w-full"
                 >
-                  {analyzing ? 'Analyzing...' : `Analyze ${selectedFiles.length} File${selectedFiles.length !== 1 ? 's' : ''}`}
+                  {analyzing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Spinner size="sm" />
+                      Analyzing...
+                    </span>
+                  ) : `Analyze ${selectedFiles.length} File${selectedFiles.length !== 1 ? 's' : ''}`}
                 </Button>
               </>
             ) : (

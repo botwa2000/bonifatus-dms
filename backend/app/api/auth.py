@@ -176,7 +176,7 @@ async def google_oauth_callback_redirect(
             secure=True,
             samesite="lax",
             domain=".bonidoc.com",
-            max_age=900,  # 15 minutes
+            max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
 
@@ -254,7 +254,7 @@ async def google_oauth_callback_ajax(
             secure=True,
             samesite="lax",  # Lax allows navigation while preventing CSRF
             domain=".bonidoc.com",  # Accessible across all *.bonidoc.com subdomains
-            max_age=900,  # 15 minutes
+            max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
 
@@ -356,11 +356,11 @@ async def refresh_token(
             secure=True,
             samesite="lax",
             domain=".bonidoc.com",
-            max_age=900,  # 15 minutes
+            max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
 
-        logger.info(f"[REFRESH DEBUG] ✅ Access token cookie SET with domain=.bonidoc.com, max_age=900, httponly=True")
+        logger.info(f"[REFRESH DEBUG] ✅ Access token cookie SET with domain=.bonidoc.com, max_age={settings.security.access_token_expire_minutes * 60}, httponly=True")
         logger.info(f"[REFRESH DEBUG] Access token refreshed for user {refresh_result.get('email')} from IP: {ip_address}")
 
         return RefreshTokenResponse(**refresh_result)
