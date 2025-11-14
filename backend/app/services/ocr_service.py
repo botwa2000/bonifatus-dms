@@ -426,50 +426,52 @@ class OCRService:
                 for i in range(pages_to_process):
                     page = doc[i]
 
-                    # Try extracting text at current rotation
+                    # Check PDF metadata for rotation first
+                    metadata_rotation = page.rotation
+                    if metadata_rotation != 0:
+                        logger.info(f"[ROTATION DEBUG] Page {i+1} has metadata rotation: {metadata_rotation}°")
+
+                    # Extract text at current rotation
                     page_text = page.get_text()
 
-                    # Detect if text needs rotation (check for garbage characters)
-                    if page_text and len(page_text) > 20:
-                        # Count alphabetic vs non-alphabetic characters
-                        alpha_chars = sum(c.isalpha() for c in page_text)
-                        total_chars = len(page_text.replace(' ', '').replace('\n', ''))
-                        alpha_ratio = alpha_chars / total_chars if total_chars > 0 else 0
+                    # Use Tesseract OSD (Orientation and Script Detection) for rotation detection
+                    if page_text and len(page_text) > 50:
+                        try:
+                            # Render page as image for OSD analysis
+                            zoom = 2  # 144 DPI for OSD (balance speed vs accuracy)
+                            mat = fitz.Matrix(zoom, zoom)
+                            pix = page.get_pixmap(matrix=mat)
+                            import io
+                            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-                        logger.info(f"[ROTATION DEBUG] Page {i+1}: Alpha ratio = {alpha_ratio:.2f}, Sample: {page_text[:50]}")
+                            # Run Tesseract OSD (fast, analyzes structure not full text)
+                            osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
+                            detected_rotation = osd.get('rotate', 0)  # How much to rotate to correct
+                            orientation_conf = osd.get('orientation_conf', 0)
 
-                        # If mostly garbage (< 30% alphabetic), try rotating
-                        if alpha_ratio < 0.3:
-                            logger.info(f"[ROTATION DEBUG] Page {i+1} appears rotated, trying auto-rotation...")
+                            logger.info(f"[ROTATION DEBUG] Page {i+1} Tesseract OSD:")
+                            logger.info(f"[ROTATION DEBUG]   - Detected rotation needed: {detected_rotation}°")
+                            logger.info(f"[ROTATION DEBUG]   - Confidence: {orientation_conf:.2f}")
+                            logger.info(f"[ROTATION DEBUG]   - Text sample: {page_text[:50]}")
 
-                            best_text = page_text
-                            best_ratio = alpha_ratio
-                            best_rotation = 0
+                            # Apply rotation if detected with high confidence (>2.0 is typically reliable)
+                            if detected_rotation != 0 and orientation_conf > 2.0:
+                                logger.info(f"[ROTATION DEBUG] ✅ Applying {detected_rotation}° rotation correction")
 
-                            # Try 90, 180, 270 degree rotations
-                            for rotation in [90, 180, 270]:
-                                page.set_rotation(rotation)
-                                rotated_text = page.get_text()
+                                # Apply rotation (Tesseract returns how much to rotate to fix)
+                                current_rotation = page.rotation
+                                new_rotation = (current_rotation + detected_rotation) % 360
+                                page.set_rotation(new_rotation)
 
-                                if rotated_text:
-                                    rotated_alpha = sum(c.isalpha() for c in rotated_text)
-                                    rotated_total = len(rotated_text.replace(' ', '').replace('\n', ''))
-                                    rotated_ratio = rotated_alpha / rotated_total if rotated_total > 0 else 0
-
-                                    logger.info(f"[ROTATION DEBUG] Rotation {rotation}°: Alpha ratio = {rotated_ratio:.2f}")
-
-                                    if rotated_ratio > best_ratio:
-                                        best_text = rotated_text
-                                        best_ratio = rotated_ratio
-                                        best_rotation = rotation
-
-                            # Reset to best rotation
-                            if best_rotation != 0:
-                                page.set_rotation(best_rotation)
-                                page_text = best_text
-                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} auto-rotated to {best_rotation}° (alpha ratio: {best_ratio:.2f})")
+                                # Re-extract text with corrected rotation
+                                page_text = page.get_text()
+                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} corrected from {current_rotation}° to {new_rotation}°, new sample: {page_text[:50]}")
                             else:
-                                logger.info(f"[ROTATION DEBUG] ⚠️ Page {i+1} rotation detection failed, using original text")
+                                logger.info(f"[ROTATION DEBUG] Page {i+1} appears correctly oriented (rotation: {detected_rotation}°, conf: {orientation_conf:.2f})")
+
+                        except Exception as e:
+                            # OSD can fail on pages with very little text or complex layouts
+                            logger.warning(f"[ROTATION DEBUG] OSD failed for page {i+1}: {e}, using text as-is")
 
                     if page_text:
                         text_parts.append(page_text)
