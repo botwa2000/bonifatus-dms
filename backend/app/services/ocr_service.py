@@ -425,7 +425,52 @@ class OCRService:
                 text_parts = []
                 for i in range(pages_to_process):
                     page = doc[i]
+
+                    # Try extracting text at current rotation
                     page_text = page.get_text()
+
+                    # Detect if text needs rotation (check for garbage characters)
+                    if page_text and len(page_text) > 20:
+                        # Count alphabetic vs non-alphabetic characters
+                        alpha_chars = sum(c.isalpha() for c in page_text)
+                        total_chars = len(page_text.replace(' ', '').replace('\n', ''))
+                        alpha_ratio = alpha_chars / total_chars if total_chars > 0 else 0
+
+                        logger.info(f"[ROTATION DEBUG] Page {i+1}: Alpha ratio = {alpha_ratio:.2f}, Sample: {page_text[:50]}")
+
+                        # If mostly garbage (< 30% alphabetic), try rotating
+                        if alpha_ratio < 0.3:
+                            logger.info(f"[ROTATION DEBUG] Page {i+1} appears rotated, trying auto-rotation...")
+
+                            best_text = page_text
+                            best_ratio = alpha_ratio
+                            best_rotation = 0
+
+                            # Try 90, 180, 270 degree rotations
+                            for rotation in [90, 180, 270]:
+                                page.set_rotation(rotation)
+                                rotated_text = page.get_text()
+
+                                if rotated_text:
+                                    rotated_alpha = sum(c.isalpha() for c in rotated_text)
+                                    rotated_total = len(rotated_text.replace(' ', '').replace('\n', ''))
+                                    rotated_ratio = rotated_alpha / rotated_total if rotated_total > 0 else 0
+
+                                    logger.info(f"[ROTATION DEBUG] Rotation {rotation}°: Alpha ratio = {rotated_ratio:.2f}")
+
+                                    if rotated_ratio > best_ratio:
+                                        best_text = rotated_text
+                                        best_ratio = rotated_ratio
+                                        best_rotation = rotation
+
+                            # Reset to best rotation
+                            if best_rotation != 0:
+                                page.set_rotation(best_rotation)
+                                page_text = best_text
+                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} auto-rotated to {best_rotation}° (alpha ratio: {best_ratio:.2f})")
+                            else:
+                                logger.info(f"[ROTATION DEBUG] ⚠️ Page {i+1} rotation detection failed, using original text")
+
                     if page_text:
                         text_parts.append(page_text)
 
