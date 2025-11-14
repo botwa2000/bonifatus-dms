@@ -48,14 +48,29 @@ class DocumentAnalysisService:
         """
         try:
             # Get user's preferred document languages BEFORE OCR to use as language hint
-            # This is critical for scanned PDFs where Tesseract needs the correct language upfront
-            language_hint = 'en'  # Default fallback
+            # Use Tesseract multilingual mode: all user languages simultaneously (e.g., 'eng+deu+rus+fra')
+            # This allows Tesseract to automatically pick the best matching language
+
+            # Get language mapping from database (no hardcoded values)
+            lang_mapping = ocr_service.get_supported_languages(db)
+
+            # Build multilingual language hint from user preferences
+            tesseract_langs = []
             if user_id:
                 from app.database.models import User
                 user = db.get(User, UUID(user_id))
-                if user and user.preferred_doc_languages and len(user.preferred_doc_languages) > 0:
-                    language_hint = user.preferred_doc_languages[0]
-                    logger.info(f"[OCR LANG HINT] Using user's first preferred language as hint: {language_hint}")
+                if user and user.preferred_doc_languages:
+                    # Only include languages that exist in database mapping
+                    tesseract_langs = [lang_mapping[lang] for lang in user.preferred_doc_languages if lang in lang_mapping]
+
+            # Build language hint string
+            if tesseract_langs:
+                language_hint = '+'.join(tesseract_langs)
+                logger.info(f"[OCR LANG HINT] Using multilingual OCR with languages: {language_hint}")
+            else:
+                # Use first language from database as ultimate fallback
+                language_hint = list(lang_mapping.values())[0] if lang_mapping else 'eng'
+                logger.info(f"[OCR LANG HINT] No user preferences, using database default: {language_hint}")
 
             extracted_text, ocr_confidence = ocr_service.extract_text(
                 file_content,
