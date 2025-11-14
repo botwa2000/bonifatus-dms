@@ -456,16 +456,25 @@ class OCRService:
 
                             # Apply rotation if detected with high confidence (>2.0 is typically reliable)
                             if detected_rotation != 0 and orientation_conf > 2.0:
-                                logger.info(f"[ROTATION DEBUG] ✅ Applying {detected_rotation}° rotation correction")
+                                logger.info(f"[ROTATION DEBUG] ✅ Detected {detected_rotation}° rotation, re-extracting via OCR")
 
-                                # Apply rotation (Tesseract returns how much to rotate to fix)
-                                current_rotation = page.rotation
-                                new_rotation = (current_rotation + detected_rotation) % 360
-                                page.set_rotation(new_rotation)
+                                # For rotated pages, page.set_rotation() doesn't affect get_text()
+                                # Solution: Rotate the image and OCR it
+                                rotated_image = image.rotate(-detected_rotation, expand=True)  # PIL rotates counter-clockwise
 
-                                # Re-extract text with corrected rotation
-                                page_text = page.get_text()
-                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} corrected from {current_rotation}° to {new_rotation}°, new sample: {page_text[:50]}")
+                                # Get Tesseract language codes for OCR
+                                supported_languages = self.get_supported_languages(db)
+                                tesseract_lang = supported_languages.get(language, 'eng')
+
+                                # OCR the rotated image
+                                custom_config = r'--oem 3 --psm 3'
+                                page_text = pytesseract.image_to_string(
+                                    rotated_image,
+                                    lang=tesseract_lang,
+                                    config=custom_config
+                                ).strip()
+
+                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} re-OCR'd after {detected_rotation}° rotation, new sample: {page_text[:50]}")
                             else:
                                 logger.info(f"[ROTATION DEBUG] Page {i+1} appears correctly oriented (rotation: {detected_rotation}°, conf: {orientation_conf:.2f})")
 
