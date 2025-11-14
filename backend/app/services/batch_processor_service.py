@@ -199,6 +199,7 @@ class BatchProcessorService:
                         await f.write(json.dumps(metadata))
 
                     # Store ONLY minimal metadata in results (not full analysis to prevent memory bloat)
+                    # Include keywords (small, ~1KB) but exclude extracted_text (large, 100KB-1MB)
                     # Full analysis is already saved to disk above and retrieved later via temp_id
                     results.append({
                         'success': True,
@@ -209,7 +210,9 @@ class BatchProcessorService:
                             'suggested_category_id': analysis_result.get('suggested_category_id'),
                             'classification_confidence': analysis_result.get('classification_confidence'),
                             'detected_language': analysis_result.get('detected_language'),
-                            'keywords_count': len(analysis_result.get('keywords', []))
+                            'keywords': analysis_result.get('keywords', []),  # Include keywords for UI display
+                            'document_date': analysis_result.get('document_date'),
+                            'document_date_type': analysis_result.get('document_date_type')
                         }
                     })
 
