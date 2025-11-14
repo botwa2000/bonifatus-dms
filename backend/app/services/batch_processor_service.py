@@ -7,6 +7,7 @@ Handles asynchronous batch document processing with real-time progress tracking
 import logging
 import asyncio
 import uuid
+import gc
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
@@ -118,7 +119,7 @@ class BatchProcessorService:
 
             results = []
 
-            # Process each file from disk
+            # Process each file from disk ONE AT A TIME (memory-efficient)
             for idx, file_info in enumerate(file_paths):
                 file_path = file_info['path']
                 original_filename = file_info['original_filename']
@@ -132,7 +133,7 @@ class BatchProcessorService:
 
                     logger.info(f"[Batch {batch_id}] Processing file {idx+1}/{len(file_paths)}: {original_filename}")
 
-                    # Read file from disk
+                    # Read file from disk (unavoidable for OCR processing)
                     async with aiofiles.open(file_path, 'rb') as f:
                         file_content = await f.read()
 
@@ -161,6 +162,8 @@ class BatchProcessorService:
                         batch.failed_files += 1
                         batch.processed_files += 1
                         session.commit()
+                        # Explicit cleanup
+                        del file_content
                         continue
 
                     # Analyze document
@@ -171,6 +174,9 @@ class BatchProcessorService:
                         db=session,
                         user_id=user_id
                     )
+
+                    # Explicit cleanup after analysis (free memory immediately)
+                    del file_content
 
                     # Generate temporary ID and store metadata on disk (NOT in memory)
                     temp_id = str(uuid.uuid4())
@@ -213,10 +219,16 @@ class BatchProcessorService:
                     })
                     batch.failed_files += 1
                     batch.processed_files += 1
+                    # Cleanup on error
+                    if 'file_content' in locals():
+                        del file_content
 
                 # Update progress
                 batch.results = results
                 session.commit()
+
+                # Force garbage collection after each file to free memory immediately
+                gc.collect()
 
             # Mark batch as completed
             batch.status = 'completed'

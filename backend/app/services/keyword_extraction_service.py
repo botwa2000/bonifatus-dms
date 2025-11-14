@@ -288,6 +288,13 @@ class KeywordExtractionService:
             total_tokens = len(filtered_tokens)
             max_freq = max(frequency.values())
 
+            # Adaptive min_frequency for short documents
+            # Short documents (like invoices) naturally have low word repetition
+            # Use min_frequency=1 for short docs to avoid empty keyword lists
+            adaptive_min_frequency = 1 if total_tokens < 200 else min_frequency
+            if adaptive_min_frequency != min_frequency:
+                logger.info(f"[KEYWORD EXTRACTION] Short document detected ({total_tokens} tokens), using adaptive min_frequency={adaptive_min_frequency} instead of {min_frequency}")
+
             # STEP 4: Extract keywords with priority scoring
             keywords = []
             extracted_words = set()
@@ -317,8 +324,8 @@ class KeywordExtractionService:
                     logger.warning(f"Skipping keyword with invalid word: word={repr(word)}, type={type(word).__name__}, count={count}")
                     continue
 
-                if count is None or not isinstance(count, int) or count < min_frequency:
-                    logger.warning(f"Skipping keyword '{word}' with invalid count: count={repr(count)}, type={type(count).__name__ if count is not None else 'NoneType'}, min_required={min_frequency}")
+                if count is None or not isinstance(count, int) or count < adaptive_min_frequency:
+                    logger.debug(f"Skipping keyword '{word}' with low frequency: count={count}, min_required={adaptive_min_frequency}")
                     continue
 
                 relevance = (count / max_freq) * 100

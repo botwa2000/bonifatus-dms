@@ -736,17 +736,19 @@ async def analyze_batch_async(
             safe_filename = f"{idx}_{file.filename}"
             file_path = temp_dir / safe_filename
 
-            # Stream file to disk
+            # Stream file to disk in chunks (memory-efficient)
+            file_size = 0
             async with aiofiles.open(file_path, 'wb') as f:
-                content = await file.read()
-                await f.write(content)
-                total_size += len(content)
+                while chunk := await file.read(1024 * 1024):  # 1MB chunks
+                    await f.write(chunk)
+                    file_size += len(chunk)
+                total_size += file_size
 
             file_paths.append({
                 'path': str(file_path),
                 'original_filename': file.filename,
                 'mime_type': file.content_type,
-                'size': len(content)
+                'size': file_size
             })
 
         # Check storage quota AFTER calculating total size
