@@ -175,19 +175,31 @@ export default function DocumentsPage() {
 
     try {
       if (shouldLog('debug')) console.log('[DELETE DEBUG] Calling API delete endpoint:', `/api/v1/documents/${documentId}`)
+
+      // Optimistic update: remove document from UI immediately
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId))
+      setDeletingDocument(null)
+
       const response = await apiClient.delete(`/api/v1/documents/${documentId}`, true)
       if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅ Delete API response:', response)
 
-      setDeletingDocument(null)
+      // Reload to get accurate count and sync with server
       if (shouldLog('debug')) console.log('[DELETE DEBUG] Reloading documents list...')
-      loadDocuments()
+      await loadDocuments()
       if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅✅✅ Delete completed successfully')
     } catch (err) {
       if (shouldLog('debug')) {
         console.error('[DELETE DEBUG] ❌ Delete failed:', err)
         console.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
       }
-      setError('Failed to delete document')
+
+      // Close modal on error to prevent double-delete attempts
+      setDeletingDocument(null)
+
+      // Reload documents to restore correct state after failed delete
+      await loadDocuments()
+
+      setError('Failed to delete document. It may have already been deleted.')
       console.error('Delete error:', err)
     }
   }
