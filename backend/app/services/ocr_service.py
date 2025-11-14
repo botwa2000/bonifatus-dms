@@ -467,8 +467,41 @@ class OCRService:
                         page_height_inches = page_rect.height / 72
 
                         # Calculate DPI
-                        dpi_x = base_image['width'] / page_width_inches
-                        dpi_y = base_image['height'] / page_height_inches
+                        dpi_x = base_image['width'] / page_width_inches if page_width_inches > 0 else 0
+                        dpi_y = base_image['height'] / page_height_inches if page_height_inches > 0 else 0
+
+                        # Handle PDFs with incorrect page dimensions (common issue)
+                        # If calculated DPI is suspiciously low but image resolution is high, recalculate using standard page sizes
+                        if (dpi_x < 150 or dpi_y < 150) and (base_image['width'] >= 2000 or base_image['height'] >= 2000):
+                            logger.info(f"[OCR DEBUG] ⚠️ PDF has incorrect page dimensions ({page_width_inches:.2f}x{page_height_inches:.2f} in), recalculating DPI")
+
+                            # Detect orientation from image aspect ratio
+                            image_aspect = base_image['width'] / base_image['height']
+
+                            # Standard page sizes (width x height in inches): Letter, A4
+                            standard_sizes = [
+                                (8.5, 11.0),   # US Letter portrait
+                                (11.0, 8.5),   # US Letter landscape
+                                (8.27, 11.69), # A4 portrait
+                                (11.69, 8.27)  # A4 landscape
+                            ]
+
+                            # Find best matching standard size
+                            best_match = None
+                            best_diff = float('inf')
+                            for std_width, std_height in standard_sizes:
+                                std_aspect = std_width / std_height
+                                aspect_diff = abs(image_aspect - std_aspect)
+                                if aspect_diff < best_diff:
+                                    best_diff = aspect_diff
+                                    best_match = (std_width, std_height)
+
+                            # Recalculate DPI using standard page size
+                            if best_match:
+                                page_width_inches, page_height_inches = best_match
+                                dpi_x = base_image['width'] / page_width_inches
+                                dpi_y = base_image['height'] / page_height_inches
+                                logger.info(f"[OCR DEBUG] ✅ Matched to standard page size: {page_width_inches}x{page_height_inches} inches, recalculated DPI: {dpi_x:.0f}x{dpi_y:.0f}")
 
                         logger.info(f"[OCR DEBUG] Embedded image found:")
                         logger.info(f"[OCR DEBUG]   - Resolution: {base_image['width']}x{base_image['height']} pixels")
