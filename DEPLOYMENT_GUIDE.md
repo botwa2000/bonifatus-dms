@@ -1254,6 +1254,70 @@ docker compose up -d
 - **Debug Logs:** Always verify debug is `false` on prod after deployment
 - **Testing:** Always test on dev.bonidoc.com before deploying to bonidoc.com
 
+### 8.2b IP Whitelist and Nginx Reload (CRITICAL for Dev Access)
+
+**⚠️ MANDATORY: After EVERY Dev Deployment**
+
+After deploying to dev, you MUST reload nginx to maintain IP whitelist access:
+
+```bash
+ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
+```
+
+**Updated Dev Deployment Procedure (with Nginx reload):**
+
+```bash
+ssh root@91.99.212.17
+cd /opt/bonifatus-dms-dev
+git pull origin main
+docker compose build
+docker compose up -d
+
+# ⚠️ CRITICAL: Reload nginx after container restart
+nginx -t && systemctl reload nginx
+
+# Run migrations if needed
+docker exec bonifatus-backend-dev alembic upgrade head
+
+docker compose ps
+exit
+```
+
+**If Access Is Still Blocked After Deployment:**
+
+Your IPv6 subnet may have changed (common with dynamic IPv6). Check your current IPv6:
+
+```powershell
+# On Windows PC:
+ipconfig | findstr "IPv6"
+```
+
+Look for the IPv6 address starting with `2003:fb:f0e:fc6a:` (your current subnet).
+
+**Update Nginx Whitelist with New IPv6 Subnet:**
+
+If your subnet changed (e.g., from `fc6a` to a different value):
+
+```bash
+ssh root@91.99.212.17
+
+# Check current whitelist
+grep "allow 2003" /etc/nginx/sites-available/dev.bonidoc.com
+
+# Update to new subnet (replace fc6a with your new subnet)
+sed -i 's|2003:fb:f0e:fc6a::/64|2003:fb:f0e:NEW_SUBNET::/64|g' /etc/nginx/sites-available/dev.bonidoc.com
+
+# Reload nginx
+nginx -t && systemctl reload nginx
+```
+
+**Current Whitelisted IPs:**
+- IPv4: `93.197.148.73` (home PC public IP)
+- IPv6: `2003:fb:f0e:fc6a::/64` (home PC IPv6 subnet)
+
+**Whitelist Location:**
+`/etc/nginx/sites-available/dev.bonidoc.com` (both frontend and API server blocks)
+
 ### 8.3 Database Migrations
 
 **Check current status:**
