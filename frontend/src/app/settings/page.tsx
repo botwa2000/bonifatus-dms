@@ -435,7 +435,6 @@ export default function SettingsPage() {
                 <ToggleSwitch
                   enabled={true}
                   onChange={() => {}}
-                  disabled
                   label="Essential Emails (Required)"
                   description="Security alerts, password resets, and critical service updates. Cannot be disabled for compliance."
                 />
