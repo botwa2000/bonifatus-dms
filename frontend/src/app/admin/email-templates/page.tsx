@@ -131,9 +131,9 @@ export default function EmailTemplatesAdmin() {
       setIsEditing(false)
       setSelectedTemplate(null)
       await loadTemplates()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving template:', error)
-      const errorMessage = error?.message || error?.detail || 'Error saving template'
+      const errorMessage = error instanceof Error ? error.message : 'Error saving template'
       setMessage({ type: 'error', text: errorMessage })
     } finally {
       setIsSaving(false)
