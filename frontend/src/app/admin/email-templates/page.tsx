@@ -260,7 +260,7 @@ export default function EmailTemplatesAdmin() {
                           <h3 className="text-lg font-semibold text-gray-900">
                             {template.template_key}
                           </h3>
-                          <Badge variant={template.is_active ? 'success' : 'secondary'}>
+                          <Badge variant={template.is_active ? 'success' : 'default'}>
                             {template.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                           <Badge variant="info">{template.language.toUpperCase()}</Badge>
