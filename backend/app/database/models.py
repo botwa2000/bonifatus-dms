@@ -96,6 +96,9 @@ class User(Base, TimestampMixin):
     documents = relationship("Document", foreign_keys="[Document.user_id]", back_populates="user", cascade="all, delete-orphan")
     user_settings = relationship("UserSetting", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship('UserSession', back_populates='user', cascade='all, delete-orphan')
+    payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+    invoices = relationship("Invoice", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_user_google_id', 'google_id'),
@@ -791,4 +794,227 @@ class EmailTemplate(Base, TimestampMixin):
     __table_args__ = (
         Index('idx_email_template_key_lang', 'template_key', 'language', unique=True),
         Index('idx_email_template_active', 'is_active'),
+    )
+
+
+# ============================================================
+# Payment Integration Models
+# ============================================================
+
+class Currency(Base, TimestampMixin):
+    """Currency configuration for payments (admin-configurable)"""
+    __tablename__ = "currencies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(String(3), nullable=False, unique=True)  # ISO 4217 code (USD, EUR, GBP)
+    symbol = Column(String(10), nullable=False)  # $, €, £, etc
+    name = Column(String(100), nullable=False)  # US Dollar, Euro, etc
+    decimal_places = Column(Integer, nullable=False, server_default='2')
+    is_active = Column(Boolean, nullable=False, server_default='true')
+    is_default = Column(Boolean, nullable=False, server_default='false')
+    sort_order = Column(Integer, nullable=False, server_default='0')
+
+    __table_args__ = (
+        Index('idx_currency_code', 'code'),
+        Index('idx_currency_active', 'is_active'),
+        Index('idx_currency_default', 'is_default'),
+    )
+
+
+class Payment(Base, TimestampMixin):
+    """Payment transaction history"""
+    __tablename__ = "payments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    stripe_payment_intent_id = Column(String(100), nullable=False, unique=True)
+    stripe_invoice_id = Column(String(100), nullable=True)
+    amount_cents = Column(Integer, nullable=False)
+    amount_refunded_cents = Column(Integer, nullable=False, server_default='0')
+    currency = Column(String(3), nullable=False, server_default='USD')
+    status = Column(String(20), nullable=False)  # succeeded, failed, pending, refunded, partially_refunded
+    payment_method = Column(String(50), nullable=True)  # card, paypal, sepa_debit, etc
+    card_brand = Column(String(20), nullable=True)  # visa, mastercard, amex
+    card_last4 = Column(String(4), nullable=True)
+    card_exp_month = Column(Integer, nullable=True)
+    card_exp_year = Column(Integer, nullable=True)
+    failure_code = Column(String(50), nullable=True)
+    failure_message = Column(Text, nullable=True)
+    receipt_url = Column(String(500), nullable=True)
+    payment_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="payments")
+
+    __table_args__ = (
+        Index('idx_payment_user', 'user_id'),
+        Index('idx_payment_stripe_intent', 'stripe_payment_intent_id'),
+        Index('idx_payment_status', 'status'),
+        Index('idx_payment_created', 'created_at'),
+    )
+
+
+class Subscription(Base, TimestampMixin):
+    """Active subscription tracking"""
+    __tablename__ = "subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    tier_id = Column(Integer, ForeignKey("tier_plans.id"), nullable=False)
+    stripe_subscription_id = Column(String(100), nullable=False, unique=True)
+    stripe_price_id = Column(String(100), nullable=False)
+    billing_cycle = Column(String(10), nullable=False)  # 'monthly' or 'yearly'
+    status = Column(String(20), nullable=False)  # active, past_due, canceled, unpaid, trialing, incomplete
+    current_period_start = Column(DateTime(timezone=True), nullable=False)
+    current_period_end = Column(DateTime(timezone=True), nullable=False)
+    trial_start = Column(DateTime(timezone=True), nullable=True)
+    trial_end = Column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end = Column(Boolean, nullable=False, server_default='false')
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="subscriptions")
+    tier = relationship("TierPlan")
+
+    __table_args__ = (
+        Index('idx_subscription_user', 'user_id'),
+        Index('idx_subscription_stripe', 'stripe_subscription_id'),
+        Index('idx_subscription_status', 'status'),
+        Index('idx_subscription_tier', 'tier_id'),
+        Index('idx_subscription_period_end', 'current_period_end'),
+    )
+
+
+class DiscountCode(Base, TimestampMixin):
+    """Promotional discount codes"""
+    __tablename__ = "discount_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(String(50), nullable=False, unique=True)
+    stripe_coupon_id = Column(String(100), nullable=True)
+    stripe_promotion_code_id = Column(String(100), nullable=True)
+    discount_type = Column(String(20), nullable=False)  # percentage, fixed_amount, free_months
+    discount_value = Column(Integer, nullable=False)  # For %, stored as whole number (25 = 25%), for fixed amount in cents
+    currency = Column(String(3), nullable=True)  # Required for fixed_amount type
+    duration = Column(String(20), nullable=False)  # once, repeating, forever
+    duration_in_months = Column(Integer, nullable=True)  # For repeating type
+    max_redemptions = Column(Integer, nullable=True)  # NULL = unlimited
+    times_redeemed = Column(Integer, nullable=False, server_default='0')
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+    applicable_tiers = Column(JSONB, nullable=True)  # Array of tier IDs, NULL = all tiers
+    is_active = Column(Boolean, nullable=False, server_default='true')
+    description = Column(Text, nullable=True)
+    discount_metadata = Column(JSONB, nullable=True)
+
+    __table_args__ = (
+        Index('idx_discount_code', 'code'),
+        Index('idx_discount_active', 'is_active'),
+        Index('idx_discount_valid', 'valid_from', 'valid_until'),
+    )
+
+
+class UserDiscountRedemption(Base):
+    """Discount code redemption tracking"""
+    __tablename__ = "user_discount_redemptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    discount_code_id = Column(UUID(as_uuid=True), ForeignKey("discount_codes.id", ondelete="CASCADE"), nullable=False)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"), nullable=True)
+    redeemed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    discount_amount_cents = Column(Integer, nullable=True)  # Actual discount applied
+    redemption_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    user = relationship("User")
+    discount_code = relationship("DiscountCode")
+    subscription = relationship("Subscription")
+
+    __table_args__ = (
+        Index('idx_redemption_user', 'user_id'),
+        Index('idx_redemption_discount', 'discount_code_id'),
+        Index('idx_redemption_subscription', 'subscription_id'),
+        Index('idx_redemption_unique', 'user_id', 'discount_code_id', unique=True),
+    )
+
+
+class Referral(Base, TimestampMixin):
+    """Referral reward system"""
+    __tablename__ = "referrals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    referrer_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    referred_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    referral_code = Column(String(50), nullable=False, unique=True)
+    status = Column(String(20), nullable=False, server_default='pending')  # pending, completed, expired
+    reward_type = Column(String(20), nullable=True)  # discount_code, free_months, credit
+    reward_value = Column(Integer, nullable=True)
+    referrer_reward_granted = Column(Boolean, nullable=False, server_default='false')
+    referred_reward_granted = Column(Boolean, nullable=False, server_default='false')
+    referrer_discount_code_id = Column(UUID(as_uuid=True), ForeignKey("discount_codes.id", ondelete="SET NULL"), nullable=True)
+    referred_discount_code_id = Column(UUID(as_uuid=True), ForeignKey("discount_codes.id", ondelete="SET NULL"), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    referral_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    referrer = relationship("User", foreign_keys=[referrer_user_id])
+    referred = relationship("User", foreign_keys=[referred_user_id])
+
+    __table_args__ = (
+        Index('idx_referral_referrer', 'referrer_user_id'),
+        Index('idx_referral_referred', 'referred_user_id'),
+        Index('idx_referral_code', 'referral_code'),
+        Index('idx_referral_status', 'status'),
+    )
+
+
+class Invoice(Base, TimestampMixin):
+    """Billing invoices"""
+    __tablename__ = "invoices"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"), nullable=True)
+    payment_id = Column(UUID(as_uuid=True), ForeignKey("payments.id", ondelete="SET NULL"), nullable=True)
+    stripe_invoice_id = Column(String(100), nullable=False, unique=True)
+    invoice_number = Column(String(50), nullable=False, unique=True)
+    status = Column(String(20), nullable=False)  # draft, open, paid, void, uncollectible
+    amount_due_cents = Column(Integer, nullable=False)
+    amount_paid_cents = Column(Integer, nullable=False, server_default='0')
+    amount_remaining_cents = Column(Integer, nullable=False)
+    subtotal_cents = Column(Integer, nullable=False)
+    tax_cents = Column(Integer, nullable=False, server_default='0')
+    discount_cents = Column(Integer, nullable=False, server_default='0')
+    currency = Column(String(3), nullable=False, server_default='USD')
+    billing_reason = Column(String(50), nullable=True)  # subscription_create, subscription_cycle, manual, etc
+    tax_rate = Column(Float, nullable=True)  # VAT rate applied
+    tax_country = Column(String(2), nullable=True)  # ISO country code
+    period_start = Column(DateTime(timezone=True), nullable=True)
+    period_end = Column(DateTime(timezone=True), nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    voided_at = Column(DateTime(timezone=True), nullable=True)
+    pdf_url = Column(String(500), nullable=True)  # Stripe hosted invoice PDF
+    hosted_invoice_url = Column(String(500), nullable=True)  # Stripe hosted payment page
+    line_items = Column(JSONB, nullable=True)  # Array of invoice line items
+    invoice_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="invoices")
+    subscription = relationship("Subscription")
+    payment = relationship("Payment")
+
+    __table_args__ = (
+        Index('idx_invoice_user', 'user_id'),
+        Index('idx_invoice_subscription', 'subscription_id'),
+        Index('idx_invoice_payment', 'payment_id'),
+        Index('idx_invoice_stripe', 'stripe_invoice_id'),
+        Index('idx_invoice_number', 'invoice_number'),
+        Index('idx_invoice_status', 'status'),
+        Index('idx_invoice_created', 'created_at'),
+        Index('idx_invoice_due', 'due_date'),
     )

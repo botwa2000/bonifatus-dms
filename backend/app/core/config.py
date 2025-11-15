@@ -106,6 +106,33 @@ class EmailSettings(BaseSettings):
         env_file = ".env"
 
 
+class StripeSettings(BaseSettings):
+    """Stripe payment integration configuration from environment variables"""
+
+    stripe_secret_key: Optional[str] = Field(
+        None,
+        description="Stripe secret key (test keys in .env for dev, system env vars for prod)"
+    )
+    stripe_publishable_key: Optional[str] = Field(
+        None,
+        description="Stripe publishable key"
+    )
+    stripe_webhook_secret: Optional[str] = Field(
+        None,
+        description="Stripe webhook endpoint secret for signature verification"
+    )
+    # Price IDs for each tier and billing cycle
+    stripe_price_id_starter_monthly: Optional[str] = Field(None, description="Stripe price ID for Starter monthly")
+    stripe_price_id_starter_yearly: Optional[str] = Field(None, description="Stripe price ID for Starter yearly")
+    stripe_price_id_pro_monthly: Optional[str] = Field(None, description="Stripe price ID for Pro monthly")
+    stripe_price_id_pro_yearly: Optional[str] = Field(None, description="Stripe price ID for Pro yearly")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
 
@@ -135,6 +162,7 @@ class Settings(BaseSettings):
     translation: TranslationSettings = Field(default_factory=TranslationSettings)
     scanner: ScannerSettings = Field(default_factory=ScannerSettings)
     email: EmailSettings = Field(default_factory=EmailSettings)
+    stripe: StripeSettings = Field(default_factory=StripeSettings)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
