@@ -94,14 +94,8 @@ export default function EmailTemplatesAdmin() {
   const loadTemplates = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.get('/api/v1/admin/email-templates')
-
-      if (response.ok) {
-        const data = await response.json()
-        setTemplates(data.templates || [])
-      } else {
-        setMessage({ type: 'error', text: 'Failed to load email templates' })
-      }
+      const data = await apiClient.get<{ templates: EmailTemplate[] }>('/api/v1/admin/email-templates')
+      setTemplates(data.templates || [])
     } catch (error) {
       console.error('Error loading templates:', error)
       setMessage({ type: 'error', text: 'Error loading email templates' })
@@ -128,23 +122,19 @@ export default function EmailTemplatesAdmin() {
       setIsSaving(true)
       setMessage(null)
 
-      const response = await apiClient.put(
+      await apiClient.put(
         `/api/v1/admin/email-templates/${selectedTemplate.id}`,
         formData
       )
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Template updated successfully' })
-        setIsEditing(false)
-        setSelectedTemplate(null)
-        await loadTemplates()
-      } else {
-        const data = await response.json()
-        setMessage({ type: 'error', text: data.detail || 'Failed to update template' })
-      }
-    } catch (error) {
+      setMessage({ type: 'success', text: 'Template updated successfully' })
+      setIsEditing(false)
+      setSelectedTemplate(null)
+      await loadTemplates()
+    } catch (error: any) {
       console.error('Error saving template:', error)
-      setMessage({ type: 'error', text: 'Error saving template' })
+      const errorMessage = error?.message || error?.detail || 'Error saving template'
+      setMessage({ type: 'error', text: errorMessage })
     } finally {
       setIsSaving(false)
     }
