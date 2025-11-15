@@ -392,6 +392,7 @@ class UserService:
                 return None
 
             user_email = user.email
+            user_name = user.full_name
 
             # Log deletion before deleting (will be deleted with audit logs)
             await self._log_user_action(
@@ -415,6 +416,20 @@ class UserService:
             # 3. Delete audit logs for this user (not cascade)
             session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
             logger.info(f"Deleted audit logs for {user_email}")
+
+            # Send account deletion email notification (GDPR compliance)
+            try:
+                from app.services.email_service import email_service
+                deletion_date = datetime.utcnow().strftime("%B %d, %Y at %H:%M UTC")
+                await email_service.send_account_deleted_notification(
+                    to_email=user_email,
+                    user_name=user_name,
+                    deletion_date=deletion_date
+                )
+                logger.info(f"Account deletion email sent to {user_email}")
+            except Exception as email_error:
+                # Don't fail deletion if email fails, but log it
+                logger.error(f"Failed to send account deletion email to {user_email}: {email_error}")
 
             # 4. Delete user record (cascades to documents, sessions, etc.)
             session.delete(user)

@@ -71,7 +71,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([])
   const [tiers, setTiers] = useState<TierPlan[]>([])
   const [clamavHealth, setClamavHealth] = useState<ClamAVHealth | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'health'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'health' | 'email-templates'>('overview')
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [restartingClamav, setRestartingClamav] = useState(false)
@@ -306,6 +306,16 @@ export default function AdminDashboard() {
             {clamavHealth && !clamavHealth.available && (
               <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500"></span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('email-templates')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'email-templates'
+                ? 'text-admin-primary border-b-2 border-admin-primary'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+            }`}
+          >
+            Email Templates
           </button>
         </div>
 
@@ -768,6 +778,87 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Email Templates Tab */}
+        {activeTab === 'email-templates' && (
+          <Card>
+            <CardHeader title="Email Template Management" />
+            <CardContent>
+              <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
+                    Email Notifications
+                  </h3>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4">
+                    BoniDoc sends automated email notifications for important user events. All emails are sent via Brevo with GDPR-compliant consent management.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+                    <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Welcome Email</h4>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                      Sent when a new user creates an account.
+                    </p>
+                    <Badge variant="success">Active</Badge>
+                  </div>
+
+                  <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+                    <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Drive Connected</h4>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                      Sent when user successfully connects Google Drive.
+                    </p>
+                    <Badge variant="success">Active</Badge>
+                  </div>
+
+                  <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+                    <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Account Deleted</h4>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                      Sent when user deletes their account (GDPR mandatory).
+                    </p>
+                    <Badge variant="success">Active</Badge>
+                  </div>
+
+                  <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+                    <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Password Reset</h4>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
+                      Sent when user requests a password reset link.
+                    </p>
+                    <Badge variant="success">Active</Badge>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Configuration</h4>
+                  <div className="space-y-2 text-sm text-neutral-700 dark:text-neutral-300">
+                    <div className="flex items-center justify-between">
+                      <span>Email Service Provider:</span>
+                      <span className="font-medium">Brevo (Sendinblue)</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>From Address:</span>
+                      <span className="font-medium">info@bonidoc.com</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Reply-To Address:</span>
+                      <span className="font-medium">info@bonidoc.com</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Marketing Emails:</span>
+                      <Badge variant="info">User Opt-in Required</Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-4">
+                  <Button onClick={() => router.push('/admin/email-templates')}>
+                    Go to Advanced Email Template Editor
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

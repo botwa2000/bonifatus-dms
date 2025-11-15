@@ -438,6 +438,77 @@ class EmailService:
             reply_to=settings.email.email_from_info
         )
 
+    async def send_account_deleted_notification(
+        self,
+        to_email: str,
+        user_name: str,
+        deletion_date: str
+    ) -> bool:
+        """
+        Send notification when user account is deleted/deactivated
+
+        This is a mandatory notification (GDPR Article 17 - Right to Erasure)
+        User must be informed about their data deletion.
+
+        Args:
+            to_email: User email
+            user_name: User name
+            deletion_date: Date when account was deleted
+
+        Returns:
+            True if email sent successfully
+        """
+        subject = "Your BoniDoc Account Has Been Deleted"
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2>Account Deletion Confirmation</h2>
+            <p>Hello {user_name},</p>
+            <p>This email confirms that your BoniDoc account has been successfully deleted on {deletion_date}.</p>
+
+            <h3>What has been done:</h3>
+            <ul>
+                <li>Your account has been deactivated and scheduled for permanent deletion</li>
+                <li>Your personal information will be removed from our systems</li>
+                <li>Your documents remain in your Google Drive (we only removed our access)</li>
+                <li>All active sessions have been terminated</li>
+            </ul>
+
+            <h3>Data Retention:</h3>
+            <p>Per our data retention policy and legal requirements:</p>
+            <ul>
+                <li>Most personal data will be deleted within 30 days</li>
+                <li>Some anonymized usage statistics may be retained for analytics</li>
+                <li>Transaction records may be kept for accounting/legal purposes (7 years)</li>
+            </ul>
+
+            <p><strong>Important:</strong> Your documents stored in Google Drive are still yours and remain untouched.
+            We have only removed BoniDoc's access to your Drive.</p>
+
+            <p>If you deleted your account by mistake or would like to return, you're always welcome to create a new account.</p>
+
+            <p>We're sorry to see you go. If you have any feedback about your experience, we'd love to hear it.</p>
+
+            <p>Best regards,<br>The BoniDoc Team</p>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666;">
+                This is a mandatory notification per GDPR regulations. You received this email because your
+                BoniDoc account was deleted. For questions, contact: {settings.email.email_from_info}
+            </p>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(
+            to_email=to_email,
+            to_name=user_name,
+            subject=subject,
+            html_content=html_content,
+            from_email=settings.email.email_from_info,
+            reply_to=settings.email.email_from_info
+        )
+
 
 # Global email service instance
 email_service = EmailService()
