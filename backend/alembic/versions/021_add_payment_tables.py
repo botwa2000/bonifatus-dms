@@ -1,7 +1,7 @@
 """add payment integration tables and user billing fields
 
 Revision ID: 021_payment_tables
-Revises: 020_email_preferences
+Revises: 020_add_email_preferences
 Create Date: 2025-11-15 00:00:00.000000
 
 Adds:
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 
 # revision identifiers, used by Alembic.
 revision = '021_payment_tables'
-down_revision = '020_email_preferences'
+down_revision = '020_add_email_preferences'
 branch_labels = None
 depends_on = None
 
