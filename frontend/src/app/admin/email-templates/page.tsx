@@ -192,9 +192,7 @@ export default function EmailTemplatesAdmin() {
 
         {/* Filters */}
         <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Filters</h2>
-          </CardHeader>
+          <CardHeader title="Filters" />
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -243,11 +241,7 @@ export default function EmailTemplatesAdmin() {
 
         {/* Templates List */}
         <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">
-              Templates ({filteredTemplates.length})
-            </h2>
-          </CardHeader>
+          <CardHeader title={`Templates (${filteredTemplates.length})`} />
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading templates...</div>
