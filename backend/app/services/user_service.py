@@ -230,10 +230,13 @@ class UserService:
         try:
             preferences = {}
 
-            # Get user from database for preferred_doc_languages
+            # Get user from database for preferred_doc_languages and email_marketing_enabled
             user = session.get(User, user_id)
-            if user and user.preferred_doc_languages:
-                preferences['preferred_doc_languages'] = user.preferred_doc_languages
+            if user:
+                if user.preferred_doc_languages:
+                    preferences['preferred_doc_languages'] = user.preferred_doc_languages
+                # Email marketing preference from users table
+                preferences['email_marketing_enabled'] = user.email_marketing_enabled
 
             # Get user settings from database
             settings_stmt = select(UserSetting).where(UserSetting.user_id == user_id)
@@ -298,6 +301,16 @@ class UserService:
 
                 # Remove from update_data so it doesn't go to user_settings
                 del update_data["preferred_doc_languages"]
+
+            # Handle email_marketing_enabled separately (stored in users table)
+            if "email_marketing_enabled" in update_data:
+                email_marketing = update_data["email_marketing_enabled"]
+                old_values['email_marketing_enabled'] = user.email_marketing_enabled
+                user.email_marketing_enabled = email_marketing
+                new_values['email_marketing_enabled'] = email_marketing
+
+                # Remove from update_data so it doesn't go to user_settings
+                del update_data["email_marketing_enabled"]
 
             # Validate UI language if provided
             if "language" in update_data:

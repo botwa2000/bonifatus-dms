@@ -85,6 +85,7 @@ class UserPreferences(BaseModel):
     theme: Optional[str] = Field(None, description="Preferred theme (light/dark)")
     notifications_enabled: bool = Field(..., description="Email notifications enabled")
     auto_categorization: bool = Field(..., description="AI auto-categorization enabled")
+    email_marketing_enabled: bool = Field(..., description="Marketing/promotional emails enabled (GDPR compliance)")
 
     class Config:
         json_schema_extra = {
@@ -94,7 +95,8 @@ class UserPreferences(BaseModel):
                 "timezone": "Europe/Berlin",
                 "theme": "light",
                 "notifications_enabled": True,
-                "auto_categorization": True
+                "auto_categorization": True,
+                "email_marketing_enabled": True
             }
         }
 
@@ -107,6 +109,7 @@ class UserPreferencesUpdate(BaseModel):
     theme: Optional[str] = Field(None, description="Preferred theme (light/dark)")
     notifications_enabled: Optional[bool] = Field(None, description="Email notifications")
     auto_categorization: Optional[bool] = Field(None, description="AI auto-categorization")
+    email_marketing_enabled: Optional[bool] = Field(None, description="Marketing/promotional emails (GDPR compliance)")
 
     class Config:
         json_schema_extra = {
@@ -115,7 +118,8 @@ class UserPreferencesUpdate(BaseModel):
                 "preferred_doc_languages": ["de", "en", "ru"],
                 "timezone": "Europe/Berlin",
                 "theme": "dark",
-                "notifications_enabled": False
+                "notifications_enabled": False,
+                "email_marketing_enabled": True
             }
         }
 

@@ -16,6 +16,7 @@ interface UserPreferences {
   theme?: string
   notifications_enabled: boolean
   auto_categorization: boolean
+  email_marketing_enabled: boolean
 }
 
 interface LanguageMetadata {
@@ -428,14 +429,26 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Notifications" />
+            <CardHeader title="Email Communications" />
             <CardContent>
-              <ToggleSwitch
-                enabled={preferences.notifications_enabled}
-                onChange={() => setPreferences({ ...preferences, notifications_enabled: !preferences.notifications_enabled })}
-                label="Email Notifications"
-                description="Receive email updates about your documents"
-              />
+              <div className="space-y-4">
+                <ToggleSwitch
+                  enabled={true}
+                  onChange={() => {}}
+                  disabled
+                  label="Essential Emails (Required)"
+                  description="Security alerts, password resets, and critical service updates. Cannot be disabled for compliance."
+                />
+
+                <div className="pt-4 border-t border-neutral-200">
+                  <ToggleSwitch
+                    enabled={preferences.email_marketing_enabled}
+                    onChange={() => setPreferences({ ...preferences, email_marketing_enabled: !preferences.email_marketing_enabled })}
+                    label="Product Updates & Tips"
+                    description="Welcome emails, feature announcements, and helpful tips (optional)"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 

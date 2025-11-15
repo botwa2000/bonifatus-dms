@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, UserStorageQuota, Document, AuditLog
+from app.database.models import User, TierPlan, UserStorageQuota, Document, AuditLog, EmailTemplate
 from app.database.connection import db_manager
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -514,3 +514,267 @@ async def restart_clamav(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restart ClamAV: {str(e)}"
         )
+
+
+# ============================================================
+# Email Template Management Endpoints
+# ============================================================
+
+class EmailTemplateCreate(BaseModel):
+    """Create new email template"""
+    template_key: str = Field(..., description="Template identifier (e.g., 'welcome_email')")
+    language: str = Field(default="en", description="Language code (ISO 639-1)")
+    subject: str = Field(..., description="Email subject line")
+    html_content: str = Field(..., description="HTML email content with {{variable}} placeholders")
+    variables: Optional[List[str]] = Field(None, description="List of variable names used in template")
+    description: Optional[str] = Field(None, description="Template description for admins")
+    is_active: bool = Field(default=True, description="Template active status")
+
+
+class EmailTemplateUpdate(BaseModel):
+    """Update existing email template"""
+    subject: Optional[str] = None
+    html_content: Optional[str] = None
+    variables: Optional[List[str]] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/email-templates")
+async def list_email_templates(
+    template_key: Optional[str] = Query(None, description="Filter by template key"),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    List all email templates with optional filtering
+
+    Admin only endpoint to manage email templates.
+    """
+    session = db_manager.session_local()
+    try:
+        query = select(EmailTemplate)
+
+        if template_key:
+            query = query.where(EmailTemplate.template_key == template_key)
+
+        if language:
+            query = query.where(EmailTemplate.language == language)
+
+        if is_active is not None:
+            query = query.where(EmailTemplate.is_active == is_active)
+
+        query = query.order_by(EmailTemplate.template_key, EmailTemplate.language)
+
+        result = session.execute(query)
+        templates = result.scalars().all()
+
+        return {
+            "templates": [
+                {
+                    "id": str(template.id),
+                    "template_key": template.template_key,
+                    "language": template.language,
+                    "subject": template.subject,
+                    "html_content": template.html_content,
+                    "variables": template.variables,
+                    "description": template.description,
+                    "is_active": template.is_active,
+                    "created_at": template.created_at.isoformat(),
+                    "updated_at": template.updated_at.isoformat()
+                }
+                for template in templates
+            ],
+            "total": len(templates)
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing email templates: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list email templates"
+        )
+    finally:
+        session.close()
+
+
+@router.post("/email-templates")
+async def create_email_template(
+    template: EmailTemplateCreate,
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Create a new email template
+
+    Admin only endpoint to create email templates for transactional emails.
+    """
+    session = db_manager.session_local()
+    try:
+        # Check if template already exists for this key and language
+        existing = session.execute(
+            select(EmailTemplate).where(
+                and_(
+                    EmailTemplate.template_key == template.template_key,
+                    EmailTemplate.language == template.language
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Template '{template.template_key}' already exists for language '{template.language}'"
+            )
+
+        # Create new template
+        new_template = EmailTemplate(
+            template_key=template.template_key,
+            language=template.language,
+            subject=template.subject,
+            html_content=template.html_content,
+            variables=template.variables,
+            description=template.description,
+            is_active=template.is_active
+        )
+
+        session.add(new_template)
+        session.commit()
+        session.refresh(new_template)
+
+        logger.info(f"Admin {current_user.email} created email template: {template.template_key} ({template.language})")
+
+        return {
+            "message": "Email template created successfully",
+            "template": {
+                "id": str(new_template.id),
+                "template_key": new_template.template_key,
+                "language": new_template.language,
+                "subject": new_template.subject,
+                "is_active": new_template.is_active
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error creating email template: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create email template"
+        )
+    finally:
+        session.close()
+
+
+@router.put("/email-templates/{template_id}")
+async def update_email_template(
+    template_id: str,
+    update_data: EmailTemplateUpdate,
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Update an existing email template
+
+    Admin only endpoint to modify email template content.
+    """
+    session = db_manager.session_local()
+    try:
+        template = session.execute(
+            select(EmailTemplate).where(EmailTemplate.id == template_id)
+        ).scalar_one_or_none()
+
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email template not found"
+            )
+
+        # Update fields
+        if update_data.subject is not None:
+            template.subject = update_data.subject
+        if update_data.html_content is not None:
+            template.html_content = update_data.html_content
+        if update_data.variables is not None:
+            template.variables = update_data.variables
+        if update_data.description is not None:
+            template.description = update_data.description
+        if update_data.is_active is not None:
+            template.is_active = update_data.is_active
+
+        session.commit()
+        session.refresh(template)
+
+        logger.info(f"Admin {current_user.email} updated email template: {template.template_key} ({template.language})")
+
+        return {
+            "message": "Email template updated successfully",
+            "template": {
+                "id": str(template.id),
+                "template_key": template.template_key,
+                "language": template.language,
+                "subject": template.subject,
+                "is_active": template.is_active,
+                "updated_at": template.updated_at.isoformat()
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating email template: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update email template"
+        )
+    finally:
+        session.close()
+
+
+@router.delete("/email-templates/{template_id}")
+async def delete_email_template(
+    template_id: str,
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Delete an email template
+
+    Admin only endpoint to remove email templates.
+    """
+    session = db_manager.session_local()
+    try:
+        template = session.execute(
+            select(EmailTemplate).where(EmailTemplate.id == template_id)
+        ).scalar_one_or_none()
+
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email template not found"
+            )
+
+        template_info = f"{template.template_key} ({template.language})"
+
+        session.delete(template)
+        session.commit()
+
+        logger.info(f"Admin {current_user.email} deleted email template: {template_info}")
+
+        return {
+            "message": "Email template deleted successfully",
+            "deleted_template": template_info
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error deleting email template: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete email template"
+        )
+    finally:
+        session.close()

@@ -1599,9 +1599,112 @@ category_classification_metrics (metrics_id, category_id, date,
 ```sql
 system_settings (setting_id, setting_key, setting_value)
 localization_strings (string_id, string_key, language_code, string_value)
-audit_logs (log_id, user_id, event_type, resource_type, resource_id, 
+audit_logs (log_id, user_id, event_type, resource_type, resource_id,
             status, ip_address, error_message, created_at)
 ```
+
+**Email:**
+```sql
+email_templates (id, template_key, language, subject, html_content,
+                variables, description, is_active, created_at, updated_at)
+UNIQUE(template_key, language)  -- One template per key per language
+```
+
+### 9.4.1 Email Service Configuration
+
+**Provider:** Brevo (Sendinblue) - Transactional email API
+**Free Tier:** 300 emails/day
+**Domains:** info@bonidoc.com, no-reply@bonidoc.com
+**Email Routing:** Cloudflare Email Routing (free forwarding)
+
+**Environment Variables:**
+```bash
+# System environment variable (NOT in .env - same key for dev/staging/prod)
+BREVO_API_KEY=xkeysib-xxxxx...  # Set via: setx BREVO_API_KEY "key" (Windows)
+                                 # Or export BREVO_API_KEY="key" (Linux)
+
+# Email addresses (.env file - not sensitive)
+EMAIL_FROM_INFO=info@bonidoc.com
+EMAIL_FROM_NOREPLY=no-reply@bonidoc.com
+EMAIL_FROM_NAME=BoniDoc
+```
+
+**Why separate API key storage:**
+- Same Brevo account/key across all environments
+- Never committed to Git (security risk)
+- Rotatable without code deployment
+- Industry best practice
+
+**Email Template Structure:**
+- **template_key**: Identifier (e.g., `welcome_email`, `password_reset`)
+- **language**: ISO 639-1 code (`en`, `de`, etc.)
+- **subject**: Email subject line
+- **html_content**: HTML body with `{{variable}}` placeholders
+- **variables**: JSON array of variable names
+- **is_active**: Enable/disable template
+
+**Default Templates** (auto-created on migration):
+1. `welcome_email` - New user account creation
+2. `password_reset` - Password reset with secure link
+3. `verification_code` - 2FA verification codes
+
+**Sending Emails:**
+```python
+from app.services.email_service import email_service
+
+# Basic email
+await email_service.send_email(
+    to_email="user@example.com",
+    to_name="John Doe",
+    subject="Welcome!",
+    html_content="<p>Hello!</p>"
+)
+
+# Template with variables
+await email_service.send_welcome_email(
+    to_email="user@example.com",
+    user_name="John Doe",
+    login_url="https://bonidoc.com/login"
+)
+```
+
+**Admin API Endpoints** (admin auth required):
+```bash
+GET    /api/v1/admin/email-templates          # List all templates
+POST   /api/v1/admin/email-templates          # Create new template
+PUT    /api/v1/admin/email-templates/{id}     # Update template
+DELETE /api/v1/admin/email-templates/{id}     # Delete template
+```
+
+**Multilingual Support:**
+- Store one template per language per key
+- Select based on user's `preferred_doc_languages[0]`
+- Fallback to English (`en`) if language unavailable
+
+**Cloudflare Email Routing Setup:**
+1. Add MX records for bonidoc.com
+2. Create routing rules:
+   - `info@bonidoc.com` → your.email@gmail.com
+   - `no-reply@bonidoc.com` → (catch-all or specific inbox)
+3. Brevo sends FROM these addresses, replies forward to your inbox
+
+**Deployment:**
+```bash
+# Development
+setx BREVO_API_KEY "your-key-here"  # Windows
+export BREVO_API_KEY="your-key"     # Linux
+
+# Run migration
+alembic upgrade head
+
+# Production (Railway/Vercel/etc.)
+# Set BREVO_API_KEY via platform environment variables UI
+```
+
+**Monitoring:**
+- Brevo dashboard: delivery rates, bounce rates, API usage
+- Application logs: email send success/failure
+- Free tier limit: 300 emails/day
 
 ### 9.5 Docker Compose Configuration
 

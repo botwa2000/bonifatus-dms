@@ -548,6 +548,21 @@ async def drive_oauth_callback(
 
             logger.info(f"[DRIVE CALLBACK DEBUG] ✅ Returning success response to frontend")
 
+            # Send Drive connected notification email
+            try:
+                from app.services.email_service import email_service
+                dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
+                await email_service.send_drive_connected_notification(
+                    to_email=user.email,
+                    user_name=user.full_name,
+                    dashboard_url=dashboard_url,
+                    user_can_receive_marketing=user.email_marketing_enabled
+                )
+                logger.info(f"Drive connection email sent to user: {user.email}")
+            except Exception as email_error:
+                # Don't fail Drive connection if email fails
+                logger.error(f"Failed to send Drive connection email to {user.email}: {email_error}")
+
             return {
                 "success": True,
                 "message": "Google Drive connected successfully",

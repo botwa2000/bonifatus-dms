@@ -89,6 +89,23 @@ class ScannerSettings(BaseSettings):
         env_file = ".env"
 
 
+class EmailSettings(BaseSettings):
+    """Email service configuration from environment variables"""
+
+    brevo_api_key: Optional[str] = Field(
+        None,
+        description="Brevo API key (set via system environment variable, NOT in .env file)"
+    )
+    email_from_info: str = Field(default="info@bonidoc.com", description="Info email address")
+    email_from_noreply: str = Field(default="no-reply@bonidoc.com", description="No-reply email address")
+    email_from_name: str = Field(default="BoniDoc", description="Sender name for emails")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
 
@@ -117,6 +134,7 @@ class Settings(BaseSettings):
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     translation: TranslationSettings = Field(default_factory=TranslationSettings)
     scanner: ScannerSettings = Field(default_factory=ScannerSettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

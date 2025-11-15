@@ -444,6 +444,21 @@ class AuthService:
                     if is_new_user:
                         self._copy_template_categories_to_user(user.id, db)
 
+                        # Send welcome email to new user
+                        try:
+                            from app.services.email_service import email_service
+                            login_url = f"{settings.app.app_frontend_url}/login"
+                            await email_service.send_user_created_notification(
+                                to_email=user.email,
+                                user_name=user.full_name,
+                                login_url=login_url,
+                                user_can_receive_marketing=user.email_marketing_enabled
+                            )
+                            logger.info(f"Welcome email sent to new user: {user.email}")
+                        except Exception as email_error:
+                            # Don't fail user creation if email fails
+                            logger.error(f"Failed to send welcome email to {user.email}: {email_error}")
+
                     # Create session with refresh token
                     session_info = await session_service.create_session(
                         user_id=str(user.id),
