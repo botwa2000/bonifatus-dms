@@ -161,13 +161,13 @@ export default function ProfilePage() {
   const loadSubscriptionData = async () => {
     try {
       setLoadingSubscription(true)
-      const [subData, tiersData] = await Promise.all([
+      const [subData, tiersResponse] = await Promise.all([
         apiClient.get<Subscription>('/api/v1/billing/subscription', true).catch(() => null),
-        apiClient.get<TierPlan[]>('/api/v1/settings/tiers/public', true)
+        apiClient.get<{ tiers: TierPlan[] }>('/api/v1/settings/tiers/public', true)
       ])
 
       setSubscription(subData)
-      setAvailableTiers(tiersData || [])
+      setAvailableTiers(tiersResponse?.tiers || [])
       if (subData) {
         setBillingCycle(subData.billing_cycle as 'monthly' | 'yearly')
       }
