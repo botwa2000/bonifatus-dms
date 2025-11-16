@@ -16,7 +16,7 @@ from app.schemas.settings_schemas import (
     LocalizationResponse,
     ErrorResponse
 )
-from app.database.models import SystemSetting, LocalizationString, UserSetting, User
+from app.database.models import SystemSetting, LocalizationString, UserSetting, User, Currency
 from app.database.connection import db_manager
 from app.api.auth import get_current_active_user
 
@@ -416,6 +416,52 @@ async def get_public_tier_plans():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve tier plans"
+        )
+    finally:
+        session.close()
+
+@router.get(
+    "/currencies/available",
+    summary="Get Available Currencies",
+    description="Get currencies with exchange rates set (public endpoint for currency selector)"
+)
+async def get_available_currencies():
+    """
+    Get currencies available for selection
+
+    Returns only currencies that have exchange_rate set.
+    This prevents users from selecting unconfigured currencies.
+
+    Used by currency selector in the frontend header.
+    """
+    session = db_manager.get_session()
+
+    try:
+        # Only return currencies with exchange rates configured
+        currencies = session.query(Currency).filter(
+            Currency.is_active == True,
+            Currency.exchange_rate.isnot(None)
+        ).order_by(Currency.sort_order).all()
+
+        return {
+            "currencies": [
+                {
+                    "code": c.code,
+                    "symbol": c.symbol,
+                    "name": c.name,
+                    "decimal_places": c.decimal_places,
+                    "exchange_rate": float(c.exchange_rate),
+                    "is_default": c.is_default
+                }
+                for c in currencies
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching available currencies: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch available currencies"
         )
     finally:
         session.close()

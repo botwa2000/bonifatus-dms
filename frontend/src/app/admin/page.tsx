@@ -64,6 +64,17 @@ interface ClamAVHealth {
   error?: string
 }
 
+interface Currency {
+  code: string
+  symbol: string
+  name: string
+  decimal_places: number
+  exchange_rate: number | null
+  is_active: boolean
+  is_default: boolean
+  sort_order: number
+}
+
 export default function AdminDashboard() {
   const { user, isLoading, loadUser } = useAuth()
   const router = useRouter()
@@ -71,10 +82,12 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [tiers, setTiers] = useState<TierPlan[]>([])
+  const [currencies, setCurrencies] = useState<Currency[]>([])
   const [clamavHealth, setClamavHealth] = useState<ClamAVHealth | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'health' | 'email-templates'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates'>('overview')
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
+  const [editingCurrency, setEditingCurrency] = useState<{code: string, rate: string} | null>(null)
   const [restartingClamav, setRestartingClamav] = useState(false)
 
   // User search and sorting
@@ -129,6 +142,10 @@ export default function AdminDashboard() {
       const tiersData = await apiClient.get<{ tiers: TierPlan[] }>('/api/v1/admin/tiers')
       setTiers(tiersData.tiers)
 
+      // Load currencies
+      const currenciesData = await apiClient.get<{ currencies: Currency[] }>('/api/v1/admin/currencies')
+      setCurrencies(currenciesData.currencies)
+
       // Load ClamAV health
       const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
@@ -178,6 +195,20 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to update tier:', error)
       alert('Failed to update tier configuration')
+    }
+  }
+
+  const updateCurrency = async (currencyCode: string, exchangeRate: number | null) => {
+    try {
+      await apiClient.patch(`/api/v1/admin/currencies/${currencyCode}`, {
+        exchange_rate: exchangeRate
+      })
+      await loadData()
+      setEditingCurrency(null)
+      alert(`Currency ${currencyCode} updated successfully!`)
+    } catch (error) {
+      console.error('Failed to update currency:', error)
+      alert('Failed to update currency exchange rate')
     }
   }
 
@@ -294,6 +325,16 @@ export default function AdminDashboard() {
             }`}
           >
             Tier Configuration
+          </button>
+          <button
+            onClick={() => setActiveTab('currencies')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'currencies'
+                ? 'text-admin-primary border-b-2 border-admin-primary'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+            }`}
+          >
+            Currencies
           </button>
           <button
             onClick={() => setActiveTab('health')}
@@ -676,6 +717,156 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Currencies Tab */}
+        {activeTab === 'currencies' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader
+                title="Currency Exchange Rates"
+                description="Set exchange rates for multi-currency pricing. Only currencies with rates will be shown to users."
+              />
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="text-sm text-blue-900 dark:text-blue-100">
+                        <strong>Exchange Rate Formula:</strong> EUR is the base currency (1.00)
+                        <br />
+                        <strong>Rate = units of currency per 1 EUR</strong>
+                        <br />
+                        Example: USD rate of 1.10 means 1 EUR = 1.10 USD
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-700">
+                      <thead className="bg-neutral-50 dark:bg-neutral-800">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Currency
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Code
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Symbol
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Exchange Rate (per 1 EUR)
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-neutral-900 divide-y divide-neutral-200 dark:divide-neutral-700">
+                        {currencies.map((currency) => (
+                          <tr key={currency.code}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900 dark:text-white">
+                              {currency.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600 dark:text-neutral-300">
+                              {currency.code}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600 dark:text-neutral-300">
+                              {currency.symbol}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {editingCurrency?.code === currency.code ? (
+                                <input
+                                  type="number"
+                                  step="0.000001"
+                                  value={editingCurrency.rate}
+                                  onChange={(e) => setEditingCurrency({...editingCurrency, rate: e.target.value})}
+                                  className="w-32 px-2 py-1 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
+                                  placeholder="e.g., 1.10"
+                                />
+                              ) : (
+                                <span className="text-sm text-neutral-900 dark:text-white">
+                                  {currency.exchange_rate ? currency.exchange_rate.toFixed(6) : (
+                                    <span className="text-neutral-400">Not set</span>
+                                  )}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {currency.exchange_rate ? (
+                                <Badge variant="success">Available</Badge>
+                              ) : (
+                                <Badge variant="default">Hidden</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {editingCurrency?.code === currency.code ? (
+                                <div className="flex space-x-2">
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      const rate = parseFloat(editingCurrency.rate)
+                                      if (!isNaN(rate) && rate > 0) {
+                                        updateCurrency(currency.code, rate)
+                                      } else {
+                                        alert('Please enter a valid exchange rate')
+                                      }
+                                    }}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setEditingCurrency(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex space-x-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setEditingCurrency({
+                                      code: currency.code,
+                                      rate: currency.exchange_rate?.toString() || ''
+                                    })}
+                                  >
+                                    Edit
+                                  </Button>
+                                  {currency.exchange_rate && (
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (confirm(`Hide ${currency.code} from users? This will set its exchange rate to null.`)) {
+                                          updateCurrency(currency.code, null)
+                                        }
+                                      }}
+                                    >
+                                      Hide
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, UserStorageQuota, Document, AuditLog, EmailTemplate
+from app.database.models import User, TierPlan, UserStorageQuota, Document, AuditLog, EmailTemplate, Currency
 from app.database.connection import db_manager
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -46,6 +46,18 @@ class TierPlanUpdate(BaseModel):
 class UserTierUpdate(BaseModel):
     """Update user tier"""
     tier_id: int = Field(..., description="New tier ID (0=Free, 1=Starter, 2=Pro, 100=Admin)")
+
+
+class CurrencyUpdate(BaseModel):
+    """
+    Update currency exchange rate
+
+    Exchange rate interpretation:
+    - EUR is the BASE currency (exchange_rate = 1.00)
+    - exchange_rate = units of THIS currency per 1 EUR (EUR/XXX rate)
+    - Example: USD with exchange_rate = 1.10 means 1 EUR = 1.10 USD
+    """
+    exchange_rate: Optional[float] = Field(None, ge=0, description="Exchange rate (units of currency per 1 EUR)")
 
 
 class SystemStats(BaseModel):
@@ -775,6 +787,123 @@ async def delete_email_template(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete email template"
+        )
+    finally:
+        session.close()
+
+# ============================================================
+# Currency Management (Admin Only)
+# ============================================================
+
+@router.get(
+    "/currencies",
+    summary="Get All Currencies",
+    description="Get all currencies with their exchange rates (admin only)"
+)
+async def get_currencies(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all currencies for admin management
+
+    Returns all currencies including those without exchange rates set.
+    This allows admin to see which currencies need configuration.
+    """
+    session = db_manager.get_session()
+
+    try:
+        currencies = session.query(Currency).order_by(Currency.sort_order).all()
+
+        return {
+            "currencies": [
+                {
+                    "code": c.code,
+                    "symbol": c.symbol,
+                    "name": c.name,
+                    "decimal_places": c.decimal_places,
+                    "exchange_rate": float(c.exchange_rate) if c.exchange_rate else None,
+                    "is_active": c.is_active,
+                    "is_default": c.is_default,
+                    "sort_order": c.sort_order
+                }
+                for c in currencies
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching currencies: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch currencies"
+        )
+    finally:
+        session.close()
+
+
+@router.patch(
+    "/currencies/{currency_code}",
+    summary="Update Currency Exchange Rate",
+    description="Update the exchange rate for a specific currency (admin only)"
+)
+async def update_currency_exchange_rate(
+    currency_code: str,
+    currency_update: CurrencyUpdate,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Update currency exchange rate
+
+    Exchange rate interpretation:
+    - EUR is the BASE currency (exchange_rate = 1.00)
+    - exchange_rate = units of THIS currency per 1 EUR (EUR/XXX rate)
+    - Example: Setting USD exchange_rate to 1.10 means 1 EUR = 1.10 USD
+    - Formula: price_in_currency = price_in_eur × exchange_rate
+
+    Only currencies WITH exchange rates will be shown to users for selection.
+    Set exchange_rate to null to hide a currency from users.
+    """
+    session = db_manager.get_session()
+
+    try:
+        # Find currency by code
+        currency = session.query(Currency).filter(
+            Currency.code == currency_code.upper()
+        ).first()
+
+        if not currency:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Currency '{currency_code}' not found"
+            )
+
+        # Update exchange rate
+        if currency_update.exchange_rate is not None:
+            currency.exchange_rate = currency_update.exchange_rate
+            logger.info(
+                f"Admin {current_admin.email} updated {currency_code} exchange rate to {currency_update.exchange_rate}"
+            )
+        
+        session.commit()
+
+        return {
+            "message": f"Currency '{currency_code}' updated successfully",
+            "currency": {
+                "code": currency.code,
+                "symbol": currency.symbol,
+                "name": currency.name,
+                "exchange_rate": float(currency.exchange_rate) if currency.exchange_rate else None,
+                "is_active": currency.is_active
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating currency {currency_code}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update currency"
         )
     finally:
         session.close()

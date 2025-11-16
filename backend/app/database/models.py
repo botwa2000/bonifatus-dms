@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, ForeignKey, Table, UUID as SQLUUID, Index
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, Numeric, ForeignKey, Table, UUID as SQLUUID, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Mapped
@@ -802,7 +802,15 @@ class EmailTemplate(Base, TimestampMixin):
 # ============================================================
 
 class Currency(Base, TimestampMixin):
-    """Currency configuration for payments (admin-configurable)"""
+    """
+    Currency configuration for payments (admin-configurable)
+
+    Exchange Rate Interpretation (IMPORTANT):
+    - EUR is the BASE currency (exchange_rate = 1.00)
+    - exchange_rate = units of THIS currency per 1 EUR (EUR/XXX rate)
+    - Example: USD with exchange_rate = 1.10 means 1 EUR = 1.10 USD
+    - Formula: price_in_currency = price_in_eur × exchange_rate
+    """
     __tablename__ = "currencies"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -810,6 +818,7 @@ class Currency(Base, TimestampMixin):
     symbol = Column(String(10), nullable=False)  # $, €, £, etc
     name = Column(String(100), nullable=False)  # US Dollar, Euro, etc
     decimal_places = Column(Integer, nullable=False, server_default='2')
+    exchange_rate = Column(Numeric(10, 6), nullable=True)  # Rate: units of this currency per 1 EUR
     is_active = Column(Boolean, nullable=False, server_default='true')
     is_default = Column(Boolean, nullable=False, server_default='false')
     sort_order = Column(Integer, nullable=False, server_default='0')
