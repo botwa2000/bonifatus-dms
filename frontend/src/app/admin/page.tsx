@@ -233,9 +233,10 @@ export default function AdminDashboard() {
       await apiClient.post('/api/v1/admin/currencies', currencyData)
       await loadData()
       alert(`Currency ${currencyData.code} created successfully!`)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to create currency:', error)
-      alert(error?.response?.data?.detail || 'Failed to create currency')
+      const errorMessage = (error as {response?: {data?: {detail?: string}}})?.response?.data?.detail || 'Failed to create currency'
+      alert(errorMessage)
     }
   }
 
@@ -248,9 +249,10 @@ export default function AdminDashboard() {
       await apiClient.delete(`/api/v1/admin/currencies/${currencyCode}`)
       await loadData()
       alert(`Currency ${currencyCode} deleted successfully!`)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to delete currency:', error)
-      alert(error?.response?.data?.detail || 'Failed to delete currency')
+      const errorMessage = (error as {response?: {data?: {detail?: string}}})?.response?.data?.detail || 'Failed to delete currency'
+      alert(errorMessage)
     }
   }
 
