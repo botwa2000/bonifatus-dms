@@ -44,6 +44,7 @@ interface TierPlan {
   name: string
   display_name: string
   price_monthly_cents: number
+  price_yearly_cents: number
   storage_quota_bytes: number
   max_file_size_bytes: number
   max_documents: number | null
@@ -506,6 +507,18 @@ export default function AdminDashboard() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Annual Price (€)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            defaultValue={tier.price_yearly_cents / 100}
+                            onChange={(e) => setEditingTier({ ...editingTier, price_yearly_cents: Math.round(parseFloat(e.target.value) * 100) })}
+                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                             Storage Quota
                           </label>
                           <div className="flex gap-2">
@@ -616,9 +629,15 @@ export default function AdminDashboard() {
                     /* View Mode */
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Price</div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Monthly Price</div>
                         <div className="text-sm font-medium text-neutral-900 dark:text-white">
                           {formatPrice(tier.price_monthly_cents)}/month
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Annual Price</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {formatPrice(tier.price_yearly_cents)}/year
                         </div>
                       </div>
                       <div>

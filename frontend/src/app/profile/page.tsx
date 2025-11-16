@@ -138,10 +138,18 @@ export default function ProfilePage() {
 
       setMessage({ type: 'success', text: 'Account deactivated. Signing out...' })
 
+      // Account is deleted, so clear local auth and redirect without calling backend logout
       setTimeout(() => {
-        logout().then(() => {
-          router.push('/')
-        })
+        // Clear local storage and auth state
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('theme')
+          localStorage.clear()
+          document.documentElement.classList.remove('dark')
+          document.documentElement.classList.add('light')
+        }
+
+        // Redirect to homepage
+        window.location.href = '/'
       }, 2000)
     } catch (error) {
       console.error('Failed to delete account:', error)
