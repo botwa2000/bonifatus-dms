@@ -64,7 +64,9 @@ async def stripe_webhook(
 
         logger.info(f"Received Stripe webhook: {event.type} - {event.id}")
 
-        if event.type == 'customer.subscription.created':
+        if event.type == 'checkout.session.completed':
+            await handle_checkout_session_completed(event, session)
+        elif event.type == 'customer.subscription.created':
             await handle_subscription_created(event, session)
         elif event.type == 'customer.subscription.updated':
             await handle_subscription_updated(event, session)
@@ -99,6 +101,42 @@ async def stripe_webhook(
         )
 
 
+async def handle_checkout_session_completed(event, session: Session):
+    """Process checkout.session.completed event"""
+    checkout_session = event.data.object
+
+    # Extract metadata
+    user_id = checkout_session.metadata.get('user_id')
+    tier_id = checkout_session.metadata.get('tier_id')
+    billing_cycle = checkout_session.metadata.get('billing_cycle')
+
+    if not user_id or not tier_id:
+        logger.warning(f"Missing metadata in checkout session {checkout_session.id}")
+        return
+
+    # Get user
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        logger.warning(f"User {user_id} not found for checkout session {checkout_session.id}")
+        return
+
+    # Update user's Stripe customer ID if not already set
+    if not user.stripe_customer_id and checkout_session.customer:
+        user.stripe_customer_id = checkout_session.customer
+
+    # Get tier
+    tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
+    if not tier:
+        logger.warning(f"Tier {tier_id} not found for checkout session {checkout_session.id}")
+        return
+
+    # Subscription will be created via the subscription.created webhook
+    # Just log the successful checkout here
+    logger.info(f"Checkout session completed for user {user.email}, tier {tier.name}")
+
+    session.commit()
+
+
 async def handle_subscription_created(event, session: Session):
     """Process subscription.created event"""
     stripe_sub = event.data.object
@@ -111,7 +149,62 @@ async def handle_subscription_created(event, session: Session):
         logger.warning(f"User not found for customer {stripe_sub.customer}")
         return
 
-    logger.info(f"Subscription created webhook for user {user.email}")
+    # Get tier from subscription metadata or price metadata
+    tier_id = None
+    if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
+        tier_id = stripe_sub.metadata['tier_id']
+    elif stripe_sub.items and stripe_sub.items.data:
+        price_metadata = stripe_sub.items.data[0].price.metadata
+        if price_metadata and 'tier_id' in price_metadata:
+            tier_id = price_metadata['tier_id']
+
+    if not tier_id:
+        logger.warning(f"No tier_id found in subscription {stripe_sub.id}")
+        return
+
+    tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
+    if not tier:
+        logger.warning(f"Tier {tier_id} not found")
+        return
+
+    # Check if subscription already exists
+    existing_sub = session.query(Subscription).filter(
+        Subscription.stripe_subscription_id == stripe_sub.id
+    ).first()
+
+    if existing_sub:
+        logger.info(f"Subscription {stripe_sub.id} already exists")
+        return
+
+    # Create subscription in database
+    billing_cycle = stripe_sub.metadata.get('billing_cycle', 'monthly') if stripe_sub.metadata else 'monthly'
+
+    db_subscription = Subscription(
+        user_id=user.id,
+        tier_id=tier.id,
+        stripe_subscription_id=stripe_sub.id,
+        stripe_price_id=stripe_sub.items.data[0].price.id if stripe_sub.items.data else None,
+        billing_cycle=billing_cycle,
+        status=stripe_sub.status,
+        current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc),
+        current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc),
+        trial_start=datetime.fromtimestamp(stripe_sub.trial_start, tz=timezone.utc) if stripe_sub.trial_start else None,
+        trial_end=datetime.fromtimestamp(stripe_sub.trial_end, tz=timezone.utc) if stripe_sub.trial_end else None,
+        cancel_at_period_end=stripe_sub.cancel_at_period_end
+    )
+
+    session.add(db_subscription)
+
+    # Update user's tier
+    user.tier_id = tier.id
+    user.subscription_status = stripe_sub.status
+    user.billing_cycle = billing_cycle
+    user.subscription_started_at = datetime.now(timezone.utc)
+    user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+
+    session.commit()
+
+    logger.info(f"Created subscription {db_subscription.id} for user {user.email}, tier {tier.name}")
 
 
 async def handle_subscription_updated(event, session: Session):

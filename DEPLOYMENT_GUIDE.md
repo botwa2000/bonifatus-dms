@@ -29,8 +29,9 @@
 8. [Implementation Standards](#8-implementation-standards)
 9. [Deployment & Operations](#9-deployment--operations)
 10. [Configuration Reference](#10-configuration-reference)
-11. [Feature History](#11-feature-history)
-12. [Project Instructions](#12-project-instructions)
+11. [Payment Integration](#11-payment-integration)
+12. [Feature History](#12-feature-history)
+13. [Project Instructions](#13-project-instructions)
 
 ---
 
@@ -2061,7 +2062,341 @@ server {
 
 ---
 
-## Appendix A: Quick Command Reference
+## 11. Payment Integration
+
+### 11.1 Overview
+
+BoniDoc's payment system supports Stripe and PayPal for subscription billing with flexible tier management, promotional discounts, automated invoicing, and comprehensive email communications.
+
+**Key Capabilities:**
+- Multi-tier subscription plans (Free, Basic, Pro, Enterprise)
+- Monthly and annual billing cycles with automatic savings
+- Flexible discount system (%, fixed amount, free months, referrals)
+- Multiple payment methods (cards, PayPal, SEPA, regional options)
+- Automated invoice generation with EU VAT compliance
+- Comprehensive dunning process for failed payments
+- Seamless upgrades, downgrades, and cancellations
+
+### 11.2 Stripe Infrastructure
+
+**Account Setup:**
+- Separate development (`sk_test_...`) and production (`sk_live_...`) accounts
+- Webhook endpoints for event-driven processing
+- Price IDs for each tier and billing cycle combination
+- Customer portal for self-service subscription management
+
+**Environment Variables:**
+```bash
+STRIPE_SECRET_KEY=sk_test_... (dev) / sk_live_... (prod)
+STRIPE_PUBLISHABLE_KEY=pk_test_... / pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_FREE=price_...
+STRIPE_PRICE_ID_BASIC_MONTHLY=price_...
+STRIPE_PRICE_ID_BASIC_ANNUAL=price_...
+STRIPE_PRICE_ID_PRO_MONTHLY=price_...
+STRIPE_PRICE_ID_PRO_ANNUAL=price_...
+```
+
+### 11.3 Database Schema
+
+**Core Payment Tables:**
+
+**payments** - Transaction history
+- User linkage, Stripe payment intent/invoice IDs
+- Amount, currency, status, payment method details
+- Card brand and last 4 digits for display
+
+**subscriptions** - Active subscription tracking
+- User and tier linkage, Stripe subscription ID
+- Billing cycle, status, period dates
+- Cancellation flags, trial tracking
+
+**discount_codes** - Promotional system
+- Code and Stripe coupon ID linkage
+- Type (percentage, fixed, free months)
+- Duration, redemption limits, validity periods
+- Tier applicability filters
+
+**user_discount_redemptions** - Usage tracking
+- Prevents duplicate redemptions
+- Links users to applied discounts
+
+**referrals** - Referral reward system
+- Referrer/referee relationships
+- Reward types and application status
+- Conversion tracking
+
+**invoices** - Billing documentation
+- Stripe invoice synchronization
+- PDF storage, payment status
+- Tax amounts, invoice numbering
+
+### 11.4 Tier Management
+
+**Subscription Operations:**
+
+**Create Subscription:**
+- Customer creation or retrieval in Stripe
+- Discount code validation and application
+- Payment method attachment
+- Subscription creation with trial period (if applicable)
+- Tier activation and welcome email
+
+**Upgrade:**
+- Immediate tier change with prorated billing
+- Instant feature access
+- Prorated invoice generation
+- Upgrade confirmation email
+
+**Downgrade:**
+- Scheduled change at current period end
+- No immediate refund (credit applied)
+- Continued access until transition
+- Downgrade notification email
+
+**Cancel:**
+- Access continues until period end
+- Optional cancellation survey
+- Cancellation confirmation email
+- 30-day data retention period
+
+**Reactivate:**
+- Remove cancel flag if within period
+- Resume normal billing
+- Reactivation confirmation email
+
+### 11.5 Discount System
+
+**Discount Types:**
+
+1. **Percentage Discounts** - X% off for specified duration
+   - Once: Single invoice discount
+   - Repeating: X months discounted
+   - Forever: Permanent discount
+
+2. **Fixed Amount** - €X off in cents
+   - Applied to invoice total
+   - Duration configurable
+
+3. **Free Months** - 100% off for X months
+   - Trial extensions
+   - Promotional campaigns
+
+4. **Annual Savings** - Built-in discount
+   - 15-20% savings vs monthly
+   - Billed annually upfront
+
+5. **Referral Rewards** - Dual rewards
+   - Referrer: €10 credit or 1 month free
+   - Referred: 20% off first 3 months
+
+**Admin Management:**
+- Code creation with all discount types
+- Redemption limit enforcement
+- Validity period controls
+- Tier applicability filters
+- Real-time redemption tracking
+- Performance analytics
+
+### 11.6 Payment Methods
+
+**Supported Options:**
+- **Credit/Debit Cards** - Via Stripe Elements (PCI compliant)
+- **PayPal** - Integrated subscription billing
+- **SEPA Direct Debit** - EU bank transfers
+- **Regional** - iDEAL (NL), Giropay (DE), Bancontact (BE)
+
+**Security & Compliance:**
+- PCI DSS via Stripe tokenization
+- No card data storage (tokens only)
+- Strong Customer Authentication (SCA) for EU
+- HTTPS-only payment processing
+- Stored data: customer ID, last 4 digits, brand, expiry
+
+### 11.7 Webhooks & Events
+
+**Critical Stripe Events:**
+
+| Event | Action |
+|-------|--------|
+| `customer.subscription.created` | Activate tier, send welcome email |
+| `customer.subscription.updated` | Handle tier changes, update status |
+| `customer.subscription.deleted` | Downgrade to free, send confirmation |
+| `invoice.paid` | Store invoice, send receipt |
+| `invoice.payment_failed` | Initiate dunning, send failure notice |
+| `customer.subscription.trial_will_end` | Send 3-day reminder |
+| `charge.refunded` | Process refund, update status |
+
+**Processing Requirements:**
+- Webhook signature verification
+- Idempotent handling (duplicate prevention)
+- Asynchronous processing with retry
+- Database transaction consistency
+- Email notification triggering
+
+### 11.8 Invoicing
+
+**Auto-Generation:**
+- Sequential invoice numbering
+- Company letterhead with tax ID
+- Itemized line items
+- EU VAT calculation by country
+- PDF generation and Stripe upload
+- Automatic email delivery
+
+**Tax Handling:**
+- **B2C**: Apply customer's country VAT (19% DE, 20% AT, etc.)
+- **B2B with VAT ID**: Reverse charge (0% VAT)
+- VAT ID validation via EU VIES API
+- 10-year tax record retention
+
+**Features:**
+- Downloadable PDFs from billing dashboard
+- Email attachments for payment events
+- Historical archive
+- Payment status tracking
+
+### 11.9 Email Communications
+
+**Subscription Lifecycle Emails:**
+
+1. **Subscription Confirmation** - Welcome, features, invoice attached
+2. **Payment Successful** - Receipt, next billing date
+3. **Payment Failed** - Reason, update link, retry schedule
+4. **Subscription Upgraded** - New features, prorated charge
+5. **Subscription Downgraded** - Effective date, access end
+6. **Subscription Canceled** - Access end, data retention, feedback
+7. **Trial Ending** - 3-day reminder, payment prompt
+8. **Invoice Ready** - Monthly notification, PDF link
+
+**Brevo Integration:**
+- Transactional email API
+- HTML templates with branding
+- PDF invoice attachments
+- Personalization (user, tier, amounts, dates)
+- Delivery tracking
+
+### 11.10 Billing Dashboard
+
+**User Interface:**
+
+**Current Plan Section:**
+- Tier name, status badge, price display
+- Billing cycle (monthly/annual)
+- Next billing date
+- Cancellation warnings
+- Change Plan / Cancel buttons
+
+**Payment Method:**
+- Card brand icon, last 4 digits, expiry
+- Update payment method flow
+- Multiple method support
+
+**Billing History:**
+- Invoice table (date, description, amount, status)
+- PDF download links
+- Status badges
+- Transaction archive
+
+**Usage Monitoring:**
+- Document count vs limit
+- Storage usage vs quota
+- Visual progress bars
+- Upgrade prompts
+
+### 11.11 Business Logic
+
+**Proration:**
+- **Upgrade**: Immediate prorated charge for remaining period
+- **Downgrade**: Credit to next invoice, no refund
+- Daily rate calculation based on cycle
+
+**Failed Payment Handling (Dunning):**
+- Retry schedule: Day 3, Day 8, Day 15
+- Email at each retry
+- Status: `past_due` after first failure
+- Downgrade to free after 3 failures
+- 30-day data retention
+
+**Refund Policy:**
+- Full refund within 14 days
+- Prorated refund for annual (if applicable)
+- No refund after 30 days
+- Manual admin approval
+- Automatic confirmation emails
+
+**Trial Periods:**
+- Free trial duration per tier
+- End reminders (7, 3, 1 day)
+- Auto-conversion or downgrade
+- Payment required before end
+- Extension via discount codes
+
+### 11.12 Analytics
+
+**Admin Metrics:**
+- Monthly Recurring Revenue (MRR)
+- Annual Recurring Revenue (ARR)
+- Churn rate (monthly/annual)
+- Customer Lifetime Value (LTV)
+- Average Revenue Per User (ARPU)
+- Discount performance
+- Trial-to-paid conversion
+- Payment failure rate
+- Refund rate
+- Revenue by tier
+
+**Export Capabilities:**
+- CSV for accounting
+- Invoice batch downloads
+- Payment history
+- Discount redemption reports
+
+### 11.13 Compliance
+
+**PCI DSS:**
+- No card data storage
+- Client-side input via Stripe.js
+- Tokenization only
+- HTTPS enforcement
+
+**GDPR:**
+- Payment data in user exports
+- Invoice deletion on account deletion
+- 30-day grace period
+- Clear cancellation process
+
+**Tax Compliance:**
+- VAT invoice requirements
+- VAT ID validation (VIES API)
+- Country-specific rates
+- 10-year archival
+
+### 11.14 Implementation Phases
+
+**Phase 1 - Foundation (Weeks 1-2):**
+Database schema, Stripe setup, webhooks, basic flow
+
+**Phase 2 - Core Features (Weeks 3-4):**
+Pricing page, checkout, subscription management
+
+**Phase 3 - Discounts & Invoicing (Weeks 5-6):**
+Discount system, referrals, invoice generation, tax
+
+**Phase 4 - Email & UX (Weeks 7-8):**
+Email templates, billing dashboard, payment methods
+
+**Phase 5 - Edge Cases (Weeks 9-10):**
+Dunning, proration, refunds, trials, testing
+
+**Phase 6 - Analytics (Weeks 11-12):**
+Reporting, optimization, monitoring, security audit
+
+**Total Estimated Timeline:** 12 weeks
+
+---
+
+## 12. Feature History
 
 ```bash
 # Deployment

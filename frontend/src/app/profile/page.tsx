@@ -29,6 +29,28 @@ interface UserStatistics {
   last_activity?: string
 }
 
+interface Subscription {
+  id: string
+  tier_id: number
+  tier_name: string
+  billing_cycle: string
+  status: string
+  current_period_end: string
+  cancel_at_period_end: boolean
+  amount: number
+  currency: string
+}
+
+interface TierPlan {
+  id: number
+  name: string
+  display_name: string
+  price_monthly_cents: number
+  price_yearly_cents: number
+  currency: string
+  description: string
+}
+
 export default function ProfilePage() {
   const { user, isAuthenticated, isLoading, loadUser, logout } = useAuth()
   const router = useRouter()
@@ -42,6 +64,12 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [availableTiers, setAvailableTiers] = useState<TierPlan[]>([])
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
+  const [processingSubscription, setProcessingSubscription] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   // Load user data on mount
   useEffect(() => {
@@ -57,6 +85,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadProfileData()
+      loadSubscriptionData()
     }
   }, [isAuthenticated])
 
@@ -98,15 +127,15 @@ export default function ProfilePage() {
   const handleDeleteAccount = async () => {
     setDeleting(true)
     setMessage(null)
-    
+
     try {
       await apiClient.post('/api/v1/users/deactivate', {
         reason: deleteReason,
         feedback: deleteFeedback
       }, true)
-      
+
       setMessage({ type: 'success', text: 'Account deactivated. Signing out...' })
-      
+
       setTimeout(() => {
         logout().then(() => {
           router.push('/')
@@ -116,6 +145,82 @@ export default function ProfilePage() {
       console.error('Failed to delete account:', error)
       setMessage({ type: 'error', text: 'Failed to deactivate account' })
       setDeleting(false)
+    }
+  }
+
+  const loadSubscriptionData = async () => {
+    try {
+      setLoadingSubscription(true)
+      const [subData, tiersData] = await Promise.all([
+        apiClient.get<Subscription>('/api/v1/billing/subscriptions/current', true).catch(() => null),
+        apiClient.get<TierPlan[]>('/api/v1/tiers', true)
+      ])
+
+      setSubscription(subData)
+      setAvailableTiers(tiersData || [])
+      if (subData) {
+        setBillingCycle(subData.billing_cycle as 'monthly' | 'yearly')
+      }
+    } catch (error) {
+      console.error('Failed to load subscription:', error)
+    } finally {
+      setLoadingSubscription(false)
+    }
+  }
+
+  const handleUpgrade = async (tierId: number) => {
+    setProcessingSubscription(true)
+    setMessage(null)
+
+    try {
+      const response = await apiClient.post<{ checkout_url: string }>(
+        '/api/v1/billing/subscriptions/create-checkout',
+        { tier_id: tierId, billing_cycle: billingCycle },
+        true
+      )
+
+      window.location.href = response.checkout_url
+    } catch (error) {
+      console.error('Failed to create checkout:', error)
+      setMessage({ type: 'error', text: 'Failed to start upgrade process' })
+      setProcessingSubscription(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    setProcessingSubscription(true)
+    setMessage(null)
+
+    try {
+      await apiClient.post('/api/v1/billing/subscriptions/cancel', {}, true)
+      setMessage({ type: 'success', text: 'Subscription will be cancelled at the end of the billing period' })
+      setShowCancelModal(false)
+      await loadSubscriptionData()
+      await loadProfileData()
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error)
+      setMessage({ type: 'error', text: 'Failed to cancel subscription' })
+    } finally {
+      setProcessingSubscription(false)
+    }
+  }
+
+  const handleManageBilling = async () => {
+    setProcessingSubscription(true)
+    setMessage(null)
+
+    try {
+      const response = await apiClient.post<{ url: string }>(
+        '/api/v1/billing/subscriptions/portal',
+        {},
+        true
+      )
+
+      window.location.href = response.url
+    } catch (error) {
+      console.error('Failed to open billing portal:', error)
+      setMessage({ type: 'error', text: 'Failed to open billing portal' })
+      setProcessingSubscription(false)
     }
   }
 
@@ -277,27 +382,136 @@ export default function ProfilePage() {
           )}
 
           <Card>
-            <CardHeader title="Subscription" />
+            <CardHeader title="Subscription & Billing" />
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Current Plan:</span>
-                  <span className="font-medium text-neutral-900">
-                    {isTrialActive ? 'Premium Trial' : profile.tier || 'Free'}
-                  </span>
+              {loadingSubscription ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-admin-primary border-t-transparent"></div>
+                  <span className="ml-3 text-sm text-neutral-600">Loading subscription...</span>
                 </div>
-                {isTrialActive && profile.trial_end_date && (
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600">Trial Ends:</span>
-                    <span className="font-medium text-neutral-900">{formatDate(profile.trial_end_date)}</span>
+              ) : subscription && subscription.status === 'active' ? (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-green-900">{subscription.tier_name}</h3>
+                        <p className="text-sm text-green-700 mt-1">
+                          {subscription.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'} billing •
+                          ${(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                        </p>
+                      </div>
+                      <Badge variant="success">Active</Badge>
+                    </div>
                   </div>
-                )}
-                <div className="pt-3">
-                  <Link href="/pricing" className="text-sm text-admin-primary hover:underline">
-                    View pricing plans →
-                  </Link>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-600">Next billing date:</span>
+                      <span className="font-medium text-neutral-900">{formatDate(subscription.current_period_end)}</span>
+                    </div>
+                    {subscription.cancel_at_period_end && (
+                      <Alert type="warning" message="Your subscription will be cancelled at the end of the current billing period." />
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t border-neutral-200">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleManageBilling}
+                      disabled={processingSubscription}
+                      className="w-full"
+                    >
+                      {processingSubscription ? 'Loading...' : 'Manage Billing & Payment Methods'}
+                    </Button>
+
+                    {!subscription.cancel_at_period_end && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCancelModal(true)}
+                        className="w-full text-red-600 hover:bg-red-50"
+                      >
+                        Cancel Subscription
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-neutral-900">Free Plan</h3>
+                        <p className="text-sm text-neutral-600 mt-1">
+                          {isTrialActive && profile.trial_end_date
+                            ? `Premium trial ends ${formatDate(profile.trial_end_date)}`
+                            : 'Basic features included'}
+                        </p>
+                      </div>
+                      <Badge variant="default">Free</Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-neutral-700">Upgrade to unlock more features:</p>
+
+                    {availableTiers
+                      .filter(tier => tier.name.toLowerCase() !== 'free')
+                      .map(tier => {
+                        const isPro = tier.name.toLowerCase() === 'pro'
+                        const isComingSoon = isPro
+
+                        return (
+                          <div key={tier.id} className="border border-neutral-200 rounded-lg p-4 hover:border-admin-primary transition-colors">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <h4 className="font-semibold text-neutral-900">{tier.display_name}</h4>
+                                <p className="text-sm text-neutral-600 mt-1">{tier.description}</p>
+                              </div>
+                              {isComingSoon && <Badge variant="warning">Coming Soon</Badge>}
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-2xl font-bold text-neutral-900">
+                                  ${(billingCycle === 'yearly'
+                                    ? tier.price_yearly_cents / 100 / 12
+                                    : tier.price_monthly_cents / 100
+                                  ).toFixed(2)}
+                                  <span className="text-sm font-normal text-neutral-600">/month</span>
+                                </p>
+                                {billingCycle === 'yearly' && (
+                                  <p className="text-xs text-neutral-500">
+                                    Billed ${(tier.price_yearly_cents / 100).toFixed(2)} annually
+                                  </p>
+                                )}
+                              </div>
+
+                              <Button
+                                variant={isComingSoon ? "secondary" : "primary"}
+                                size="sm"
+                                onClick={() => !isComingSoon && handleUpgrade(tier.id)}
+                                disabled={isComingSoon || processingSubscription}
+                              >
+                                {isComingSoon ? 'Coming Soon' : 'Upgrade'}
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                    <div className="flex items-center justify-center pt-2">
+                      <button
+                        onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+                        className="text-sm text-admin-primary hover:underline"
+                      >
+                        Switch to {billingCycle === 'monthly' ? 'annual' : 'monthly'} billing
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -321,13 +535,13 @@ export default function ProfilePage() {
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
         <ModalHeader title="Delete Account" onClose={() => setShowDeleteModal(false)} />
         <ModalContent>
-          <Alert 
-            type="error" 
+          <Alert
+            type="error"
             message="Warning: This action cannot be undone. Your account will be deactivated immediately, and all data will be permanently deleted after 30 days."
           />
-          
-          <Alert 
-            type="info" 
+
+          <Alert
+            type="info"
             message="Your documents are safe: All files in your Google Drive will remain intact. Only the Bonifatus DMS metadata and categorization will be deleted."
           />
 
@@ -357,6 +571,38 @@ export default function ProfilePage() {
           </Button>
           <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting} className="flex-1">
             Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)}>
+        <ModalHeader title="Cancel Subscription" onClose={() => setShowCancelModal(false)} />
+        <ModalContent>
+          <Alert
+            type="warning"
+            message="Your subscription will remain active until the end of the current billing period. You'll continue to have access to all premium features until then."
+          />
+
+          <div className="space-y-3 mt-4">
+            <p className="text-sm text-neutral-700">
+              Are you sure you want to cancel your subscription? You can always resubscribe later.
+            </p>
+            {subscription && (
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
+                <p className="text-sm text-neutral-600">
+                  Your <span className="font-semibold text-neutral-900">{subscription.tier_name}</span> subscription will end on{' '}
+                  <span className="font-semibold text-neutral-900">{formatDate(subscription.current_period_end)}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        </ModalContent>
+        <ModalFooter>
+          <Button variant="danger" onClick={handleCancelSubscription} disabled={processingSubscription} className="flex-1">
+            {processingSubscription ? 'Cancelling...' : 'Yes, Cancel Subscription'}
+          </Button>
+          <Button variant="secondary" onClick={() => setShowCancelModal(false)} disabled={processingSubscription} className="flex-1">
+            Keep Subscription
           </Button>
         </ModalFooter>
       </Modal>

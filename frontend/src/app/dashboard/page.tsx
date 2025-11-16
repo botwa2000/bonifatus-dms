@@ -29,11 +29,67 @@ export default function DashboardPage() {
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
   const [recentDocuments, setRecentDocuments] = useState<Document[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(true)
+  const [isProcessingTier, setIsProcessingTier] = useState(false)
+  const [tierProcessed, setTierProcessed] = useState(false)
 
   // Load user data on mount (passive auth context requires explicit call)
   useEffect(() => {
     loadUser()
   }, [loadUser])
+
+  // Check if user selected a paid tier before login and redirect to checkout
+  useEffect(() => {
+    const handleTierSelection = async () => {
+      if (!user || tierProcessed || isProcessingTier) return
+
+      // Get selected tier from sessionStorage
+      const selectedTierId = sessionStorage.getItem('selected_tier_id')
+
+      if (!selectedTierId) {
+        setTierProcessed(true)
+        return
+      }
+
+      const tierId = parseInt(selectedTierId, 10)
+
+      // Clear the tier selection from sessionStorage
+      sessionStorage.removeItem('selected_tier_id')
+
+      // If user selected free tier (id: 0), they're already on free tier
+      if (tierId === 0) {
+        setTierProcessed(true)
+        return
+      }
+
+      // User selected a paid tier - initiate Stripe checkout
+      setIsProcessingTier(true)
+
+      try {
+        // Create Stripe checkout session
+        const checkoutResponse = await apiClient.post<{ checkout_url: string }>(
+          '/api/v1/billing/subscriptions/create-checkout',
+          {
+            tier_id: tierId,
+            billing_cycle: 'monthly'
+          },
+          true
+        )
+
+        // Redirect to Stripe checkout
+        window.location.href = checkoutResponse.checkout_url
+
+      } catch (error) {
+        console.error('Failed to process tier selection:', error)
+        setTierProcessed(true)
+        setIsProcessingTier(false)
+        // Continue to dashboard even if checkout fails
+      }
+    }
+
+    if (user && !tierProcessed && !isProcessingTier) {
+      handleTierSelection()
+    }
+  }, [user, tierProcessed, isProcessingTier])
 
   // Load recent documents
   useEffect(() => {
@@ -58,13 +114,15 @@ export default function DashboardPage() {
   }, [user])
 
 
-  // Show loading state while user data loads
-  if (isLoading || !user) {
+  // Show loading state while user data loads or processing tier selection
+  if (isLoading || !user || isProcessingTier) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading dashboard...</p>
+          <p className="mt-4 text-sm text-neutral-600">
+            {isProcessingTier ? 'Setting up your subscription...' : 'Loading dashboard...'}
+          </p>
         </div>
       </div>
     )

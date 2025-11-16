@@ -25,6 +25,110 @@ router = APIRouter()
 
 
 @router.post(
+    "/subscriptions/create-checkout",
+    status_code=status.HTTP_200_OK,
+    summary="Create Stripe Checkout Session"
+)
+async def create_checkout_session(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Create a Stripe Checkout session for a paid tier subscription
+
+    This endpoint is used during the registration flow when a user selects a paid tier.
+    It creates a Stripe Checkout session and returns the checkout URL.
+
+    After successful payment, Stripe redirects back to the success URL and
+    the webhook handler will create the subscription in the database.
+    """
+    try:
+        tier_id = request.get('tier_id')
+        billing_cycle = request.get('billing_cycle', 'monthly')
+
+        if not tier_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tier_id is required"
+            )
+
+        # Get tier information
+        tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
+        if not tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tier {tier_id} not found"
+            )
+
+        if tier.name.lower() == 'free':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot create checkout for free tier"
+            )
+
+        # Check for existing active subscription
+        existing_sub = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if existing_sub:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User already has an active subscription"
+            )
+
+        # Create Stripe checkout session
+        from app.core.config import settings
+        import stripe
+
+        # Get or create price ID
+        price_id = await stripe_service.get_or_create_price(session, tier, billing_cycle)
+
+        if not price_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create price"
+            )
+
+        # Create checkout session
+        checkout_session = stripe.checkout.Session.create(
+            customer=current_user.stripe_customer_id if current_user.stripe_customer_id else None,
+            customer_email=current_user.email if not current_user.stripe_customer_id else None,
+            mode='subscription',
+            line_items=[{
+                'price': price_id,
+                'quantity': 1,
+            }],
+            success_url=f"{settings.app.app_frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.app.app_frontend_url}/dashboard?checkout=cancel",
+            metadata={
+                'user_id': str(current_user.id),
+                'tier_id': str(tier.id),
+                'billing_cycle': billing_cycle
+            }
+        )
+
+        logger.info(f"Created checkout session {checkout_session.id} for user {current_user.email}")
+
+        return {
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create checkout session error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
     "/subscribe",
     response_model=SubscriptionResponse,
     status_code=status.HTTP_201_CREATED,

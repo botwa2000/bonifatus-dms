@@ -492,7 +492,11 @@ export default function HomePage() {
                         Coming Soon
                       </Button>
                     ) : (
-                      <GoogleLoginButton className="w-full" variant="secondary">
+                      <GoogleLoginButton
+                        className="w-full"
+                        variant="secondary"
+                        tierId={tier.id}
+                      >
                         {isFree ? 'Start Free' : 'Get Started'}
                       </GoogleLoginButton>
                     )}

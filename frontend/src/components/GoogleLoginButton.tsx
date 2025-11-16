@@ -10,13 +10,15 @@ interface GoogleLoginButtonProps {
   size?: 'sm' | 'md' | 'lg'
   className?: string
   children?: React.ReactNode
+  tierId?: number  // Optional tier ID for registration flow
 }
 
-export function GoogleLoginButton({ 
-  variant = 'primary', 
+export function GoogleLoginButton({
+  variant = 'primary',
   size = 'md',
   className = '',
-  children 
+  children,
+  tierId
 }: GoogleLoginButtonProps) {
   const { initializeGoogleAuth, isLoading } = useAuth()
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -24,6 +26,12 @@ export function GoogleLoginButton({
   const handleLogin = async () => {
     try {
       setIsRedirecting(true)
+
+      // Store selected tier in sessionStorage if provided
+      if (tierId !== undefined && typeof window !== 'undefined') {
+        sessionStorage.setItem('selected_tier_id', tierId.toString())
+      }
+
       await initializeGoogleAuth()
     } catch (error) {
       console.error('Google login failed:', error)
