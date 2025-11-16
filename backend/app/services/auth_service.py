@@ -336,10 +336,11 @@ class AuthService:
         }
 
     async def authenticate_with_google_code(
-            self, 
+            self,
             authorization_code: str,
             ip_address: str,
-            user_agent: str
+            user_agent: str,
+            tier_id: Optional[int] = None
         ) -> Optional[Dict[str, Any]]:
             """
             Authenticate user with Google authorization code
@@ -407,8 +408,20 @@ class AuthService:
                     
                     is_new_user = False
                     if not user:
-                        # Determine tier based on admin status
+                        # Determine tier based on admin status or user selection
                         is_admin = email in settings.security.admin_emails
+
+                        # Priority: admin (100) > user selected tier > free (0)
+                        if is_admin:
+                            final_tier_id = 100
+                            logger.info(f"Creating admin user: {email} with tier_id=100")
+                        elif tier_id is not None:
+                            final_tier_id = tier_id
+                            logger.info(f"Creating new user: {email} with selected tier_id={tier_id}")
+                        else:
+                            final_tier_id = 0
+                            logger.info(f"Creating new user: {email} with default tier_id=0 (Free)")
+
                         user = User(
                             email=email,
                             full_name=full_name,
@@ -416,12 +429,11 @@ class AuthService:
                             profile_picture=profile_picture,
                             is_active=True,
                             is_admin=is_admin,
-                            tier_id=100 if is_admin else 0,  # 100=admin, 0=free
+                            tier_id=final_tier_id,
                             preferred_doc_languages=["en"]  # Default to English
                         )
                         db.add(user)
                         is_new_user = True
-                        logger.info(f"Creating new user: {email}")
                     else:
                         user.google_id = google_id
                         user.profile_picture = profile_picture

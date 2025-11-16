@@ -152,11 +152,27 @@ async def google_oauth_callback_redirect(
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "unknown")
 
+        # Extract tier selection from OAuth state parameter
+        tier_id = None
+        billing_cycle = None
+        if state:
+            try:
+                import json
+                import base64
+                state_data = json.loads(base64.b64decode(state).decode('utf-8'))
+                tier_id = state_data.get('tier_id')
+                billing_cycle = state_data.get('billing_cycle')
+                logger.info(f"OAuth state decoded - tier_id: {tier_id}, billing_cycle: {billing_cycle}")
+            except Exception as e:
+                logger.warning(f"Failed to decode OAuth state: {e}")
+                # Continue without tier selection - user will get free tier
+
         # Exchange authorization code for tokens
         auth_result = await auth_service.authenticate_with_google_code(
             code,
             ip_address,
-            user_agent
+            user_agent,
+            tier_id=tier_id
         )
 
         if not auth_result:

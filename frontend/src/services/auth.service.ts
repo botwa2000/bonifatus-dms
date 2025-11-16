@@ -79,13 +79,22 @@ export class AuthService {
     }
   }
 
-  generateSecureState(): string {
+  generateSecureState(tierId?: number, billingCycle?: 'monthly' | 'yearly'): string {
     const array = new Uint8Array(32)
     crypto.getRandomValues(array)
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+    const csrfToken = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+
+    // Encode tier selection into state for backend to access during OAuth callback
+    const stateData = {
+      csrf: csrfToken,
+      ...(tierId !== undefined && { tier_id: tierId }),
+      ...(billingCycle && { billing_cycle: billingCycle })
+    }
+
+    return btoa(JSON.stringify(stateData))
   }
 
-  storeOAuthState(state: string): void {
+  storeOAuthState(state: string, tierId?: number, billingCycle?: 'monthly' | 'yearly'): void {
     if (!this.checkSessionStorageAvailable()) {
       throw new Error('SessionStorage is not available. Please check browser privacy settings.')
     }
@@ -93,6 +102,14 @@ export class AuthService {
     try {
       sessionStorage.setItem('oauth_state', state)
       sessionStorage.setItem('oauth_state_timestamp', Date.now().toString())
+
+      // Also store tier selection separately for frontend use after OAuth redirect
+      if (tierId !== undefined) {
+        sessionStorage.setItem('selected_tier_id', tierId.toString())
+      }
+      if (billingCycle) {
+        sessionStorage.setItem('selected_billing_cycle', billingCycle)
+      }
     } catch (error) {
       console.error('Failed to store OAuth state:', error)
       throw new Error('Failed to store OAuth state: ' + (error as Error).message)
@@ -136,13 +153,13 @@ export class AuthService {
     keysToRemove.forEach(key => sessionStorage.removeItem(key))
   }
 
-  async initializeGoogleOAuth(): Promise<void> {
+  async initializeGoogleOAuth(tierId?: number, billingCycle?: 'monthly' | 'yearly'): Promise<void> {
     try {
       // Clear any stale OAuth processing flags from previous attempts
       this.clearOAuthProcessingFlags()
 
       const config = await this.getOAuthConfig()
-      const state = this.generateSecureState()
+      const state = this.generateSecureState(tierId, billingCycle)
 
       const params = new URLSearchParams({
         client_id: config.google_client_id,
@@ -155,7 +172,7 @@ export class AuthService {
       })
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-      this.storeOAuthState(state)
+      this.storeOAuthState(state, tierId, billingCycle)
       window.location.href = authUrl
 
     } catch (error) {

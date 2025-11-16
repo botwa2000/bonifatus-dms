@@ -11,7 +11,7 @@ interface AuthContextType {
   isLoading: boolean
   error: string | null
   loadUser: () => Promise<void>
-  initializeGoogleAuth: () => Promise<void>
+  initializeGoogleAuth: (tierId?: number, billingCycle?: 'monthly' | 'yearly') => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
 }
@@ -44,11 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const initializeGoogleAuth = useCallback(async () => {
+  const initializeGoogleAuth = useCallback(async (tierId?: number, billingCycle?: 'monthly' | 'yearly') => {
     try {
       setIsLoading(true)
       setError(null)
-      await authService.initializeGoogleOAuth()
+      await authService.initializeGoogleOAuth(tierId, billingCycle)
     } catch (err) {
       console.error('[AuthProvider] Google auth failed:', err)
       setError(err instanceof Error ? err.message : 'Authentication failed')

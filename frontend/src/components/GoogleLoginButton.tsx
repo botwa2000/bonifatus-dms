@@ -28,20 +28,9 @@ export function GoogleLoginButton({
   const handleLogin = async () => {
     try {
       setIsRedirecting(true)
-
-      if (typeof window !== 'undefined') {
-        // Store selected tier in sessionStorage if provided
-        if (tierId !== undefined) {
-          sessionStorage.setItem('selected_tier_id', tierId.toString())
-        }
-
-        // Store billing cycle preference if provided
-        if (billingCycle) {
-          sessionStorage.setItem('selected_billing_cycle', billingCycle)
-        }
-      }
-
-      await initializeGoogleAuth()
+      // Pass tier selection directly to initializeGoogleAuth
+      // It will be encoded into OAuth state parameter for backend to access
+      await initializeGoogleAuth(tierId, billingCycle)
     } catch (error) {
       console.error('Google login failed:', error)
       setIsRedirecting(false)
