@@ -48,6 +48,18 @@ class UserTierUpdate(BaseModel):
     tier_id: int = Field(..., description="New tier ID (0=Free, 1=Starter, 2=Pro, 100=Admin)")
 
 
+class CurrencyCreate(BaseModel):
+    """Create new currency"""
+    code: str = Field(..., min_length=3, max_length=3, description="ISO 4217 currency code (e.g., USD, EUR, GBP)")
+    symbol: str = Field(..., min_length=1, max_length=10, description="Currency symbol (e.g., $, €, £)")
+    name: str = Field(..., min_length=1, max_length=100, description="Currency name (e.g., US Dollar, Euro)")
+    decimal_places: int = Field(2, ge=0, le=4, description="Number of decimal places")
+    exchange_rate: Optional[float] = Field(None, ge=0, description="Exchange rate (units of currency per 1 EUR)")
+    is_active: bool = Field(True, description="Whether currency is active")
+    is_default: bool = Field(False, description="Whether this is the default currency")
+    sort_order: int = Field(0, ge=0, description="Display sort order")
+
+
 class CurrencyUpdate(BaseModel):
     """
     Update currency exchange rate
@@ -904,6 +916,140 @@ async def update_currency_exchange_rate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update currency"
+        )
+    finally:
+        session.close()
+
+
+@router.post(
+    "/currencies",
+    summary="Create New Currency",
+    description="Create a new currency (admin only)"
+)
+async def create_currency(
+    currency_data: CurrencyCreate,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Create a new currency
+
+    Exchange rate interpretation:
+    - EUR is the BASE currency (exchange_rate = 1.00)
+    - exchange_rate = units of THIS currency per 1 EUR (EUR/XXX rate)
+    - Example: Setting USD exchange_rate to 1.10 means 1 EUR = 1.10 USD
+    """
+    session = db_manager.get_session()
+
+    try:
+        # Check if currency already exists
+        existing = session.query(Currency).filter(
+            Currency.code == currency_data.code.upper()
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Currency '{currency_data.code}' already exists"
+            )
+
+        # Create new currency
+        import uuid
+        new_currency = Currency(
+            id=uuid.uuid4(),
+            code=currency_data.code.upper(),
+            symbol=currency_data.symbol,
+            name=currency_data.name,
+            decimal_places=currency_data.decimal_places,
+            exchange_rate=currency_data.exchange_rate,
+            is_active=currency_data.is_active,
+            is_default=currency_data.is_default,
+            sort_order=currency_data.sort_order
+        )
+
+        session.add(new_currency)
+        session.commit()
+
+        logger.info(f"Admin {current_admin.email} created currency {currency_data.code}")
+
+        return {
+            "message": f"Currency '{currency_data.code}' created successfully",
+            "currency": {
+                "code": new_currency.code,
+                "symbol": new_currency.symbol,
+                "name": new_currency.name,
+                "decimal_places": new_currency.decimal_places,
+                "exchange_rate": float(new_currency.exchange_rate) if new_currency.exchange_rate else None,
+                "is_active": new_currency.is_active,
+                "is_default": new_currency.is_default,
+                "sort_order": new_currency.sort_order
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error creating currency: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create currency"
+        )
+    finally:
+        session.close()
+
+
+@router.delete(
+    "/currencies/{currency_code}",
+    summary="Delete Currency",
+    description="Delete a currency (admin only)"
+)
+async def delete_currency(
+    currency_code: str,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """
+    Delete a currency
+
+    Note: Cannot delete currency if it's set as default or if it's used in active subscriptions.
+    """
+    session = db_manager.get_session()
+
+    try:
+        # Find currency by code
+        currency = session.query(Currency).filter(
+            Currency.code == currency_code.upper()
+        ).first()
+
+        if not currency:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Currency '{currency_code}' not found"
+            )
+
+        # Check if it's the default currency
+        if currency.is_default:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the default currency"
+            )
+
+        session.delete(currency)
+        session.commit()
+
+        logger.info(f"Admin {current_admin.email} deleted currency {currency_code}")
+
+        return {
+            "message": f"Currency '{currency_code}' deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error deleting currency {currency_code}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete currency"
         )
     finally:
         session.close()

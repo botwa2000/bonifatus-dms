@@ -88,6 +88,15 @@ export default function AdminDashboard() {
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [editingCurrency, setEditingCurrency] = useState<{code: string, rate: string} | null>(null)
+  const [showAddCurrency, setShowAddCurrency] = useState(false)
+  const [newCurrency, setNewCurrency] = useState({
+    code: '',
+    symbol: '',
+    name: '',
+    decimal_places: 2,
+    exchange_rate: null as number | null,
+    sort_order: 0
+  })
   const [restartingClamav, setRestartingClamav] = useState(false)
 
   // User search and sorting
@@ -209,6 +218,39 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to update currency:', error)
       alert('Failed to update currency exchange rate')
+    }
+  }
+
+  const createCurrency = async (currencyData: {
+    code: string
+    symbol: string
+    name: string
+    decimal_places: number
+    exchange_rate: number | null
+    sort_order: number
+  }) => {
+    try {
+      await apiClient.post('/api/v1/admin/currencies', currencyData)
+      await loadData()
+      alert(`Currency ${currencyData.code} created successfully!`)
+    } catch (error: any) {
+      console.error('Failed to create currency:', error)
+      alert(error?.response?.data?.detail || 'Failed to create currency')
+    }
+  }
+
+  const deleteCurrency = async (currencyCode: string) => {
+    if (!confirm(`Are you sure you want to delete currency ${currencyCode}? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await apiClient.delete(`/api/v1/admin/currencies/${currencyCode}`)
+      await loadData()
+      alert(`Currency ${currencyCode} deleted successfully!`)
+    } catch (error: any) {
+      console.error('Failed to delete currency:', error)
+      alert(error?.response?.data?.detail || 'Failed to delete currency')
     }
   }
 
@@ -727,6 +769,7 @@ export default function AdminDashboard() {
               <CardHeader title="Currency Exchange Rates" />
               <CardContent>
                 <div className="space-y-4">
+                  {/* Info Box */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <div className="flex items-start">
                       <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -741,6 +784,103 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Add Currency Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setShowAddCurrency(!showAddCurrency)}
+                    >
+                      {showAddCurrency ? 'Cancel' : '+ Add Currency'}
+                    </Button>
+                  </div>
+
+                  {/* Add Currency Form */}
+                  {showAddCurrency && (
+                    <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800">
+                      <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-4">Add New Currency</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Currency Code (ISO 4217)
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={3}
+                            value={newCurrency.code}
+                            onChange={(e) => setNewCurrency({...newCurrency, code: e.target.value.toUpperCase()})}
+                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
+                            placeholder="e.g., USD"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Symbol
+                          </label>
+                          <input
+                            type="text"
+                            value={newCurrency.symbol}
+                            onChange={(e) => setNewCurrency({...newCurrency, symbol: e.target.value})}
+                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
+                            placeholder="e.g., $"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Currency Name
+                          </label>
+                          <input
+                            type="text"
+                            value={newCurrency.name}
+                            onChange={(e) => setNewCurrency({...newCurrency, name: e.target.value})}
+                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
+                            placeholder="e.g., US Dollar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Exchange Rate (per 1 EUR)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={newCurrency.exchange_rate || ''}
+                            onChange={(e) => setNewCurrency({...newCurrency, exchange_rate: e.target.value ? parseFloat(e.target.value) : null})}
+                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
+                            placeholder="e.g., 1.10"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-4 space-x-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setShowAddCurrency(false)
+                            setNewCurrency({code: '', symbol: '', name: '', decimal_places: 2, exchange_rate: null, sort_order: 0})
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            if (!newCurrency.code || !newCurrency.symbol || !newCurrency.name) {
+                              alert('Please fill in all required fields (Code, Symbol, Name)')
+                              return
+                            }
+                            createCurrency(newCurrency)
+                            setShowAddCurrency(false)
+                            setNewCurrency({code: '', symbol: '', name: '', decimal_places: 2, exchange_rate: null, sort_order: 0})
+                          }}
+                        >
+                          Add Currency
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-700">
@@ -853,6 +993,13 @@ export default function AdminDashboard() {
                                       Hide
                                     </Button>
                                   )}
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => deleteCurrency(currency.code)}
+                                  >
+                                    Delete
+                                  </Button>
                                 </div>
                               )}
                             </td>
