@@ -368,7 +368,7 @@ async def get_public_tier_plans():
     """
     session = db_manager.session_local()
     try:
-        from app.database.models import TierPlan
+        from app.database.models import TierPlan, Currency
 
         result = session.execute(
             select(TierPlan).where(
@@ -378,8 +378,18 @@ async def get_public_tier_plans():
         )
         tiers = result.scalars().all()
 
+        # Get currency symbols mapping
+        currencies_result = session.execute(
+            select(Currency).where(Currency.is_active == True)
+        )
+        currencies = currencies_result.scalars().all()
+        currency_map = {curr.code: curr.symbol for curr in currencies}
+
         tier_list = []
         for tier in tiers:
+            # Get currency symbol from currencies table
+            currency_symbol = currency_map.get(tier.currency, tier.currency)
+
             tier_list.append({
                 'id': tier.id,
                 'name': tier.name,
@@ -388,6 +398,7 @@ async def get_public_tier_plans():
                 'price_monthly_cents': tier.price_monthly_cents,
                 'price_yearly_cents': tier.price_yearly_cents,
                 'currency': tier.currency,
+                'currency_symbol': currency_symbol,
                 'storage_quota_bytes': tier.storage_quota_bytes,
                 'max_file_size_bytes': tier.max_file_size_bytes,
                 'max_documents': tier.max_documents,

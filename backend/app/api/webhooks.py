@@ -109,6 +109,7 @@ async def handle_checkout_session_completed(event, session: Session):
     user_id = checkout_session.metadata.get('user_id')
     tier_id = checkout_session.metadata.get('tier_id')
     billing_cycle = checkout_session.metadata.get('billing_cycle')
+    referral_code = checkout_session.metadata.get('referral_code')
 
     if not user_id or not tier_id:
         logger.warning(f"Missing metadata in checkout session {checkout_session.id}")
@@ -129,6 +130,27 @@ async def handle_checkout_session_completed(event, session: Session):
     if not tier:
         logger.warning(f"Tier {tier_id} not found for checkout session {checkout_session.id}")
         return
+
+    # Process referral code if provided
+    if referral_code:
+        from app.database.models import Referral
+        from datetime import datetime, timezone
+
+        # Find the referrer by their referral code (assuming users have a referral_code field)
+        # For now, just log the referral - full implementation depends on your referral system
+        logger.info(f"Referral code '{referral_code}' used by user {user.email}")
+
+        # TODO: Create referral record when referral system is fully implemented
+        # referrer = session.query(User).filter(User.referral_code == referral_code).first()
+        # if referrer:
+        #     referral = Referral(
+        #         referrer_id=referrer.id,
+        #         referred_id=user.id,
+        #         code=referral_code,
+        #         status='completed',
+        #         completed_at=datetime.now(timezone.utc)
+        #     )
+        #     session.add(referral)
 
     # Subscription will be created via the subscription.created webhook
     # Just log the successful checkout here

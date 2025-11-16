@@ -42,8 +42,10 @@ export default function DashboardPage() {
     const handleTierSelection = async () => {
       if (!user || tierProcessed || isProcessingTier) return
 
-      // Get selected tier from sessionStorage
+      // Get selected tier and billing cycle from sessionStorage
       const selectedTierId = sessionStorage.getItem('selected_tier_id')
+      const selectedBillingCycle = sessionStorage.getItem('selected_billing_cycle')
+      const referralCode = sessionStorage.getItem('referral_code')
 
       if (!selectedTierId) {
         setTierProcessed(true)
@@ -52,8 +54,9 @@ export default function DashboardPage() {
 
       const tierId = parseInt(selectedTierId, 10)
 
-      // Clear the tier selection from sessionStorage
+      // Clear the tier selection from sessionStorage (keep referral for future use)
       sessionStorage.removeItem('selected_tier_id')
+      sessionStorage.removeItem('selected_billing_cycle')
 
       // If user selected free tier (id: 0), they're already on free tier
       if (tierId === 0) {
@@ -70,7 +73,8 @@ export default function DashboardPage() {
           '/api/v1/billing/subscriptions/create-checkout',
           {
             tier_id: tierId,
-            billing_cycle: 'monthly'
+            billing_cycle: selectedBillingCycle || 'yearly',  // Default to yearly for better conversion
+            referral_code: referralCode || undefined
           },
           true
         )

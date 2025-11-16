@@ -22,6 +22,7 @@ interface TierPlan {
   price_monthly_cents: number
   price_yearly_cents: number
   currency: string
+  currency_symbol: string
   storage_quota_bytes: number
   max_file_size_bytes: number
   max_documents: number | null
@@ -36,6 +37,7 @@ export default function HomePage() {
   const { user } = useAuth()
   const [tiers, setTiers] = useState<TierPlan[]>([])
   const [loading, setLoading] = useState(true)
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly') // Default to yearly for better conversion
 
   // Fetch tier plans on component mount
   useEffect(() => {
@@ -56,6 +58,17 @@ export default function HomePage() {
     fetchTiers()
   }, [])
 
+  // Capture referral code from URL and store in sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const referralCode = urlParams.get('ref')
+      if (referralCode) {
+        sessionStorage.setItem('referral_code', referralCode)
+      }
+    }
+  }, [])
+
   // Helper function to format price
   const formatPrice = (cents: number): string => {
     return (cents / 100).toFixed(2)
@@ -73,6 +86,18 @@ export default function HomePage() {
     } else {
       return `${bytes} bytes`
     }
+  }
+
+  // Calculate savings percentage for yearly billing from first paid tier
+  const calculateYearlySavings = (): string => {
+    const paidTier = tiers.find(t => t.price_monthly_cents > 0 && t.price_yearly_cents > 0)
+    if (!paidTier) return ''
+
+    const monthlyCost = paidTier.price_monthly_cents * 12
+    const yearlyCost = paidTier.price_yearly_cents
+    const savings = ((monthlyCost - yearlyCost) / monthlyCost) * 100
+
+    return savings > 0 ? `Save ${Math.round(savings)}%` : ''
   }
 
   return (
@@ -355,6 +380,35 @@ export default function HomePage() {
             <p className="text-lg text-neutral-600 dark:text-neutral-400">
               Start free, upgrade as you grow. Cancel anytime.
             </p>
+
+            {/* Billing Cycle Toggle */}
+            <div className="mt-8 flex items-center justify-center gap-4">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                  billingCycle === 'monthly'
+                    ? 'bg-admin-primary text-white shadow-md'
+                    : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('yearly')}
+                className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
+                  billingCycle === 'yearly'
+                    ? 'bg-admin-primary text-white shadow-md'
+                    : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                }`}
+              >
+                Annual
+                {calculateYearlySavings() && (
+                  <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
+                    {calculateYearlySavings()}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -402,9 +456,18 @@ export default function HomePage() {
                       </h3>
                       <div className="mb-4">
                         <span className="text-3xl font-bold text-neutral-900 dark:text-white">
-                          {tier.currency === 'EUR' ? '€' : '$'}{formatPrice(tier.price_monthly_cents)}
+                          {tier.currency_symbol}{formatPrice(
+                            billingCycle === 'yearly'
+                              ? Math.round(tier.price_yearly_cents / 12)
+                              : tier.price_monthly_cents
+                          )}
                         </span>
                         <span className="text-neutral-600 dark:text-neutral-400">/month</span>
+                        {!isFree && billingCycle === 'yearly' && (
+                          <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+                            {tier.currency_symbol}{formatPrice(tier.price_yearly_cents)} billed annually
+                          </div>
+                        )}
                       </div>
                       <p className="text-neutral-600 dark:text-neutral-400">
                         {tier.description || (isFree ? 'Perfect for trying it out' : isStarter ? 'For light personal use' : 'For professionals & teams')}
@@ -496,6 +559,7 @@ export default function HomePage() {
                         className="w-full"
                         variant="secondary"
                         tierId={tier.id}
+                        billingCycle={billingCycle}
                       >
                         {isFree ? 'Start Free' : 'Get Started'}
                       </GoogleLoginButton>

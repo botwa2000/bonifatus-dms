@@ -21,7 +21,7 @@ from app.middleware.auth_middleware import get_current_active_user
 from app.services.stripe_service import stripe_service
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/billing", tags=["billing"])
 
 
 @router.post(
@@ -46,6 +46,7 @@ async def create_checkout_session(
     try:
         tier_id = request.get('tier_id')
         billing_cycle = request.get('billing_cycle', 'monthly')
+        referral_code = request.get('referral_code')
 
         if not tier_id:
             raise HTTPException(
@@ -93,6 +94,17 @@ async def create_checkout_session(
                 detail="Failed to create price"
             )
 
+        # Prepare metadata
+        metadata = {
+            'user_id': str(current_user.id),
+            'tier_id': str(tier.id),
+            'billing_cycle': billing_cycle
+        }
+
+        # Add referral code to metadata if provided
+        if referral_code:
+            metadata['referral_code'] = referral_code
+
         # Create checkout session
         checkout_session = stripe.checkout.Session.create(
             customer=current_user.stripe_customer_id if current_user.stripe_customer_id else None,
@@ -104,11 +116,7 @@ async def create_checkout_session(
             }],
             success_url=f"{settings.app.app_frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.app.app_frontend_url}/dashboard?checkout=cancel",
-            metadata={
-                'user_id': str(current_user.id),
-                'tier_id': str(tier.id),
-                'billing_cycle': billing_cycle
-            }
+            metadata=metadata
         )
 
         logger.info(f"Created checkout session {checkout_session.id} for user {current_user.email}")
@@ -249,6 +257,8 @@ async def get_subscription(
     session: Session = Depends(get_db)
 ) -> SubscriptionResponse:
     """Get current user's active subscription"""
+    from app.database.models import Currency
+
     subscription = session.execute(
         select(Subscription)
         .where(Subscription.user_id == current_user.id)
@@ -262,6 +272,10 @@ async def get_subscription(
         )
 
     tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+
+    # Get currency symbol from currencies table
+    currency = session.query(Currency).filter(Currency.code == tier.currency).first()
+    currency_symbol = currency.symbol if currency else tier.currency
 
     return SubscriptionResponse(
         id=subscription.stripe_subscription_id,
@@ -278,6 +292,7 @@ async def get_subscription(
         canceled_at=subscription.canceled_at,
         amount=tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else tier.price_yearly_cents,
         currency=tier.currency,
+        currency_symbol=currency_symbol,
         created_at=subscription.created_at
     )
 
@@ -424,6 +439,99 @@ async def cancel_subscription(
     except Exception as e:
         session.rollback()
         logger.error(f"Cancel subscription error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/subscriptions/cancel",
+    status_code=status.HTTP_200_OK,
+    summary="Cancel Subscription at Period End"
+)
+async def cancel_subscription_at_period_end(
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """Cancel subscription at the end of the current billing period"""
+    try:
+        subscription = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active subscription"
+            )
+
+        # Update subscription in Stripe to cancel at period end
+        import stripe
+        updated_sub = stripe.Subscription.modify(
+            subscription.stripe_subscription_id,
+            cancel_at_period_end=True
+        )
+
+        # Update database
+        subscription.cancel_at_period_end = True
+        subscription.canceled_at = datetime.now(timezone.utc)
+        session.commit()
+
+        logger.info(f"Subscription set to cancel at period end for user {current_user.email}")
+
+        return {
+            "message": "Subscription will be cancelled at the end of the current billing period",
+            "cancel_at": subscription.current_period_end
+        }
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Cancel subscription error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/subscriptions/portal",
+    status_code=status.HTTP_200_OK,
+    summary="Create Stripe Customer Portal Session"
+)
+async def create_portal_session(
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """Create a Stripe Customer Portal session for managing billing and payment methods"""
+    try:
+        if not current_user.stripe_customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Stripe customer found"
+            )
+
+        import stripe
+        from app.core.config import settings
+
+        portal_session = stripe.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=f"{settings.app.app_frontend_url}/profile"
+        )
+
+        logger.info(f"Created portal session for user {current_user.email}")
+
+        return {"url": portal_session.url}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create portal session error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

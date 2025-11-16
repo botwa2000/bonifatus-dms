@@ -111,6 +111,7 @@ class SubscriptionResponse(BaseModel):
     canceled_at: Optional[datetime] = Field(None, description="Cancellation timestamp")
     amount: int = Field(..., description="Subscription amount in cents")
     currency: str = Field(..., description="Currency code")
+    currency_symbol: Optional[str] = Field(None, description="Currency symbol")
     created_at: datetime = Field(..., description="Subscription creation date")
 
     class Config:

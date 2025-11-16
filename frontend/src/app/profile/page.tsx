@@ -39,6 +39,7 @@ interface Subscription {
   cancel_at_period_end: boolean
   amount: number
   currency: string
+  currency_symbol?: string
 }
 
 interface TierPlan {
@@ -48,6 +49,7 @@ interface TierPlan {
   price_monthly_cents: number
   price_yearly_cents: number
   currency: string
+  currency_symbol: string
   description: string
 }
 
@@ -152,8 +154,8 @@ export default function ProfilePage() {
     try {
       setLoadingSubscription(true)
       const [subData, tiersData] = await Promise.all([
-        apiClient.get<Subscription>('/api/v1/billing/subscriptions/current', true).catch(() => null),
-        apiClient.get<TierPlan[]>('/api/v1/tiers', true)
+        apiClient.get<Subscription>('/api/v1/billing/subscription', true).catch(() => null),
+        apiClient.get<TierPlan[]>('/api/v1/settings/tiers/public', true)
       ])
 
       setSubscription(subData)
@@ -397,7 +399,7 @@ export default function ProfilePage() {
                         <h3 className="font-semibold text-green-900">{subscription.tier_name}</h3>
                         <p className="text-sm text-green-700 mt-1">
                           {subscription.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'} billing •
-                          ${(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                          {subscription.currency_symbol || subscription.currency}{(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
                         </p>
                       </div>
                       <Badge variant="success">Active</Badge>
@@ -475,7 +477,7 @@ export default function ProfilePage() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-2xl font-bold text-neutral-900">
-                                  ${(billingCycle === 'yearly'
+                                  {tier.currency_symbol}{(billingCycle === 'yearly'
                                     ? tier.price_yearly_cents / 100 / 12
                                     : tier.price_monthly_cents / 100
                                   ).toFixed(2)}
@@ -483,7 +485,7 @@ export default function ProfilePage() {
                                 </p>
                                 {billingCycle === 'yearly' && (
                                   <p className="text-xs text-neutral-500">
-                                    Billed ${(tier.price_yearly_cents / 100).toFixed(2)} annually
+                                    Billed {tier.currency_symbol}{(tier.price_yearly_cents / 100).toFixed(2)} annually
                                   </p>
                                 )}
                               </div>

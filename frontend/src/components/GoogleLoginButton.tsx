@@ -11,6 +11,7 @@ interface GoogleLoginButtonProps {
   className?: string
   children?: React.ReactNode
   tierId?: number  // Optional tier ID for registration flow
+  billingCycle?: 'monthly' | 'yearly'  // Optional billing cycle preference
 }
 
 export function GoogleLoginButton({
@@ -18,7 +19,8 @@ export function GoogleLoginButton({
   size = 'md',
   className = '',
   children,
-  tierId
+  tierId,
+  billingCycle
 }: GoogleLoginButtonProps) {
   const { initializeGoogleAuth, isLoading } = useAuth()
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -27,9 +29,16 @@ export function GoogleLoginButton({
     try {
       setIsRedirecting(true)
 
-      // Store selected tier in sessionStorage if provided
-      if (tierId !== undefined && typeof window !== 'undefined') {
-        sessionStorage.setItem('selected_tier_id', tierId.toString())
+      if (typeof window !== 'undefined') {
+        // Store selected tier in sessionStorage if provided
+        if (tierId !== undefined) {
+          sessionStorage.setItem('selected_tier_id', tierId.toString())
+        }
+
+        // Store billing cycle preference if provided
+        if (billingCycle) {
+          sessionStorage.setItem('selected_billing_cycle', billingCycle)
+        }
       }
 
       await initializeGoogleAuth()
