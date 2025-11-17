@@ -180,8 +180,19 @@ async def google_oauth_callback_redirect(
             error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
-        # Create redirect response to dashboard
-        redirect_url = f"{settings.app.app_frontend_url}/dashboard"
+        # Determine redirect URL based on tier selection
+        # If user selected a paid tier, redirect to checkout page
+        # If user selected free tier or no tier, redirect to dashboard
+        if tier_id and tier_id > 0:
+            # Paid tier selected - redirect to checkout with tier_id
+            billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
+            redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
+            logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
+        else:
+            # Free tier or no tier selected - redirect to welcome dashboard
+            redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
+            logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+
         redirect_response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
         # Set tokens in httpOnly cookies before redirect

@@ -12,7 +12,9 @@ import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/auth-context'
+import { useCurrency } from '@/contexts/currency-context'
 import AppHeader from '@/components/AppHeader'
+import CurrencySelector from '@/components/CurrencySelector'
 
 interface TierPlan {
   id: number
@@ -35,6 +37,7 @@ interface TierPlan {
 
 export default function HomePage() {
   const { user } = useAuth()
+  const { formatPrice } = useCurrency()
   const [tiers, setTiers] = useState<TierPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly') // Default to yearly for better conversion
@@ -70,8 +73,8 @@ export default function HomePage() {
   }, [])
 
   // Helper function to format price
-  const formatPrice = (cents: number): string => {
-    return (cents / 100).toFixed(2)
+  const formatCentsToEur = (cents: number): number => {
+    return cents / 100 // Convert cents to EUR
   }
 
   // Helper function to format storage size
@@ -381,33 +384,42 @@ export default function HomePage() {
               Start free, upgrade as you grow. Cancel anytime.
             </p>
 
-            {/* Billing Cycle Toggle */}
-            <div className="mt-8 flex items-center justify-center gap-4">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'bg-admin-primary text-white shadow-md'
-                    : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
-                  billingCycle === 'yearly'
-                    ? 'bg-admin-primary text-white shadow-md'
-                    : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
-                }`}
-              >
-                Annual
-                {calculateYearlySavings() && (
-                  <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
-                    {calculateYearlySavings()}
-                  </span>
-                )}
-              </button>
+            {/* Pricing Controls: Billing Cycle & Currency */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              {/* Billing Cycle Toggle */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                    billingCycle === 'monthly'
+                      ? 'bg-admin-primary text-white shadow-md'
+                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('yearly')}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
+                    billingCycle === 'yearly'
+                      ? 'bg-admin-primary text-white shadow-md'
+                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                  }`}
+                >
+                  Annual
+                  {calculateYearlySavings() && (
+                    <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
+                      {calculateYearlySavings()}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Currency Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-neutral-600 dark:text-neutral-400">Currency:</span>
+                <CurrencySelector />
+              </div>
             </div>
           </div>
 
@@ -456,16 +468,18 @@ export default function HomePage() {
                       </h3>
                       <div className="mb-4">
                         <span className="text-3xl font-bold text-neutral-900 dark:text-white">
-                          {tier.currency_symbol}{formatPrice(
-                            billingCycle === 'yearly'
-                              ? Math.round(tier.price_yearly_cents / 12)
-                              : tier.price_monthly_cents
+                          {formatPrice(
+                            formatCentsToEur(
+                              billingCycle === 'yearly'
+                                ? Math.round(tier.price_yearly_cents / 12)
+                                : tier.price_monthly_cents
+                            )
                           )}
                         </span>
                         <span className="text-neutral-600 dark:text-neutral-400">/month</span>
                         {!isFree && billingCycle === 'yearly' && (
                           <div className="text-sm text-green-600 dark:text-green-400 mt-1">
-                            {tier.currency_symbol}{formatPrice(tier.price_yearly_cents)} billed annually
+                            {formatPrice(formatCentsToEur(tier.price_yearly_cents))} billed annually
                           </div>
                         )}
                       </div>
