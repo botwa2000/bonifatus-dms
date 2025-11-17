@@ -1,7 +1,7 @@
 // frontend/src/services/auth.service.ts
 
 import { apiClient } from './api-client'
-import { TokenResponse, User, GoogleOAuthConfig, AuthError } from '@/types/auth.types'
+import { User, GoogleOAuthConfig, AuthError } from '@/types/auth.types'
 
 interface AuthServiceConfig {
   apiUrl: string
