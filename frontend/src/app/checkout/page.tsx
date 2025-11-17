@@ -3,10 +3,12 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { apiClient } from '@/services/api-client'
+import { useCurrency } from '@/contexts/currency-context'
 
 function CheckoutContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { selectedCurrency } = useCurrency()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('Initializing checkout...')
 
@@ -23,15 +25,22 @@ function CheckoutContent() {
           return
         }
 
-        setStatus(`Creating checkout session for tier ${tierId}...`)
+        if (!selectedCurrency) {
+          setError('Currency not loaded')
+          setTimeout(() => router.push('/'), 3000)
+          return
+        }
 
-        // Create Stripe checkout session
+        setStatus(`Creating checkout session for tier ${tierId} in ${selectedCurrency.code}...`)
+
+        // Create Stripe checkout session with selected currency
         const response = await apiClient.post<{
           checkout_url: string
           session_id: string
         }>('/api/v1/billing/subscriptions/create-checkout', {
           tier_id: parseInt(tierId),
-          billing_cycle: billingCycle as 'monthly' | 'yearly'
+          billing_cycle: billingCycle as 'monthly' | 'yearly',
+          currency: selectedCurrency.code
         })
 
         if (response.checkout_url) {
@@ -52,7 +61,7 @@ function CheckoutContent() {
     }
 
     initializeCheckout()
-  }, [searchParams, router])
+  }, [searchParams, router, selectedCurrency])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">

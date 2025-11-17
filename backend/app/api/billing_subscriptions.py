@@ -46,12 +46,19 @@ async def create_checkout_session(
     try:
         tier_id = request.get('tier_id')
         billing_cycle = request.get('billing_cycle', 'monthly')
+        currency = request.get('currency')
         referral_code = request.get('referral_code')
 
         if not tier_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="tier_id is required"
+            )
+
+        if not currency:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="currency is required"
             )
 
         # Get tier information
@@ -85,8 +92,8 @@ async def create_checkout_session(
         from app.core.config import settings
         import stripe
 
-        # Get or create price ID
-        price_id = await stripe_service.get_or_create_price(session, tier, billing_cycle)
+        # Get or create price ID with selected currency
+        price_id = await stripe_service.get_or_create_price(session, tier, billing_cycle, currency)
 
         if not price_id:
             raise HTTPException(
@@ -98,7 +105,8 @@ async def create_checkout_session(
         metadata = {
             'user_id': str(current_user.id),
             'tier_id': str(tier.id),
-            'billing_cycle': billing_cycle
+            'billing_cycle': billing_cycle,
+            'currency': currency
         }
 
         # Add referral code to metadata if provided
@@ -179,6 +187,7 @@ async def create_subscription(
             user=current_user,
             tier=tier,
             billing_cycle=subscription_request.billing_cycle.value,
+            currency=subscription_request.currency,
             payment_method_id=subscription_request.payment_method_id,
             trial_days=subscription_request.trial_days,
             discount_code=subscription_request.discount_code
@@ -329,8 +338,20 @@ async def update_subscription(
                     detail=f"Tier {update_request.tier_id} not found"
                 )
 
+            # Get current subscription currency from Stripe price
+            import stripe
+            try:
+                current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+                currency = current_price.currency.upper()
+            except Exception as e:
+                logger.error(f"Failed to retrieve current price currency: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to retrieve subscription currency"
+                )
+
             billing_cycle = update_request.billing_cycle.value if update_request.billing_cycle else subscription.billing_cycle
-            new_price_id = await stripe_service.get_or_create_price(session, new_tier, billing_cycle)
+            new_price_id = await stripe_service.get_or_create_price(session, new_tier, billing_cycle, currency)
 
             updated_stripe_sub = await stripe_service.update_subscription(
                 subscription.stripe_subscription_id,

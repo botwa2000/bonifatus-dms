@@ -64,6 +64,7 @@ class SubscriptionCreateRequest(BaseModel):
     """Request to create a new subscription"""
     tier_id: int = Field(..., description="Tier plan ID to subscribe to", ge=1)
     billing_cycle: BillingCycle = Field(..., description="Billing cycle (monthly or yearly)")
+    currency: str = Field(..., description="Currency code (e.g., USD, EUR)", min_length=3, max_length=3)
     payment_method_id: Optional[str] = Field(None, description="Stripe payment method ID")
     discount_code: Optional[str] = Field(None, description="Discount or promo code to apply")
     trial_days: Optional[int] = Field(None, description="Number of trial days", ge=0, le=90)
@@ -73,6 +74,7 @@ class SubscriptionCreateRequest(BaseModel):
             "example": {
                 "tier_id": 2,
                 "billing_cycle": "monthly",
+                "currency": "USD",
                 "payment_method_id": "pm_1234567890",
                 "discount_code": "LAUNCH25",
                 "trial_days": 14

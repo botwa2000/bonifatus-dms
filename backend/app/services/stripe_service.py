@@ -176,7 +176,8 @@ class StripeService:
         self,
         db: AsyncSession,
         tier: TierPlan,
-        billing_cycle: str
+        billing_cycle: str,
+        currency: Optional[str] = None
     ) -> Optional[str]:
         """
         Get existing or create new Stripe price from database tier configuration
@@ -188,6 +189,7 @@ class StripeService:
             db: Database session
             tier: TierPlan object from database
             billing_cycle: 'monthly' or 'yearly'
+            currency: Currency code (e.g., 'USD', 'EUR'). If None, uses tier.currency
 
         Returns:
             Stripe price ID or None if failed
@@ -196,12 +198,34 @@ class StripeService:
             return None
 
         try:
-            # Determine price amount from database
-            price_cents = tier.price_monthly_cents if billing_cycle == 'monthly' else tier.price_yearly_cents
+            # Get base price from database tier
+            price_cents_base = tier.price_monthly_cents if billing_cycle == 'monthly' else tier.price_yearly_cents
 
-            if price_cents == 0:
+            if price_cents_base == 0:
                 logger.error(f"Cannot create subscription for free tier {tier.name}")
                 return None
+
+            # Determine target currency - must be provided or error
+            if not currency:
+                logger.error("Currency parameter is required")
+                return None
+
+            target_currency = currency.upper()
+
+            # Get currency details from database (including exchange rate)
+            currency_obj = await self.get_currency(db, target_currency)
+            if not currency_obj:
+                logger.error(f"Currency {target_currency} not found in database")
+                return None
+
+            if currency_obj.exchange_rate is None:
+                logger.error(f"Currency {target_currency} has no exchange rate set")
+                return None
+
+            # Convert price using database exchange rate (base prices are in EUR)
+            # Exchange rate format: 1 EUR = X target_currency (e.g., 1 EUR = 1.10 USD)
+            price_cents = int(price_cents_base * currency_obj.exchange_rate)
+            logger.info(f"Converted {price_cents_base} EUR cents to {price_cents} {target_currency} cents using rate {currency_obj.exchange_rate}")
 
             # Check if we already have a Stripe price ID cached for this tier/cycle
             # This reduces API calls by reusing existing price objects
@@ -211,39 +235,45 @@ class StripeService:
             # For now, we'll create a new price object each time or search existing ones
 
             # Search for existing price in Stripe with matching criteria
+            # Note: We cannot filter by product name in Price.list(), only by price attributes
+            interval = 'month' if billing_cycle == 'monthly' else 'year'
             existing_prices = stripe.Price.list(
-                product_data={'name': f'{tier.display_name} - {billing_cycle.capitalize()}'},
-                currency=tier.currency.lower(),
-                unit_amount=price_cents,
-                recurring={'interval': 'month' if billing_cycle == 'monthly' else 'year'},
+                currency=target_currency.lower(),
                 active=True,
-                limit=1
+                limit=100  # Get more results to filter manually
             )
 
-            if existing_prices.data:
-                logger.info(f"Reusing existing Stripe price {existing_prices.data[0].id}")
-                return existing_prices.data[0].id
+            # Filter manually for matching price
+            for price in existing_prices.data:
+                if (price.unit_amount == price_cents and
+                    price.recurring and
+                    price.recurring.interval == interval and
+                    price.currency == target_currency.lower()):
+                    logger.info(f"Reusing existing Stripe price {price.id}")
+                    return price.id
 
             # Create new price object dynamically from database values
-            interval = 'month' if billing_cycle == 'monthly' else 'year'
+            # interval already defined above
 
             price = stripe.Price.create(
-                currency=tier.currency.lower(),
+                currency=target_currency.lower(),
                 unit_amount=price_cents,
                 recurring={'interval': interval},
                 product_data={
-                    'name': f'{tier.display_name} - {billing_cycle.capitalize()}',
+                    'name': f'{tier.display_name} - {billing_cycle.capitalize()} ({target_currency})',
                     'description': tier.description,
                     'metadata': {
                         'tier_id': str(tier.id),
                         'tier_name': tier.name,
-                        'billing_cycle': billing_cycle
+                        'billing_cycle': billing_cycle,
+                        'currency': target_currency
                     }
                 },
                 metadata={
                     'tier_id': str(tier.id),
                     'tier_name': tier.name,
                     'billing_cycle': billing_cycle,
+                    'currency': target_currency,
                     'source': 'bonidoc_dynamic'
                 }
             )
@@ -286,6 +316,7 @@ class StripeService:
         user: User,
         tier: TierPlan,
         billing_cycle: str,
+        currency: str,
         payment_method_id: Optional[str] = None,
         trial_days: Optional[int] = None,
         discount_code: Optional[str] = None
@@ -298,6 +329,7 @@ class StripeService:
             user: User object
             tier: TierPlan object
             billing_cycle: monthly or yearly
+            currency: Currency code (e.g., 'USD', 'EUR')
             payment_method_id: Stripe payment method ID
             trial_days: Number of trial days
             discount_code: Discount/promo code
@@ -315,10 +347,10 @@ class StripeService:
                 logger.error(f"Failed to get/create customer for user {user.id}")
                 return None
 
-            # Get or create dynamic price from database
-            price_id = await self.get_or_create_price(db, tier, billing_cycle)
+            # Get or create dynamic price from database with selected currency
+            price_id = await self.get_or_create_price(db, tier, billing_cycle, currency)
             if not price_id:
-                logger.error(f"Failed to get/create price for {tier.name} {billing_cycle}")
+                logger.error(f"Failed to get/create price for {tier.name} {billing_cycle} in {currency}")
                 return None
 
             # Build subscription params
