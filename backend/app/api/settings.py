@@ -434,7 +434,7 @@ async def get_available_currencies():
 
     Used by currency selector in the frontend header.
     """
-    session = db_manager.get_session()
+    session = db_manager.session_local()
 
     try:
         # Only return currencies with exchange rates configured

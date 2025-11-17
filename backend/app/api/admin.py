@@ -821,7 +821,7 @@ async def get_currencies(
     Returns all currencies including those without exchange rates set.
     This allows admin to see which currencies need configuration.
     """
-    session = db_manager.get_session()
+    session = db_manager.session_local()
 
     try:
         currencies = session.query(Currency).order_by(Currency.sort_order).all()
@@ -874,7 +874,7 @@ async def update_currency_exchange_rate(
     Only currencies WITH exchange rates will be shown to users for selection.
     Set exchange_rate to null to hide a currency from users.
     """
-    session = db_manager.get_session()
+    session = db_manager.session_local()
 
     try:
         # Find currency by code
@@ -938,7 +938,7 @@ async def create_currency(
     - exchange_rate = units of THIS currency per 1 EUR (EUR/XXX rate)
     - Example: Setting USD exchange_rate to 1.10 means 1 EUR = 1.10 USD
     """
-    session = db_manager.get_session()
+    session = db_manager.session_local()
 
     try:
         # Check if currency already exists
@@ -1012,7 +1012,7 @@ async def delete_currency(
 
     Note: Cannot delete currency if it's set as default or if it's used in active subscriptions.
     """
-    session = db_manager.get_session()
+    session = db_manager.session_local()
 
     try:
         # Find currency by code

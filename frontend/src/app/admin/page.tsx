@@ -14,6 +14,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { apiClient } from '@/services/api-client'
+import currencyList from 'currency-list'
 
 interface SystemStats {
   total_users: number
@@ -803,42 +804,33 @@ export default function AdminDashboard() {
                     <div className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4 bg-neutral-50 dark:bg-neutral-800">
                       <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-4">Add New Currency</h3>
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
+                        <div className="col-span-2">
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Currency Code (ISO 4217)
+                            Select Currency
                           </label>
-                          <input
-                            type="text"
-                            maxLength={3}
+                          <select
                             value={newCurrency.code}
-                            onChange={(e) => setNewCurrency({...newCurrency, code: e.target.value.toUpperCase()})}
+                            onChange={(e) => {
+                              const selectedCode = e.target.value
+                              const currencyData = currencyList.get(selectedCode)
+                              if (currencyData) {
+                                setNewCurrency({
+                                  ...newCurrency,
+                                  code: currencyData.code,
+                                  symbol: currencyData.symbol,
+                                  name: currencyData.name
+                                })
+                              }
+                            }}
                             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
-                            placeholder="e.g., USD"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Symbol
-                          </label>
-                          <input
-                            type="text"
-                            value={newCurrency.symbol}
-                            onChange={(e) => setNewCurrency({...newCurrency, symbol: e.target.value})}
-                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
-                            placeholder="e.g., $"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Currency Name
-                          </label>
-                          <input
-                            type="text"
-                            value={newCurrency.name}
-                            onChange={(e) => setNewCurrency({...newCurrency, name: e.target.value})}
-                            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
-                            placeholder="e.g., US Dollar"
-                          />
+                          >
+                            <option value="">-- Select a currency --</option>
+                            {Object.values(currencyList.getAll('en_US')).map((currency: any) => (
+                              <option key={currency.code} value={currency.code}>
+                                {currency.code} - {currency.name} ({currency.symbol})
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
@@ -852,6 +844,14 @@ export default function AdminDashboard() {
                             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
                             placeholder="e.g., 1.10"
                           />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                            Selected: {newCurrency.code ? `${newCurrency.code} (${newCurrency.symbol})` : 'None'}
+                          </label>
+                          <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                            {newCurrency.name || 'Select a currency from the dropdown'}
+                          </div>
                         </div>
                       </div>
                       <div className="flex justify-end mt-4 space-x-2">
