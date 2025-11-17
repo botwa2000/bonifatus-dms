@@ -825,7 +825,7 @@ export default function AdminDashboard() {
                             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white"
                           >
                             <option value="">-- Select a currency --</option>
-                            {Object.values(currencyList.getAll('en_US')).map((currency: any) => (
+                            {Object.values(currencyList.getAll('en_US')).map((currency: {code: string; name: string; symbol: string}) => (
                               <option key={currency.code} value={currency.code}>
                                 {currency.code} - {currency.name} ({currency.symbol})
                               </option>
