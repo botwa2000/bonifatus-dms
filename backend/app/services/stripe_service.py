@@ -213,7 +213,7 @@ class StripeService:
             target_currency = currency.upper()
 
             # Get currency details from database (including exchange rate)
-            currency_obj = await self.get_currency(db, target_currency)
+            currency_obj = self.get_currency(db, target_currency)
             if not currency_obj:
                 logger.error(f"Currency {target_currency} not found in database")
                 return None
@@ -622,22 +622,20 @@ class StripeService:
     # Currency Formatting (Database-driven)
     # ============================================================
 
-    async def get_currency(self, db: AsyncSession, currency_code: str) -> Optional[Currency]:
+    def get_currency(self, db, currency_code: str) -> Optional[Currency]:
         """
         Get currency information from database
 
         Args:
-            db: Database session
+            db: Database session (sync or async)
             currency_code: Currency code (USD, EUR, GBP)
 
         Returns:
             Currency object or None if not found
         """
         try:
-            result = await db.execute(
-                select(Currency).where(Currency.code == currency_code.upper())
-            )
-            return result.scalar_one_or_none()
+            result = db.query(Currency).filter(Currency.code == currency_code.upper()).first()
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch currency {currency_code}: {str(e)}")
             return None
