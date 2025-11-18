@@ -186,16 +186,16 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
           {/* Refund eligibility notice */}
           {refundEligible && (
-            <Alert variant="info">
-              <p className="font-medium">14-Day Money-Back Guarantee</p>
-              <p className="text-sm mt-1">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="font-medium text-blue-900">14-Day Money-Back Guarantee</p>
+              <p className="text-sm mt-1 text-blue-700">
                 You subscribed {subscriptionAgeDays} day{subscriptionAgeDays !== 1 ? 's' : ''} ago.
                 You&apos;re eligible for a full refund if you cancel immediately.
               </p>
-            </Alert>
+            </div>
           )}
 
-          {error && <Alert variant="error">{error}</Alert>}
+          {error && <Alert type="error" message={error} />}
         </div>
       </ModalContent>
       <ModalFooter>
@@ -307,7 +307,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </p>
           </div>
 
-          {error && <Alert variant="error">{error}</Alert>}
+          {error && <Alert type="error" message={error} />}
         </div>
       </ModalContent>
       <ModalFooter>
@@ -330,15 +330,15 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       <ModalHeader title="Confirm cancellation" onClose={handleClose} />
       <ModalContent>
         <div className="space-y-4">
-          <Alert variant="warning">
-            <p className="font-medium">Are you sure?</p>
-            <p className="text-sm mt-1">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="font-medium text-yellow-900">Are you sure?</p>
+            <p className="text-sm mt-1 text-yellow-700">
               {cancelType === 'immediate'
                 ? 'Your subscription will be canceled immediately and you will receive a full refund.'
                 : `Your subscription will end on ${new Date(subscription.current_period_end).toLocaleDateString()}. You&apos;ll have access until then.`
               }
             </p>
-          </Alert>
+          </div>
 
           <div className="bg-neutral-50 rounded-lg p-4 space-y-2 text-sm">
             <div className="flex justify-between">
@@ -366,7 +366,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </div>
           </div>
 
-          {error && <Alert variant="error">{error}</Alert>}
+          {error && <Alert type="error" message={error} />}
         </div>
       </ModalContent>
       <ModalFooter>
@@ -401,13 +401,13 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
           </div>
 
           {result?.refund_issued && (
-            <Alert variant="success">
-              <p className="font-medium">Refund initiated</p>
-              <p className="text-sm mt-1">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="font-medium text-green-900">Refund initiated</p>
+              <p className="text-sm mt-1 text-green-700">
                 A refund of {result.refund_currency} {result.refund_amount?.toFixed(2)} has been initiated.
                 It will appear in your account within 5-10 business days.
               </p>
-            </Alert>
+            </div>
           )}
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
