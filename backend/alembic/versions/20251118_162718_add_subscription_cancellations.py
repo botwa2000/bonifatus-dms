@@ -46,12 +46,12 @@ def upgrade():
     op.create_index('idx_cancellation_date', 'subscription_cancellations', ['canceled_at'])
 
     # Add cancellation reasons to system_settings
-    op.execute("""
+    op.execute(r"""
         INSERT INTO system_settings (setting_key, setting_value, description, value_type, is_public)
         VALUES
         (
             'subscription_cancellation_reasons',
-            '[
+            $$[
                 {"value": "too_expensive", "label_en": "Too expensive", "label_de": "Zu teuer", "label_ru": "Слишком дорого", "label_fr": "Trop cher"},
                 {"value": "not_using", "label_en": "Not using it enough", "label_de": "Nicht genug genutzt", "label_ru": "Недостаточно используется", "label_fr": "Pas assez utilisé"},
                 {"value": "missing_features", "label_en": "Missing features I need", "label_de": "Fehlende Funktionen", "label_ru": "Нужные функции отсутствуют", "label_fr": "Fonctionnalités manquantes"},
@@ -59,7 +59,7 @@ def upgrade():
                 {"value": "technical_issues", "label_en": "Technical issues", "label_de": "Technische Probleme", "label_ru": "Технические проблемы", "label_fr": "Problèmes techniques"},
                 {"value": "customer_service", "label_en": "Customer service issues", "label_de": "Kundenservice-Probleme", "label_ru": "Проблемы с поддержкой", "label_fr": "Problèmes de service client"},
                 {"value": "other", "label_en": "Other reason", "label_de": "Anderer Grund", "label_ru": "Другая причина", "label_fr": "Autre raison"}
-            ]'::jsonb,
+            ]$$::jsonb,
             'Available cancellation reasons for subscription cancellations',
             'json',
             true
@@ -73,11 +73,11 @@ def upgrade():
         ),
         (
             'free_tier_features',
-            '[
-                {"feature_en": "Upload up to 50 documents per month", "feature_de": "Bis zu 50 Dokumente pro Monat hochladen", "feature_ru": "Загрузка до 50 документов в месяц", "feature_fr": "Télécharger jusqu\'à 50 documents par mois"},
+            $$[
+                {"feature_en": "Upload up to 50 documents per month", "feature_de": "Bis zu 50 Dokumente pro Monat hochladen", "feature_ru": "Загрузка до 50 документов в месяц", "feature_fr": "Télécharger jusqu'à 50 documents par mois"},
                 {"feature_en": "Basic document categorization", "feature_de": "Basis-Dokumentenkategorisierung", "feature_ru": "Базовая категоризация документов", "feature_fr": "Catégorisation de base des documents"},
-                {"feature_en": "Access to your document history", "feature_de": "Zugriff auf Ihre Dokumenthistorie", "feature_ru": "Доступ к истории документов", "feature_fr": "Accès à l\'historique des documents"}
-            ]'::jsonb,
+                {"feature_en": "Access to your document history", "feature_de": "Zugriff auf Ihre Dokumenthistorie", "feature_ru": "Доступ к истории документов", "feature_fr": "Accès à l'historique des documents"}
+            ]$$::jsonb,
             'Free tier features shown during cancellation and in cancellation emails',
             'json',
             true
