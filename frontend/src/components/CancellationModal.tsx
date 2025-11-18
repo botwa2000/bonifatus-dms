@@ -102,9 +102,10 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       setResult(response)
       setStep('success')
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Cancellation failed:', error)
-      setError(error.detail || 'Failed to cancel subscription. Please try again.')
+      const errorDetail = error && typeof error === 'object' && 'detail' in error ? (error as { detail: string }).detail : null
+      setError(errorDetail || 'Failed to cancel subscription. Please try again.')
     } finally {
       setProcessing(false)
     }
@@ -126,7 +127,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
     <>
       <ModalHeader onClose={handleClose}>
         <h3 className="text-xl font-semibold text-neutral-900">
-          We're sorry to see you go
+          We&apos;re sorry to see you go
         </h3>
       </ModalHeader>
       <ModalContent>
@@ -193,7 +194,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
               <p className="font-medium">14-Day Money-Back Guarantee</p>
               <p className="text-sm mt-1">
                 You subscribed {subscriptionAgeDays} day{subscriptionAgeDays !== 1 ? 's' : ''} ago.
-                You're eligible for a full refund if you cancel immediately.
+                You&apos;re eligible for a full refund if you cancel immediately.
               </p>
             </Alert>
           )}
@@ -226,7 +227,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       <ModalContent>
         <div className="space-y-6">
           <p className="text-neutral-600">
-            We'd love to know why you're canceling. Your feedback helps us improve.
+            We&apos;d love to know why you&apos;re canceling. Your feedback helps us improve.
           </p>
 
           {/* Cancellation type selection */}
@@ -346,7 +347,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             <p className="text-sm mt-1">
               {cancelType === 'immediate'
                 ? 'Your subscription will be canceled immediately and you will receive a full refund.'
-                : `Your subscription will end on ${new Date(subscription.current_period_end).toLocaleDateString()}. You'll have access until then.`
+                : `Your subscription will end on ${new Date(subscription.current_period_end).toLocaleDateString()}. You&apos;ll have access until then.`
               }
             </p>
           </Alert>
