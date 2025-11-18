@@ -776,27 +776,6 @@ class SearchHistory(Base):
     __table_args__ = (
         Index('idx_search_history_user', 'user_id', sa.text('created_at DESC')),
     )
-
-
-class EmailTemplate(Base, TimestampMixin):
-    """Email templates for transactional emails with multilingual support"""
-    __tablename__ = "email_templates"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    template_key = Column(String(100), nullable=False, index=True)  # e.g., 'welcome_email', 'password_reset'
-    language = Column(String(2), nullable=False, server_default='en')  # ISO 639-1 language code
-    subject = Column(String(255), nullable=False)
-    html_content = Column(Text, nullable=False)
-    variables = Column(JSONB, nullable=True)  # JSON array of variable names and descriptions
-    description = Column(Text, nullable=True)  # Template description for admins
-    is_active = Column(Boolean, nullable=False, server_default='true')
-
-    __table_args__ = (
-        Index('idx_email_template_key_lang', 'template_key', 'language', unique=True),
-        Index('idx_email_template_active', 'is_active'),
-    )
-
-
 # ============================================================
 # Payment Integration Models
 # ============================================================
