@@ -306,6 +306,7 @@ routers = [
     ("app.api.security", "Security"),
     ("app.api.translation", "Translation"),
     ("app.api.billing_subscriptions", "Billing"),
+    ("app.api.billing_cancellations", "BillingCancellations"),
 ]
 
 for module_path, name in routers:

@@ -875,6 +875,38 @@ class Subscription(Base, TimestampMixin):
     )
 
 
+class SubscriptionCancellation(Base, TimestampMixin):
+    """Subscription cancellation tracking with refund information"""
+    __tablename__ = "subscription_cancellations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    cancellation_reason = Column(String(50), nullable=True)  # too_expensive, not_using, missing_features, switching, other
+    feedback_text = Column(Text, nullable=True)  # Optional detailed feedback
+    cancel_type = Column(String(20), nullable=False)  # immediate, at_period_end
+    refund_requested = Column(Boolean, nullable=False, server_default='false')
+    refund_issued = Column(Boolean, nullable=False, server_default='false')
+    refund_amount_cents = Column(Integer, nullable=True)
+    refund_currency = Column(String(3), nullable=True)
+    stripe_refund_id = Column(String(100), nullable=True)
+    subscription_age_days = Column(Integer, nullable=True)  # Age at cancellation for analytics
+    canceled_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    cancellation_metadata = Column(JSONB, nullable=True)
+
+    # Relationships
+    subscription = relationship("Subscription")
+    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_cancellation_subscription', 'subscription_id'),
+        Index('idx_cancellation_user', 'user_id'),
+        Index('idx_cancellation_reason', 'cancellation_reason'),
+        Index('idx_cancellation_refund', 'refund_issued'),
+        Index('idx_cancellation_date', 'canceled_at'),
+    )
+
+
 class DiscountCode(Base, TimestampMixin):
     """Promotional discount codes"""
     __tablename__ = "discount_codes"
