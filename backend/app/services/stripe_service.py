@@ -261,12 +261,12 @@ class StripeService:
                 recurring={'interval': interval},
                 product_data={
                     'name': f'{tier.display_name} - {billing_cycle.capitalize()} ({target_currency})',
-                    'description': tier.description,
                     'metadata': {
                         'tier_id': str(tier.id),
                         'tier_name': tier.name,
                         'billing_cycle': billing_cycle,
-                        'currency': target_currency
+                        'currency': target_currency,
+                        'description': tier.description  # Store description in metadata instead
                     }
                 },
                 metadata={
