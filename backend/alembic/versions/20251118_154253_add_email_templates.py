@@ -17,6 +17,9 @@ depends_on = None
 
 
 def upgrade():
+    # Drop old table if exists (from previous schema)
+    op.execute("DROP TABLE IF EXISTS email_templates CASCADE")
+
     # Create email_templates table
     op.create_table(
         'email_templates',
