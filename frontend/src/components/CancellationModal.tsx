@@ -278,14 +278,11 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
               id="reason"
               value={selectedReason}
               onChange={(e) => setSelectedReason(e.target.value)}
-            >
-              <option value="">Select a reason</option>
-              {reasons.map(reason => (
-                <option key={reason.value} value={reason.value}>
-                  {reason.label}
-                </option>
-              ))}
-            </Select>
+              options={[
+                { value: '', label: 'Select a reason' },
+                ...reasons
+              ]}
+            />
           </div>
 
           {/* Feedback textarea */}
