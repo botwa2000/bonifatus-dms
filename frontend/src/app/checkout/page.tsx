@@ -8,7 +8,7 @@ import { useCurrency } from '@/contexts/currency-context'
 function CheckoutContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { selectedCurrency } = useCurrency()
+  const { selectedCurrency, isLoading: currencyLoading } = useCurrency()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('Initializing checkout...')
 
@@ -25,8 +25,14 @@ function CheckoutContent() {
           return
         }
 
+        // Wait for currency to load
+        if (currencyLoading) {
+          setStatus('Loading currency settings...')
+          return
+        }
+
         if (!selectedCurrency) {
-          setError('Currency not loaded')
+          setError('Currency not available')
           setTimeout(() => router.push('/'), 3000)
           return
         }
@@ -61,7 +67,7 @@ function CheckoutContent() {
     }
 
     initializeCheckout()
-  }, [searchParams, router, selectedCurrency])
+  }, [searchParams, router, selectedCurrency, currencyLoading])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
