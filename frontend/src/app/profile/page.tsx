@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Input, Select, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
+import CancellationModal from '@/components/CancellationModal'
 
 interface UserProfile {
   id: string
@@ -40,6 +41,7 @@ interface Subscription {
   amount: number
   currency: string
   currency_symbol?: string
+  created_at?: string
 }
 
 interface TierPlan {
@@ -197,22 +199,10 @@ export default function ProfilePage() {
     }
   }
 
-  const handleCancelSubscription = async () => {
-    setProcessingSubscription(true)
-    setMessage(null)
-
-    try {
-      await apiClient.post('/api/v1/billing/subscriptions/cancel', {}, true)
-      setMessage({ type: 'success', text: 'Subscription will be cancelled at the end of the billing period' })
-      setShowCancelModal(false)
-      await loadSubscriptionData()
-      await loadProfileData()
-    } catch (error) {
-      console.error('Failed to cancel subscription:', error)
-      setMessage({ type: 'error', text: 'Failed to cancel subscription' })
-    } finally {
-      setProcessingSubscription(false)
-    }
+  const handleCancellationSuccess = async () => {
+    setMessage({ type: 'success', text: 'Subscription canceled successfully' })
+    await loadSubscriptionData()
+    await loadProfileData()
   }
 
   const handleManageBilling = async () => {
@@ -585,37 +575,14 @@ export default function ProfilePage() {
         </ModalFooter>
       </Modal>
 
-      <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)}>
-        <ModalHeader title="Cancel Subscription" onClose={() => setShowCancelModal(false)} />
-        <ModalContent>
-          <Alert
-            type="warning"
-            message="Your subscription will remain active until the end of the current billing period. You'll continue to have access to all premium features until then."
-          />
-
-          <div className="space-y-3 mt-4">
-            <p className="text-sm text-neutral-700">
-              Are you sure you want to cancel your subscription? You can always resubscribe later.
-            </p>
-            {subscription && (
-              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
-                <p className="text-sm text-neutral-600">
-                  Your <span className="font-semibold text-neutral-900">{subscription.tier_name}</span> subscription will end on{' '}
-                  <span className="font-semibold text-neutral-900">{formatDate(subscription.current_period_end)}</span>
-                </p>
-              </div>
-            )}
-          </div>
-        </ModalContent>
-        <ModalFooter>
-          <Button variant="danger" onClick={handleCancelSubscription} disabled={processingSubscription} className="flex-1">
-            {processingSubscription ? 'Cancelling...' : 'Yes, Cancel Subscription'}
-          </Button>
-          <Button variant="secondary" onClick={() => setShowCancelModal(false)} disabled={processingSubscription} className="flex-1">
-            Keep Subscription
-          </Button>
-        </ModalFooter>
-      </Modal>
+      {subscription && (
+        <CancellationModal
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          subscription={subscription}
+          onSuccess={handleCancellationSuccess}
+        />
+      )}
     </div>
   )
 }
