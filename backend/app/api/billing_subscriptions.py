@@ -114,9 +114,10 @@ async def create_checkout_session(
             metadata['referral_code'] = referral_code
 
         # Create checkout session
+        stripe_customer_id = getattr(current_user, 'stripe_customer_id', None)
         checkout_session = stripe.checkout.Session.create(
-            customer=current_user.stripe_customer_id if current_user.stripe_customer_id else None,
-            customer_email=current_user.email if not current_user.stripe_customer_id else None,
+            customer=stripe_customer_id if stripe_customer_id else None,
+            customer_email=current_user.email if not stripe_customer_id else None,
             mode='subscription',
             line_items=[{
                 'price': price_id,
