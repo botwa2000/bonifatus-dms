@@ -125,11 +125,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
   const renderRetentionStep = () => (
     <>
-      <ModalHeader onClose={handleClose}>
-        <h3 className="text-xl font-semibold text-neutral-900">
-          We&apos;re sorry to see you go
-        </h3>
-      </ModalHeader>
+      <ModalHeader title="We're sorry to see you go" onClose={handleClose} />
       <ModalContent>
         <div className="space-y-6">
           {/* Current subscription info */}
@@ -219,11 +215,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
   const renderReasonStep = () => (
     <>
-      <ModalHeader onClose={handleClose}>
-        <h3 className="text-xl font-semibold text-neutral-900">
-          Help us improve
-        </h3>
-      </ModalHeader>
+      <ModalHeader title="Help us improve" onClose={handleClose} />
       <ModalContent>
         <div className="space-y-6">
           <p className="text-neutral-600">
@@ -335,11 +327,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
   const renderConfirmStep = () => (
     <>
-      <ModalHeader onClose={handleClose}>
-        <h3 className="text-xl font-semibold text-neutral-900">
-          Confirm cancellation
-        </h3>
-      </ModalHeader>
+      <ModalHeader title="Confirm cancellation" onClose={handleClose} />
       <ModalContent>
         <div className="space-y-4">
           <Alert variant="warning">
@@ -398,11 +386,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
   const renderSuccessStep = () => (
     <>
-      <ModalHeader onClose={handleClose}>
-        <h3 className="text-xl font-semibold text-neutral-900">
-          Subscription canceled
-        </h3>
-      </ModalHeader>
+      <ModalHeader title="Subscription canceled" onClose={handleClose} />
       <ModalContent>
         <div className="space-y-4">
           <div className="text-center py-4">
