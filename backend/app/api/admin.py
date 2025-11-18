@@ -566,8 +566,8 @@ class EmailTemplateUpdate(BaseModel):
 
 @router.get("/email-templates")
 async def list_email_templates(
-    template_key: Optional[str] = Query(None, description="Filter by template key"),
-    language: Optional[str] = Query(None, description="Filter by language"),
+    name: Optional[str] = Query(None, description="Filter by template name"),
+    category: Optional[str] = Query(None, description="Filter by category"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -580,16 +580,16 @@ async def list_email_templates(
     try:
         query = select(EmailTemplate)
 
-        if template_key:
-            query = query.where(EmailTemplate.template_key == template_key)
+        if name:
+            query = query.where(EmailTemplate.name == name)
 
-        if language:
-            query = query.where(EmailTemplate.language == language)
+        if category:
+            query = query.where(EmailTemplate.category == category)
 
         if is_active is not None:
             query = query.where(EmailTemplate.is_active == is_active)
 
-        query = query.order_by(EmailTemplate.template_key, EmailTemplate.language)
+        query = query.order_by(EmailTemplate.name)
 
         result = session.execute(query)
         templates = result.scalars().all()
@@ -598,11 +598,11 @@ async def list_email_templates(
             "templates": [
                 {
                     "id": str(template.id),
-                    "template_key": template.template_key,
-                    "language": template.language,
+                    "template_key": template.name,  # Map name to template_key for frontend compatibility
+                    "language": "en",  # Default language since no language field exists
                     "subject": template.subject,
-                    "html_content": template.html_content,
-                    "variables": template.variables,
+                    "html_content": template.html_body,  # Map html_body to html_content
+                    "variables": template.available_variables or [],
                     "description": template.description,
                     "is_active": template.is_active,
                     "created_at": template.created_at.isoformat(),
@@ -719,25 +719,24 @@ async def update_email_template(
         if update_data.subject is not None:
             template.subject = update_data.subject
         if update_data.html_content is not None:
-            template.html_content = update_data.html_content
-        if update_data.variables is not None:
-            template.variables = update_data.variables
+            template.html_body = update_data.html_content  # Map html_content to html_body
         if update_data.description is not None:
             template.description = update_data.description
         if update_data.is_active is not None:
             template.is_active = update_data.is_active
 
+        template.updated_at = datetime.now()
         session.commit()
         session.refresh(template)
 
-        logger.info(f"Admin {current_user.email} updated email template: {template.template_key} ({template.language})")
+        logger.info(f"Admin {current_user.email} updated email template: {template.name}")
 
         return {
             "message": "Email template updated successfully",
             "template": {
                 "id": str(template.id),
-                "template_key": template.template_key,
-                "language": template.language,
+                "template_key": template.name,
+                "language": "en",
                 "subject": template.subject,
                 "is_active": template.is_active,
                 "updated_at": template.updated_at.isoformat()
