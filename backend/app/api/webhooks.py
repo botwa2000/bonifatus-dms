@@ -199,7 +199,14 @@ async def handle_subscription_created(event, session: Session):
         return
 
     # Create subscription in database
-    billing_cycle = stripe_sub.metadata.get('billing_cycle', 'monthly') if stripe_sub.metadata else 'monthly'
+    # Get billing cycle from Stripe price interval (month -> monthly, year -> yearly)
+    price_interval = None
+    if stripe_sub.items.data:
+        price = stripe_sub.items.data[0].price
+        if price.recurring:
+            price_interval = price.recurring.interval
+
+    billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
 
     db_subscription = Subscription(
         user_id=user.id,
