@@ -860,6 +860,8 @@ class Subscription(Base, TimestampMixin):
     cancel_at_period_end = Column(Boolean, nullable=False, server_default='false')
     canceled_at = Column(DateTime(timezone=True), nullable=True)
     ended_at = Column(DateTime(timezone=True), nullable=True)
+    currency = Column(String(3), nullable=True)  # Actual currency used for subscription (CHF, USD, EUR, etc.)
+    amount_cents = Column(Integer, nullable=True)  # Actual amount charged in cents
     subscription_metadata = Column(JSONB, nullable=True)
 
     # Relationships

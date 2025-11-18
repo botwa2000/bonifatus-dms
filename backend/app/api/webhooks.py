@@ -202,12 +202,17 @@ async def handle_subscription_created(event, session: Session):
         return
 
     # Create subscription in database
-    # Get billing cycle from Stripe price interval (month -> monthly, year -> yearly)
+    # Get billing cycle and currency from Stripe price
     price_interval = None
+    currency = None
+    amount_cents = None
     if stripe_sub.items.data:
         price = stripe_sub.items.data[0].price
         if price.recurring:
             price_interval = price.recurring.interval
+        # Store the actual currency and amount charged
+        currency = price.currency.upper() if price.currency else None
+        amount_cents = price.unit_amount if price.unit_amount else None
 
     billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
 
@@ -222,7 +227,9 @@ async def handle_subscription_created(event, session: Session):
         current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc),
         trial_start=datetime.fromtimestamp(stripe_sub.trial_start, tz=timezone.utc) if stripe_sub.trial_start else None,
         trial_end=datetime.fromtimestamp(stripe_sub.trial_end, tz=timezone.utc) if stripe_sub.trial_end else None,
-        cancel_at_period_end=stripe_sub.cancel_at_period_end
+        cancel_at_period_end=stripe_sub.cancel_at_period_end,
+        currency=currency,
+        amount_cents=amount_cents
     )
 
     session.add(db_subscription)

@@ -283,9 +283,13 @@ async def get_subscription(
 
     tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
 
+    # Use subscription's actual currency/amount if available, otherwise fall back to tier defaults
+    actual_currency = subscription.currency or tier.currency
+    actual_amount = subscription.amount_cents or (tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else tier.price_yearly_cents)
+
     # Get currency symbol from currencies table
-    currency = session.query(Currency).filter(Currency.code == tier.currency).first()
-    currency_symbol = currency.symbol if currency else tier.currency
+    currency = session.query(Currency).filter(Currency.code == actual_currency).first()
+    currency_symbol = currency.symbol if currency else actual_currency
 
     return SubscriptionResponse(
         id=subscription.stripe_subscription_id,
@@ -300,8 +304,8 @@ async def get_subscription(
         trial_end=subscription.trial_end,
         cancel_at_period_end=subscription.cancel_at_period_end,
         canceled_at=subscription.canceled_at,
-        amount=tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else tier.price_yearly_cents,
-        currency=tier.currency,
+        amount=actual_amount,
+        currency=actual_currency,
         currency_symbol=currency_symbol,
         created_at=subscription.created_at
     )
