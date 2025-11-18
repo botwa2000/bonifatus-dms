@@ -434,7 +434,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
   if (!isOpen) return null
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} maxWidth="600px">
       {step === 'retention' && renderRetentionStep()}
       {step === 'reason' && renderReasonStep()}
       {step === 'confirm' && renderConfirmStep()}
