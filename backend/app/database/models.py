@@ -1027,3 +1027,27 @@ class Invoice(Base, TimestampMixin):
         Index('idx_invoice_created', 'created_at'),
         Index('idx_invoice_due', 'due_date'),
     )
+
+class EmailTemplate(Base, TimestampMixin):
+    """Email templates for subscription communications"""
+    __tablename__ = "email_templates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), unique=True, nullable=False)  # e.g., 'subscription_confirmation', 'invoice', 'cancellation'
+    display_name = Column(String(200), nullable=False)  # Human-readable name for admin UI
+    description = Column(Text, nullable=True)  # Description shown in admin UI
+    subject = Column(String(500), nullable=False)  # Email subject line with variable support
+    html_body = Column(Text, nullable=False)  # HTML email body with variable support
+    text_body = Column(Text, nullable=True)  # Plain text fallback
+    available_variables = Column(JSONB, nullable=False, server_default='[]')  # List of available template variables
+    category = Column(String(50), nullable=False, server_default='subscription')  # subscription, billing, system
+    is_active = Column(Boolean, nullable=False, server_default='true')
+    is_system = Column(Boolean, nullable=False, server_default='false')  # System templates cannot be deleted
+    send_from_name = Column(String(100), nullable=True)  # Override default from name
+    send_from_email = Column(String(255), nullable=True)  # Override default from email
+    
+    __table_args__ = (
+        Index('idx_email_template_name', 'name'),
+        Index('idx_email_template_category', 'category'),
+        Index('idx_email_template_active', 'is_active'),
+    )
