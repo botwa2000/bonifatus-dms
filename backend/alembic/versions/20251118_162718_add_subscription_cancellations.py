@@ -47,9 +47,10 @@ def upgrade():
 
     # Add cancellation reasons to system_settings
     op.execute(r"""
-        INSERT INTO system_settings (setting_key, setting_value, description, value_type, is_public)
+        INSERT INTO system_settings (id, setting_key, setting_value, description, data_type, is_public, category)
         VALUES
         (
+            gen_random_uuid(),
             'subscription_cancellation_reasons',
             $$[
                 {"value": "too_expensive", "label_en": "Too expensive", "label_de": "Zu teuer", "label_ru": "Слишком дорого", "label_fr": "Trop cher"},
@@ -62,16 +63,20 @@ def upgrade():
             ]$$::jsonb,
             'Available cancellation reasons for subscription cancellations',
             'json',
-            true
+            true,
+            'billing'
         ),
         (
+            gen_random_uuid(),
             'refund_policy_days',
             '14',
             'Number of days for full refund eligibility (money-back guarantee)',
             'integer',
-            true
+            true,
+            'billing'
         ),
         (
+            gen_random_uuid(),
             'free_tier_features',
             $$[
                 {"feature_en": "Upload up to 50 documents per month", "feature_de": "Bis zu 50 Dokumente pro Monat hochladen", "feature_ru": "Загрузка до 50 документов в месяц", "feature_fr": "Télécharger jusqu'à 50 documents par mois"},
@@ -80,7 +85,8 @@ def upgrade():
             ]$$::jsonb,
             'Free tier features shown during cancellation and in cancellation emails',
             'json',
-            true
+            true,
+            'billing'
         )
     """)
 
