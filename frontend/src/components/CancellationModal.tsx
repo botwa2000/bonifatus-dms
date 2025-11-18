@@ -148,7 +148,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
           {/* What they'll lose */}
           <div>
             <h4 className="font-semibold text-neutral-900 mb-3">
-              What you'll miss with Free tier
+              What you&apos;ll miss with Free tier
             </h4>
             <ul className="space-y-2 text-sm text-neutral-700">
               <li className="flex items-start">
@@ -180,7 +180,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
 
           {/* Free tier features */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-900 mb-2">What you'll keep with Free tier</h4>
+            <h4 className="font-semibold text-green-900 mb-2">What you&apos;ll keep with Free tier</h4>
             <ul className="space-y-1 text-sm text-green-800">
               <li>✓ Up to 50 documents per month</li>
               <li>✓ Basic document categorization</li>
@@ -432,7 +432,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </p>
             {!result?.downgraded_to_free && (
               <p className="text-sm text-blue-800 mt-2">
-                After this date, you'll be automatically downgraded to the Free tier.
+                After this date, you&apos;ll be automatically downgraded to the Free tier.
               </p>
             )}
           </div>
