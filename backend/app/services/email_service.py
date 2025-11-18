@@ -5,8 +5,10 @@ Email service using Brevo (Sendinblue) API for transactional emails
 
 import logging
 import httpx
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.services.email_template_service import email_template_service
 
 logger = logging.getLogger(__name__)
 
@@ -508,6 +510,222 @@ class EmailService:
             from_email=settings.email.email_from_info,
             reply_to=settings.email.email_from_info
         )
+
+    async def send_subscription_confirmation(
+        self,
+        session: Session,
+        user_email: str,
+        user_name: str,
+        plan_name: str,
+        billing_cycle: str,
+        amount: float,
+        currency_symbol: str,
+        billing_period: str,
+        next_billing_date: str,
+        dashboard_url: str,
+        support_url: str
+    ) -> bool:
+        """
+        Send subscription confirmation email using database template
+
+        Args:
+            session: Database session
+            user_email: User email address
+            user_name: User name
+            plan_name: Subscription plan name
+            billing_cycle: Billing cycle (monthly/yearly)
+            amount: Subscription amount
+            currency_symbol: Currency symbol ($, €, etc.)
+            billing_period: Billing period text (month/year)
+            next_billing_date: Next billing date
+            dashboard_url: Dashboard URL
+            support_url: Support URL
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            variables = {
+                'user_name': user_name,
+                'plan_name': plan_name,
+                'billing_cycle': billing_cycle,
+                'billing_period': billing_period,
+                'amount': str(amount),
+                'currency_symbol': currency_symbol,
+                'next_billing_date': next_billing_date,
+                'dashboard_url': dashboard_url,
+                'support_url': support_url
+            }
+
+            email_data = email_template_service.prepare_email(
+                session=session,
+                template_name='subscription_confirmation',
+                variables=variables,
+                recipient_email=user_email,
+                recipient_name=user_name
+            )
+
+            if not email_data:
+                logger.error("Subscription confirmation template not found")
+                return False
+
+            return await self.send_email(
+                to_email=email_data['to_email'],
+                to_name=email_data['to_name'],
+                subject=email_data['subject'],
+                html_content=email_data['html_body'],
+                from_email=email_data.get('from_email'),
+                from_name=email_data.get('from_name')
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send subscription confirmation to {user_email}: {e}")
+            return False
+
+    async def send_invoice_email(
+        self,
+        session: Session,
+        user_email: str,
+        user_name: str,
+        plan_name: str,
+        invoice_number: str,
+        invoice_date: str,
+        period_start: str,
+        period_end: str,
+        amount: float,
+        currency_symbol: str,
+        invoice_pdf_url: str,
+        support_url: str
+    ) -> bool:
+        """
+        Send invoice email using database template
+
+        Args:
+            session: Database session
+            user_email: User email address
+            user_name: User name
+            plan_name: Subscription plan name
+            invoice_number: Invoice number
+            invoice_date: Invoice date
+            period_start: Billing period start date
+            period_end: Billing period end date
+            amount: Invoice amount
+            currency_symbol: Currency symbol
+            invoice_pdf_url: URL to invoice PDF
+            support_url: Support URL
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            variables = {
+                'user_name': user_name,
+                'plan_name': plan_name,
+                'invoice_number': invoice_number,
+                'invoice_date': invoice_date,
+                'period_start': period_start,
+                'period_end': period_end,
+                'amount': str(amount),
+                'currency_symbol': currency_symbol,
+                'invoice_pdf_url': invoice_pdf_url,
+                'support_url': support_url
+            }
+
+            email_data = email_template_service.prepare_email(
+                session=session,
+                template_name='invoice_email',
+                variables=variables,
+                recipient_email=user_email,
+                recipient_name=user_name
+            )
+
+            if not email_data:
+                logger.error("Invoice email template not found")
+                return False
+
+            return await self.send_email(
+                to_email=email_data['to_email'],
+                to_name=email_data['to_name'],
+                subject=email_data['subject'],
+                html_content=email_data['html_body'],
+                from_email=email_data.get('from_email'),
+                from_name=email_data.get('from_name')
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send invoice email to {user_email}: {e}")
+            return False
+
+    async def send_cancellation_email(
+        self,
+        session: Session,
+        user_email: str,
+        user_name: str,
+        plan_name: str,
+        access_end_date: str,
+        free_tier_feature_1: str,
+        free_tier_feature_2: str,
+        free_tier_feature_3: str,
+        reactivate_url: str,
+        feedback_url: str,
+        support_url: str
+    ) -> bool:
+        """
+        Send cancellation confirmation email using database template
+
+        Args:
+            session: Database session
+            user_email: User email address
+            user_name: User name
+            plan_name: Cancelled plan name
+            access_end_date: Date when access ends
+            free_tier_feature_1: First free tier feature
+            free_tier_feature_2: Second free tier feature
+            free_tier_feature_3: Third free tier feature
+            reactivate_url: URL to reactivate subscription
+            feedback_url: URL to feedback survey
+            support_url: Support URL
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            variables = {
+                'user_name': user_name,
+                'plan_name': plan_name,
+                'access_end_date': access_end_date,
+                'free_tier_feature_1': free_tier_feature_1,
+                'free_tier_feature_2': free_tier_feature_2,
+                'free_tier_feature_3': free_tier_feature_3,
+                'reactivate_url': reactivate_url,
+                'feedback_url': feedback_url,
+                'support_url': support_url
+            }
+
+            email_data = email_template_service.prepare_email(
+                session=session,
+                template_name='cancellation_confirmation',
+                variables=variables,
+                recipient_email=user_email,
+                recipient_name=user_name
+            )
+
+            if not email_data:
+                logger.error("Cancellation confirmation template not found")
+                return False
+
+            return await self.send_email(
+                to_email=email_data['to_email'],
+                to_name=email_data['to_name'],
+                subject=email_data['subject'],
+                html_content=email_data['html_body'],
+                from_email=email_data.get('from_email'),
+                from_name=email_data.get('from_name')
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send cancellation email to {user_email}: {e}")
+            return False
 
 
 # Global email service instance

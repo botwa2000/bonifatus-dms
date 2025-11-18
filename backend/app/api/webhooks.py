@@ -5,6 +5,7 @@ Handles asynchronous events from Stripe (payments, subscriptions, invoices)
 """
 
 import logging
+import asyncio
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -15,7 +16,9 @@ from app.database.models import (
     UserDiscountRedemption
 )
 from app.services.stripe_service import stripe_service
+from app.services.email_service import email_service
 from app.schemas.billing_schemas import WebhookEventResponse
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +238,49 @@ async def handle_subscription_created(event, session: Session):
 
     logger.info(f"Created subscription {db_subscription.id} for user {user.email}, tier {tier.name}")
 
+    # Send subscription confirmation email
+    try:
+        # Get currency from price
+        price = stripe_sub.items.data[0].price if stripe_sub.items.data else None
+        currency = price.currency.upper() if price and price.currency else 'USD'
+        amount = (price.unit_amount / 100) if price and price.unit_amount else 0
+
+        # Get currency symbol
+        from app.database.models import Currency
+        currency_obj = session.query(Currency).filter(Currency.code == currency).first()
+        currency_symbol = currency_obj.symbol if currency_obj else '$'
+
+        # Format billing period
+        billing_period = 'year' if billing_cycle == 'yearly' else 'month'
+
+        # Format next billing date
+        next_billing_date = db_subscription.current_period_end.strftime('%B %d, %Y')
+
+        # Get dashboard URL from settings
+        frontend_url = settings.app.app_frontend_url
+        dashboard_url = f"{frontend_url}/dashboard"
+        support_url = f"{frontend_url}/support"
+
+        # Send email
+        asyncio.create_task(
+            email_service.send_subscription_confirmation(
+                session=session,
+                user_email=user.email,
+                user_name=user.full_name or user.email,
+                plan_name=tier.name,
+                billing_cycle=billing_cycle,
+                amount=amount,
+                currency_symbol=currency_symbol,
+                billing_period=billing_period,
+                next_billing_date=next_billing_date,
+                dashboard_url=dashboard_url,
+                support_url=support_url
+            )
+        )
+        logger.info(f"Subscription confirmation email queued for {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send subscription confirmation email: {e}")
+
 
 async def handle_subscription_updated(event, session: Session):
     """Process subscription.updated event"""
@@ -281,6 +327,8 @@ async def handle_subscription_deleted(event, session: Session):
     subscription.ended_at = datetime.now(timezone.utc)
 
     user = session.query(User).filter(User.id == subscription.user_id).first()
+    tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+
     if user:
         free_tier = session.query(TierPlan).filter(TierPlan.name == 'free').first()
         if free_tier:
@@ -289,6 +337,44 @@ async def handle_subscription_deleted(event, session: Session):
 
     session.commit()
     logger.info(f"Deleted subscription {subscription.id}")
+
+    # Send cancellation confirmation email
+    try:
+        # Access ends at current_period_end (user keeps access until then)
+        access_end_date = subscription.current_period_end.strftime('%B %d, %Y')
+
+        # Get frontend URL
+        frontend_url = settings.app.app_frontend_url
+        reactivate_url = f"{frontend_url}/profile/subscription"
+        feedback_url = f"{frontend_url}/feedback?reason=cancellation"
+        support_url = f"{frontend_url}/support"
+
+        # Free tier features (you can customize these)
+        free_tier_features = [
+            "Upload up to 50 documents per month",
+            "Basic document categorization",
+            "Access to your document history"
+        ]
+
+        # Send email
+        asyncio.create_task(
+            email_service.send_cancellation_email(
+                session=session,
+                user_email=user.email,
+                user_name=user.full_name or user.email,
+                plan_name=tier.name if tier else 'Premium',
+                access_end_date=access_end_date,
+                free_tier_feature_1=free_tier_features[0],
+                free_tier_feature_2=free_tier_features[1],
+                free_tier_feature_3=free_tier_features[2],
+                reactivate_url=reactivate_url,
+                feedback_url=feedback_url,
+                support_url=support_url
+            )
+        )
+        logger.info(f"Cancellation email queued for {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send cancellation email: {e}")
 
 
 async def handle_invoice_payment_succeeded(event, session: Session):
@@ -354,6 +440,56 @@ async def handle_invoice_payment_succeeded(event, session: Session):
 
     session.commit()
     logger.info(f"Invoice {stripe_invoice.id} payment succeeded for user {user.email}")
+
+    # Send invoice email
+    try:
+        # Get subscription and tier information
+        subscription = session.query(Subscription).filter(
+            Subscription.stripe_subscription_id == stripe_invoice.subscription
+        ).first() if stripe_invoice.subscription else None
+
+        tier = None
+        if subscription:
+            tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+
+        # Get currency
+        currency = stripe_invoice.currency.upper()
+        from app.database.models import Currency
+        currency_obj = session.query(Currency).filter(Currency.code == currency).first()
+        currency_symbol = currency_obj.symbol if currency_obj else '$'
+
+        # Format dates
+        invoice_date = datetime.fromtimestamp(stripe_invoice.created, tz=timezone.utc).strftime('%B %d, %Y')
+        period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
+        period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
+
+        # Calculate amount
+        amount = stripe_invoice.amount_paid / 100
+
+        # Get frontend URL
+        frontend_url = settings.app.app_frontend_url
+        support_url = f"{frontend_url}/support"
+
+        # Send email
+        asyncio.create_task(
+            email_service.send_invoice_email(
+                session=session,
+                user_email=user.email,
+                user_name=user.full_name or user.email,
+                plan_name=tier.name if tier else 'Subscription',
+                invoice_number=stripe_invoice.number or f"INV-{stripe_invoice.id[-8:]}",
+                invoice_date=invoice_date,
+                period_start=period_start,
+                period_end=period_end,
+                amount=amount,
+                currency_symbol=currency_symbol,
+                invoice_pdf_url=stripe_invoice.invoice_pdf or stripe_invoice.hosted_invoice_url or '#',
+                support_url=support_url
+            )
+        )
+        logger.info(f"Invoice email queued for {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send invoice email: {e}")
 
 
 async def handle_invoice_payment_failed(event, session: Session):
