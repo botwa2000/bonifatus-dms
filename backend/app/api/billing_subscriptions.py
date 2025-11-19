@@ -7,7 +7,7 @@ Handles subscription creation, updates, and cancellations
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 from datetime import datetime, timezone
 
 from app.schemas.billing_schemas import (
@@ -124,11 +124,13 @@ async def create_checkout_session(
             )
             stripe_customer_id = customer.id
 
-            # Save to database immediately
-            current_user.stripe_customer_id = stripe_customer_id
-            session.add(current_user)  # Attach user to session
+            # Save to database immediately using direct UPDATE to avoid session state issues
+            session.execute(
+                update(User)
+                .where(User.id == current_user.id)
+                .values(stripe_customer_id=stripe_customer_id)
+            )
             session.commit()
-            session.refresh(current_user)
             logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
         # Create checkout session with existing customer
