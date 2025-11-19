@@ -500,15 +500,6 @@ export default function ProfilePage() {
                           </div>
                         )
                       })}
-
-                    <div className="flex items-center justify-center pt-2">
-                      <button
-                        onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                        className="text-sm text-admin-primary hover:underline"
-                      >
-                        Switch to {billingCycle === 'monthly' ? 'annual' : 'monthly'} billing
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}

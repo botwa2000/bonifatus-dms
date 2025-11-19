@@ -167,14 +167,14 @@ export default function EmailTemplatesAdmin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900">
       <AppHeader />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Email Templates</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-neutral-100">Email Templates</h1>
+          <p className="mt-2 text-gray-600 dark:text-neutral-400">
             Manage transactional email templates with multilingual support
           </p>
         </div>
@@ -196,13 +196,13 @@ export default function EmailTemplatesAdmin() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                   Language
                 </label>
                 <select
                   value={filterLanguage}
                   onChange={(e) => setFilterLanguage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">All Languages</option>
                   {languages.map(lang => (
@@ -212,13 +212,13 @@ export default function EmailTemplatesAdmin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                   Status
                 </label>
                 <select
                   value={filterActive}
                   onChange={(e) => setFilterActive(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">All</option>
                   <option value="active">Active Only</option>
@@ -244,20 +244,20 @@ export default function EmailTemplatesAdmin() {
           <CardHeader title={`Templates (${filteredTemplates.length})`} />
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading templates...</div>
+              <div className="text-center py-8 text-gray-500 dark:text-neutral-400">Loading templates...</div>
             ) : filteredTemplates.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No templates found</div>
+              <div className="text-center py-8 text-gray-500 dark:text-neutral-400">No templates found</div>
             ) : (
               <div className="space-y-4">
                 {filteredTemplates.map(template => (
                   <div
                     key={template.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                    className="border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 rounded-lg p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-neutral-100">
                             {template.template_key}
                           </h3>
                           <Badge variant={template.is_active ? 'success' : 'default'}>
@@ -266,23 +266,23 @@ export default function EmailTemplatesAdmin() {
                           <Badge variant="info">{template.language.toUpperCase()}</Badge>
                         </div>
 
-                        <p className="text-sm text-gray-600 mb-2">
+                        <p className="text-sm text-gray-600 dark:text-neutral-300 mb-2">
                           <strong>Subject:</strong> {template.subject}
                         </p>
 
                         {template.description && (
-                          <p className="text-sm text-gray-500 mb-2">
+                          <p className="text-sm text-gray-500 dark:text-neutral-400 mb-2">
                             {template.description}
                           </p>
                         )}
 
                         {template.variables && template.variables.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            <span className="text-xs text-gray-500">Variables:</span>
+                            <span className="text-xs text-gray-500 dark:text-neutral-400">Variables:</span>
                             {template.variables.map(v => (
                               <code
                                 key={v}
-                                className="text-xs bg-gray-100 px-2 py-1 rounded"
+                                className="text-xs bg-gray-100 dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 px-2 py-1 rounded"
                               >
                                 {`{{${v}}}`}
                               </code>
@@ -290,7 +290,7 @@ export default function EmailTemplatesAdmin() {
                           </div>
                         )}
 
-                        <p className="text-xs text-gray-400 mt-2">
+                        <p className="text-xs text-gray-400 dark:text-neutral-500 mt-2">
                           Last updated: {new Date(template.updated_at).toLocaleString()}
                         </p>
                       </div>
@@ -313,54 +313,54 @@ export default function EmailTemplatesAdmin() {
         {/* Edit Modal */}
         {isEditing && selectedTemplate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-neutral-100 mb-4">
                   Edit Template: {selectedTemplate.template_key} ({selectedTemplate.language.toUpperCase()})
                 </h2>
 
                 <div className="space-y-4">
                   {/* Subject */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                       Subject *
                     </label>
                     <input
                       type="text"
                       value={formData.subject}
                       onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-gray-900 dark:text-neutral-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Email subject line"
                     />
                   </div>
 
                   {/* HTML Content */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                       HTML Content *
                     </label>
                     <textarea
                       value={formData.html_content}
                       onChange={(e) => setFormData({ ...formData, html_content: e.target.value })}
                       rows={15}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-gray-900 dark:text-neutral-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                       placeholder="HTML email content with {{variable}} placeholders"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
                       Use {`{{variable_name}}`} for dynamic content
                     </p>
                   </div>
 
                   {/* Description */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                       Description
                     </label>
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-gray-900 dark:text-neutral-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Template description for admins"
                     />
                   </div>
@@ -372,16 +372,16 @@ export default function EmailTemplatesAdmin() {
                       id="is_active"
                       checked={formData.is_active}
                       onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-neutral-600 rounded focus:ring-blue-500"
                     />
-                    <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                    <label htmlFor="is_active" className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                       Template is active
                     </label>
                   </div>
                 </div>
 
                 {/* Buttons */}
-                <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t dark:border-neutral-700">
                   <Button
                     onClick={handleCancel}
                     variant="secondary"

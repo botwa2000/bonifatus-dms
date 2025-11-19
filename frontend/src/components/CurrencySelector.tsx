@@ -19,17 +19,17 @@ export default function CurrencySelector() {
             setSelectedCurrency(currency)
           }
         }}
-        className="appearance-none bg-transparent border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-1.5 pr-8 text-sm text-neutral-700 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors cursor-pointer"
+        className="appearance-none bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-1.5 pr-8 text-sm text-neutral-900 dark:text-neutral-100 hover:border-neutral-400 dark:hover:border-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors cursor-pointer"
         aria-label="Select currency"
       >
         {availableCurrencies.map((currency) => (
-          <option key={currency.code} value={currency.code}>
+          <option key={currency.code} value={currency.code} className="bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
             {currency.code}
           </option>
         ))}
       </select>
       <svg
-        className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-500 pointer-events-none"
+        className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-500 dark:text-neutral-400 pointer-events-none"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
