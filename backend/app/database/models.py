@@ -90,6 +90,9 @@ class User(Base, TimestampMixin):
     # Email preferences (GDPR/CAN-SPAM compliance)
     email_marketing_enabled = Column(Boolean, default=True, nullable=False, server_default='true')
 
+    # Stripe integration
+    stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
+
     # Relationships
     tier = relationship("TierPlan", foreign_keys=[tier_id])
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
