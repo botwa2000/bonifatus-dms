@@ -126,7 +126,10 @@ async def create_checkout_session(
             }],
             success_url=f"{settings.app.app_frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{settings.app.app_frontend_url}/dashboard?checkout=cancel",
-            metadata=metadata
+            metadata=metadata,
+            subscription_data={
+                'metadata': metadata  # Copy metadata to the subscription
+            }
         )
 
         logger.info(f"Created checkout session {checkout_session.id} for user {current_user.email}")

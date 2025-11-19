@@ -188,11 +188,18 @@ async def handle_subscription_created(event, session: Session):
     if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
         tier_id = stripe_sub.metadata['tier_id']
         logger.info(f"[WEBHOOK] Got tier_id from subscription metadata: {tier_id}")
-    elif stripe_sub.items and stripe_sub.items.data:
-        price_metadata = stripe_sub.items.data[0].price.metadata
-        if price_metadata and 'tier_id' in price_metadata:
-            tier_id = price_metadata['tier_id']
-            logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
+    elif hasattr(stripe_sub, 'items') and stripe_sub.items:
+        try:
+            items_data = stripe_sub.items.get('data', stripe_sub.items.data if hasattr(stripe_sub.items, 'data') else [])
+            if items_data and len(items_data) > 0:
+                price = items_data[0].get('price', items_data[0].price if hasattr(items_data[0], 'price') else None)
+                if price:
+                    price_metadata = price.get('metadata', price.metadata if hasattr(price, 'metadata') else {})
+                    if price_metadata and 'tier_id' in price_metadata:
+                        tier_id = price_metadata['tier_id']
+                        logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] Error extracting tier_id from items: {e}")
 
     if not tier_id:
         logger.warning(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}, metadata: {stripe_sub.metadata}")
