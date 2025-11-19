@@ -113,11 +113,26 @@ async def create_checkout_session(
         if referral_code:
             metadata['referral_code'] = referral_code
 
-        # Create checkout session
+        # Get or create Stripe customer BEFORE checkout to prevent race conditions
         stripe_customer_id = getattr(current_user, 'stripe_customer_id', None)
+        if not stripe_customer_id:
+            # Create customer now, not during checkout
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.full_name,
+                metadata={'user_id': str(current_user.id)}
+            )
+            stripe_customer_id = customer.id
+
+            # Save to database immediately
+            current_user.stripe_customer_id = stripe_customer_id
+            await session.commit()
+            await session.refresh(current_user)
+            logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
+
+        # Create checkout session with existing customer
         checkout_session = stripe.checkout.Session.create(
-            customer=stripe_customer_id if stripe_customer_id else None,
-            customer_email=current_user.email if not stripe_customer_id else None,
+            customer=stripe_customer_id,
             mode='subscription',
             payment_method_types=['card', 'paypal'],  # Enable card and PayPal payments
             line_items=[{
@@ -133,14 +148,6 @@ async def create_checkout_session(
         )
 
         logger.info(f"Created checkout session {checkout_session.id} for user {current_user.email}")
-
-        # Update user's stripe_customer_id immediately if not already set
-        # This prevents race conditions with webhooks that fire before checkout.session.completed
-        if not stripe_customer_id and checkout_session.customer:
-            current_user.stripe_customer_id = checkout_session.customer
-            await session.commit()
-            await session.refresh(current_user)
-            logger.info(f"Updated user {current_user.email} with stripe_customer_id: {checkout_session.customer}")
 
         return {
             "checkout_url": checkout_session.url,
