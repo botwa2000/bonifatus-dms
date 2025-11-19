@@ -134,6 +134,14 @@ async def create_checkout_session(
 
         logger.info(f"Created checkout session {checkout_session.id} for user {current_user.email}")
 
+        # Update user's stripe_customer_id immediately if not already set
+        # This prevents race conditions with webhooks that fire before checkout.session.completed
+        if not stripe_customer_id and checkout_session.customer:
+            current_user.stripe_customer_id = checkout_session.customer
+            await session.commit()
+            await session.refresh(current_user)
+            logger.info(f"Updated user {current_user.email} with stripe_customer_id: {checkout_session.customer}")
+
         return {
             "checkout_url": checkout_session.url,
             "session_id": checkout_session.id
