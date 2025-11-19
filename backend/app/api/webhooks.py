@@ -190,14 +190,15 @@ async def handle_subscription_created(event, session: Session):
         logger.info(f"[WEBHOOK] Got tier_id from subscription metadata: {tier_id}")
     elif hasattr(stripe_sub, 'items') and stripe_sub.items:
         try:
-            items_data = stripe_sub.items.get('data', stripe_sub.items.data if hasattr(stripe_sub.items, 'data') else [])
-            if items_data and len(items_data) > 0:
-                price = items_data[0].get('price', items_data[0].price if hasattr(items_data[0], 'price') else None)
-                if price:
-                    price_metadata = price.get('metadata', price.metadata if hasattr(price, 'metadata') else {})
-                    if price_metadata and 'tier_id' in price_metadata:
-                        tier_id = price_metadata['tier_id']
-                        logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
+            if hasattr(stripe_sub.items, 'data') and stripe_sub.items.data:
+                items_data = stripe_sub.items.data
+                if len(items_data) > 0:
+                    item = items_data[0]
+                    if hasattr(item, 'price') and item.price:
+                        price = item.price
+                        if hasattr(price, 'metadata') and price.metadata and 'tier_id' in price.metadata:
+                            tier_id = price.metadata['tier_id']
+                            logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
         except Exception as e:
             logger.warning(f"[WEBHOOK] Error extracting tier_id from items: {e}")
 
