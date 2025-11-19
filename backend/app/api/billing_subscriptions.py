@@ -126,8 +126,8 @@ async def create_checkout_session(
 
             # Save to database immediately
             current_user.stripe_customer_id = stripe_customer_id
-            await session.commit()
-            await session.refresh(current_user)
+            session.commit()
+            session.refresh(current_user)
             logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
         # Create checkout session with existing customer
