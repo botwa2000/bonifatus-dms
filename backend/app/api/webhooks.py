@@ -229,13 +229,16 @@ async def handle_subscription_created(event, session: Session):
     price_interval = None
     currency = None
     amount_cents = None
-    if stripe_sub.items.data:
-        price = stripe_sub.items.data[0].price
-        if price.recurring:
-            price_interval = price.recurring.interval
-        # Store the actual currency and amount charged
-        currency = price.currency.upper() if price.currency else None
-        amount_cents = price.unit_amount if price.unit_amount else None
+    items_data = None
+    if hasattr(stripe_sub, 'items') and hasattr(stripe_sub.items, 'data'):
+        items_data = stripe_sub.items.data
+        if items_data and len(items_data) > 0:
+            price = items_data[0].price
+            if hasattr(price, 'recurring') and price.recurring:
+                price_interval = price.recurring.interval
+            # Store the actual currency and amount charged
+            currency = price.currency.upper() if hasattr(price, 'currency') and price.currency else None
+            amount_cents = price.unit_amount if hasattr(price, 'unit_amount') and price.unit_amount else None
 
     billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
 
@@ -243,7 +246,7 @@ async def handle_subscription_created(event, session: Session):
         user_id=user.id,
         tier_id=tier.id,
         stripe_subscription_id=stripe_sub.id,
-        stripe_price_id=stripe_sub.items.data[0].price.id if stripe_sub.items.data else None,
+        stripe_price_id=items_data[0].price.id if items_data and len(items_data) > 0 else None,
         billing_cycle=billing_cycle,
         status=stripe_sub.status,
         current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc),
@@ -270,10 +273,10 @@ async def handle_subscription_created(event, session: Session):
 
     # Send subscription confirmation email
     try:
-        # Get currency from price
-        price = stripe_sub.items.data[0].price if stripe_sub.items.data else None
-        currency = price.currency.upper() if price and price.currency else 'USD'
-        amount = (price.unit_amount / 100) if price and price.unit_amount else 0
+        # Get currency from price (reuse items_data from above)
+        price = items_data[0].price if items_data and len(items_data) > 0 else None
+        currency = price.currency.upper() if price and hasattr(price, 'currency') and price.currency else 'USD'
+        amount = (price.unit_amount / 100) if price and hasattr(price, 'unit_amount') and price.unit_amount else 0
 
         # Get currency symbol
         from app.database.models import Currency
