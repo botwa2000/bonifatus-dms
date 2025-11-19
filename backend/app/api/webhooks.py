@@ -107,6 +107,7 @@ async def stripe_webhook(
 async def handle_checkout_session_completed(event, session: Session):
     """Process checkout.session.completed event"""
     checkout_session = event.data.object
+    logger.info(f"[WEBHOOK] Processing checkout.session.completed: {checkout_session.id}")
 
     # Extract metadata
     user_id = checkout_session.metadata.get('user_id')
@@ -114,19 +115,24 @@ async def handle_checkout_session_completed(event, session: Session):
     billing_cycle = checkout_session.metadata.get('billing_cycle')
     referral_code = checkout_session.metadata.get('referral_code')
 
+    logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier_id={tier_id}, billing_cycle={billing_cycle}")
+
     if not user_id or not tier_id:
-        logger.warning(f"Missing metadata in checkout session {checkout_session.id}")
+        logger.warning(f"[WEBHOOK] Missing metadata in checkout session {checkout_session.id}")
         return
 
     # Get user
     user = session.query(User).filter(User.id == user_id).first()
     if not user:
-        logger.warning(f"User {user_id} not found for checkout session {checkout_session.id}")
+        logger.warning(f"[WEBHOOK] User {user_id} not found for checkout session {checkout_session.id}")
         return
+
+    logger.info(f"[WEBHOOK] Found user: {user.email}, current stripe_customer_id: {user.stripe_customer_id}")
 
     # Update user's Stripe customer ID if not already set
     if not user.stripe_customer_id and checkout_session.customer:
         user.stripe_customer_id = checkout_session.customer
+        logger.info(f"[WEBHOOK] Updated user {user.email} with stripe_customer_id: {checkout_session.customer}")
 
     # Get tier
     tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
@@ -165,32 +171,39 @@ async def handle_checkout_session_completed(event, session: Session):
 async def handle_subscription_created(event, session: Session):
     """Process subscription.created event"""
     stripe_sub = event.data.object
+    logger.info(f"[WEBHOOK] Processing customer.subscription.created: {stripe_sub.id}, customer: {stripe_sub.customer}")
 
     user = session.query(User).filter(
         User.stripe_customer_id == stripe_sub.customer
     ).first()
 
     if not user:
-        logger.warning(f"User not found for customer {stripe_sub.customer}")
+        logger.warning(f"[WEBHOOK] User not found for customer {stripe_sub.customer}")
         return
+
+    logger.info(f"[WEBHOOK] Found user: {user.email}")
 
     # Get tier from subscription metadata or price metadata
     tier_id = None
     if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
         tier_id = stripe_sub.metadata['tier_id']
+        logger.info(f"[WEBHOOK] Got tier_id from subscription metadata: {tier_id}")
     elif stripe_sub.items and stripe_sub.items.data:
         price_metadata = stripe_sub.items.data[0].price.metadata
         if price_metadata and 'tier_id' in price_metadata:
             tier_id = price_metadata['tier_id']
+            logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
 
     if not tier_id:
-        logger.warning(f"No tier_id found in subscription {stripe_sub.id}")
+        logger.warning(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}, metadata: {stripe_sub.metadata}")
         return
 
     tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
     if not tier:
-        logger.warning(f"Tier {tier_id} not found")
+        logger.warning(f"[WEBHOOK] Tier {tier_id} not found")
         return
+
+    logger.info(f"[WEBHOOK] Found tier: {tier.name}")
 
     # Check if subscription already exists
     existing_sub = session.query(Subscription).filter(
@@ -198,8 +211,10 @@ async def handle_subscription_created(event, session: Session):
     ).first()
 
     if existing_sub:
-        logger.info(f"Subscription {stripe_sub.id} already exists")
+        logger.info(f"[WEBHOOK] Subscription {stripe_sub.id} already exists")
         return
+
+    logger.info(f"[WEBHOOK] Creating new subscription for user {user.email}")
 
     # Create subscription in database
     # Get billing cycle and currency from Stripe price
@@ -243,7 +258,7 @@ async def handle_subscription_created(event, session: Session):
 
     session.commit()
 
-    logger.info(f"Created subscription {db_subscription.id} for user {user.email}, tier {tier.name}")
+    logger.info(f"[WEBHOOK] ✓ Created subscription {db_subscription.id} for user {user.email}, tier {tier.name}, currency: {currency}, amount: {amount_cents}")
 
     # Send subscription confirmation email
     try:
