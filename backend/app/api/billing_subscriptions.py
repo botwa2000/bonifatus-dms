@@ -119,6 +119,7 @@ async def create_checkout_session(
             customer=stripe_customer_id if stripe_customer_id else None,
             customer_email=current_user.email if not stripe_customer_id else None,
             mode='subscription',
+            payment_method_types=['card', 'paypal'],  # Enable card and PayPal payments
             line_items=[{
                 'price': price_id,
                 'quantity': 1,
