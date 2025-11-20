@@ -662,7 +662,7 @@ export default function HomePage() {
                 <li><Link href="/legal/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
                 <li><Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link href="/legal/impressum" className="hover:text-white transition-colors">Impressum</Link></li>
-                <li><Link href="/legal/gdpr" className="hover:text-white transition-colors">GDPR</Link></li>
+                <li><Link href="/legal/privacy" className="hover:text-white transition-colors">GDPR & Privacy</Link></li>
               </ul>
             </div>
           </div>
