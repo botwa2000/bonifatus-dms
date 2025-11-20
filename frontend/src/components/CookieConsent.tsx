@@ -27,8 +27,8 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
         const config = await response.json();
 
         // Build categories configuration for vanilla-cookieconsent
-        const categories: Record<string, any> = {};
-        const sections: any[] = [
+        const categories: Record<string, { enabled: boolean; readOnly: boolean; autoClear?: { cookies: Array<{ name: RegExp | string }> } }> = {};
+        const sections: Array<{ title: string; description: string; linkedCategory?: string; cookieTable?: { headers: Record<string, string>; body: Array<{ name: string; domain: string; desc: string; exp: string }> } }> = [
           {
             title: language === 'de'
               ? 'Cookie-Nutzung'
@@ -43,7 +43,7 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
           }
         ];
 
-        config.categories.forEach((category: any) => {
+        config.categories.forEach((category: { key: string; is_enabled_by_default: boolean; is_required: boolean; cookies: Array<{ name: string; is_regex: boolean; domain: string; description: string; expiration: string }>; title: string; description: string }) => {
           categories[category.key] = {
             enabled: category.is_enabled_by_default,
             readOnly: category.is_required,
@@ -53,14 +53,14 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
           if (!category.is_required && category.cookies && category.cookies.length > 0) {
             categories[category.key].autoClear = {
               cookies: category.cookies
-                .filter((cookie: any) => cookie.is_regex)
-                .map((cookie: any) => ({
+                .filter(cookie => cookie.is_regex)
+                .map(cookie => ({
                   name: new RegExp(cookie.name.replace(/^\/|\/$/g, ''))
                 }))
                 .concat(
                   category.cookies
-                    .filter((cookie: any) => !cookie.is_regex)
-                    .map((cookie: any) => ({
+                    .filter(cookie => !cookie.is_regex)
+                    .map(cookie => ({
                       name: cookie.name
                     }))
                 )
@@ -75,7 +75,7 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
               desc: language === 'de' ? 'Beschreibung' : language === 'ru' ? 'Описание' : 'Description',
               exp: language === 'de' ? 'Ablauf' : language === 'ru' ? 'Срок действия' : 'Expiration',
             },
-            body: category.cookies.map((cookie: any) => ({
+            body: category.cookies.map(cookie => ({
               name: cookie.name,
               domain: cookie.domain || window.location.hostname,
               desc: cookie.description,
