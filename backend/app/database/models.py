@@ -1067,3 +1067,87 @@ class EmailTemplate(Base, TimestampMixin):
         Index('idx_email_template_category', 'category'),
         Index('idx_email_template_active', 'is_active'),
     )
+
+
+class CookieCategory(Base, TimestampMixin):
+    """Cookie categories for GDPR consent management"""
+    __tablename__ = "cookie_categories"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_key = Column(String(50), unique=True, nullable=False, index=True)  # necessary, analytics, functionality, marketing
+    is_required = Column(Boolean, nullable=False, server_default='false')  # True for necessary cookies
+    is_enabled_by_default = Column(Boolean, nullable=False, server_default='false')
+    sort_order = Column(Integer, nullable=False, server_default='0')
+    is_active = Column(Boolean, nullable=False, server_default='true')
+
+    # Relationships
+    translations = relationship("CookieCategoryTranslation", back_populates="category", cascade="all, delete-orphan")
+    cookies = relationship("CookieDefinition", back_populates="category", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_cookie_category_key', 'category_key'),
+        Index('idx_cookie_category_sort', 'sort_order'),
+    )
+
+
+class CookieCategoryTranslation(Base, TimestampMixin):
+    """Translations for cookie categories"""
+    __tablename__ = "cookie_category_translations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("cookie_categories.id", ondelete="CASCADE"), nullable=False)
+    language_code = Column(String(5), nullable=False, index=True)  # en, de, ru, etc.
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+
+    # Relationships
+    category = relationship("CookieCategory", back_populates="translations")
+
+    __table_args__ = (
+        Index('idx_cookie_cat_trans_category', 'category_id'),
+        Index('idx_cookie_cat_trans_lang', 'language_code'),
+        sa.UniqueConstraint('category_id', 'language_code', name='uq_cookie_cat_trans'),
+    )
+
+
+class CookieDefinition(Base, TimestampMixin):
+    """Individual cookie definitions with details"""
+    __tablename__ = "cookie_definitions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("cookie_categories.id", ondelete="CASCADE"), nullable=False)
+    cookie_name = Column(String(100), nullable=False)  # Can use regex patterns like /^_ga/
+    is_regex = Column(Boolean, nullable=False, server_default='false')  # True if cookie_name is regex
+    domain = Column(String(200), nullable=True)  # Provider domain (e.g., "Google", "Stripe")
+    expiration = Column(String(100), nullable=True)  # Human-readable (e.g., "30 minutes", "1 year")
+    sort_order = Column(Integer, nullable=False, server_default='0')
+    is_active = Column(Boolean, nullable=False, server_default='true')
+
+    # Relationships
+    category = relationship("CookieCategory", back_populates="cookies")
+    translations = relationship("CookieDefinitionTranslation", back_populates="cookie", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_cookie_def_category', 'category_id'),
+        Index('idx_cookie_def_name', 'cookie_name'),
+        Index('idx_cookie_def_sort', 'sort_order'),
+    )
+
+
+class CookieDefinitionTranslation(Base, TimestampMixin):
+    """Translations for cookie definitions"""
+    __tablename__ = "cookie_definition_translations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    cookie_id = Column(UUID(as_uuid=True), ForeignKey("cookie_definitions.id", ondelete="CASCADE"), nullable=False)
+    language_code = Column(String(5), nullable=False, index=True)
+    description = Column(Text, nullable=False)  # What the cookie does
+
+    # Relationships
+    cookie = relationship("CookieDefinition", back_populates="translations")
+
+    __table_args__ = (
+        Index('idx_cookie_def_trans_cookie', 'cookie_id'),
+        Index('idx_cookie_def_trans_lang', 'language_code'),
+        sa.UniqueConstraint('cookie_id', 'language_code', name='uq_cookie_def_trans'),
+    )
