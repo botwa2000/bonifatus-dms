@@ -249,6 +249,105 @@ async def set_user_theme(
 
 
 @router.get(
+    "/cookie-consent",
+    summary="Get Cookie Consent Configuration",
+    description="Get GDPR cookie consent configuration with categories, translations, and cookie definitions (public endpoint)"
+)
+async def get_cookie_consent_config(language: str = Query(default="en", description="Language code (en, de, ru, etc.)")):
+    """
+    Get cookie consent configuration for GDPR compliance
+
+    Returns:
+    - Cookie categories (necessary, analytics, functionality, etc.)
+    - Translations for the specified language
+    - Cookie definitions with descriptions
+    - UI configuration settings
+
+    This is a public endpoint that doesn't require authentication.
+    """
+    session = db_manager.session_local()
+
+    try:
+        # Get active cookie categories
+        categories = session.query(CookieCategory).filter(
+            CookieCategory.is_active == True
+        ).order_by(CookieCategory.sort_order).all()
+
+        # Get UI settings from system_settings
+        ui_settings_query = session.query(SystemSetting).filter(
+            SystemSetting.category == 'cookie_consent',
+            SystemSetting.is_public == True
+        ).all()
+
+        ui_settings = {
+            setting.setting_key.replace('cookie_consent_', ''): (
+                setting.setting_value if setting.data_type == 'string'
+                else json.loads(setting.setting_value) if setting.data_type == 'json'
+                else setting.setting_value == 'true' if setting.data_type == 'boolean'
+                else int(setting.setting_value) if setting.data_type == 'integer'
+                else setting.setting_value
+            )
+            for setting in ui_settings_query
+        }
+
+        # Build category configuration
+        categories_config = []
+        for cat in categories:
+            # Get translation for this category in requested language (fallback to English)
+            translation = next(
+                (t for t in cat.translations if t.language_code == language),
+                next((t for t in cat.translations if t.language_code == 'en'), None)
+            )
+
+            if not translation:
+                continue
+
+            # Get cookie definitions for this category
+            cookies_data = []
+            for cookie in cat.cookies:
+                if not cookie.is_active:
+                    continue
+
+                cookie_translation = next(
+                    (t for t in cookie.translations if t.language_code == language),
+                    next((t for t in cookie.translations if t.language_code == 'en'), None)
+                )
+
+                if cookie_translation:
+                    cookies_data.append({
+                        "name": cookie.cookie_name,
+                        "is_regex": cookie.is_regex,
+                        "domain": cookie.domain,
+                        "expiration": cookie.expiration,
+                        "description": cookie_translation.description
+                    })
+
+            categories_config.append({
+                "key": cat.category_key,
+                "title": translation.title,
+                "description": translation.description,
+                "is_required": cat.is_required,
+                "is_enabled_by_default": cat.is_enabled_by_default,
+                "cookies": cookies_data
+            })
+
+        return {
+            "categories": categories_config,
+            "ui_settings": ui_settings,
+            "language": language
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching cookie consent config: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch cookie consent configuration"
+        )
+    finally:
+        session.close()
+
+
+@router.get(
     "/{setting_key}",
     responses={
         200: {"description": "Setting value"},
@@ -462,105 +561,6 @@ async def get_available_currencies():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch available currencies"
-        )
-    finally:
-        session.close()
-
-
-@router.get(
-    "/cookie-consent",
-    summary="Get Cookie Consent Configuration",
-    description="Get GDPR cookie consent configuration with categories, translations, and cookie definitions (public endpoint)"
-)
-async def get_cookie_consent_config(language: str = Query(default="en", description="Language code (en, de, ru, etc.)")):
-    """
-    Get cookie consent configuration for GDPR compliance
-
-    Returns:
-    - Cookie categories (necessary, analytics, functionality, etc.)
-    - Translations for the specified language
-    - Cookie definitions with descriptions
-    - UI configuration settings
-
-    This is a public endpoint that doesn't require authentication.
-    """
-    session = db_manager.session_local()
-
-    try:
-        # Get active cookie categories
-        categories = session.query(CookieCategory).filter(
-            CookieCategory.is_active == True
-        ).order_by(CookieCategory.sort_order).all()
-
-        # Get UI settings from system_settings
-        ui_settings_query = session.query(SystemSetting).filter(
-            SystemSetting.category == 'cookie_consent',
-            SystemSetting.is_public == True
-        ).all()
-
-        ui_settings = {
-            setting.setting_key.replace('cookie_consent_', ''): (
-                setting.setting_value if setting.data_type == 'string'
-                else json.loads(setting.setting_value) if setting.data_type == 'json'
-                else setting.setting_value == 'true' if setting.data_type == 'boolean'
-                else int(setting.setting_value) if setting.data_type == 'integer'
-                else setting.setting_value
-            )
-            for setting in ui_settings_query
-        }
-
-        # Build category configuration
-        categories_config = []
-        for cat in categories:
-            # Get translation for this category in requested language (fallback to English)
-            translation = next(
-                (t for t in cat.translations if t.language_code == language),
-                next((t for t in cat.translations if t.language_code == 'en'), None)
-            )
-
-            if not translation:
-                continue
-
-            # Get cookie definitions for this category
-            cookies_data = []
-            for cookie in cat.cookies:
-                if not cookie.is_active:
-                    continue
-
-                cookie_translation = next(
-                    (t for t in cookie.translations if t.language_code == language),
-                    next((t for t in cookie.translations if t.language_code == 'en'), None)
-                )
-
-                if cookie_translation:
-                    cookies_data.append({
-                        "name": cookie.cookie_name,
-                        "is_regex": cookie.is_regex,
-                        "domain": cookie.domain,
-                        "expiration": cookie.expiration,
-                        "description": cookie_translation.description
-                    })
-
-            categories_config.append({
-                "key": cat.category_key,
-                "title": translation.title,
-                "description": translation.description,
-                "is_required": cat.is_required,
-                "is_enabled_by_default": cat.is_enabled_by_default,
-                "cookies": cookies_data
-            })
-
-        return {
-            "categories": categories_config,
-            "ui_settings": ui_settings,
-            "language": language
-        }
-
-    except Exception as e:
-        logger.error(f"Error fetching cookie consent config: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch cookie consent configuration"
         )
     finally:
         session.close()
