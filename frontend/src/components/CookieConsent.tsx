@@ -27,7 +27,7 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
         const config = await response.json();
 
         // Build categories configuration for vanilla-cookieconsent
-        const categories: Record<string, { enabled: boolean; readOnly: boolean; autoClear?: { cookies: Array<{ name: RegExp | string }> } }> = {};
+        const categories: Record<string, { enabled: boolean; readOnly: boolean; autoClear?: { cookies: Array<{ name: string | RegExp }> } }> = {};
         const sections: Array<{ title: string; description: string; linkedCategory?: string; cookieTable?: { headers: Record<string, string>; body: Array<{ name: string; domain: string; desc: string; exp: string }> } }> = [
           {
             title: language === 'de'
@@ -51,20 +51,23 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
 
           // Add autoClear for non-necessary cookies
           if (!category.is_required && category.cookies && category.cookies.length > 0) {
-            categories[category.key].autoClear = {
-              cookies: category.cookies
-                .filter(cookie => cookie.is_regex)
-                .map(cookie => ({
-                  name: new RegExp(cookie.name.replace(/^\/|\/$/g, ''))
-                }))
-                .concat(
-                  category.cookies
-                    .filter(cookie => !cookie.is_regex)
-                    .map(cookie => ({
-                      name: cookie.name
-                    }))
-                )
-            };
+            const cookieArray: Array<{ name: string | RegExp }> = [];
+
+            // Add regex patterns
+            category.cookies
+              .filter(cookie => cookie.is_regex)
+              .forEach(cookie => {
+                cookieArray.push({ name: new RegExp(cookie.name.replace(/^\/|\/$/g, '')) });
+              });
+
+            // Add literal names
+            category.cookies
+              .filter(cookie => !cookie.is_regex)
+              .forEach(cookie => {
+                cookieArray.push({ name: cookie.name });
+              });
+
+            categories[category.key].autoClear = { cookies: cookieArray };
           }
 
           // Build cookie table for modal
