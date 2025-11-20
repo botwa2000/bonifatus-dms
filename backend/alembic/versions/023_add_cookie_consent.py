@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
 revision = '023_add_cookie_consent'
-down_revision = '20251119_102400_add_stripe_customer_id'
+down_revision = '20251119_102400'
 branch_labels = None
 depends_on = None
 
