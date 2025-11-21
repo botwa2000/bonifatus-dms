@@ -133,7 +133,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             <h4 className="font-semibold text-blue-900 mb-2">Your current plan</h4>
             <div className="space-y-1 text-sm">
               <p className="text-blue-800">
-                <span className="font-medium">{subscription.tier_name}</span> - {subscription.currency_symbol || '$'}{subscription.amount}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                <span className="font-medium">{subscription.tier_name}</span> - {subscription.currency_symbol || '$'}{(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
               </p>
               <p className="text-blue-600">
                 Next billing: {new Date(subscription.current_period_end).toLocaleDateString()}
@@ -219,7 +219,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
                   <div className="flex-1">
                     <div className="font-medium text-neutral-900">Cancel immediately</div>
                     <div className="text-sm text-neutral-600 mt-1">
-                      Full refund of {subscription.currency_symbol || '$'}{subscription.amount}. Access ends immediately.
+                      Full refund of {subscription.currency_symbol || '$'}{(subscription.amount / 100).toFixed(2)}. Access ends immediately.
                     </div>
                     <Badge variant="success" className="mt-2">Eligible for full refund</Badge>
                   </div>
@@ -326,7 +326,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
               <div className="flex justify-between">
                 <span className="text-neutral-600">Refund amount:</span>
                 <span className="font-medium text-green-600">
-                  {subscription.currency_symbol}{subscription.amount}
+                  {subscription.currency_symbol}{(subscription.amount / 100).toFixed(2)}
                 </span>
               </div>
             )}

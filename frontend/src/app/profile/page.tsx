@@ -185,9 +185,13 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
+      // Get currency from the tier being upgraded to
+      const tier = availableTiers.find(t => t.id === tierId)
+      const currency = tier?.currency || subscription?.currency || 'EUR'
+
       const response = await apiClient.post<{ checkout_url: string }>(
         '/api/v1/billing/subscriptions/create-checkout',
-        { tier_id: tierId, billing_cycle: billingCycle },
+        { tier_id: tierId, billing_cycle: billingCycle, currency },
         true
       )
 
@@ -459,9 +463,23 @@ export default function ProfilePage() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => {
+                            onClick={async () => {
                               const newCycle = subscription.billing_cycle === 'yearly' ? 'monthly' : 'yearly'
-                              handleUpgrade(subscription.tier_id)
+                              setProcessingSubscription(true)
+                              setMessage(null)
+
+                              try {
+                                const response = await apiClient.post<{ checkout_url: string }>(
+                                  '/api/v1/billing/subscriptions/create-checkout',
+                                  { tier_id: subscription.tier_id, billing_cycle: newCycle, currency: subscription.currency },
+                                  true
+                                )
+                                window.location.href = response.checkout_url
+                              } catch (error) {
+                                console.error('Failed to switch billing cycle:', error)
+                                setMessage({ type: 'error', text: 'Failed to switch billing cycle' })
+                                setProcessingSubscription(false)
+                              }
                             }}
                             disabled={processingSubscription}
                           >

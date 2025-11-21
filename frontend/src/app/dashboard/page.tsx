@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
+import { useCurrency } from '@/contexts/currency-context'
 import { apiClient } from '@/services/api-client'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
@@ -24,6 +25,7 @@ interface Document {
 
 export default function DashboardPage() {
   const { user, isLoading, loadUser, logout } = useAuth()
+  const { selectedCurrency, isLoading: currencyLoading } = useCurrency()
   const router = useRouter()
 
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
@@ -41,7 +43,7 @@ export default function DashboardPage() {
   // ONLY if they don't already have an active subscription
   useEffect(() => {
     const handleTierSelection = async () => {
-      if (!user || tierProcessed || isProcessingTier) return
+      if (!user || tierProcessed || isProcessingTier || currencyLoading) return
 
       // Get selected tier and billing cycle from sessionStorage
       const selectedTierId = sessionStorage.getItem('selected_tier_id')
@@ -92,6 +94,7 @@ export default function DashboardPage() {
           {
             tier_id: tierId,
             billing_cycle: selectedBillingCycle || 'yearly',  // Default to yearly for better conversion
+            currency: selectedCurrency.code,
             referral_code: referralCode || undefined
           },
           true
@@ -108,10 +111,10 @@ export default function DashboardPage() {
       }
     }
 
-    if (user && !tierProcessed && !isProcessingTier) {
+    if (user && !tierProcessed && !isProcessingTier && !currencyLoading) {
       handleTierSelection()
     }
-  }, [user, tierProcessed, isProcessingTier])
+  }, [user, tierProcessed, isProcessingTier, selectedCurrency, currencyLoading])
 
   // Load recent documents
   useEffect(() => {
