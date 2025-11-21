@@ -248,12 +248,12 @@ async def handle_subscription_created(event, session: Session):
         stripe_subscription_id=stripe_sub.id,
         stripe_price_id=items_data[0].price.id if items_data and len(items_data) > 0 else None,
         billing_cycle=billing_cycle,
-        status=stripe_sub.status,
-        current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc),
-        current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc),
-        trial_start=datetime.fromtimestamp(stripe_sub.trial_start, tz=timezone.utc) if stripe_sub.trial_start else None,
-        trial_end=datetime.fromtimestamp(stripe_sub.trial_end, tz=timezone.utc) if stripe_sub.trial_end else None,
-        cancel_at_period_end=stripe_sub.cancel_at_period_end,
+        status=stripe_sub.status if hasattr(stripe_sub, 'status') else 'active',
+        current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_start') and stripe_sub.current_period_start else datetime.now(timezone.utc),
+        current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_end') and stripe_sub.current_period_end else datetime.now(timezone.utc),
+        trial_start=datetime.fromtimestamp(stripe_sub.trial_start, tz=timezone.utc) if hasattr(stripe_sub, 'trial_start') and stripe_sub.trial_start else None,
+        trial_end=datetime.fromtimestamp(stripe_sub.trial_end, tz=timezone.utc) if hasattr(stripe_sub, 'trial_end') and stripe_sub.trial_end else None,
+        cancel_at_period_end=stripe_sub.cancel_at_period_end if hasattr(stripe_sub, 'cancel_at_period_end') else False,
         currency=currency,
         amount_cents=amount_cents
     )
@@ -262,10 +262,10 @@ async def handle_subscription_created(event, session: Session):
 
     # Update user's tier
     user.tier_id = tier.id
-    user.subscription_status = stripe_sub.status
+    user.subscription_status = stripe_sub.status if hasattr(stripe_sub, 'status') else 'active'
     user.billing_cycle = billing_cycle
     user.subscription_started_at = datetime.now(timezone.utc)
-    user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+    user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_end') and stripe_sub.current_period_end else None
 
     session.commit()
 
@@ -433,7 +433,7 @@ async def handle_invoice_payment_succeeded(event, session: Session):
     else:
         subscription = session.query(Subscription).filter(
             Subscription.stripe_subscription_id == stripe_invoice.subscription
-        ).first() if stripe_invoice.subscription else None
+        ).first() if hasattr(stripe_invoice, 'subscription') and stripe_invoice.subscription else None
 
         line_items = []
         if stripe_invoice.lines and stripe_invoice.lines.data:
@@ -479,7 +479,7 @@ async def handle_invoice_payment_succeeded(event, session: Session):
         # Get subscription and tier information
         subscription = session.query(Subscription).filter(
             Subscription.stripe_subscription_id == stripe_invoice.subscription
-        ).first() if stripe_invoice.subscription else None
+        ).first() if hasattr(stripe_invoice, 'subscription') and stripe_invoice.subscription else None
 
         tier = None
         if subscription:
