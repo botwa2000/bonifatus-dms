@@ -394,6 +394,37 @@ class UserService:
             user_email = user.email
             user_name = user.full_name
 
+            # Check for and cancel active subscriptions
+            from app.database.models import Subscription
+            import stripe
+            from app.core.config import settings
+
+            active_subscription = session.query(Subscription).filter(
+                Subscription.user_id == user_id,
+                Subscription.status.in_(['active', 'trialing', 'past_due'])
+            ).first()
+
+            if active_subscription:
+                logger.info(f"Found active subscription {active_subscription.stripe_subscription_id} for user {user_email}")
+                try:
+                    # Cancel subscription in Stripe
+                    stripe.Subscription.modify(
+                        active_subscription.stripe_subscription_id,
+                        cancel_at_period_end=False  # Cancel immediately
+                    )
+                    stripe.Subscription.cancel(active_subscription.stripe_subscription_id)
+                    logger.info(f"Canceled Stripe subscription {active_subscription.stripe_subscription_id}")
+
+                    # Update subscription in database
+                    active_subscription.status = 'canceled'
+                    active_subscription.ended_at = datetime.utcnow()
+                    active_subscription.canceled_at = datetime.utcnow()
+                    session.commit()
+
+                except Exception as stripe_error:
+                    logger.error(f"Failed to cancel Stripe subscription: {stripe_error}")
+                    # Continue with account deletion even if Stripe cancellation fails
+
             # Log deletion before deleting (will be deleted with audit logs)
             await self._log_user_action(
                 user_id, "account_deletion_hard", "user", user_id,
@@ -401,7 +432,8 @@ class UserService:
                 ip_address, session,
                 extra_data={
                     "reason": deactivation_request.reason,
-                    "feedback": deactivation_request.feedback
+                    "feedback": deactivation_request.feedback,
+                    "had_active_subscription": active_subscription is not None
                 }
             )
 
