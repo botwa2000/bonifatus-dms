@@ -401,6 +401,77 @@ export default function ProfilePage() {
                     )}
                   </div>
 
+                  {/* Tier Change Options */}
+                  {!subscription.cancel_at_period_end && availableTiers.length > 0 && (
+                    <div className="pt-4 border-t border-neutral-200 space-y-3">
+                      <h4 className="font-medium text-neutral-900">Change Plan</h4>
+
+                      {availableTiers
+                        .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== subscription.tier_id)
+                        .map(tier => {
+                          const isPro = tier.name.toLowerCase() === 'pro'
+                          const isComingSoon = isPro
+                          const isUpgrade = tier.id > subscription.tier_id
+
+                          return (
+                            <div key={tier.id} className="border border-neutral-200 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h5 className="font-medium text-neutral-900">{tier.display_name}</h5>
+                                    {isComingSoon && <Badge variant="warning" className="text-xs">Coming Soon</Badge>}
+                                    {isUpgrade && !isComingSoon && <Badge variant="success" className="text-xs">Upgrade</Badge>}
+                                  </div>
+                                  <p className="text-xs text-neutral-600 mt-1">
+                                    {subscription.billing_cycle === 'yearly'
+                                      ? `${tier.currency_symbol}${(tier.price_yearly_cents / 100).toFixed(2)}/year`
+                                      : `${tier.currency_symbol}${(tier.price_monthly_cents / 100).toFixed(2)}/month`
+                                    }
+                                  </p>
+                                </div>
+                                <Button
+                                  variant={isUpgrade ? "primary" : "secondary"}
+                                  size="sm"
+                                  onClick={() => !isComingSoon && handleUpgrade(tier.id)}
+                                  disabled={isComingSoon || processingSubscription}
+                                >
+                                  {isComingSoon ? 'Coming Soon' : isUpgrade ? 'Upgrade' : 'Switch'}
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                      {/* Billing Cycle Change */}
+                      <div className="border border-neutral-200 rounded-lg p-3 bg-blue-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h5 className="font-medium text-blue-900">
+                              Switch to {subscription.billing_cycle === 'yearly' ? 'Monthly' : 'Annual'} Billing
+                            </h5>
+                            <p className="text-xs text-blue-700 mt-1">
+                              {subscription.billing_cycle === 'yearly'
+                                ? 'Pay month-by-month with more flexibility'
+                                : 'Save money with annual billing'
+                              }
+                            </p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              const newCycle = subscription.billing_cycle === 'yearly' ? 'monthly' : 'yearly'
+                              handleUpgrade(subscription.tier_id)
+                            }}
+                            disabled={processingSubscription}
+                          >
+                            Switch
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2 pt-4 border-t border-neutral-200">
                     <Button
                       variant="secondary"
