@@ -225,22 +225,40 @@ async def handle_subscription_created(event, session: Session):
     logger.info(f"[WEBHOOK] Creating new subscription for user {user.email}")
 
     # Create subscription in database
-    # Get billing cycle and currency from Stripe price
-    price_interval = None
+    # Get billing cycle and currency from subscription metadata first (more reliable)
+    # Fall back to Stripe price data if metadata is not available
+    billing_cycle = None
     currency = None
     amount_cents = None
-    items_data = None
-    if hasattr(stripe_sub, 'items') and hasattr(stripe_sub.items, 'data'):
-        items_data = stripe_sub.items.data
-        if items_data and len(items_data) > 0:
-            price = items_data[0].price
-            if hasattr(price, 'recurring') and price.recurring:
-                price_interval = price.recurring.interval
-            # Store the actual currency and amount charged
-            currency = price.currency.upper() if hasattr(price, 'currency') and price.currency else None
-            amount_cents = price.unit_amount if hasattr(price, 'unit_amount') and price.unit_amount else None
 
-    billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
+    # Check metadata first
+    if hasattr(stripe_sub, 'metadata') and stripe_sub.metadata:
+        billing_cycle = stripe_sub.metadata.get('billing_cycle')
+        currency = stripe_sub.metadata.get('currency')
+        if currency:
+            currency = currency.upper()
+        logger.info(f"[WEBHOOK] Got from metadata: billing_cycle={billing_cycle}, currency={currency}")
+
+    # Fall back to items.data if metadata doesn't have the info
+    items_data = None
+    if not billing_cycle or not currency:
+        if hasattr(stripe_sub, 'items') and hasattr(stripe_sub.items, 'data'):
+            items_data = stripe_sub.items.data
+            if items_data and len(items_data) > 0:
+                price = items_data[0].price
+                if not billing_cycle and hasattr(price, 'recurring') and price.recurring:
+                    price_interval = price.recurring.interval
+                    billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
+                # Store the actual currency and amount charged
+                if not currency and hasattr(price, 'currency') and price.currency:
+                    currency = price.currency.upper()
+                if hasattr(price, 'unit_amount') and price.unit_amount:
+                    amount_cents = price.unit_amount
+
+    # Default to monthly if still not set
+    if not billing_cycle:
+        billing_cycle = 'monthly'
+        logger.warning(f"[WEBHOOK] billing_cycle not found in metadata or items, defaulting to monthly")
 
     db_subscription = Subscription(
         user_id=user.id,
