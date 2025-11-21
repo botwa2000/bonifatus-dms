@@ -59,7 +59,7 @@ export default function DashboardPage() {
 
       // Check if user already has an active subscription
       try {
-        const subscriptions = await apiClient.get<{ subscriptions: any[] }>(
+        const subscriptions = await apiClient.get<{ subscriptions: Array<{ id: string; status: string }> }>(
           '/api/v1/billing/subscriptions',
           true
         )
