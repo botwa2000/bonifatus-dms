@@ -38,6 +38,7 @@ export default function DashboardPage() {
   }, [loadUser])
 
   // Check if user selected a paid tier before login and redirect to checkout
+  // ONLY if they don't already have an active subscription
   useEffect(() => {
     const handleTierSelection = async () => {
       if (!user || tierProcessed || isProcessingTier) return
@@ -47,16 +48,33 @@ export default function DashboardPage() {
       const selectedBillingCycle = sessionStorage.getItem('selected_billing_cycle')
       const referralCode = sessionStorage.getItem('referral_code')
 
+      // Clear sessionStorage first
+      sessionStorage.removeItem('selected_tier_id')
+      sessionStorage.removeItem('selected_billing_cycle')
+
       if (!selectedTierId) {
         setTierProcessed(true)
         return
       }
 
-      const tierId = parseInt(selectedTierId, 10)
+      // Check if user already has an active subscription
+      try {
+        const subscriptions = await apiClient.get<{ subscriptions: any[] }>(
+          '/api/v1/billing/subscriptions',
+          true
+        )
 
-      // Clear the tier selection from sessionStorage (keep referral for future use)
-      sessionStorage.removeItem('selected_tier_id')
-      sessionStorage.removeItem('selected_billing_cycle')
+        if (subscriptions.subscriptions && subscriptions.subscriptions.length > 0) {
+          // User already has a subscription - don't process tier selection
+          console.log('User already has active subscription, skipping tier selection')
+          setTierProcessed(true)
+          return
+        }
+      } catch (error) {
+        console.error('Failed to check subscription status:', error)
+      }
+
+      const tierId = parseInt(selectedTierId, 10)
 
       // If user selected free tier (id: 0), they're already on free tier
       if (tierId === 0) {
