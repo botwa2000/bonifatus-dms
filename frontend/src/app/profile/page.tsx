@@ -205,23 +205,10 @@ export default function ProfilePage() {
     await loadProfileData()
   }
 
-  const handleManageBilling = async () => {
-    setProcessingSubscription(true)
-    setMessage(null)
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false)
 
-    try {
-      const response = await apiClient.post<{ url: string }>(
-        '/api/v1/billing/subscriptions/portal',
-        {},
-        true
-      )
-
-      window.location.href = response.url
-    } catch (error) {
-      console.error('Failed to open billing portal:', error)
-      setMessage({ type: 'error', text: 'Failed to open billing portal' })
-      setProcessingSubscription(false)
-    }
+  const handleUpdatePaymentMethod = () => {
+    setShowPaymentMethodModal(true)
   }
 
   const getTierBadgeVariant = (tier: string): 'default' | 'success' | 'warning' | 'error' => {
@@ -418,11 +405,11 @@ export default function ProfilePage() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={handleManageBilling}
+                      onClick={handleUpdatePaymentMethod}
                       disabled={processingSubscription}
                       className="w-full"
                     >
-                      {processingSubscription ? 'Loading...' : 'Manage Billing & Payment Methods'}
+                      Update Payment Method
                     </Button>
 
                     {!subscription.cancel_at_period_end && (

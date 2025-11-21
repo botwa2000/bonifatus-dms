@@ -584,3 +584,121 @@ async def create_portal_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post(
+    "/update-payment-method/setup",
+    summary="Create SetupIntent for Payment Method Update",
+    description="Generate a Stripe SetupIntent client secret for updating payment method in-app"
+)
+async def setup_payment_method_update(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Create a Stripe SetupIntent for updating payment method.
+    Returns client_secret for use with Stripe Elements.
+    """
+    try:
+        if not current_user.stripe_customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Stripe customer found. Please contact support."
+            )
+
+        import stripe
+        from app.core.config import settings
+
+        # Create SetupIntent for payment method update
+        setup_intent = stripe.SetupIntent.create(
+            customer=current_user.stripe_customer_id,
+            payment_method_types=['card'],
+            usage='off_session',  # Allow charging without customer present
+            metadata={
+                'user_id': str(current_user.id),
+                'user_email': current_user.email,
+                'purpose': 'payment_method_update'
+            }
+        )
+
+        logger.info(f"Created SetupIntent for user {current_user.email}")
+
+        return {
+            "client_secret": setup_intent.client_secret,
+            "setup_intent_id": setup_intent.id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Setup payment method error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to initialize payment method update"
+        )
+
+
+@router.post(
+    "/update-payment-method/confirm",
+    summary="Confirm Payment Method Update",
+    description="Set the new payment method as default for subscription"
+)
+async def confirm_payment_method_update(
+    payment_method_id: str,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Set the new payment method as default for the customer and their subscriptions.
+    """
+    try:
+        if not current_user.stripe_customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Stripe customer found"
+            )
+
+        import stripe
+
+        # Attach payment method to customer
+        payment_method = stripe.PaymentMethod.attach(
+            payment_method_id,
+            customer=current_user.stripe_customer_id
+        )
+
+        # Set as default payment method
+        stripe.Customer.modify(
+            current_user.stripe_customer_id,
+            invoice_settings={
+                'default_payment_method': payment_method_id
+            }
+        )
+
+        # Update all active subscriptions to use this payment method
+        subscriptions = stripe.Subscription.list(
+            customer=current_user.stripe_customer_id,
+            status='active'
+        )
+
+        for sub in subscriptions.data:
+            stripe.Subscription.modify(
+                sub.id,
+                default_payment_method=payment_method_id
+            )
+
+        logger.info(f"Updated payment method for user {current_user.email} to {payment_method_id}")
+
+        return {
+            "success": True,
+            "message": "Payment method updated successfully",
+            "card_brand": payment_method.card.brand if hasattr(payment_method, 'card') else None,
+            "last4": payment_method.card.last4 if hasattr(payment_method, 'card') else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Confirm payment method error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update payment method"
+        )

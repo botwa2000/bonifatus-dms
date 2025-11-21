@@ -180,14 +180,32 @@ async def google_oauth_callback_redirect(
             error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
-        # Determine redirect URL based on tier selection
-        # If user selected a paid tier, redirect to checkout page
+        # Determine redirect URL based on tier selection and existing subscription
+        # If user selected a paid tier, check if they already have an active subscription
         # If user selected free tier or no tier, redirect to dashboard
         if tier_id and tier_id > 0:
-            # Paid tier selected - redirect to checkout with tier_id
-            billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
-            redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
-            logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
+            # Paid tier selected - check if user already has active subscription
+            from app.database.models import Subscription
+            from app.core.database import get_db
+
+            db = next(get_db())
+            try:
+                active_sub = db.query(Subscription).filter(
+                    Subscription.user_id == auth_result['user_id'],
+                    Subscription.status.in_(['active', 'trialing', 'past_due'])
+                ).first()
+
+                if active_sub:
+                    # User already has active subscription - redirect to subscription management
+                    redirect_url = f"{settings.app.app_frontend_url}/profile"
+                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to profile")
+                else:
+                    # No active subscription - proceed to checkout
+                    billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
+                    redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
+                    logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
+            finally:
+                db.close()
         else:
             # Free tier or no tier selected - redirect to welcome dashboard
             redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
