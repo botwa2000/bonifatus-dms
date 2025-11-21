@@ -2083,7 +2083,7 @@ BoniDoc's payment system supports Stripe and PayPal for subscription billing wit
 - Separate development (`sk_test_...`) and production (`sk_live_...`) accounts
 - Webhook endpoints for event-driven processing
 - Price IDs for each tier and billing cycle combination
-- Customer portal for self-service subscription management
+- **NO customer portal usage** - all management is in-app
 
 **Environment Variables:**
 ```bash
@@ -2096,6 +2096,54 @@ STRIPE_PRICE_ID_BASIC_ANNUAL=price_...
 STRIPE_PRICE_ID_PRO_MONTHLY=price_...
 STRIPE_PRICE_ID_PRO_ANNUAL=price_...
 ```
+
+### 11.2a OAuth Redirect Logic for Subscribed Users
+
+**⚠️ IMPORTANT: Smart Redirect Based on User State**
+
+When users click "Login" from different locations, the OAuth callback redirects them appropriately:
+
+**Scenario 1: User clicks package selection and logs in**
+- OAuth state includes `tier_id` and `billing_cycle`
+- Backend checks if user has active subscription
+- **If user HAS active subscription** → Redirect to `/profile` (subscription management)
+- **If user has NO subscription** → Redirect to `/checkout` with selected tier
+- Prevents duplicate subscription attempts
+- Better UX - existing subscribers go to manage page
+
+**Scenario 2: User clicks top menu "Login" button**
+- OAuth state has no `tier_id` (or `tier_id=0`)
+- Backend redirects to `/dashboard` regardless of subscription status
+- Standard login flow
+
+**Implementation (backend/app/api/auth.py):**
+```python
+# In google_oauth_callback_redirect function (line 183-194)
+if tier_id and tier_id > 0:
+    # User selected a paid tier - check if they already have subscription
+    from app.database.models import Subscription
+    active_sub = session.query(Subscription).filter(
+        Subscription.user_id == user.id,
+        Subscription.status.in_(['active', 'trialing', 'past_due'])
+    ).first()
+
+    if active_sub:
+        # User already subscribed - redirect to subscription management
+        redirect_url = f"{settings.app.app_frontend_url}/profile"
+        logger.info(f"User {user.email} has active subscription, redirecting to profile")
+    else:
+        # No subscription - proceed to checkout
+        redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}..."
+else:
+    # Free tier or top menu login - redirect to dashboard
+    redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
+```
+
+**Benefits:**
+- Prevents 409 Conflict errors from duplicate subscription attempts
+- Clearer user journey
+- Existing subscribers immediately see their subscription management page
+- New users proceed smoothly to checkout
 
 ### 11.3 Database Schema
 
@@ -2276,7 +2324,11 @@ STRIPE_PRICE_ID_PRO_ANNUAL=price_...
 - Personalization (user, tier, amounts, dates)
 - Delivery tracking
 
-### 11.10 Billing Dashboard
+### 11.10 Billing Dashboard & In-App Subscription Management
+
+**⚠️ IMPORTANT: In-App Management (Not Stripe Portal)**
+
+BoniDoc uses **in-app subscription management** to keep users within the application and prevent logout issues. Users should NEVER be redirected to Stripe's customer portal.
 
 **User Interface:**
 
@@ -2285,12 +2337,16 @@ STRIPE_PRICE_ID_PRO_ANNUAL=price_...
 - Billing cycle (monthly/annual)
 - Next billing date
 - Cancellation warnings
-- Change Plan / Cancel buttons
+- **In-app** Cancel Subscription button (opens CancellationModal)
+- **In-app** Update Payment Method button (Stripe Elements embed)
 
-**Payment Method:**
+**Payment Method Management:**
 - Card brand icon, last 4 digits, expiry
-- Update payment method flow
-- Multiple method support
+- **Update payment method using Stripe Elements** (embedded, no redirect)
+- Backend creates SetupIntent for payment method update
+- Frontend displays Stripe CardElement component
+- Updates payment method without leaving bonidoc.com
+- Success/error messages shown in-app
 
 **Billing History:**
 - Invoice table (date, description, amount, status)
@@ -2303,6 +2359,17 @@ STRIPE_PRICE_ID_PRO_ANNUAL=price_...
 - Storage usage vs quota
 - Visual progress bars
 - Upgrade prompts
+
+**Subscription Cancellation Flow:**
+- Multi-step CancellationModal component (frontend/src/components/CancellationModal.tsx)
+- Step 1: Retention - Show what user will lose, refund eligibility (14-day money-back)
+- Step 2: Reason - Collect cancellation reason and feedback
+- Step 3: Confirm - Review cancellation type (immediate vs end of period)
+- Step 4: Success - Confirmation with access end date
+- Backend endpoint: POST /api/v1/billing/cancel-subscription
+- Automatic subscription cancellation in Stripe
+- Email notification sent
+- User remains within bonidoc.com throughout process
 
 ### 11.11 Business Logic
 
@@ -2331,6 +2398,18 @@ STRIPE_PRICE_ID_PRO_ANNUAL=price_...
 - Auto-conversion or downgrade
 - Payment required before end
 - Extension via discount codes
+
+**Account Deletion with Active Subscription:**
+- **Automatic subscription cancellation** when user deletes account
+- Check for active subscriptions (`status in ['active', 'trialing', 'past_due']`)
+- Cancel subscription in Stripe immediately (not at period end)
+- Update subscription status to 'canceled' in database
+- Log cancellation in audit trail (`had_active_subscription: true`)
+- Continue with account deletion even if Stripe cancellation fails
+- Implementation: `backend/app/services/user_service.py:397-426`
+- User receives account deletion email (subscription cancellation mentioned)
+- Prevents continued billing after account deletion
+- GDPR compliant - no orphaned billing records
 
 ### 11.12 Analytics
 
