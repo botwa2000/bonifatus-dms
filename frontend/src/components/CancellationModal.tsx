@@ -141,47 +141,25 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </div>
           </div>
 
-          {/* What they'll lose */}
-          <div>
-            <h4 className="font-semibold text-neutral-900 mb-3">
-              What you&apos;ll miss with Free tier
+          {/* Impact of downgrading */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-semibold text-yellow-900 mb-2">
+              Downgrading to Free tier
             </h4>
-            <ul className="space-y-2 text-sm text-neutral-700">
-              <li className="flex items-start">
-                <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Advanced document categorization with AI
-              </li>
-              <li className="flex items-start">
-                <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Unlimited document uploads
-              </li>
-              <li className="flex items-start">
-                <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Priority support
-              </li>
-              <li className="flex items-start">
-                <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Bulk operations
-              </li>
-            </ul>
+            <p className="text-sm text-yellow-800">
+              By canceling your <span className="font-medium">{subscription.tier_name}</span> subscription,
+              you&apos;ll lose access to premium features and be limited to basic functionality.
+              Your investment in professional document management will be paused.
+            </p>
           </div>
 
-          {/* Free tier features */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-900 mb-2">What you&apos;ll keep with Free tier</h4>
-            <ul className="space-y-1 text-sm text-green-800">
-              <li>✓ Up to 50 documents per month</li>
-              <li>✓ Basic document categorization</li>
-              <li>✓ Access to your document history</li>
-            </ul>
+          {/* Retention message */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">Consider staying</h4>
+            <p className="text-sm text-blue-800">
+              Thousands of professionals trust BoniDoc to keep their documents organized and accessible.
+              Your productivity gains and time savings are worth the investment.
+            </p>
           </div>
 
           {/* Refund eligibility notice */}
