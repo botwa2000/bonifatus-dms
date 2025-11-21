@@ -237,7 +237,9 @@ async def google_oauth_callback_redirect(
             path="/"
         )
 
-        logger.info(f"User {auth_result['email']} authenticated, redirecting to dashboard")
+        logger.info(f"[OAuth] User {auth_result['email']} authenticated successfully")
+        logger.info(f"[OAuth] Setting cookies: domain=.bonidoc.com, secure=True, httponly=True")
+        logger.info(f"[OAuth] Redirecting to: {redirect_url}")
 
         return redirect_response
 
