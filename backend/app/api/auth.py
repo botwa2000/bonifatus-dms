@@ -196,9 +196,10 @@ async def google_oauth_callback_redirect(
                 ).first()
 
                 if active_sub:
-                    # User already has active subscription - redirect to subscription management
-                    redirect_url = f"{settings.app.app_frontend_url}/profile"
-                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to profile")
+                    # User already has active subscription - redirect to dashboard
+                    # (Redirecting to /profile causes cookie timing issues)
+                    redirect_url = f"{settings.app.app_frontend_url}/dashboard"
+                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to dashboard")
                 else:
                     # No active subscription - proceed to checkout
                     billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
