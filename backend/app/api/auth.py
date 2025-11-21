@@ -186,7 +186,7 @@ async def google_oauth_callback_redirect(
         if tier_id and tier_id > 0:
             # Paid tier selected - check if user already has active subscription
             from app.database.models import Subscription
-            from app.core.database import get_db
+            from app.database.connection import get_db
 
             db = next(get_db())
             try:
