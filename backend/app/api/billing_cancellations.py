@@ -177,10 +177,9 @@ async def cancel_subscription(
 
         # Handle immediate cancellation with refund
         if request.cancel_type == "immediate" and refund_eligible:
-            # Find the most recent payment for this subscription
+            # Find the most recent payment for this user
             recent_payment = session.query(Payment).filter(
                 Payment.user_id == current_user.id,
-                Payment.stripe_subscription_id == subscription.stripe_subscription_id,
                 Payment.status == 'succeeded'
             ).order_by(Payment.created_at.desc()).first()
 
