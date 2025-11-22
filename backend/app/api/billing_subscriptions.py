@@ -698,3 +698,130 @@ async def confirm_payment_method_update(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update payment method"
         )
+
+
+@router.post(
+    "/subscriptions/schedule-billing-cycle-change",
+    status_code=status.HTTP_200_OK,
+    summary="Schedule Billing Cycle Change at Period End"
+)
+async def schedule_billing_cycle_change(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Schedule a billing cycle change (yearly ↔ monthly) to take effect at the end of the current period.
+
+    This is the cleanest approach because:
+    - User gets full value of what they paid for
+    - No complex refund/proration calculations
+    - Simple one-API-call implementation
+    - Clear user experience
+    - Automatic execution by Stripe
+    """
+    try:
+        new_billing_cycle = request.get('billing_cycle')
+
+        if not new_billing_cycle or new_billing_cycle not in ['monthly', 'yearly']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="billing_cycle must be 'monthly' or 'yearly'"
+            )
+
+        # Get active subscription
+        subscription = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active subscription found"
+            )
+
+        # Check if already on requested billing cycle
+        if subscription.billing_cycle == new_billing_cycle:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Already on {new_billing_cycle} billing cycle"
+            )
+
+        # Get tier information
+        tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+        if not tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tier not found"
+            )
+
+        # Get subscription's currency
+        import stripe
+        current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+        currency = current_price.currency.upper()
+
+        # Get or create new price ID for the new billing cycle
+        new_price_id = await stripe_service.get_or_create_price(
+            session, tier, new_billing_cycle, currency
+        )
+
+        if not new_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create price for new billing cycle"
+            )
+
+        # Create subscription schedule to change billing cycle at period end
+        try:
+            subscription_schedule = stripe.SubscriptionSchedule.create(
+                from_subscription=subscription.stripe_subscription_id,
+                end_behavior='release',  # Release subscription back to normal after schedule completes
+                phases=[
+                    {
+                        # Current phase - runs until end of current period
+                        'items': [{'price': subscription.stripe_price_id, 'quantity': 1}],
+                        'end_date': int(subscription.current_period_end.timestamp()),
+                    },
+                    {
+                        # New phase - starts after current period with new billing cycle
+                        'items': [{'price': new_price_id, 'quantity': 1}],
+                        'iterations': 1,  # Run for one billing cycle then release
+                    }
+                ]
+            )
+
+            logger.info(
+                f"Scheduled billing cycle change for user {current_user.email} "
+                f"from {subscription.billing_cycle} to {new_billing_cycle} "
+                f"at {subscription.current_period_end}"
+            )
+
+            # Store the scheduled change in subscription metadata or a new field
+            # For now, we'll just log it. You could add a scheduled_changes JSON field to track this.
+
+            return {
+                "success": True,
+                "message": f"Billing cycle will change from {subscription.billing_cycle} to {new_billing_cycle} on {subscription.current_period_end.strftime('%B %d, %Y')}",
+                "current_billing_cycle": subscription.billing_cycle,
+                "new_billing_cycle": new_billing_cycle,
+                "change_effective_date": subscription.current_period_end.isoformat(),
+                "schedule_id": subscription_schedule.id
+            }
+
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe subscription schedule error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to schedule billing cycle change: {str(e)}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Schedule billing cycle change error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

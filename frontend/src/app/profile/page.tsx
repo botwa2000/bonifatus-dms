@@ -466,8 +466,8 @@ export default function ProfilePage() {
                             </h5>
                             <p className="text-xs text-blue-700 mt-1">
                               {subscription.billing_cycle === 'yearly'
-                                ? 'Pay month-by-month with more flexibility'
-                                : 'Save money with annual billing'
+                                ? 'Change will take effect at the end of your current billing period'
+                                : 'Switch to annual billing and save. Change takes effect at period end.'
                               }
                             </p>
                           </div>
@@ -480,22 +480,37 @@ export default function ProfilePage() {
                               setMessage(null)
 
                               try {
-                                // Currency comes from tier data - backend will use it
-                                const response = await apiClient.post<{ checkout_url: string }>(
-                                  '/api/v1/billing/subscriptions/create-checkout',
-                                  { tier_id: subscription.tier_id, billing_cycle: newCycle },
+                                // Schedule billing cycle change at period end
+                                const response = await apiClient.post<{
+                                  success: boolean
+                                  message: string
+                                  change_effective_date: string
+                                }>(
+                                  '/api/v1/billing/subscriptions/schedule-billing-cycle-change',
+                                  { billing_cycle: newCycle },
                                   true
                                 )
-                                window.location.href = response.checkout_url
+
+                                if (response.success) {
+                                  setMessage({
+                                    type: 'success',
+                                    text: response.message
+                                  })
+                                  await loadSubscriptionData()
+                                }
                               } catch (error) {
-                                console.error('Failed to switch billing cycle:', error)
-                                setMessage({ type: 'error', text: 'Failed to switch billing cycle' })
+                                console.error('Failed to schedule billing cycle change:', error)
+                                setMessage({
+                                  type: 'error',
+                                  text: 'Failed to schedule billing cycle change. Please try again.'
+                                })
+                              } finally {
                                 setProcessingSubscription(false)
                               }
                             }}
                             disabled={processingSubscription}
                           >
-                            Switch
+                            {processingSubscription ? 'Processing...' : 'Schedule Change'}
                           </Button>
                         </div>
                       </div>
