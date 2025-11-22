@@ -209,10 +209,24 @@ export default function ProfilePage() {
     await loadProfileData()
   }
 
-  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false)
+  const handleUpdatePaymentMethod = async () => {
+    setProcessingSubscription(true)
+    setMessage(null)
 
-  const handleUpdatePaymentMethod = () => {
-    setShowPaymentMethodModal(true)
+    try {
+      const response = await apiClient.post<{ url: string }>(
+        '/api/v1/billing/subscriptions/portal',
+        {},
+        true
+      )
+
+      // Redirect to Stripe Customer Portal
+      window.location.href = response.url
+    } catch (error) {
+      console.error('Failed to open payment portal:', error)
+      setMessage({ type: 'error', text: 'Failed to open payment management portal' })
+      setProcessingSubscription(false)
+    }
   }
 
   const getTierBadgeVariant = (tier: string): 'default' | 'success' | 'warning' | 'error' => {

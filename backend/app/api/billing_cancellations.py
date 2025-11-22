@@ -78,11 +78,11 @@ def get_setting_value(session: Session, key: str, default: Any = None) -> Any:
         return default
 
     try:
-        if setting.value_type == 'json':
+        if setting.data_type == 'json':
             return json.loads(setting.setting_value)
-        elif setting.value_type == 'integer':
+        elif setting.data_type == 'integer':
             return int(setting.setting_value)
-        elif setting.value_type == 'boolean':
+        elif setting.data_type == 'boolean':
             return setting.setting_value.lower() in ('true', '1', 'yes')
         else:
             return setting.setting_value
