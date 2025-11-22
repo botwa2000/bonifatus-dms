@@ -61,19 +61,22 @@ export default function DashboardPage() {
 
       // Check if user already has an active subscription
       try {
-        const subscriptions = await apiClient.get<{ subscriptions: Array<{ id: string; status: string }> }>(
-          '/api/v1/billing/subscriptions',
+        const subscription = await apiClient.get<{ id: string; status: string }>(
+          '/api/v1/billing/subscription',
           true
         )
 
-        if (subscriptions.subscriptions && subscriptions.subscriptions.length > 0) {
+        if (subscription && subscription.id) {
           // User already has a subscription - don't process tier selection
           console.log('User already has active subscription, skipping tier selection')
           setTierProcessed(true)
           return
         }
       } catch (error) {
-        console.error('Failed to check subscription status:', error)
+        // If 404, user has no subscription - continue with tier selection
+        if ((error as any)?.response?.status !== 404) {
+          console.error('Failed to check subscription status:', error)
+        }
       }
 
       const tierId = parseInt(selectedTierId, 10)
