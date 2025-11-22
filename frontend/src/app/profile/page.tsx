@@ -81,17 +81,22 @@ export default function ProfilePage() {
   }, [loadUser])
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login')
-    }
-  }, [isAuthenticated, isLoading, router])
-
-  useEffect(() => {
     if (isAuthenticated) {
       loadProfileData()
       loadSubscriptionData()
+
+      // Check if returning from Stripe payment portal
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('payment_updated') === 'true') {
+        setMessage({ type: 'success', text: 'Payment method updated successfully' })
+        // Clean up URL
+        window.history.replaceState({}, '', '/profile')
+      }
+    } else if (!isLoading && !isAuthenticated) {
+      // Only redirect after loading completes and user is confirmed not authenticated
+      router.push('/login')
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, isLoading, router])
 
   const loadProfileData = async () => {
     try {

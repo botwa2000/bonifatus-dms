@@ -6,6 +6,7 @@ All configuration loaded from database - no hardcoded values
 
 import logging
 import json
+import stripe
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -186,7 +187,7 @@ async def cancel_subscription(
             if recent_payment and recent_payment.stripe_payment_intent_id:
                 try:
                     # Issue refund via Stripe
-                    refund = stripe_service.stripe.Refund.create(
+                    refund = stripe.Refund.create(
                         payment_intent=recent_payment.stripe_payment_intent_id,
                         reason='requested_by_customer'
                     )
@@ -211,14 +212,14 @@ async def cancel_subscription(
                     )
 
                 # Cancel in Stripe
-                canceled_sub = stripe_service.stripe.Subscription.cancel(subscription.stripe_subscription_id)
+                canceled_sub = stripe.Subscription.cancel(subscription.stripe_subscription_id)
                 subscription.status = 'canceled'
                 subscription.canceled_at = datetime.now(timezone.utc)
                 subscription.ended_at = datetime.now(timezone.utc)
 
                 logger.info(f"Successfully canceled Stripe subscription {subscription.stripe_subscription_id}")
 
-            except stripe_service.stripe.error.InvalidRequestError as e:
+            except stripe.error.InvalidRequestError as e:
                 logger.error(f"Stripe invalid request error for subscription {subscription.stripe_subscription_id}: {e}")
                 # If subscription doesn't exist in Stripe, mark as canceled in our DB anyway
                 if 'No such subscription' in str(e):
@@ -231,7 +232,7 @@ async def cancel_subscription(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Invalid Stripe request: {str(e)}"
                     )
-            except stripe_service.stripe.error.StripeError as e:
+            except stripe.error.StripeError as e:
                 logger.error(f"Stripe API error during cancellation: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -264,7 +265,7 @@ async def cancel_subscription(
                     )
 
                 # Update subscription in Stripe to cancel at period end
-                stripe_service.stripe.Subscription.modify(
+                stripe.Subscription.modify(
                     subscription.stripe_subscription_id,
                     cancel_at_period_end=True
                 )
@@ -273,13 +274,13 @@ async def cancel_subscription(
 
                 logger.info(f"Scheduled cancellation at period end for subscription {subscription.stripe_subscription_id}")
 
-            except stripe_service.stripe.error.InvalidRequestError as e:
+            except stripe.error.InvalidRequestError as e:
                 logger.error(f"Stripe invalid request error: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid Stripe request: {str(e)}"
                 )
-            except stripe_service.stripe.error.StripeError as e:
+            except stripe.error.StripeError as e:
                 logger.error(f"Stripe API error: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -404,7 +405,7 @@ async def reactivate_subscription(
 
         # Remove cancel_at_period_end flag in Stripe
         try:
-            stripe_service.stripe.Subscription.modify(
+            stripe.Subscription.modify(
                 subscription.stripe_subscription_id,
                 cancel_at_period_end=False
             )

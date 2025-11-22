@@ -565,7 +565,7 @@ async def create_portal_session(
 
         portal_session = stripe.billing_portal.Session.create(
             customer=current_user.stripe_customer_id,
-            return_url=f"{settings.app.app_frontend_url}/profile"
+            return_url=f"{settings.app.app_frontend_url}/profile?payment_updated=true"
         )
 
         logger.info(f"Created portal session for user {current_user.email}")
@@ -759,8 +759,23 @@ async def schedule_billing_cycle_change(
 
         # Get subscription's currency
         import stripe
-        current_price = stripe.Price.retrieve(subscription.stripe_price_id)
-        currency = current_price.currency.upper()
+
+        if not subscription.stripe_price_id:
+            logger.error(f"Subscription {subscription.id} has no stripe_price_id")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe price ID"
+            )
+
+        try:
+            current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+            currency = current_price.currency.upper()
+        except Exception as e:
+            logger.error(f"Failed to retrieve current price {subscription.stripe_price_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to retrieve subscription price: {str(e)}"
+            )
 
         # Get or create new price ID for the new billing cycle
         new_price_id = await stripe_service.get_or_create_price(
@@ -768,10 +783,13 @@ async def schedule_billing_cycle_change(
         )
 
         if not new_price_id:
+            logger.error(f"get_or_create_price returned None for tier {tier.id}, cycle {new_billing_cycle}, currency {currency}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create price for new billing cycle"
             )
+
+        logger.info(f"Current price ID: {subscription.stripe_price_id}, New price ID: {new_price_id}")
 
         # Create subscription schedule to change billing cycle at period end
         try:
@@ -781,12 +799,12 @@ async def schedule_billing_cycle_change(
                 phases=[
                     {
                         # Current phase - runs until end of current period
-                        'items': [{'price': subscription.stripe_price_id, 'quantity': 1}],
+                        'items': [{'price': str(subscription.stripe_price_id), 'quantity': 1}],
                         'end_date': int(subscription.current_period_end.timestamp()),
                     },
                     {
                         # New phase - starts after current period with new billing cycle
-                        'items': [{'price': new_price_id, 'quantity': 1}],
+                        'items': [{'price': str(new_price_id), 'quantity': 1}],
                         'iterations': 1,  # Run for one billing cycle then release
                     }
                 ]
