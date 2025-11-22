@@ -9,7 +9,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
-import { useCurrency } from '@/contexts/currency-context'
 import { apiClient } from '@/services/api-client'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
