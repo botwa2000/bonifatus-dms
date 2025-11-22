@@ -74,7 +74,8 @@ export default function DashboardPage() {
         }
       } catch (error) {
         // If 404, user has no subscription - continue with tier selection
-        if ((error as any)?.response?.status !== 404) {
+        const apiError = error as { response?: { status?: number } }
+        if (apiError?.response?.status !== 404) {
           console.error('Failed to check subscription status:', error)
         }
       }
