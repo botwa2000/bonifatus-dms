@@ -25,7 +25,6 @@ interface Document {
 
 export default function DashboardPage() {
   const { user, isLoading, loadUser, logout } = useAuth()
-  const { selectedCurrency, isLoading: currencyLoading } = useCurrency()
   const router = useRouter()
 
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
@@ -43,7 +42,7 @@ export default function DashboardPage() {
   // ONLY if they don't already have an active subscription
   useEffect(() => {
     const handleTierSelection = async () => {
-      if (!user || tierProcessed || isProcessingTier || currencyLoading) return
+      if (!user || tierProcessed || isProcessingTier) return
 
       // Get selected tier and billing cycle from sessionStorage
       const selectedTierId = sessionStorage.getItem('selected_tier_id')
@@ -93,12 +92,12 @@ export default function DashboardPage() {
 
       try {
         // Create Stripe checkout session
+        // Currency comes from tier data - no need to pass it
         const checkoutResponse = await apiClient.post<{ checkout_url: string }>(
           '/api/v1/billing/subscriptions/create-checkout',
           {
             tier_id: tierId,
             billing_cycle: selectedBillingCycle || 'yearly',  // Default to yearly for better conversion
-            currency: selectedCurrency.code,
             referral_code: referralCode || undefined
           },
           true
@@ -115,10 +114,10 @@ export default function DashboardPage() {
       }
     }
 
-    if (user && !tierProcessed && !isProcessingTier && !currencyLoading) {
+    if (user && !tierProcessed && !isProcessingTier) {
       handleTierSelection()
     }
-  }, [user, tierProcessed, isProcessingTier, selectedCurrency, currencyLoading])
+  }, [user, tierProcessed, isProcessingTier])
 
   // Load recent documents
   useEffect(() => {

@@ -185,13 +185,10 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      // Get currency from the tier being upgraded to
-      const tier = availableTiers.find(t => t.id === tierId)
-      const currency = tier?.currency || subscription?.currency || 'EUR'
-
+      // Currency comes from tier data - backend will use it
       const response = await apiClient.post<{ checkout_url: string }>(
         '/api/v1/billing/subscriptions/create-checkout',
-        { tier_id: tierId, billing_cycle: billingCycle, currency },
+        { tier_id: tierId, billing_cycle: billingCycle },
         true
       )
 
@@ -483,9 +480,10 @@ export default function ProfilePage() {
                               setMessage(null)
 
                               try {
+                                // Currency comes from tier data - backend will use it
                                 const response = await apiClient.post<{ checkout_url: string }>(
                                   '/api/v1/billing/subscriptions/create-checkout',
-                                  { tier_id: subscription.tier_id, billing_cycle: newCycle, currency: subscription.currency },
+                                  { tier_id: subscription.tier_id, billing_cycle: newCycle },
                                   true
                                 )
                                 window.location.href = response.checkout_url

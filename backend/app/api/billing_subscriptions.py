@@ -46,19 +46,12 @@ async def create_checkout_session(
     try:
         tier_id = request.get('tier_id')
         billing_cycle = request.get('billing_cycle', 'monthly')
-        currency = request.get('currency')
         referral_code = request.get('referral_code')
 
         if not tier_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="tier_id is required"
-            )
-
-        if not currency:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="currency is required"
             )
 
         # Get tier information
@@ -68,6 +61,9 @@ async def create_checkout_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Tier {tier_id} not found"
             )
+
+        # Always use tier's currency - every tier must have a currency
+        currency = tier.currency
 
         if tier.name.lower() == 'free':
             raise HTTPException(
