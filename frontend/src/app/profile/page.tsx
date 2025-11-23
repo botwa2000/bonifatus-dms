@@ -562,7 +562,37 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-neutral-700">Upgrade to unlock more features:</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm font-medium text-neutral-700">Upgrade to unlock more features:</p>
+
+                      {/* Billing Cycle Toggle */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={billingCycle === 'monthly' ? 'primary' : 'secondary'}
+                          size="sm"
+                          onClick={() => setBillingCycle('monthly')}
+                        >
+                          Monthly
+                        </Button>
+                        <Button
+                          variant={billingCycle === 'yearly' ? 'primary' : 'secondary'}
+                          size="sm"
+                          onClick={() => setBillingCycle('yearly')}
+                        >
+                          Yearly
+                          {availableTiers.length > 0 && (() => {
+                            const sampleTier = availableTiers.find(t => t.name.toLowerCase() !== 'free')
+                            if (sampleTier && sampleTier.price_yearly_cents > 0 && sampleTier.price_monthly_cents > 0) {
+                              const yearlyCostPerMonth = sampleTier.price_yearly_cents / 12
+                              const monthlyCost = sampleTier.price_monthly_cents
+                              const savingsPercent = Math.round(((monthlyCost - yearlyCostPerMonth) / monthlyCost) * 100)
+                              return savingsPercent > 0 ? ` (Save ${savingsPercent}%)` : ''
+                            }
+                            return ''
+                          })()}
+                        </Button>
+                      </div>
+                    </div>
 
                     {availableTiers
                       .filter(tier => tier.name.toLowerCase() !== 'free')
