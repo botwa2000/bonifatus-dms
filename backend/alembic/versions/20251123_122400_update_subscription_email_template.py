@@ -1,7 +1,7 @@
 """update subscription confirmation email template with tier features
 
 Revision ID: 20251123_122400
-Revises: 20251118_154253
+Revises: 024_nullable_price_id
 Create Date: 2025-11-23 12:24:00
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251123_122400'
-down_revision = '20251118_154253'
+down_revision = '024_nullable_price_id'
 branch_labels = None
 depends_on = None
 
