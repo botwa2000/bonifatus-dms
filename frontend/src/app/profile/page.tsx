@@ -42,6 +42,7 @@ interface Subscription {
   currency: string
   currency_symbol?: string
   created_at?: string
+  stripe_price_id?: string
 }
 
 interface TierPlan {
@@ -74,10 +75,15 @@ export default function ProfilePage() {
   const [processingSubscription, setProcessingSubscription] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
 
   // Load user data on mount
   useEffect(() => {
-    loadUser()
+    const attemptAuth = async () => {
+      await loadUser()
+      setHasAttemptedAuth(true)
+    }
+    attemptAuth()
   }, [loadUser])
 
   useEffect(() => {
@@ -92,11 +98,11 @@ export default function ProfilePage() {
         // Clean up URL
         window.history.replaceState({}, '', '/profile')
       }
-    } else if (!isLoading && !isAuthenticated) {
-      // Only redirect after loading completes and user is confirmed not authenticated
+    } else if (hasAttemptedAuth && !isLoading && !isAuthenticated) {
+      // Only redirect after we've attempted auth AND loading completes AND user is not authenticated
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, hasAttemptedAuth, router])
 
   const loadProfileData = async () => {
     try {
@@ -612,16 +618,20 @@ export default function ProfilePage() {
 
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-2xl font-bold text-neutral-900">
-                                  {tier.currency_symbol}{(billingCycle === 'yearly'
-                                    ? tier.price_yearly_cents / 100 / 12
-                                    : tier.price_monthly_cents / 100
-                                  ).toFixed(2)}
-                                  <span className="text-sm font-normal text-neutral-600">/month</span>
-                                </p>
-                                {billingCycle === 'yearly' && (
-                                  <p className="text-xs text-neutral-500">
-                                    Billed {tier.currency_symbol}{(tier.price_yearly_cents / 100).toFixed(2)} annually
+                                {billingCycle === 'yearly' ? (
+                                  <>
+                                    <p className="text-2xl font-bold text-neutral-900">
+                                      {tier.currency_symbol}{(tier.price_yearly_cents / 100).toFixed(2)}
+                                      <span className="text-sm font-normal text-neutral-600">/year</span>
+                                    </p>
+                                    <p className="text-xs text-neutral-500 mt-1">
+                                      {tier.currency_symbol}{(tier.price_yearly_cents / 100 / 12).toFixed(2)}/month
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="text-2xl font-bold text-neutral-900">
+                                    {tier.currency_symbol}{(tier.price_monthly_cents / 100).toFixed(2)}
+                                    <span className="text-sm font-normal text-neutral-600">/month</span>
                                   </p>
                                 )}
                               </div>
