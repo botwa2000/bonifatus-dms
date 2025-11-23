@@ -46,6 +46,7 @@ async def create_checkout_session(
     try:
         tier_id = request.get('tier_id')
         billing_cycle = request.get('billing_cycle', 'monthly')
+        currency_code = request.get('currency')
         referral_code = request.get('referral_code')
 
         if not tier_id:
@@ -62,8 +63,28 @@ async def create_checkout_session(
                 detail=f"Tier {tier_id} not found"
             )
 
-        # Always use tier's currency - every tier must have a currency
-        currency = tier.currency
+        # Currency is required - user must select one
+        if not currency_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="currency is required"
+            )
+
+        # Validate currency exists in database
+        from app.database.models import Currency
+        currency_obj = session.query(Currency).filter(
+            Currency.code == currency_code.upper(),
+            Currency.is_active == True
+        ).first()
+
+        if not currency_obj:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Currency {currency_code} is not supported"
+            )
+
+        currency = currency_code.upper()
+        logger.info(f"Using user-selected currency: {currency}")
 
         if tier.name.lower() == 'free':
             raise HTTPException(

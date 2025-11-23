@@ -324,6 +324,18 @@ async def handle_subscription_created(event, session: Session):
         dashboard_url = f"{frontend_url}/dashboard"
         support_url = f"{frontend_url}/support"
 
+        # Get tier features from database
+        tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} documents"
+        tier_feature_2 = f"{tier.storage_quota_bytes // (1024**3) if tier.storage_quota_bytes else 'Unlimited'} GB secure storage"
+        tier_feature_3 = "AI-powered document categorization and search"
+
+        # Add additional features based on tier capabilities
+        if tier.bulk_operations_enabled:
+            tier_feature_3 = "Bulk document operations and batch uploads"
+        if tier.priority_support:
+            # If priority support, make it the third feature and shift others
+            tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} documents with priority support"
+
         # Send email
         asyncio.create_task(
             email_service.send_subscription_confirmation(
@@ -336,6 +348,9 @@ async def handle_subscription_created(event, session: Session):
                 currency_symbol=currency_symbol,
                 billing_period=billing_period,
                 next_billing_date=next_billing_date,
+                tier_feature_1=tier_feature_1,
+                tier_feature_2=tier_feature_2,
+                tier_feature_3=tier_feature_3,
                 dashboard_url=dashboard_url,
                 support_url=support_url
             )

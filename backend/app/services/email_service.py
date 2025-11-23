@@ -522,6 +522,9 @@ class EmailService:
         currency_symbol: str,
         billing_period: str,
         next_billing_date: str,
+        tier_feature_1: str,
+        tier_feature_2: str,
+        tier_feature_3: str,
         dashboard_url: str,
         support_url: str
     ) -> bool:
@@ -538,6 +541,9 @@ class EmailService:
             currency_symbol: Currency symbol ($, €, etc.)
             billing_period: Billing period text (month/year)
             next_billing_date: Next billing date
+            tier_feature_1: First tier feature description
+            tier_feature_2: Second tier feature description
+            tier_feature_3: Third tier feature description
             dashboard_url: Dashboard URL
             support_url: Support URL
 
@@ -553,6 +559,9 @@ class EmailService:
                 'amount': str(amount),
                 'currency_symbol': currency_symbol,
                 'next_billing_date': next_billing_date,
+                'tier_feature_1': tier_feature_1,
+                'tier_feature_2': tier_feature_2,
+                'tier_feature_3': tier_feature_3,
                 'dashboard_url': dashboard_url,
                 'support_url': support_url
             }

@@ -323,7 +323,7 @@ async def cancel_subscription(
         # Send cancellation email with database-driven content
         try:
             frontend_url = settings.app.app_frontend_url
-            reactivate_url = f"{frontend_url}/profile/subscription"
+            reactivate_url = f"{frontend_url}/profile"
             feedback_url = f"{frontend_url}/feedback?reason=cancellation"
             support_url = f"{frontend_url}/support"
 
@@ -335,7 +335,7 @@ async def cancel_subscription(
                 session=session,
                 user_email=current_user.email,
                 user_name=current_user.full_name or current_user.email,
-                plan_name=tier.name if tier else 'Premium',
+                plan_name=tier.display_name,
                 access_end_date=access_end_date,
                 free_tier_feature_1=free_tier_features[0] if len(free_tier_features) > 0 else '',
                 free_tier_feature_2=free_tier_features[1] if len(free_tier_features) > 1 else '',
