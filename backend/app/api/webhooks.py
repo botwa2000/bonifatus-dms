@@ -241,6 +241,13 @@ async def handle_subscription_created(event, session: Session):
 
     # Always get items data for price ID
     items_data = None
+    logger.info(f"[WEBHOOK] Checking for items in subscription {stripe_sub.id}")
+    logger.info(f"[WEBHOOK] hasattr items: {hasattr(stripe_sub, 'items')}")
+    if hasattr(stripe_sub, 'items'):
+        logger.info(f"[WEBHOOK] items type: {type(stripe_sub.items)}, hasattr data: {hasattr(stripe_sub.items, 'data')}")
+        if hasattr(stripe_sub.items, 'data'):
+            logger.info(f"[WEBHOOK] items.data length: {len(stripe_sub.items.data) if stripe_sub.items.data else 0}")
+
     if hasattr(stripe_sub, 'items') and hasattr(stripe_sub.items, 'data'):
         items_data = stripe_sub.items.data
         if items_data and len(items_data) > 0:
@@ -303,18 +310,17 @@ async def handle_subscription_created(event, session: Session):
 
     # Send subscription confirmation email
     try:
-        # Get currency from price (reuse items_data from above)
-        price = items_data[0].price if items_data and len(items_data) > 0 else None
-        currency = price.currency.upper() if price and hasattr(price, 'currency') and price.currency else 'USD'
-        amount = (price.unit_amount / 100) if price and hasattr(price, 'unit_amount') and price.unit_amount else 0
+        # Use currency and amount from subscription (already extracted above)
+        email_currency = db_subscription.currency or 'USD'
+        email_amount = (db_subscription.amount_cents / 100) if db_subscription.amount_cents else 0
 
         # Get currency symbol
         from app.database.models import Currency
-        currency_obj = session.query(Currency).filter(Currency.code == currency).first()
+        currency_obj = session.query(Currency).filter(Currency.code == email_currency).first()
         currency_symbol = currency_obj.symbol if currency_obj else '$'
 
-        # Format billing period
-        billing_period = 'year' if billing_cycle == 'yearly' else 'month'
+        # Format billing period (capitalize first letter)
+        billing_period = billing_cycle.capitalize()
 
         # Format next billing date
         next_billing_date = db_subscription.current_period_end.strftime('%B %d, %Y')
@@ -324,17 +330,16 @@ async def handle_subscription_created(event, session: Session):
         dashboard_url = f"{frontend_url}/dashboard"
         support_url = f"{frontend_url}/support"
 
-        # Get tier features from database
-        tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} documents"
-        tier_feature_2 = f"{tier.storage_quota_bytes // (1024**3) if tier.storage_quota_bytes else 'Unlimited'} GB secure storage"
-        tier_feature_3 = "AI-powered document categorization and search"
+        # Get tier features from database (match front page features)
+        tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} document uploads"
+        tier_feature_2 = f"{tier.storage_quota_bytes // (1024**3) if tier.storage_quota_bytes else 'Unlimited'} GB cloud storage"
+        tier_feature_3 = "Advanced search and categorization"
 
         # Add additional features based on tier capabilities
         if tier.bulk_operations_enabled:
-            tier_feature_3 = "Bulk document operations and batch uploads"
+            tier_feature_3 = "Bulk operations and batch uploads"
         if tier.priority_support:
-            # If priority support, make it the third feature and shift others
-            tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} documents with priority support"
+            tier_feature_3 = "Priority customer support"
 
         # Send email
         asyncio.create_task(
@@ -342,9 +347,9 @@ async def handle_subscription_created(event, session: Session):
                 session=session,
                 user_email=user.email,
                 user_name=user.full_name or user.email,
-                plan_name=tier.name,
-                billing_cycle=billing_cycle,
-                amount=amount,
+                plan_name=tier.display_name,
+                billing_cycle=billing_cycle.capitalize(),
+                amount=email_amount,
                 currency_symbol=currency_symbol,
                 billing_period=billing_period,
                 next_billing_date=next_billing_date,
@@ -536,10 +541,17 @@ async def handle_invoice_payment_succeeded(event, session: Session):
         currency_obj = session.query(Currency).filter(Currency.code == currency).first()
         currency_symbol = currency_obj.symbol if currency_obj else '$'
 
-        # Format dates
+        # Format dates - use subscription period for accurate billing cycle dates
         invoice_date = datetime.fromtimestamp(stripe_invoice.created, tz=timezone.utc).strftime('%B %d, %Y')
-        period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
-        period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
+
+        # Get period dates from subscription if available (more accurate for billing cycle)
+        if subscription:
+            period_start = subscription.current_period_start.strftime('%B %d, %Y')
+            period_end = subscription.current_period_end.strftime('%B %d, %Y')
+        else:
+            # Fallback to invoice period dates
+            period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
+            period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
 
         # Calculate amount
         amount = stripe_invoice.amount_paid / 100

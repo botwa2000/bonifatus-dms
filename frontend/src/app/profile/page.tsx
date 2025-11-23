@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
+import { useCurrency } from '@/contexts/currency-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Input, Select, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
@@ -58,6 +59,7 @@ interface TierPlan {
 
 export default function ProfilePage() {
   const { user, isAuthenticated, isLoading, loadUser, logout } = useAuth()
+  const { selectedCurrency } = useCurrency()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
@@ -196,10 +198,20 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      // Currency comes from tier data - backend will use it
+      // Validate currency is selected
+      if (!selectedCurrency) {
+        setMessage({ type: 'error', text: 'Please select a currency first' })
+        setProcessingSubscription(false)
+        return
+      }
+
       const response = await apiClient.post<{ checkout_url: string }>(
         '/api/v1/billing/subscriptions/create-checkout',
-        { tier_id: tierId, billing_cycle: billingCycle },
+        {
+          tier_id: tierId,
+          billing_cycle: billingCycle,
+          currency: selectedCurrency.code
+        },
         true
       )
 
