@@ -1355,6 +1355,86 @@ docker exec bonifatus-backend alembic downgrade -1
 docker exec bonifatus-backend alembic current
 ```
 
+### 8.3a Database Access
+
+**Direct Database Access - Production**
+
+Access the production PostgreSQL database directly from the server:
+
+```bash
+# SSH to server first
+ssh root@91.99.212.17
+
+# Access production database (interactive mode)
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms
+
+# Run a single query
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "SELECT version_num FROM alembic_version;"
+
+# View table structure
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "\d email_templates"
+
+# List all tables
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "\dt"
+```
+
+**Direct Database Access - Development**
+
+Access the development PostgreSQL database:
+
+```bash
+# SSH to server first
+ssh root@91.99.212.17
+
+# Access development database (interactive mode)
+PGPASSWORD=<DEV_DB_PASSWORD> psql -U bonifatus_dev -h localhost -d bonifatus_dms_dev
+
+# Run a single query
+PGPASSWORD=<DEV_DB_PASSWORD> psql -U bonifatus_dev -h localhost -d bonifatus_dms_dev -c "SELECT version_num FROM alembic_version;"
+
+# View table structure
+PGPASSWORD=<DEV_DB_PASSWORD> psql -U bonifatus_dev -h localhost -d bonifatus_dms_dev -c "\d email_templates"
+```
+
+**Database Credentials Reference**
+
+All database passwords are stored in `HETZNER_SETUP_ACTUAL.md`. **Never commit this file to git.**
+
+| Environment | Database | User | Password Placeholder | Find Password In |
+|------------|----------|------|---------------------|------------------|
+| **Production** | `bonifatus_dms` | `bonifatus` | `<PRODUCTION_DB_PASSWORD>` | `HETZNER_SETUP_ACTUAL.md` § Database (line 67) |
+| **Development** | `bonifatus_dms_dev` | `bonifatus_dev` | `<DEV_DB_PASSWORD>` | `HETZNER_SETUP_ACTUAL.md` § Development Database (line 106) |
+
+**How to Find the Actual Passwords:**
+
+1. Open `HETZNER_SETUP_ACTUAL.md` (located in project root)
+2. For production password: Search for "**Password:** BoniDoc" (section "Database")
+3. For development password: Search for "**Password:** BoniDocDev" (section "Development Database")
+4. Replace the placeholders in commands above with actual passwords
+
+**Common Database Queries**
+
+```bash
+# Check current migration version
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "SELECT version_num FROM alembic_version;"
+
+# List all email templates
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "SELECT name, display_name, category FROM email_templates ORDER BY name;"
+
+# Check subscription data
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "SELECT id, stripe_subscription_id, stripe_price_id, status FROM subscriptions ORDER BY created_at DESC LIMIT 10;"
+
+# View currency settings
+PGPASSWORD=<PRODUCTION_DB_PASSWORD> psql -U bonifatus -h localhost -d bonifatus_dms -c "SELECT code, symbol, name, exchange_rate FROM currencies WHERE is_active = true;"
+```
+
+**Important Notes:**
+- **Credentials:** All passwords in `HETZNER_SETUP_ACTUAL.md` (never commit this file)
+- **SSL Required:** PostgreSQL connections require SSL (configured in `pg_hba.conf`)
+- **Password Method:** Use `PGPASSWORD` environment variable to avoid interactive password prompts
+- **Host Access:** The `psql` command is available on the host system (not in Docker containers)
+- **Connection:** Always use `-h localhost` when connecting from the Hetzner server
+
 ### 8.4 Feature Deployments (Example: Add New Language)
 
 **Step 1: Add language support to backend**

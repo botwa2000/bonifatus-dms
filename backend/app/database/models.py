@@ -1151,3 +1151,70 @@ class CookieDefinitionTranslation(Base, TimestampMixin):
         Index('idx_cookie_def_trans_lang', 'language_code'),
         sa.UniqueConstraint('cookie_id', 'language_code', name='uq_cookie_def_trans'),
     )
+
+
+class SubscriptionCancellationFeedback(Base):
+    """Feedback collected when users cancel subscriptions
+
+    Used for business intelligence and product improvement.
+    User account still exists, so we can link to user_id.
+    """
+    __tablename__ = "subscription_cancellation_feedback"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    subscription_id = Column(UUID(as_uuid=True), nullable=True)
+    plan_name = Column(String(100), nullable=True)
+    billing_cycle = Column(String(20), nullable=True)  # 'monthly', 'yearly'
+    days_subscribed = Column(Integer, nullable=True)
+
+    # Feedback data
+    reason_category = Column(String(100), nullable=True)  # 'too_expensive', 'not_using', 'missing_features', 'switching_to_competitor', 'other'
+    feedback_text = Column(Text, nullable=True)
+    would_recommend = Column(Boolean, nullable=True)  # NPS-style question
+
+    # Timestamps
+    cancellation_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
+    __table_args__ = (
+        Index('idx_sub_cancel_feedback_date', 'cancellation_date'),
+        Index('idx_sub_cancel_feedback_reason', 'reason_category'),
+        Index('idx_sub_cancel_feedback_plan', 'plan_name'),
+    )
+
+
+class AccountDeletionFeedback(Base):
+    """Anonymous feedback collected when users delete accounts
+
+    Anonymous (no user_id) since account is being deleted, but captures
+    useful metrics for business intelligence and product improvement.
+    """
+    __tablename__ = "account_deletion_feedback"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    anonymous_id = Column(String(64), nullable=False)  # SHA256 hash of email
+
+    # User metrics at deletion time
+    tier_at_deletion = Column(String(50), nullable=True)  # 'free', 'starter', 'professional', 'enterprise'
+    days_since_registration = Column(Integer, nullable=True)
+    total_documents_uploaded = Column(Integer, nullable=True)
+    had_active_subscription = Column(Boolean, nullable=True)
+
+    # Feedback data
+    reason_category = Column(String(100), nullable=True)  # 'privacy_concerns', 'not_useful', 'too_complex', 'switching_service', 'other'
+    feedback_text = Column(Text, nullable=True)
+    would_return = Column(Boolean, nullable=True)  # Would you return if we improved X?
+
+    # Timestamps
+    deletion_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('idx_acct_delete_feedback_date', 'deletion_date'),
+        Index('idx_acct_delete_feedback_reason', 'reason_category'),
+        Index('idx_acct_delete_feedback_tier', 'tier_at_deletion'),
+    )
