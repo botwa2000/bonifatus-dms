@@ -59,7 +59,7 @@ interface TierPlan {
 
 export default function ProfilePage() {
   const { user, isAuthenticated, isLoading, loadUser, logout } = useAuth()
-  const { selectedCurrency } = useCurrency()
+  const { selectedCurrency, availableCurrencies, setSelectedCurrency } = useCurrency()
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
@@ -580,35 +580,56 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-medium text-neutral-700">Upgrade to unlock more features:</p>
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-neutral-700 mb-3">Upgrade to unlock more features:</p>
 
-                      {/* Billing Cycle Toggle */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant={billingCycle === 'monthly' ? 'primary' : 'secondary'}
-                          size="sm"
-                          onClick={() => setBillingCycle('monthly')}
-                        >
-                          Monthly
-                        </Button>
-                        <Button
-                          variant={billingCycle === 'yearly' ? 'primary' : 'secondary'}
-                          size="sm"
-                          onClick={() => setBillingCycle('yearly')}
-                        >
-                          Yearly
-                          {availableTiers.length > 0 && (() => {
-                            const sampleTier = availableTiers.find(t => t.name.toLowerCase() !== 'free')
-                            if (sampleTier && sampleTier.price_yearly_cents > 0 && sampleTier.price_monthly_cents > 0) {
-                              const yearlyCostPerMonth = sampleTier.price_yearly_cents / 12
-                              const monthlyCost = sampleTier.price_monthly_cents
-                              const savingsPercent = Math.round(((monthlyCost - yearlyCostPerMonth) / monthlyCost) * 100)
-                              return savingsPercent > 0 ? ` (Save ${savingsPercent}%)` : ''
-                            }
-                            return ''
-                          })()}
-                        </Button>
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Currency Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-neutral-600">Currency:</span>
+                          <select
+                            value={selectedCurrency?.code || ''}
+                            onChange={(e) => {
+                              const currency = availableCurrencies.find(c => c.code === e.target.value)
+                              if (currency) setSelectedCurrency(currency)
+                            }}
+                            className="px-3 py-1.5 text-sm border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-admin-primary"
+                          >
+                            {availableCurrencies.map(currency => (
+                              <option key={currency.code} value={currency.code}>
+                                {currency.code} ({currency.symbol})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Billing Cycle Toggle */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={billingCycle === 'monthly' ? 'primary' : 'secondary'}
+                            size="sm"
+                            onClick={() => setBillingCycle('monthly')}
+                          >
+                            Monthly
+                          </Button>
+                          <Button
+                            variant={billingCycle === 'yearly' ? 'primary' : 'secondary'}
+                            size="sm"
+                            onClick={() => setBillingCycle('yearly')}
+                          >
+                            Yearly
+                            {availableTiers.length > 0 && (() => {
+                              const sampleTier = availableTiers.find(t => t.name.toLowerCase() !== 'free')
+                              if (sampleTier && sampleTier.price_yearly_cents > 0 && sampleTier.price_monthly_cents > 0) {
+                                const yearlyCostPerMonth = sampleTier.price_yearly_cents / 12
+                                const monthlyCost = sampleTier.price_monthly_cents
+                                const savingsPercent = Math.round(((monthlyCost - yearlyCostPerMonth) / monthlyCost) * 100)
+                                return savingsPercent > 0 ? ` (Save ${savingsPercent}%)` : ''
+                              }
+                              return ''
+                            })()}
+                          </Button>
+                        </div>
                       </div>
                     </div>
 
