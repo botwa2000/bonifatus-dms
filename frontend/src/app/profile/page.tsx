@@ -639,6 +639,21 @@ export default function ProfilePage() {
                         const isPro = tier.name.toLowerCase() === 'pro'
                         const isComingSoon = isPro
 
+                        // Convert prices from base currency (EUR cents) to selected currency
+                        const priceMonthlyInEur = tier.price_monthly_cents / 100
+                        const priceYearlyInEur = tier.price_yearly_cents / 100
+
+                        const priceMonthly = selectedCurrency
+                          ? priceMonthlyInEur * selectedCurrency.exchange_rate
+                          : priceMonthlyInEur
+
+                        const priceYearly = selectedCurrency
+                          ? priceYearlyInEur * selectedCurrency.exchange_rate
+                          : priceYearlyInEur
+
+                        const currencySymbol = selectedCurrency?.symbol || tier.currency_symbol
+                        const decimalPlaces = selectedCurrency?.decimal_places || 2
+
                         return (
                           <div key={tier.id} className="border border-neutral-200 rounded-lg p-4 hover:border-admin-primary transition-colors">
                             <div className="flex items-start justify-between mb-3">
@@ -654,16 +669,16 @@ export default function ProfilePage() {
                                 {billingCycle === 'yearly' ? (
                                   <>
                                     <p className="text-2xl font-bold text-neutral-900">
-                                      {tier.currency_symbol}{(tier.price_yearly_cents / 100).toFixed(2)}
+                                      {currencySymbol}{priceYearly.toFixed(decimalPlaces)}
                                       <span className="text-sm font-normal text-neutral-600">/year</span>
                                     </p>
                                     <p className="text-xs text-neutral-500 mt-1">
-                                      {tier.currency_symbol}{(tier.price_yearly_cents / 100 / 12).toFixed(2)}/month
+                                      {currencySymbol}{(priceYearly / 12).toFixed(decimalPlaces)}/month
                                     </p>
                                   </>
                                 ) : (
                                   <p className="text-2xl font-bold text-neutral-900">
-                                    {tier.currency_symbol}{(tier.price_monthly_cents / 100).toFixed(2)}
+                                    {currencySymbol}{priceMonthly.toFixed(decimalPlaces)}
                                     <span className="text-sm font-normal text-neutral-600">/month</span>
                                   </p>
                                 )}
