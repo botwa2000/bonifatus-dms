@@ -1,7 +1,7 @@
 """add all email templates with simplified HTML
 
 Revision ID: 025_add_all_email_templates
-Revises: 024_make_stripe_price_id_nullable
+Revises: 20251123_122400
 Create Date: 2025-11-23 17:00:00
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '025_add_all_email_templates'
-down_revision = '024_make_stripe_price_id_nullable'
+down_revision = '20251123_122400'
 branch_labels = None
 depends_on = None
 
