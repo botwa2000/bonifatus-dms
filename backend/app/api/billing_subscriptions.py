@@ -833,8 +833,8 @@ async def schedule_billing_cycle_change(
                         },
                         {
                             # New phase - starts after current period with new billing cycle
+                            # No end_date or iterations = continues indefinitely until released
                             'items': [{'price': str(new_price_id), 'quantity': 1}],
-                            'iterations': 1,
                         }
                     ]
                 )
@@ -859,8 +859,8 @@ async def schedule_billing_cycle_change(
                         },
                         {
                             # New phase - starts after current period with new billing cycle
+                            # No end_date or iterations = continues indefinitely until released
                             'items': [{'price': str(new_price_id), 'quantity': 1}],
-                            'iterations': 1,
                         }
                     ]
                 )
