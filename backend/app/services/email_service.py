@@ -194,7 +194,7 @@ class EmailService:
         self,
         to_email: str,
         user_name: str,
-        login_url: str
+        dashboard_url: str
     ) -> bool:
         """
         Send welcome email to new user
@@ -202,7 +202,7 @@ class EmailService:
         Args:
             to_email: User email
             user_name: User name
-            login_url: Login page URL
+            dashboard_url: Dashboard/homepage URL
 
         Returns:
             True if email sent successfully
@@ -213,9 +213,9 @@ class EmailService:
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <h2>Welcome to BoniDoc, {user_name}!</h2>
             <p>Your account has been created successfully.</p>
-            <p>You can now log in and start organizing your documents:</p>
-            <p><a href="{login_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a></p>
-            <p>If you have any questions, feel free to contact our support team.</p>
+            <p>Get started with organizing your documents:</p>
+            <p><a href="{dashboard_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a></p>
+            <p>If you have any questions, feel free to reply to this email.</p>
             <p>Best regards,<br>The BoniDoc Team</p>
         </body>
         </html>
@@ -316,7 +316,7 @@ class EmailService:
         self,
         to_email: str,
         user_name: str,
-        login_url: str,
+        dashboard_url: str,
         user_can_receive_marketing: bool = True
     ) -> bool:
         """
@@ -325,7 +325,7 @@ class EmailService:
         Args:
             to_email: User email
             user_name: User name
-            login_url: Login page URL
+            dashboard_url: Dashboard/homepage URL
             user_can_receive_marketing: Check if user opted in for marketing emails
 
         Returns:
@@ -352,7 +352,7 @@ class EmailService:
             </ul>
 
             <p>Get started now:</p>
-            <p><a href="{login_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Log In to BoniDoc</a></p>
+            <p><a href="{dashboard_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a></p>
 
             <p>If you have any questions or need help, feel free to reach out to our support team.</p>
 

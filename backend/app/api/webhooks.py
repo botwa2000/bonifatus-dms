@@ -9,6 +9,7 @@ import asyncio
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from dateutil.relativedelta import relativedelta
 
 from app.database.connection import get_db
 from app.database.models import (
@@ -289,8 +290,28 @@ async def handle_subscription_created(event, session: Session):
         billing_cycle = 'monthly'
         logger.warning(f"[WEBHOOK] billing_cycle not found in metadata or items, defaulting to monthly")
 
+    # stripe_price_id is mandatory for subscription management features (billing cycle changes, upgrades)
     if not stripe_price_id:
-        logger.error(f"[WEBHOOK] No stripe_price_id found for subscription {stripe_sub.id}")
+        error_msg = f"[WEBHOOK] CRITICAL: No stripe_price_id found for subscription {stripe_sub.id}. Cannot create subscription without price ID."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Calculate period dates with proper fallback
+    if hasattr(stripe_sub, 'current_period_start') and stripe_sub.current_period_start:
+        period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
+    else:
+        period_start = datetime.now(timezone.utc)
+        logger.warning(f"[WEBHOOK] No current_period_start in Stripe subscription, using now()")
+
+    if hasattr(stripe_sub, 'current_period_end') and stripe_sub.current_period_end:
+        period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+    else:
+        # Calculate period_end based on billing_cycle
+        if billing_cycle == 'yearly':
+            period_end = period_start + relativedelta(years=1)
+        else:  # monthly
+            period_end = period_start + relativedelta(months=1)
+        logger.warning(f"[WEBHOOK] No current_period_end in Stripe subscription, calculated from billing_cycle: {period_end}")
 
     db_subscription = Subscription(
         user_id=user.id,
@@ -299,8 +320,8 @@ async def handle_subscription_created(event, session: Session):
         stripe_price_id=stripe_price_id,
         billing_cycle=billing_cycle,
         status=stripe_sub.status if hasattr(stripe_sub, 'status') else 'active',
-        current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_start') and stripe_sub.current_period_start else datetime.now(timezone.utc),
-        current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_end') and stripe_sub.current_period_end else datetime.now(timezone.utc),
+        current_period_start=period_start,
+        current_period_end=period_end,
         trial_start=datetime.fromtimestamp(stripe_sub.trial_start, tz=timezone.utc) if hasattr(stripe_sub, 'trial_start') and stripe_sub.trial_start else None,
         trial_end=datetime.fromtimestamp(stripe_sub.trial_end, tz=timezone.utc) if hasattr(stripe_sub, 'trial_end') and stripe_sub.trial_end else None,
         cancel_at_period_end=stripe_sub.cancel_at_period_end if hasattr(stripe_sub, 'cancel_at_period_end') else False,
@@ -315,7 +336,7 @@ async def handle_subscription_created(event, session: Session):
     user.subscription_status = stripe_sub.status if hasattr(stripe_sub, 'status') else 'active'
     user.billing_cycle = billing_cycle
     user.subscription_started_at = datetime.now(timezone.utc)
-    user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc) if hasattr(stripe_sub, 'current_period_end') and stripe_sub.current_period_end else None
+    user.subscription_ends_at = period_end
 
     session.commit()
 
