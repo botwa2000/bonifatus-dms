@@ -530,9 +530,27 @@ export default function ProfilePage() {
                                 // Get preview of billing cycle change
                                 const previewResponse = await apiClient.post<{
                                   success: boolean
-                                  current_subscription: any
-                                  new_subscription: any
-                                  change_details: any
+                                  current_subscription: {
+                                    tier_name: string
+                                    billing_cycle: string
+                                    amount: number
+                                    currency: string
+                                    currency_symbol: string
+                                    period_end: string
+                                  }
+                                  new_subscription: {
+                                    tier_name: string
+                                    billing_cycle: string
+                                    amount: number
+                                    currency: string
+                                    currency_symbol: string
+                                    effective_date: string
+                                  }
+                                  change_details: {
+                                    change_effective_date: string
+                                    proration_info: string
+                                    next_billing_date: string
+                                  }
                                 }>(
                                   '/api/v1/billing/subscriptions/preview-billing-cycle-change',
                                   { billing_cycle: newCycle },
