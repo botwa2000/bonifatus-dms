@@ -21,9 +21,11 @@ depends_on = None
 def upgrade():
     # Add billing cycle change confirmation email template
     op.execute("""
-        INSERT INTO email_templates (name, subject, html_body, text_body, available_variables, created_at, updated_at)
+        INSERT INTO email_templates (name, display_name, category, subject, html_body, text_body, available_variables, created_at, updated_at)
         VALUES (
             'billing_cycle_change_confirmation',
+            'Billing Cycle Change Confirmation',
+            'subscription',
             'Billing Cycle Updated',
             '<html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
