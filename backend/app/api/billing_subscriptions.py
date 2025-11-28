@@ -826,14 +826,13 @@ async def schedule_billing_cycle_change(
                     end_behavior='release',
                     phases=[
                         {
-                            # Current phase - runs until end of current period
+                            # Current phase - keep until end of period
+                            # Don't include start_date (can't modify active phase start)
                             'items': [{'price': str(subscription.stripe_price_id), 'quantity': 1}],
-                            'start_date': int(subscription.current_period_start.timestamp()),
                             'end_date': int(subscription.current_period_end.timestamp()),
                         },
                         {
-                            # New phase - starts after current period with new billing cycle
-                            # No end_date or iterations = continues indefinitely until released
+                            # New phase - new billing cycle after current period
                             'items': [{'price': str(new_price_id), 'quantity': 1}],
                         }
                     ]
