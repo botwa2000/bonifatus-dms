@@ -115,6 +115,8 @@ class SubscriptionResponse(BaseModel):
     currency: str = Field(..., description="Currency code")
     currency_symbol: Optional[str] = Field(None, description="Currency symbol")
     created_at: datetime = Field(..., description="Subscription creation date")
+    pending_billing_cycle: Optional[str] = Field(None, description="Scheduled billing cycle change")
+    pending_billing_cycle_date: Optional[datetime] = Field(None, description="Date when billing cycle change takes effect")
 
     class Config:
         json_schema_extra = {

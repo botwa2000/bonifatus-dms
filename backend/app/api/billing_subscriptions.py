@@ -330,6 +330,36 @@ async def get_subscription(
     currency = session.query(Currency).filter(Currency.code == actual_currency).first()
     currency_symbol = currency.symbol if currency else actual_currency
 
+    # Check for pending billing cycle changes in Stripe
+    pending_billing_cycle = None
+    pending_billing_cycle_date = None
+
+    try:
+        import stripe
+        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+
+        # Check if there's a pending price change (items with different price at next billing)
+        if stripe_sub.get('items') and stripe_sub['items'].get('data'):
+            current_item = stripe_sub['items']['data'][0]
+            current_price_id = current_item.get('price', {}).get('id') if isinstance(current_item.get('price'), dict) else current_item.get('price')
+
+            # If the price ID on Stripe differs from our DB, there's a pending change
+            if current_price_id and current_price_id != subscription.stripe_price_id:
+                # Fetch the new price to determine billing cycle
+                try:
+                    new_price = stripe.Price.retrieve(current_price_id)
+                    new_interval = new_price.get('recurring', {}).get('interval')
+                    if new_interval == 'month':
+                        pending_billing_cycle = 'monthly'
+                    elif new_interval == 'year':
+                        pending_billing_cycle = 'yearly'
+                    pending_billing_cycle_date = subscription.current_period_end
+                    logger.info(f"Detected pending billing cycle change to {pending_billing_cycle} on {pending_billing_cycle_date}")
+                except Exception as e:
+                    logger.warning(f"Failed to retrieve pending price details: {e}")
+    except Exception as e:
+        logger.warning(f"Failed to check for pending billing cycle changes: {e}")
+
     return SubscriptionResponse(
         id=subscription.stripe_subscription_id,
         user_id=str(current_user.id),
@@ -346,7 +376,9 @@ async def get_subscription(
         amount=actual_amount,
         currency=actual_currency,
         currency_symbol=currency_symbol,
-        created_at=subscription.created_at
+        created_at=subscription.created_at,
+        pending_billing_cycle=pending_billing_cycle,
+        pending_billing_cycle_date=pending_billing_cycle_date
     )
 
 
