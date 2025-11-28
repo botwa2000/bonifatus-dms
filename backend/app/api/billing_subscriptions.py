@@ -998,6 +998,8 @@ async def schedule_billing_cycle_change(
                 )
 
             # Update the subscription with new price, change takes effect at period end
+            # Note: Cannot use billing_cycle_anchor='unchanged' when changing intervals
+            # proration_behavior='none' ensures change happens at period end
             updated_sub = stripe.Subscription.modify(
                 subscription.stripe_subscription_id,
                 items=[{
@@ -1005,7 +1007,6 @@ async def schedule_billing_cycle_change(
                     'price': str(new_price_id),
                 }],
                 proration_behavior='none',  # No proration - change at period end
-                billing_cycle_anchor='unchanged',  # Keep current billing cycle anchor
             )
 
             logger.info(
