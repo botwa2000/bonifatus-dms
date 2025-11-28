@@ -1,6 +1,6 @@
 """add billing cycle change email template
 
-Revision ID: 027_add_billing_cycle_change_template
+Revision ID: 027_billing_cycle_email
 Revises: 026_fix_email_and_feedback
 Create Date: 2025-11-28 00:00:00
 
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '027_add_billing_cycle_change_template'
+revision = '027_billing_cycle_email'
 down_revision = '026_fix_email_and_feedback'
 branch_labels = None
 depends_on = None
