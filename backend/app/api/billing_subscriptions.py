@@ -973,6 +973,7 @@ async def schedule_billing_cycle_change(
                     'price': str(new_price_id),
                 }],
                 proration_behavior='none',  # No proration - change at period end
+                billing_cycle_anchor='unchanged',  # Keep current billing cycle anchor
             )
 
             logger.info(
@@ -1008,7 +1009,7 @@ async def schedule_billing_cycle_change(
                     billing_period=billing_period,
                     change_effective_date=subscription.current_period_end.strftime('%B %d, %Y'),
                     next_billing_date=subscription.current_period_end.strftime('%B %d, %Y'),
-                    dashboard_url=settings.app.app_frontend_url
+                    dashboard_url=f"{settings.app.app_frontend_url}/profile"
                 )
                 logger.info(f"Billing cycle change notification email sent to {current_user.email}")
             except Exception as e:
