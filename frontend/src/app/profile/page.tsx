@@ -448,6 +448,11 @@ export default function ProfilePage() {
                           {subscription.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'} billing •
                           {subscription.currency_symbol || subscription.currency}{(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
                         </p>
+                        {subscription.pending_billing_cycle && subscription.pending_billing_cycle_date && (
+                          <p className="text-xs text-blue-700 mt-2 font-medium">
+                            → Switching to {subscription.pending_billing_cycle === 'yearly' ? 'annual' : 'monthly'} billing on {formatDate(subscription.pending_billing_cycle_date)}
+                          </p>
+                        )}
                       </div>
                       <Badge variant="success">Active</Badge>
                     </div>
@@ -505,23 +510,24 @@ export default function ProfilePage() {
                         })}
 
                       {/* Billing Cycle Change */}
-                      <div className="border border-neutral-200 rounded-lg p-3 bg-blue-50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h5 className="font-medium text-blue-900">
-                              Switch to {subscription.billing_cycle === 'yearly' ? 'Monthly' : 'Annual'} Billing
-                            </h5>
-                            <p className="text-xs text-blue-700 mt-1">
-                              {subscription.billing_cycle === 'yearly'
-                                ? 'Change will take effect at the end of your current billing period'
-                                : 'Switch to annual billing and save. Change takes effect at period end.'
-                              }
-                            </p>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={async () => {
+                      {!subscription.pending_billing_cycle && (
+                        <div className="border border-neutral-200 rounded-lg p-3 bg-blue-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h5 className="font-medium text-blue-900">
+                                Switch to {subscription.billing_cycle === 'yearly' ? 'Monthly' : 'Annual'} Billing
+                              </h5>
+                              <p className="text-xs text-blue-700 mt-1">
+                                {subscription.billing_cycle === 'yearly'
+                                  ? 'Change will take effect at the end of your current billing period'
+                                  : 'Switch to annual billing and save. Change takes effect at period end.'
+                                }
+                              </p>
+                            </div>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={async () => {
                               const newCycle = subscription.billing_cycle === 'yearly' ? 'monthly' : 'yearly'
                               setProcessingSubscription(true)
                               setMessage(null)
@@ -577,6 +583,7 @@ export default function ProfilePage() {
                           </Button>
                         </div>
                       </div>
+                      )}
                     </div>
                   )}
 
