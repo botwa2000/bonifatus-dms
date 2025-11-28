@@ -44,6 +44,8 @@ interface Subscription {
   currency_symbol?: string
   created_at?: string
   stripe_price_id?: string
+  pending_billing_cycle?: string
+  pending_billing_cycle_date?: string
 }
 
 interface TierPlan {
