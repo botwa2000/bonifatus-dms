@@ -813,14 +813,23 @@ async def schedule_billing_cycle_change(
         logger.info(f"Current price ID: {subscription.stripe_price_id}, New price ID: {new_price_id}")
 
         # Create subscription schedule to change billing cycle at period end
+        # Step 1: Create schedule from subscription (imports current config)
         try:
             subscription_schedule = stripe.SubscriptionSchedule.create(
                 from_subscription=subscription.stripe_subscription_id,
+            )
+
+            logger.info(f"Created subscription schedule {subscription_schedule.id} from subscription {subscription.stripe_subscription_id}")
+
+            # Step 2: Update schedule with phases to change price at period end
+            subscription_schedule = stripe.SubscriptionSchedule.modify(
+                subscription_schedule.id,
                 end_behavior='release',  # Release subscription back to normal after schedule completes
                 phases=[
                     {
                         # Current phase - runs until end of current period
                         'items': [{'price': str(subscription.stripe_price_id), 'quantity': 1}],
+                        'start_date': int(subscription.current_period_start.timestamp()),
                         'end_date': int(subscription.current_period_end.timestamp()),
                     },
                     {

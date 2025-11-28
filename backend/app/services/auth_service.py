@@ -459,11 +459,11 @@ class AuthService:
                         # Send welcome email to new user
                         try:
                             from app.services.email_service import email_service
-                            login_url = f"{settings.app.app_frontend_url}/login"
+                            dashboard_url = settings.app.app_frontend_url  # Homepage/dashboard, not login page
                             await email_service.send_user_created_notification(
                                 to_email=user.email,
                                 user_name=user.full_name,
-                                login_url=login_url,
+                                dashboard_url=dashboard_url,
                                 user_can_receive_marketing=user.email_marketing_enabled
                             )
                             logger.info(f"Welcome email sent to new user: {user.email}")
