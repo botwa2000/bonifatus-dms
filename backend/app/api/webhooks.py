@@ -251,50 +251,75 @@ async def handle_subscription_created(event, session: Session):
             stripe_sub.id,
             expand=['items.data.price']
         )
-        logger.info(f"[WEBHOOK] Retrieved subscription, items count: {len(full_subscription.items.data) if full_subscription.items and full_subscription.items.data else 0}")
 
-        if full_subscription.items and full_subscription.items.data:
-            items_data = full_subscription.items.data
-            logger.info(f"[WEBHOOK] Successfully got items_data with {len(items_data)} items")
+        # Stripe v7+ returns dict-like objects, use dict access
+        if 'items' in full_subscription and full_subscription['items']:
+            items = full_subscription['items']
+            if 'data' in items and items['data']:
+                items_data = items['data']
+                logger.info(f"[WEBHOOK] Successfully got items_data with {len(items_data)} items")
+            else:
+                logger.warning(f"[WEBHOOK] No 'data' in items response")
+        else:
+            logger.warning(f"[WEBHOOK] No 'items' in subscription response")
     except Exception as e:
         logger.error(f"[WEBHOOK] Failed to retrieve full subscription: {e}")
         items_data = None
 
     if items_data and len(items_data) > 0:
-        price = items_data[0].price
-
-        # Extract stripe_price_id
+        # Extract stripe_price_id from first item
         try:
-            stripe_price_id = price.id
-            logger.info(f"[WEBHOOK] Extracted stripe_price_id: {stripe_price_id}")
-        except (AttributeError, IndexError) as e:
+            first_item = items_data[0]
+            if 'price' in first_item and first_item['price']:
+                price = first_item['price']
+                stripe_price_id = price.get('id') or price.id
+                logger.info(f"[WEBHOOK] Extracted stripe_price_id: {stripe_price_id}")
+            else:
+                logger.error(f"[WEBHOOK] No 'price' in first subscription item")
+        except (AttributeError, IndexError, KeyError) as e:
             logger.error(f"[WEBHOOK] Failed to extract stripe_price_id: {e}")
 
         # Get billing_cycle from price if not in metadata
-        if not billing_cycle and hasattr(price, 'recurring') and price.recurring:
-            price_interval = price.recurring.interval
-            billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
-            logger.info(f"[WEBHOOK] Extracted billing_cycle from price: {billing_cycle}")
+        try:
+            if not billing_cycle:
+                recurring = price.get('recurring') if isinstance(price, dict) else getattr(price, 'recurring', None)
+                if recurring:
+                    price_interval = recurring.get('interval') if isinstance(recurring, dict) else getattr(recurring, 'interval', None)
+                    if price_interval:
+                        billing_cycle = 'yearly' if price_interval == 'year' else 'monthly'
+                        logger.info(f"[WEBHOOK] Extracted billing_cycle from price: {billing_cycle}")
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] Could not extract billing_cycle from price: {e}")
 
         # Store the actual currency and amount charged
-        if not currency and hasattr(price, 'currency') and price.currency:
-            currency = price.currency.upper()
-            logger.info(f"[WEBHOOK] Extracted currency from price: {currency}")
+        try:
+            if not currency:
+                price_currency = price.get('currency') if isinstance(price, dict) else getattr(price, 'currency', None)
+                if price_currency:
+                    currency = price_currency.upper()
+                    logger.info(f"[WEBHOOK] Extracted currency from price: {currency}")
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] Could not extract currency from price: {e}")
 
-        if hasattr(price, 'unit_amount') and price.unit_amount:
-            amount_cents = price.unit_amount
-            logger.info(f"[WEBHOOK] Extracted amount_cents from price: {amount_cents}")
+        try:
+            price_amount = price.get('unit_amount') if isinstance(price, dict) else getattr(price, 'unit_amount', None)
+            if price_amount:
+                amount_cents = price_amount
+                logger.info(f"[WEBHOOK] Extracted amount_cents from price: {amount_cents}")
+        except Exception as e:
+            logger.warning(f"[WEBHOOK] Could not extract amount from price: {e}")
 
     # Default to monthly if still not set
     if not billing_cycle:
         billing_cycle = 'monthly'
         logger.warning(f"[WEBHOOK] billing_cycle not found in metadata or items, defaulting to monthly")
 
-    # stripe_price_id is mandatory for subscription management features (billing cycle changes, upgrades)
+    # stripe_price_id is required for subscription management features (billing cycle changes, upgrades)
+    # Allow subscription creation even if missing, but log loudly for investigation
     if not stripe_price_id:
-        error_msg = f"[WEBHOOK] CRITICAL: No stripe_price_id found for subscription {stripe_sub.id}. Cannot create subscription without price ID."
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+        logger.error(f"[WEBHOOK] WARNING: No stripe_price_id found for subscription {stripe_sub.id}")
+        logger.error(f"[WEBHOOK] Billing cycle switch and some features will NOT work for this subscription")
+        logger.error(f"[WEBHOOK] Subscription will be created but should be investigated in Stripe dashboard")
 
     # Calculate period dates with proper fallback
     if hasattr(stripe_sub, 'current_period_start') and stripe_sub.current_period_start:
