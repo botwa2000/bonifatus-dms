@@ -737,5 +737,81 @@ class EmailService:
             return False
 
 
+    async def send_billing_cycle_change_email(
+        self,
+        session: Session,
+        user_email: str,
+        user_name: str,
+        plan_name: str,
+        old_billing_cycle: str,
+        new_billing_cycle: str,
+        new_amount: float,
+        currency: str,
+        billing_period: str,
+        change_effective_date: str,
+        next_billing_date: str,
+        dashboard_url: str
+    ) -> bool:
+        """
+        Send billing cycle change confirmation email using database template
+
+        Args:
+            session: Database session
+            user_email: User email address
+            user_name: User name
+            plan_name: Subscription plan name
+            old_billing_cycle: Previous billing cycle (monthly/yearly)
+            new_billing_cycle: New billing cycle (monthly/yearly)
+            new_amount: New price amount (formatted, e.g., "29.99")
+            currency: Currency code (e.g., "USD", "EUR", "GBP")
+            billing_period: Billing period text (e.g., "month", "year")
+            change_effective_date: Date when change takes effect
+            next_billing_date: Next billing date
+            dashboard_url: Dashboard URL
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            variables = {
+                'user_name': user_name,
+                'plan_name': plan_name,
+                'old_billing_cycle': old_billing_cycle.capitalize(),
+                'new_billing_cycle': new_billing_cycle.capitalize(),
+                'new_amount': str(new_amount),
+                'currency': currency,
+                'billing_period': billing_period,
+                'change_effective_date': change_effective_date,
+                'next_billing_date': next_billing_date,
+                'change_info': f'Your billing cycle has been changed from {old_billing_cycle} to {new_billing_cycle}. This change took effect on {change_effective_date}.',
+                'dashboard_url': dashboard_url
+            }
+
+            email_data = email_template_service.prepare_email(
+                session=session,
+                template_name='billing_cycle_change_confirmation',
+                variables=variables,
+                recipient_email=user_email,
+                recipient_name=user_name
+            )
+
+            if not email_data:
+                logger.error("Billing cycle change confirmation template not found")
+                return False
+
+            return await self.send_email(
+                to_email=email_data['to_email'],
+                to_name=email_data['to_name'],
+                subject=email_data['subject'],
+                html_content=email_data['html_body'],
+                from_email=email_data.get('from_email'),
+                from_name=email_data.get('from_name')
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send billing cycle change email to {user_email}: {e}")
+            return False
+
+
 # Global email service instance
 email_service = EmailService()

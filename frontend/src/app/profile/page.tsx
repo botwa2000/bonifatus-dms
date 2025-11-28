@@ -78,6 +78,30 @@ export default function ProfilePage() {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
+  const [showBillingChangeModal, setShowBillingChangeModal] = useState(false)
+  const [billingChangePreview, setBillingChangePreview] = useState<{
+    current_subscription: {
+      tier_name: string
+      billing_cycle: string
+      amount: number
+      currency: string
+      currency_symbol: string
+      period_end: string
+    }
+    new_subscription: {
+      tier_name: string
+      billing_cycle: string
+      amount: number
+      currency: string
+      currency_symbol: string
+      effective_date: string
+    }
+    change_details: {
+      change_effective_date: string
+      proration_info: string
+      next_billing_date: string
+    }
+  } | null>(null)
 
   // Load user data on mount
   useEffect(() => {
@@ -503,29 +527,27 @@ export default function ProfilePage() {
                               setMessage(null)
 
                               try {
-                                // Schedule billing cycle change at period end
-                                const response = await apiClient.post<{
+                                // Get preview of billing cycle change
+                                const previewResponse = await apiClient.post<{
                                   success: boolean
-                                  message: string
-                                  change_effective_date: string
+                                  current_subscription: any
+                                  new_subscription: any
+                                  change_details: any
                                 }>(
-                                  '/api/v1/billing/subscriptions/schedule-billing-cycle-change',
+                                  '/api/v1/billing/subscriptions/preview-billing-cycle-change',
                                   { billing_cycle: newCycle },
                                   true
                                 )
 
-                                if (response.success) {
-                                  setMessage({
-                                    type: 'success',
-                                    text: response.message
-                                  })
-                                  await loadSubscriptionData()
+                                if (previewResponse.success) {
+                                  setBillingChangePreview(previewResponse)
+                                  setShowBillingChangeModal(true)
                                 }
                               } catch (error) {
-                                console.error('Failed to schedule billing cycle change:', error)
+                                console.error('Failed to preview billing cycle change:', error)
                                 setMessage({
                                   type: 'error',
-                                  text: 'Failed to schedule billing cycle change. Please try again.'
+                                  text: 'Failed to load billing cycle change preview. Please try again.'
                                 })
                               } finally {
                                 setProcessingSubscription(false)
@@ -533,7 +555,7 @@ export default function ProfilePage() {
                             }}
                             disabled={processingSubscription}
                           >
-                            {processingSubscription ? 'Processing...' : 'Schedule Change'}
+                            {processingSubscription ? 'Loading...' : 'Schedule Change'}
                           </Button>
                         </div>
                       </div>
@@ -770,6 +792,138 @@ export default function ProfilePage() {
           onSuccess={handleCancellationSuccess}
         />
       )}
+
+      {/* Billing Cycle Change Confirmation Modal */}
+      <Modal isOpen={showBillingChangeModal} onClose={() => setShowBillingChangeModal(false)}>
+        <ModalHeader title="Confirm Billing Cycle Change" onClose={() => setShowBillingChangeModal(false)} />
+        <ModalContent>
+          {billingChangePreview && (
+            <div className="space-y-4">
+              <Alert
+                type="info"
+                message={billingChangePreview.change_details.proration_info}
+              />
+
+              {/* Current Subscription */}
+              <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                <h4 className="font-medium text-neutral-900 mb-2">Current Subscription</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Plan:</span>
+                    <span className="font-medium text-neutral-900">{billingChangePreview.current_subscription.tier_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Billing Cycle:</span>
+                    <span className="font-medium text-neutral-900 capitalize">{billingChangePreview.current_subscription.billing_cycle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Price:</span>
+                    <span className="font-medium text-neutral-900">
+                      {billingChangePreview.current_subscription.currency_symbol}
+                      {(billingChangePreview.current_subscription.amount / 100).toFixed(2)}/
+                      {billingChangePreview.current_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex justify-center">
+                <svg className="h-6 w-6 text-admin-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </div>
+
+              {/* New Subscription */}
+              <div className="border border-admin-primary rounded-lg p-4 bg-blue-50">
+                <h4 className="font-medium text-admin-primary mb-2">New Subscription</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Plan:</span>
+                    <span className="font-medium text-neutral-900">{billingChangePreview.new_subscription.tier_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Billing Cycle:</span>
+                    <span className="font-medium text-neutral-900 capitalize">{billingChangePreview.new_subscription.billing_cycle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600">Price:</span>
+                    <span className="font-medium text-neutral-900">
+                      {billingChangePreview.new_subscription.currency_symbol}
+                      {(billingChangePreview.new_subscription.amount / 100).toFixed(2)}/
+                      {billingChangePreview.new_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-admin-primary/20">
+                    <span className="text-neutral-600">Effective Date:</span>
+                    <span className="font-medium text-admin-primary">{billingChangePreview.change_details.change_effective_date}</span>
+                  </div>
+                </div>
+              </div>
+
+              <Alert
+                type="warning"
+                message="This change will take effect at the end of your current billing period. You will continue to have access to your current plan until then."
+              />
+            </div>
+          )}
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="primary"
+            onClick={async () => {
+              setProcessingSubscription(true)
+              setMessage(null)
+
+              try {
+                // Execute billing cycle change
+                const response = await apiClient.post<{
+                  success: boolean
+                  message: string
+                  change_effective_date: string
+                }>(
+                  '/api/v1/billing/subscriptions/schedule-billing-cycle-change',
+                  { billing_cycle: billingChangePreview?.new_subscription.billing_cycle },
+                  true
+                )
+
+                if (response.success) {
+                  setMessage({
+                    type: 'success',
+                    text: response.message
+                  })
+                  setShowBillingChangeModal(false)
+                  setBillingChangePreview(null)
+                  await loadSubscriptionData()
+                }
+              } catch (error) {
+                console.error('Failed to schedule billing cycle change:', error)
+                setMessage({
+                  type: 'error',
+                  text: 'Failed to schedule billing cycle change. Please try again.'
+                })
+              } finally {
+                setProcessingSubscription(false)
+              }
+            }}
+            disabled={processingSubscription}
+            className="flex-1"
+          >
+            {processingSubscription ? 'Processing...' : 'Confirm Change'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowBillingChangeModal(false)
+              setBillingChangePreview(null)
+            }}
+            disabled={processingSubscription}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   )
 }

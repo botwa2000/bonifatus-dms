@@ -722,6 +722,146 @@ async def confirm_payment_method_update(
 
 
 @router.post(
+    "/subscriptions/preview-billing-cycle-change",
+    status_code=status.HTTP_200_OK,
+    summary="Preview Billing Cycle Change Details"
+)
+async def preview_billing_cycle_change(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Preview the details of a billing cycle change without executing it.
+    Returns current and new subscription details for user confirmation.
+    """
+    try:
+        new_billing_cycle = request.get('billing_cycle')
+
+        if not new_billing_cycle or new_billing_cycle not in ['monthly', 'yearly']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="billing_cycle must be 'monthly' or 'yearly'"
+            )
+
+        # Get active subscription
+        subscription = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active subscription found"
+            )
+
+        # Check if already on requested billing cycle
+        if subscription.billing_cycle == new_billing_cycle:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Already on {new_billing_cycle} billing cycle"
+            )
+
+        # Get tier information
+        tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+        if not tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tier not found"
+            )
+
+        # Get subscription's currency and current price
+        import stripe
+        from app.database.models import Currency
+
+        if not subscription.stripe_price_id:
+            logger.error(f"Subscription {subscription.id} has no stripe_price_id")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe price ID"
+            )
+
+        try:
+            current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+            currency = current_price.currency.upper()
+        except Exception as e:
+            logger.error(f"Failed to retrieve current price {subscription.stripe_price_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to retrieve subscription price: {str(e)}"
+            )
+
+        # Get currency symbol
+        currency_obj = session.query(Currency).filter(Currency.code == currency).first()
+        currency_symbol = currency_obj.symbol if currency_obj else currency
+
+        # Get or create new price ID for the new billing cycle
+        new_price_id = await stripe_service.get_or_create_price(
+            session, tier, new_billing_cycle, currency
+        )
+
+        if not new_price_id:
+            logger.error(f"get_or_create_price returned None for tier {tier.id}, cycle {new_billing_cycle}, currency {currency}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get price for new billing cycle"
+            )
+
+        # Get new price details
+        try:
+            new_price_obj = stripe.Price.retrieve(new_price_id)
+            new_amount = new_price_obj.unit_amount  # in cents
+        except Exception as e:
+            logger.error(f"Failed to retrieve new price {new_price_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to retrieve new price details: {str(e)}"
+            )
+
+        # Get current amount
+        current_amount = subscription.amount_cents or (
+            tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else tier.price_yearly_cents
+        )
+
+        # Format the response with all details for user confirmation
+        return {
+            "success": True,
+            "current_subscription": {
+                "tier_name": tier.display_name,
+                "billing_cycle": subscription.billing_cycle,
+                "amount": current_amount,
+                "currency": currency,
+                "currency_symbol": currency_symbol,
+                "period_end": subscription.current_period_end.isoformat()
+            },
+            "new_subscription": {
+                "tier_name": tier.display_name,
+                "billing_cycle": new_billing_cycle,
+                "amount": new_amount,
+                "currency": currency,
+                "currency_symbol": currency_symbol,
+                "effective_date": subscription.current_period_end.isoformat()
+            },
+            "change_details": {
+                "change_effective_date": subscription.current_period_end.strftime('%B %d, %Y'),
+                "proration_info": "No immediate charge. Change takes effect at the end of your current billing period.",
+                "next_billing_date": subscription.current_period_end.strftime('%B %d, %Y')
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Preview billing cycle change error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
     "/subscriptions/schedule-billing-cycle-change",
     status_code=status.HTTP_200_OK,
     summary="Schedule Billing Cycle Change at Period End"
@@ -840,6 +980,40 @@ async def schedule_billing_cycle_change(
                 f"to change from {subscription.billing_cycle} to {new_billing_cycle} "
                 f"at {subscription.current_period_end}"
             )
+
+            # Get new price details for email
+            try:
+                new_price_obj = stripe.Price.retrieve(new_price_id)
+                new_amount = new_price_obj.unit_amount / 100  # Convert cents to currency units
+            except Exception as e:
+                logger.warning(f"Failed to retrieve new price for email: {e}")
+                new_amount = 0
+
+            # Send notification email
+            try:
+                from app.services.email_service import email_service
+                from app.core.config import settings
+
+                billing_period = 'year' if new_billing_cycle == 'yearly' else 'month'
+
+                await email_service.send_billing_cycle_change_email(
+                    session=session,
+                    user_email=current_user.email,
+                    user_name=current_user.full_name,
+                    plan_name=tier.display_name,
+                    old_billing_cycle=subscription.billing_cycle,
+                    new_billing_cycle=new_billing_cycle,
+                    new_amount=new_amount,
+                    currency=currency,
+                    billing_period=billing_period,
+                    change_effective_date=subscription.current_period_end.strftime('%B %d, %Y'),
+                    next_billing_date=subscription.current_period_end.strftime('%B %d, %Y'),
+                    dashboard_url=settings.app.app_frontend_url
+                )
+                logger.info(f"Billing cycle change notification email sent to {current_user.email}")
+            except Exception as e:
+                logger.error(f"Failed to send billing cycle change notification email: {e}")
+                # Don't fail the request if email fails
 
             return {
                 "success": True,
