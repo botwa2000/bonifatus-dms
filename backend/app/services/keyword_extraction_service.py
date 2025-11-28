@@ -227,6 +227,9 @@ class KeywordExtractionService:
             # STEP 2: Load stopwords and tokenize
             stop_words = stopwords if stopwords is not None else self.get_stop_words(db, language)
             logger.info(f"[KEYWORD EXTRACTION] Loaded {len(stop_words)} stopwords for language '{language}'")
+            if stop_words:
+                sample_stopwords = list(stop_words)[:10]
+                logger.info(f"[KEYWORD EXTRACTION] Sample stop words: {sample_stopwords}")
 
             normalized_text = self.normalize_text(text)
             tokens = self.tokenize(normalized_text)
@@ -236,6 +239,7 @@ class KeywordExtractionService:
             # Category keywords MUST be kept even if they appear in stopwords!
             filtered_tokens = []
             preserved_category_keywords = set()
+            filtered_out_stopwords = []
 
             for token in tokens:
                 if token in category_keywords_set:
@@ -245,6 +249,12 @@ class KeywordExtractionService:
                 elif token not in stop_words:
                     # Keep non-stopword
                     filtered_tokens.append(token)
+                else:
+                    # This is a stop word - track what we're filtering
+                    filtered_out_stopwords.append(token)
+
+            if filtered_out_stopwords:
+                logger.info(f"[KEYWORD EXTRACTION] Filtered out {len(filtered_out_stopwords)} stop words: {filtered_out_stopwords[:20]}")
 
             logger.info(f"[KEYWORD EXTRACTION] After stopword filtering: {len(filtered_tokens)} tokens (preserved {len(preserved_category_keywords)} category keywords)")
             if preserved_category_keywords:

@@ -120,6 +120,11 @@ class ClassificationService:
         """
         Calculate similarity score between document and category
 
+        Uses weighted match scoring:
+        - Score = total_weight of matched keywords
+        - Categories with more matches and higher weights score higher
+        - No artificial capping - scores naturally differentiate
+
         Args:
             document_keywords: List of keywords from document
             category_keywords: Dict of category keywords with weights
@@ -146,14 +151,12 @@ class ClassificationService:
             logger.debug(f"[SCORE DEBUG] No keyword matches found")
             return 0.0, []
 
-        avg_weight = total_weight / len(matched_keywords)
+        # Smart scoring: Use total weighted score directly
+        # This naturally rewards categories with more/better keyword matches
+        # No capping - let scores differentiate naturally
+        score = total_weight
 
-        # Score formula: (matched_count * avg_weight) / total_doc_keywords
-        score = (len(matched_keywords) * avg_weight) / len(document_keywords_lower)
-
-        score = min(score, 1.0)
-
-        logger.debug(f"[SCORE DEBUG] Score={score:.3f}, Matched={len(matched_keywords)}/{len(document_keywords_lower)}, AvgWeight={avg_weight:.2f}, TotalWeight={total_weight:.2f}")
+        logger.debug(f"[SCORE DEBUG] Score={score:.3f}, Matched={len(matched_keywords)}/{len(document_keywords_lower)}, TotalWeight={total_weight:.2f}, MatchedKeywords={matched_keywords[:5]}{'...' if len(matched_keywords) > 5 else ''}")
 
         return score, matched_keywords
 
