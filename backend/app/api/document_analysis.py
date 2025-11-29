@@ -57,6 +57,13 @@ async def analyze_document(
     Returns extracted text, keywords, and suggested category
     """
     try:
+        # Check if Google Drive is connected
+        if not current_user.google_drive_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="GOOGLE_DRIVE_NOT_CONNECTED"
+            )
+
         # Get allowed file types from database
         allowed_types = await config_service.get_allowed_mime_types(session)
         
@@ -356,6 +363,13 @@ async def analyze_batch(
     """
     try:
         ip_address = get_client_ip(request)
+
+        # Check if Google Drive is connected
+        if not current_user.google_drive_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="GOOGLE_DRIVE_NOT_CONNECTED"
+            )
 
         # Validate batch size based on user's tier
         # Admin users have unlimited batch size
@@ -666,6 +680,13 @@ async def analyze_batch_async(
     """
     try:
         ip_address = get_client_ip(request)
+
+        # Check if Google Drive is connected
+        if not current_user.google_drive_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="GOOGLE_DRIVE_NOT_CONNECTED"
+            )
 
         # Validate batch size based on user's tier
         if not current_user.is_admin:
