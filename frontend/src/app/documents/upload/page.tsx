@@ -68,7 +68,7 @@ export default function BatchUploadPage() {
   const [analysisComplete, setAnalysisComplete] = useState(false)
   const [uploadStates, setUploadStates] = useState<FileUploadState[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
+  const [message, setMessage] = useState<{type: 'success' | 'error', text: string | React.ReactNode} | null>(null)
   const [maxFilenameLength, setMaxFilenameLength] = useState(200)
 
   // Async batch processing state
