@@ -161,6 +161,8 @@ class DocumentAnalysisService:
             # Deduplicate entities
             extracted_entities = entity_extraction_service.deduplicate_entities(extracted_entities)
             logger.info(f"[ENTITY DEBUG] Extracted {len(extracted_entities)} unique entities")
+            for ent in extracted_entities[:5]:  # Log first 5 entities
+                logger.info(f"[ENTITY DEBUG]   - {ent.entity_type}: {ent.entity_value} (confidence: {ent.confidence})")
 
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
