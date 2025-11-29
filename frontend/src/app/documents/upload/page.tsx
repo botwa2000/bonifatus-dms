@@ -9,7 +9,7 @@ import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox, S
 import { categoryService, type Category } from '@/services/category.service'
 import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
 import AppHeader from '@/components/AppHeader'
-import { shouldLog } from '@/config/app.config'
+import { shouldLog, ENTITY_TYPES } from '@/config/app.config'
 
 interface ErrorResponse {
   detail?: string
@@ -37,6 +37,12 @@ interface FileAnalysisSuccess {
     document_date?: string | null
     document_date_type?: string | null
     document_date_confidence?: number | null
+    entities?: Array<{  // NEW: Named entities (sender, recipient, addresses)
+      type: string
+      value: string
+      confidence: number
+      method: string
+    }>
   }
   batch_id: string
 }
@@ -908,6 +914,43 @@ export default function BatchUploadPage() {
                             </p>
                           )}
                         </div>
+
+                        {/* Extracted Entities */}
+                        {state.analysis?.entities && state.analysis.entities.length > 0 && (() => {
+                          const groupedEntities = state.analysis.entities.reduce((acc, entity) => {
+                            const type = entity.type as keyof typeof ENTITY_TYPES
+                            if (ENTITY_TYPES[type]) {
+                              if (!acc[type]) acc[type] = []
+                              acc[type].push(entity)
+                            }
+                            return acc
+                          }, {} as Record<string, typeof state.analysis.entities>)
+
+                          return (
+                            <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                Extracted Information
+                              </label>
+                              {Object.entries(groupedEntities).map(([type, entities]) => {
+                                const config = ENTITY_TYPES[type as keyof typeof ENTITY_TYPES]
+                                return (
+                                  <div key={type}>
+                                    <div className="text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">
+                                      {config.label}:
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {entities.map((entity, eidx) => (
+                                        <Badge key={eidx} variant="secondary" className={config.color}>
+                                          {entity.value}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </Card>
                     )
