@@ -151,6 +151,17 @@ class DocumentAnalysisService:
             keyword_strings = [kw[0] for kw in keywords]
             logger.info(f"[KEYWORD DEBUG] Extracted {len(keyword_strings)} keywords using combined stopwords, top 10: {keyword_strings[:10]}")
 
+            # Extract named entities (people, organizations, addresses)
+            from app.services.entity_extraction_service import entity_extraction_service
+            extracted_entities = entity_extraction_service.extract_entities(
+                text=extracted_text,
+                language=detected_language,
+                extract_addresses=True
+            )
+            # Deduplicate entities
+            extracted_entities = entity_extraction_service.deduplicate_entities(extracted_entities)
+            logger.info(f"[ENTITY DEBUG] Extracted {len(extracted_entities)} unique entities")
+
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
                 db=db,
@@ -237,6 +248,14 @@ class DocumentAnalysisService:
                 'classification_confidence': None,
                 'matched_keywords': [],
                 'suggested_categories': [],  # NEW: All close-matching categories
+                'entities': [  # NEW: Extracted named entities
+                    {
+                        'type': ent.entity_type,
+                        'value': ent.entity_value,
+                        'confidence': ent.confidence,
+                        'method': ent.extraction_method
+                    } for ent in extracted_entities
+                ],
                 'original_filename': file_name,
                 'file_info': {
                     'name': file_name,

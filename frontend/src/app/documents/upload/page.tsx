@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox, Spinner } from '@/components/ui'
 import { categoryService, type Category } from '@/services/category.service'
@@ -379,13 +380,29 @@ export default function BatchUploadPage() {
 
     } catch (error) {
       console.error('Batch analysis error:', error)
-      let errorMessage = 'Analysis failed. Please try again.'
+      let errorMessage: string | React.ReactNode = 'Analysis failed. Please try again.'
 
       if (error instanceof Error) {
         errorMessage = error.message
       } else if (typeof error === 'object' && error !== null) {
         const errorObj = error as ErrorResponse
         errorMessage = errorObj.detail || errorObj.message || JSON.stringify(error)
+      }
+
+      // Check for Google Drive not connected error
+      if (typeof errorMessage === 'string' && errorMessage.includes('GOOGLE_DRIVE_NOT_CONNECTED')) {
+        errorMessage = (
+          <div>
+            <p className="font-medium mb-2">Google Drive Not Connected</p>
+            <p className="mb-3">You need to connect your Google Drive account before uploading documents.</p>
+            <Link
+              href="/settings"
+              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Go to Settings →
+            </Link>
+          </div>
+        )
       }
 
       setMessage({

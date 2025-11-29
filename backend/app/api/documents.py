@@ -53,7 +53,14 @@ async def upload_document(
     """
     try:
         ip_address = get_client_ip(request)
-        
+
+        # Check if Google Drive is connected
+        if not current_user.google_drive_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="GOOGLE_DRIVE_NOT_CONNECTED"  # Special code for frontend to handle
+            )
+
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

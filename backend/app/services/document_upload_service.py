@@ -297,13 +297,29 @@ class DocumentUploadService:
                 session=session
             )
 
+            # Store extracted entities (people, organizations, addresses)
+            entities = analysis_result.get('entities', [])
+            if entities:
+                logger.info(f"Storing {len(entities)} extracted entities for document {document.id}")
+                from app.database.models import DocumentEntity
+                for entity in entities:
+                    doc_entity = DocumentEntity(
+                        document_id=document.id,
+                        entity_type=entity['type'],
+                        entity_value=entity['value'],
+                        confidence=entity['confidence'],
+                        extraction_method=entity['method'],
+                        language_code=language_code
+                    )
+                    session.add(doc_entity)
+
             # Create audit log entry using ORM
             audit_log = AuditLog(
                 user_id=uuid_lib.UUID(user_id),
                 action='document_uploaded',
                 resource_type='document',
                 resource_id=document.id,
-                new_values=f'{{"title": "{title}", "categories": {len(category_ids_ordered)}, "keywords": {len(confirmed_keywords)}}}',
+                new_values=f'{{"title": "{title}", "categories": {len(category_ids_ordered)}, "keywords": {len(confirmed_keywords)}, "entities": {len(entities)}}}',
                 status='success'
             )
             session.add(audit_log)

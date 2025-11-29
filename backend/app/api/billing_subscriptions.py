@@ -151,10 +151,10 @@ async def create_checkout_session(
             logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
         # Create checkout session with existing customer
+        # Note: payment_method_types omitted - Stripe automatically shows all methods enabled in dashboard
         checkout_session = stripe.checkout.Session.create(
             customer=stripe_customer_id,
             mode='subscription',
-            payment_method_types=['card', 'paypal'],  # Enable card and PayPal payments
             line_items=[{
                 'price': price_id,
                 'quantity': 1,
