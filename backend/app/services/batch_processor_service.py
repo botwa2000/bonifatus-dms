@@ -211,8 +211,11 @@ class BatchProcessorService:
                             'classification_confidence': analysis_result.get('classification_confidence'),
                             'detected_language': analysis_result.get('detected_language'),
                             'keywords': analysis_result.get('keywords', []),  # Include keywords for UI display
+                            'entities': analysis_result.get('entities', []),  # Include extracted entities (sender, recipient, addresses)
                             'document_date': analysis_result.get('document_date'),
-                            'document_date_type': analysis_result.get('document_date_type')
+                            'document_date_type': analysis_result.get('document_date_type'),
+                            'suggested_categories': analysis_result.get('suggested_categories', []),  # Multi-category suggestions
+                            'matched_keywords': analysis_result.get('matched_keywords', [])
                         }
                     })
 
