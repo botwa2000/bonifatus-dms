@@ -940,7 +940,7 @@ export default function BatchUploadPage() {
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                       {entities.map((entity, eidx) => (
-                                        <Badge key={eidx} variant="secondary" className={config.color}>
+                                        <Badge key={eidx} className={config.color}>
                                           {entity.value}
                                         </Badge>
                                       ))}
