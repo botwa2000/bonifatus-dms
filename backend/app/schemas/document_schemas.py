@@ -28,6 +28,14 @@ class KeywordItem(BaseModel):
     relevance: float = Field(default=1.0, description="Keyword relevance score")
 
 
+class EntityItem(BaseModel):
+    """Extracted entity information"""
+    type: str = Field(..., description="Entity type (ORGANIZATION, PERSON, LOCATION, etc.)")
+    value: str = Field(..., description="Entity value/text")
+    confidence: float = Field(..., description="Extraction confidence score")
+    method: str = Field(..., description="Extraction method (spacy_ner, pattern_email, etc.)")
+
+
 class CategoryInfo(BaseModel):
     """Category assignment information"""
     id: str = Field(..., description="Category ID")
@@ -47,6 +55,7 @@ class DocumentResponse(BaseModel):
     processing_status: str = Field(..., description="Processing status")
     extracted_text: Optional[str] = Field(None, description="Extracted text content")
     keywords: Optional[List[KeywordItem]] = Field(None, description="Extracted keywords")
+    entities: Optional[List[EntityItem]] = Field(None, description="Extracted entities (people, organizations, locations, etc.)")
     confidence_score: Optional[int] = Field(None, description="AI confidence score")
     primary_language: Optional[str] = Field(None, description="Primary detected language")
     category_id: Optional[str] = Field(None, description="Assigned category ID (primary, backward compat)")

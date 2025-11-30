@@ -439,6 +439,23 @@ class DocumentService:
             # Get all categories for this document
             all_categories = self._get_document_categories(document.id, user_language, session)
 
+            # Get extracted entities
+            from app.database.models import DocumentEntity
+            from app.schemas.document_schemas import EntityItem
+            entities_query = session.execute(
+                select(DocumentEntity).where(DocumentEntity.document_id == document.id)
+            ).scalars().all()
+
+            parsed_entities = [
+                EntityItem(
+                    type=entity.entity_type,
+                    value=entity.entity_value,
+                    confidence=entity.confidence,
+                    method=entity.extraction_method
+                )
+                for entity in entities_query
+            ] if entities_query else None
+
             logger.info(f"[GET_DOCUMENT DEBUG] Document {document_id}:")
             logger.info(f"  - title: {document.title}")
             logger.info(f"  - category_id (from junction table): {category.id if category else None}")
@@ -461,6 +478,7 @@ class DocumentService:
                 processing_status=document.processing_status,
                 extracted_text=document.extracted_text,
                 keywords=parsed_keywords,
+                entities=parsed_entities,
                 confidence_score=document.confidence_score,
                 primary_language=document.primary_language,
                 category_id=str(category.id) if category else None,
