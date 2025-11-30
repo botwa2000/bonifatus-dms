@@ -26,9 +26,8 @@ def upgrade():
 
     # Store spaCy model mappings in system_settings for dynamic loading
     op.execute("""
-        INSERT INTO system_settings (id, setting_key, setting_value, data_type, description, category, is_public)
+        INSERT INTO system_settings (setting_key, setting_value, data_type, description, category, is_public)
         VALUES (
-            (SELECT COALESCE(MAX(id), 0) + 1 FROM system_settings),
             'spacy_model_mapping',
             '{"en": "en_core_web_md", "de": "de_core_news_md", "fr": "fr_core_news_md", "ru": "ru_core_news_md"}',
             'json',
