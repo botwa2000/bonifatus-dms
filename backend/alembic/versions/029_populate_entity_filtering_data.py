@@ -179,8 +179,8 @@ def upgrade():
         ('de', 'ORGANIZATION', '^[A-Z]$', 'Single capital letters', true),
         ('de', 'ORGANIZATION', '^[A-Z]{1,2}$', '1-2 letter codes', true),
 
-        -- Clean up location duplicates with newlines
-        ('de', 'ADDRESS_COMPONENT', '\\n(www|http)', 'Addresses with web artifacts', true),
+        -- Clean up location duplicates with newlines and web artifacts
+        ('de', 'ADDRESS_COMPONENT', '(\\n|\\s)(www|http)', 'Addresses with web artifacts (space or newline)', true),
         ('de', 'LOCATION', '\\n', 'Locations with line breaks', true)
         ON CONFLICT (language, entity_type, regex_pattern) DO NOTHING;
     """)
@@ -193,7 +193,7 @@ def upgrade():
         ('en', 'ORGANIZATION', '^.+\\s+(Street|Road|Avenue|Lane|Drive)\\s+\\d+$', 'Street addresses', true),
         ('en', 'ORGANIZATION', '^\\d+$', 'Pure numeric values', true),
         ('en', 'ORGANIZATION', '^[A-Z]{1,2}$', '1-2 letter codes', true),
-        ('en', 'ADDRESS_COMPONENT', '\\n(www|http)', 'Addresses with web artifacts', true),
+        ('en', 'ADDRESS_COMPONENT', '(\\n|\\s)(www|http)', 'Addresses with web artifacts (space or newline)', true),
         ('en', 'LOCATION', '\\n', 'Locations with line breaks', true)
         ON CONFLICT (language, entity_type, regex_pattern) DO NOTHING;
     """)
@@ -206,7 +206,7 @@ def upgrade():
         ('ru', 'ORGANIZATION', '^\\d{13}$', 'OGRN (13 digits)', true),
         ('ru', 'ORGANIZATION', '^[A-Z0-9]{1,10}\\d+$', 'Short alphanumeric codes', true),
         ('ru', 'ORGANIZATION', '^\\d+$', 'Pure numeric values', true),
-        ('ru', 'ADDRESS_COMPONENT', '\\n(www|http)', 'Addresses with web artifacts', true),
+        ('ru', 'ADDRESS_COMPONENT', '(\\n|\\s)(www|http)', 'Addresses with web artifacts (space or newline)', true),
         ('ru', 'LOCATION', '\\n', 'Locations with line breaks', true)
         ON CONFLICT (language, entity_type, regex_pattern) DO NOTHING;
     """)
@@ -220,7 +220,7 @@ def upgrade():
         ('fr', 'ORGANIZATION', '^[A-Z0-9]{1,10}\\d+$', 'Short alphanumeric codes', true),
         ('fr', 'ORGANIZATION', '^.+\\s+(Rue|Avenue|Boulevard|Place)\\s+\\d+$', 'Street addresses', true),
         ('fr', 'ORGANIZATION', '^\\d+$', 'Pure numeric values', true),
-        ('fr', 'ADDRESS_COMPONENT', '\\n(www|http)', 'Addresses with web artifacts', true),
+        ('fr', 'ADDRESS_COMPONENT', '(\\n|\\s)(www|http)', 'Addresses with web artifacts (space or newline)', true),
         ('fr', 'LOCATION', '\\n', 'Locations with line breaks', true)
         ON CONFLICT (language, entity_type, regex_pattern) DO NOTHING;
     """)

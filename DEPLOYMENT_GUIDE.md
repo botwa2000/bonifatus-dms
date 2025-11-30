@@ -1009,7 +1009,143 @@ export default function TermsAcceptanceModal() {
 
 ### 8.2 Routine Code Deployment (Most Common)
 
-**Simple push - takes 5 minutes:**
+**CRITICAL: When to Use Docker Cache vs --no-cache**
+
+Docker cache is **SAFE and RECOMMENDED** for 95% of deployments. Use this simple rule:
+
+#### ✅ Use Cache (DEFAULT) - Fast Build (2-3 min)
+
+```bash
+docker compose build
+```
+
+**Use for ALL of these changes:**
+- ✅ Python code changes (any .py file)
+- ✅ TypeScript/JavaScript changes (any .ts/.tsx/.js file)
+- ✅ requirements.txt changes (adding/updating packages)
+- ✅ package.json changes (adding/updating npm packages)
+- ✅ Configuration file changes (.env, config.py, etc.)
+- ✅ Database migrations (run at runtime, not build time)
+- ✅ HTML/CSS/static file changes
+- ✅ **Daily deployments, bug fixes, feature additions**
+
+**Why it's safe:** Docker detects file changes and rebuilds from that point forward. Your changes WILL be deployed.
+
+#### ❌ Use --no-cache - Slow Build (10-15 min)
+
+```bash
+docker compose build --no-cache
+```
+
+**ONLY use for these rare situations:**
+- ❌ Monthly maintenance (force fresh system packages)
+- ❌ Changing Dockerfile base image (e.g., `FROM python:3.11` → `FROM python:3.12`)
+- ❌ System dependency updates (apt-get packages need security updates)
+- ❌ Debugging build issues (suspected cache corruption)
+- ❌ First deployment to new server
+- ❌ After major Docker/OS upgrades
+
+**Why it's slow:** Downloads and installs everything from scratch, even if unchanged.
+
+#### Decision Tree
+
+```
+┌─────────────────────────────────────┐
+│ What did you change?                │
+└─────────────┬───────────────────────┘
+              │
+      ┌───────┴───────┐
+      │               │
+  Code/Config?    System/Base?
+      │               │
+      │               │
+   YES│            NO│
+      │               │
+      ▼               ▼
+┌─────────────┐ ┌──────────────────┐
+│   USE CACHE │ │ USE --no-cache   │
+│  (default)  │ │   (rare)         │
+│             │ │                  │
+│ ✅ Fast     │ │ ⚠️ Slow          │
+│ ✅ Safe     │ │ ⚠️ Only when     │
+│ ✅ Changes  │ │    needed        │
+│    deployed │ │                  │
+└─────────────┘ └──────────────────┘
+```
+
+#### How to Know if Cache Worked
+
+Watch the build output:
+
+**✅ Cache Hit (Old Layers Reused):**
+```
+#5 [3/10] RUN apt-get update && apt-get install -y gcc
+#5 CACHED
+```
+→ No changes in system packages, using cached layer
+
+**✅ Cache Miss (Rebuilding from Here):**
+```
+#8 [6/10] COPY backend/ /app/
+#8 0.234s done
+#9 [7/10] RUN pip install -r requirements.txt
+#9 12.3s done
+```
+→ Detected code changes, rebuilding from COPY step forward
+
+#### Monthly Maintenance Schedule
+
+Run this ONCE per month (not during deployments):
+
+```bash
+# First Sunday of month, 2 AM
+ssh root@91.99.212.17
+cd /opt/bonifatus-dms
+docker compose build --no-cache backend
+docker compose up -d
+docker image prune -a --force  # Clean old images
+```
+
+**Purpose:** Ensures system packages are up-to-date with security patches.
+
+#### Common Deployment Workflows
+
+**🟢 Normal Deployment (95% of time):**
+```bash
+ssh root@91.99.212.17
+cd /opt/bonifatus-dms
+git pull origin main
+docker compose build              # ← WITH cache
+docker compose up -d
+docker compose ps
+```
+**Time:** 2-3 minutes
+**Use for:** Code changes, bug fixes, new features
+
+**🟡 Dev Deployment:**
+```bash
+ssh root@91.99.212.17
+cd /opt/bonifatus-dms-dev
+git pull origin main
+docker compose build              # ← WITH cache
+docker compose up -d
+nginx -t && systemctl reload nginx  # IP whitelist
+```
+**Time:** 2-3 minutes
+**Use for:** Testing before production
+
+**🔴 Monthly Maintenance (rare):**
+```bash
+ssh root@91.99.212.17
+cd /opt/bonifatus-dms
+docker compose build --no-cache backend  # ← NO cache
+docker compose up -d
+docker image prune -a --force
+```
+**Time:** 10-15 minutes
+**Use for:** First Sunday of month, system updates
+
+**Simple push - takes 2-3 minutes:**
 
 ```bash
 ssh deploy@YOUR_SERVER_IP
@@ -1018,7 +1154,7 @@ ssh deploy@YOUR_SERVER_IP
 
 **The deploy script:**
 - Pulls latest code from GitHub
-- Rebuilds Docker images
+- Rebuilds Docker images **with cache** (default behavior)
 - Stops containers gracefully
 - Starts containers with new code
 - Verifies health checks
@@ -1179,15 +1315,21 @@ cd /opt/bonifatus-dms-dev
 # Pull latest code
 git pull origin main
 
-# Rebuild containers
-docker compose build
+# Rebuild containers (WITH CACHE - see §8.2 for cache decision)
+docker compose build              # ← Default: uses cache (2-3 min)
+# Only use --no-cache for monthly maintenance or system updates
 
 # Restart containers
 docker compose up -d
 
+# Reload nginx (CRITICAL for IP whitelist)
+nginx -t && systemctl reload nginx
+
 # Check status
 docker compose ps
 ```
+
+**⚠️ Cache Usage:** Unless you're doing monthly maintenance or changed the Dockerfile base image, **always use cache** (default `docker compose build`). Your code changes WILL be deployed. See §8.2 for full cache decision tree.
 
 **⚠️ If frontend is calling wrong API (CORS errors):**
 

@@ -141,6 +141,12 @@ class EntityExtractionService:
         # Pattern-based sender/recipient extraction from headers
         entities.extend(self._extract_from_headers(text, language))
 
+        # Pattern-based email extraction
+        entities.extend(self._extract_emails_pattern(text))
+
+        # Pattern-based URL/website extraction
+        entities.extend(self._extract_urls_pattern(text))
+
         logger.info(f"[ENTITY EXTRACTION] Extracted {len(entities)} entities from text (lang: {language})")
 
         # Apply database-driven filters if database session provided
@@ -281,6 +287,63 @@ class EntityExtractionService:
                     position_end=match.end(),
                     extraction_method="pattern_header"
                 ))
+
+        return entities
+
+    def _extract_emails_pattern(self, text: str) -> List[ExtractedEntity]:
+        """Extract email addresses using regex pattern"""
+        entities = []
+
+        # Email pattern (RFC 5322 simplified)
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+        for match in re.finditer(email_pattern, text):
+            email = match.group(0)
+
+            entities.append(ExtractedEntity(
+                entity_type="EMAIL",
+                entity_value=email,
+                confidence=0.95,  # High confidence for pattern match
+                position_start=match.start(),
+                position_end=match.end(),
+                extraction_method="pattern_email"
+            ))
+
+        return entities
+
+    def _extract_urls_pattern(self, text: str) -> List[ExtractedEntity]:
+        """Extract URLs and websites using regex pattern"""
+        entities = []
+
+        # URL pattern (http/https URLs)
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+
+        for match in re.finditer(url_pattern, text):
+            url = match.group(0)
+
+            entities.append(ExtractedEntity(
+                entity_type="URL",
+                entity_value=url,
+                confidence=0.95,
+                position_start=match.start(),
+                position_end=match.end(),
+                extraction_method="pattern_url"
+            ))
+
+        # Website pattern (www.example.com without http://)
+        website_pattern = r'\bwww\.[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+        for match in re.finditer(website_pattern, text):
+            website = match.group(0)
+
+            entities.append(ExtractedEntity(
+                entity_type="URL",
+                entity_value=website,
+                confidence=0.90,  # Slightly lower confidence than full URLs
+                position_start=match.start(),
+                position_end=match.end(),
+                extraction_method="pattern_website"
+            ))
 
         return entities
 
