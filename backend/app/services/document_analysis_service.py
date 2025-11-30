@@ -156,7 +156,8 @@ class DocumentAnalysisService:
             extracted_entities = entity_extraction_service.extract_entities(
                 text=extracted_text,
                 language=detected_language,
-                extract_addresses=True
+                extract_addresses=True,
+                db=db  # Pass database session for filtering
             )
             # Deduplicate entities
             extracted_entities = entity_extraction_service.deduplicate_entities(extracted_entities)

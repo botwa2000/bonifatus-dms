@@ -130,29 +130,58 @@ else
     done
 fi
 
-# Download spaCy models if not present (lazy loading - only downloads if missing)
-echo "[spaCy] Checking NER models..."
+# Download spaCy models from database configuration (no hardcoded languages)
+echo "[spaCy] Loading NER model configuration from database..."
 python -c "
 import spacy
-models_to_download = []
+import json
+import os
+from sqlalchemy import create_engine, text
 
-# Check which models are missing
-for lang, model_name in [('en', 'en_core_web_sm'), ('de', 'de_core_news_sm'), ('fr', 'fr_core_news_sm')]:
-    try:
-        spacy.load(model_name)
-        print(f'[spaCy] ✓ {model_name} already installed')
-    except OSError:
-        print(f'[spaCy] {model_name} not found - will download')
-        models_to_download.append((lang, model_name))
+# Get database connection
+database_url = os.getenv('DATABASE_URL')
+if not database_url:
+    print('[spaCy] ERROR: DATABASE_URL not set')
+    exit(1)
 
-if models_to_download:
-    import subprocess
-    for lang, model_name in models_to_download:
-        print(f'[spaCy] Downloading {model_name}...')
-        subprocess.run(['python', '-m', 'spacy', 'download', model_name], check=False)
-else:
-    print('[spaCy] All required models are installed')
-" || echo "[spaCy] Warning: Model check failed, continuing anyway"
+try:
+    # Connect to database and load model mapping
+    engine = create_engine(database_url)
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(\"SELECT setting_value FROM system_settings WHERE setting_key = 'spacy_model_mapping'\")
+        ).fetchone()
+
+        if not result:
+            print('[spaCy] ERROR: spacy_model_mapping not found in database')
+            exit(1)
+
+        model_mapping = json.loads(result[0])
+        print(f'[spaCy] Loaded model mapping from database: {model_mapping}')
+
+    # Check which models need to be downloaded
+    models_to_download = []
+    for lang, model_name in model_mapping.items():
+        try:
+            spacy.load(model_name)
+            print(f'[spaCy] ✓ {model_name} already installed')
+        except OSError:
+            print(f'[spaCy] {model_name} not found - will download')
+            models_to_download.append((lang, model_name))
+
+    # Download missing models
+    if models_to_download:
+        import subprocess
+        for lang, model_name in models_to_download:
+            print(f'[spaCy] Downloading {model_name}...')
+            subprocess.run(['python', '-m', 'spacy', 'download', model_name], check=False)
+    else:
+        print('[spaCy] All required models are installed')
+
+except Exception as e:
+    print(f'[spaCy] ERROR loading models from database: {e}')
+    exit(1)
+" || { echo "[spaCy] FATAL: Model initialization failed"; exit 1; }
 
 # Start the Python application (main priority)
 echo "[FastAPI] Starting application on port ${APP_PORT:-8080}..."

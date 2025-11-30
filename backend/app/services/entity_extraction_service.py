@@ -5,8 +5,10 @@ Extracts named entities (people, organizations, addresses) from documents using 
 
 import logging
 import re
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
+from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +33,40 @@ class EntityExtractionService:
         self._models = {}  # Lazy-loaded spaCy models per language
         self._model_loading_attempted = set()  # Track which models we've tried to load
 
-    def _get_model(self, language: str):
+    def _get_model_mapping(self, db: Session) -> dict:
         """
-        Get or load spaCy model for language
+        Load spaCy model mapping from database (strictly database-driven)
+
+        Args:
+            db: Database session (required)
+
+        Returns:
+            Dictionary mapping language codes to model names
+
+        Raises:
+            Exception if database not available or setting not found
+        """
+        from app.database.models import SystemSetting
+        import json
+
+        result = db.execute(
+            select(SystemSetting.setting_value).where(
+                SystemSetting.setting_key == 'spacy_model_mapping'
+            )
+        ).scalar_one_or_none()
+
+        if not result:
+            raise ValueError("spacy_model_mapping not found in system_settings")
+
+        return json.loads(result)
+
+    def _get_model(self, language: str, db: Session):
+        """
+        Get or load spaCy model for language from database configuration
 
         Args:
             language: Language code (en, de, ru, fr)
+            db: Database session (required)
 
         Returns:
             spaCy model or None if not available
@@ -50,13 +80,8 @@ class EntityExtractionService:
         try:
             import spacy
 
-            # Map language codes to spaCy model names
-            model_map = {
-                'en': 'en_core_web_sm',
-                'de': 'de_core_news_sm',
-                'fr': 'fr_core_news_sm',
-                'ru': 'ru_core_news_sm'
-            }
+            # Load model mapping from database (no hardcoded values)
+            model_map = self._get_model_mapping(db)
 
             model_name = model_map.get(language)
             if not model_name:
@@ -84,26 +109,28 @@ class EntityExtractionService:
         self,
         text: str,
         language: str = 'en',
-        extract_addresses: bool = True
+        extract_addresses: bool = True,
+        db: Session = None
     ) -> List[ExtractedEntity]:
         """
-        Extract named entities from text using spaCy NER
+        Extract named entities from text using spaCy NER with database-driven filtering
 
         Args:
             text: Document text to analyze
             language: Language code
             extract_addresses: Whether to extract address patterns
+            db: Database session for filtering rules (optional)
 
         Returns:
-            List of extracted entities
+            List of extracted and filtered entities
         """
         entities = []
 
         if not text or len(text.strip()) < 10:
             return entities
 
-        # Try spaCy NER
-        model = self._get_model(language)
+        # Try spaCy NER (requires database for model configuration)
+        model = self._get_model(language, db) if db else None
         if model:
             entities.extend(self._extract_with_spacy(text, model, language))
 
@@ -115,6 +142,12 @@ class EntityExtractionService:
         entities.extend(self._extract_from_headers(text, language))
 
         logger.info(f"[ENTITY EXTRACTION] Extracted {len(entities)} entities from text (lang: {language})")
+
+        # Apply database-driven filters if database session provided
+        if db:
+            entities = self._filter_entities(entities, language, db)
+            logger.info(f"[ENTITY FILTER] After filtering: {len(entities)} entities remain")
+
         return entities
 
     def _extract_with_spacy(self, text: str, model, language: str) -> List[ExtractedEntity]:
@@ -250,6 +283,183 @@ class EntityExtractionService:
                 ))
 
         return entities
+
+    def _filter_entities(
+        self,
+        entities: List[ExtractedEntity],
+        language: str,
+        db: Session
+    ) -> List[ExtractedEntity]:
+        """
+        Apply database-driven filters to remove low-quality entities
+
+        Args:
+            entities: Raw extracted entities
+            language: Language code
+            db: Database session
+
+        Returns:
+            Filtered entities
+        """
+        if not entities:
+            return entities
+
+        # Load filtering rules from database
+        field_labels = self._load_field_labels(db, language)
+        invalid_patterns = self._load_invalid_patterns(db, language)
+        confidence_thresholds = self._load_confidence_thresholds(db, language)
+        blacklist = self._load_blacklist(db, language)
+
+        filtered = []
+        removed_count = {
+            'field_label': 0,
+            'invalid_pattern': 0,
+            'low_confidence': 0,
+            'blacklisted': 0
+        }
+
+        for entity in entities:
+            # Normalize entity value (clean whitespace, line breaks)
+            normalized = self._normalize_entity_value(entity.entity_value)
+            entity.entity_value = normalized
+            entity.normalized_value = normalized.lower()
+
+            # Filter 1: Remove field labels
+            if normalized in field_labels:
+                removed_count['field_label'] += 1
+                logger.debug(f"[ENTITY FILTER] Removed field label: {normalized}")
+                continue
+
+            # Filter 2: Remove invalid patterns
+            if self._matches_invalid_pattern(entity, invalid_patterns):
+                removed_count['invalid_pattern'] += 1
+                logger.debug(f"[ENTITY FILTER] Removed invalid pattern: {normalized} (type: {entity.entity_type})")
+                continue
+
+            # Filter 3: Remove low confidence entities
+            min_confidence = confidence_thresholds.get(entity.entity_type, 0.5)
+            if entity.confidence < min_confidence:
+                removed_count['low_confidence'] += 1
+                logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} (confidence: {entity.confidence}, min: {min_confidence})")
+                continue
+
+            # Filter 4: Remove blacklisted entities
+            blacklist_key = (entity.entity_type, normalized.lower())
+            if blacklist_key in blacklist:
+                removed_count['blacklisted'] += 1
+                logger.debug(f"[ENTITY FILTER] Removed blacklisted: {normalized}")
+                continue
+
+            # Entity passed all filters
+            filtered.append(entity)
+
+        # Log filtering summary
+        total_removed = sum(removed_count.values())
+        if total_removed > 0:
+            logger.info(f"[ENTITY FILTER] Removed {total_removed} entities: "
+                       f"field_labels={removed_count['field_label']}, "
+                       f"invalid_patterns={removed_count['invalid_pattern']}, "
+                       f"low_confidence={removed_count['low_confidence']}, "
+                       f"blacklisted={removed_count['blacklisted']}")
+
+        return filtered
+
+    def _normalize_entity_value(self, value: str) -> str:
+        """Normalize entity value by cleaning whitespace and line breaks"""
+        # Remove line breaks and extra whitespace
+        normalized = re.sub(r'\s+', ' ', value)
+        # Remove leading/trailing whitespace
+        normalized = normalized.strip()
+        # Remove trailing punctuation
+        normalized = re.sub(r'[.,;:!?]+$', '', normalized)
+        return normalized
+
+    def _load_field_labels(self, db: Session, language: str) -> Set[str]:
+        """Load field labels from database"""
+        try:
+            from app.database.models import SystemSetting
+            result = db.execute(
+                select(SystemSetting.setting_value).where(
+                    SystemSetting.setting_key == f'entity_field_labels_{language}'
+                )
+            ).scalar_one_or_none()
+
+            if result:
+                import json
+                return set(json.loads(result))
+
+            # Fallback: query entity_field_labels table directly
+            result = db.execute(
+                select(db.text('label_text')).select_from(db.text('entity_field_labels')).where(
+                    db.text(f"language = '{language}'")
+                )
+            ).fetchall()
+            return {row[0] for row in result}
+
+        except Exception as e:
+            logger.warning(f"Failed to load field labels for {language}: {e}")
+            return set()
+
+    def _load_invalid_patterns(self, db: Session, language: str) -> List[Tuple[str, str]]:
+        """Load invalid patterns from database"""
+        try:
+            result = db.execute(
+                db.text("""
+                    SELECT entity_type, regex_pattern
+                    FROM entity_invalid_patterns
+                    WHERE language = :language AND enabled = true
+                """),
+                {"language": language}
+            ).fetchall()
+            return [(row[0], row[1]) for row in result]
+        except Exception as e:
+            logger.warning(f"Failed to load invalid patterns for {language}: {e}")
+            return []
+
+    def _load_confidence_thresholds(self, db: Session, language: str) -> Dict[str, float]:
+        """Load confidence thresholds from database"""
+        try:
+            result = db.execute(
+                db.text("""
+                    SELECT entity_type, min_confidence
+                    FROM entity_confidence_thresholds
+                    WHERE language = :language
+                """),
+                {"language": language}
+            ).fetchall()
+            return {row[0]: row[1] for row in result}
+        except Exception as e:
+            logger.warning(f"Failed to load confidence thresholds for {language}: {e}")
+            return {}
+
+    def _load_blacklist(self, db: Session, language: str) -> Set[Tuple[str, str]]:
+        """Load blacklisted entities from database"""
+        try:
+            result = db.execute(
+                db.text("""
+                    SELECT entity_type, LOWER(entity_value)
+                    FROM entity_blacklist
+                    WHERE language = :language
+                """),
+                {"language": language}
+            ).fetchall()
+            return {(row[0], row[1]) for row in result}
+        except Exception as e:
+            logger.warning(f"Failed to load entity blacklist for {language}: {e}")
+            return set()
+
+    def _matches_invalid_pattern(self, entity: ExtractedEntity, patterns: List[Tuple[str, str]]) -> bool:
+        """Check if entity matches any invalid pattern"""
+        for entity_type, pattern in patterns:
+            # Pattern applies to this entity type or all types (empty string)
+            if entity_type == entity.entity_type or entity_type == '':
+                try:
+                    if re.match(pattern, entity.entity_value, re.IGNORECASE):
+                        return True
+                except re.error as e:
+                    logger.warning(f"Invalid regex pattern: {pattern} - {e}")
+                    continue
+        return False
 
     def deduplicate_entities(self, entities: List[ExtractedEntity]) -> List[ExtractedEntity]:
         """Remove duplicate entities, keeping highest confidence"""
