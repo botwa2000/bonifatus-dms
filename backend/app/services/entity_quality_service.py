@@ -5,6 +5,7 @@ Provides quality scoring and validation for extracted entities
 
 import logging
 import re
+import subprocess
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -15,34 +16,35 @@ class EntityQualityService:
 
     def __init__(self):
         """Initialize entity quality service with Hunspell dictionaries"""
-        self._hunspell_cache = {}  # Cache Hunspell objects per language
         self._dict_paths = {
-            'de': ('de_DE', 'de_DE'),
-            'en': ('en_US', 'en_US'),
-            'fr': ('fr_FR', 'fr_FR'),
-            'ru': ('ru_RU', 'ru_RU')
+            'de': 'de_DE',
+            'en': 'en_US',
+            'fr': 'fr_FR',
+            'ru': 'ru_RU'
         }
 
-    def _get_hunspell(self, language: str):
-        """Get or create Hunspell object for language"""
-        if language in self._hunspell_cache:
-            return self._hunspell_cache[language]
-
-        if language not in self._dict_paths:
-            return None
+    def _check_word_with_hunspell(self, word: str, language: str) -> bool:
+        """Check if word is valid using system hunspell command"""
+        dict_file = self._dict_paths.get(language)
+        if not dict_file:
+            return True  # Skip validation if language not supported
 
         try:
-            from hunspell import Hunspell
-            dict_file, aff_file = self._dict_paths[language]
-            hobj = Hunspell(dict_file, hunspell_data_dir='/usr/share/hunspell')
-            self._hunspell_cache[language] = hobj
-            logger.info(f"✓ Loaded Hunspell dictionary for {language}")
-            return hobj
+            # Call hunspell with -d (dictionary) flag
+            # Input word via stdin, check exit code (0 = valid, 1 = invalid)
+            result = subprocess.run(
+                ['hunspell', '-d', dict_file, '-l'],  # -l lists misspelled words
+                input=word,
+                capture_output=True,
+                text=True,
+                timeout=1
+            )
+            # If output is empty, word is correctly spelled
+            return len(result.stdout.strip()) == 0
 
         except Exception as e:
-            logger.warning(f"Failed to load Hunspell for {language}: {e}")
-            self._hunspell_cache[language] = None
-            return None
+            logger.debug(f"Hunspell check failed for '{word}': {e}")
+            return True  # Don't filter if validation fails
 
     def validate_with_dictionary(self, text: str, language: str) -> bool:
         """
@@ -56,10 +58,6 @@ class EntityQualityService:
             True if at least 60% of words are valid in the language dictionary
         """
         try:
-            hobj = self._get_hunspell(language)
-            if not hobj:
-                return True  # Skip validation if dictionary not available
-
             # Split entity into words (handle "Frankfurt am Main", "GmbH & Co. KG")
             words = re.findall(r'\b[A-Za-zäöüÄÖÜßàâéèêëïîôùûüÿçÀÂÉÈÊËÏÎÔÙÛÜŸÇ]+\b', text)
 
@@ -67,7 +65,7 @@ class EntityQualityService:
                 return False  # No valid words found
 
             # Check how many words are valid
-            valid_words = sum(1 for word in words if hobj.spell(word))
+            valid_words = sum(1 for word in words if self._check_word_with_hunspell(word, language))
             validity_ratio = valid_words / len(words) if words else 0
 
             # At least 60% of words should be valid
