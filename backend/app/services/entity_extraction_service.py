@@ -9,6 +9,7 @@ from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from app.services.entity_quality_service import entity_quality_service
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ class EntityExtractionService:
         return entities
 
     def _extract_with_spacy(self, text: str, model, language: str) -> List[ExtractedEntity]:
-        """Extract entities using spaCy NER"""
+        """Extract entities using spaCy NER with quality-based confidence scoring"""
         entities = []
 
         try:
@@ -167,7 +168,7 @@ class EntityExtractionService:
 
             for ent in doc.ents:
                 entity_type = None
-                confidence = 0.85  # spaCy models generally have good confidence
+                base_confidence = 0.85  # spaCy base confidence
 
                 # Map spaCy entity types to our schema
                 if ent.label_ == "PERSON":
@@ -178,10 +179,20 @@ class EntityExtractionService:
                     entity_type = "LOCATION"
 
                 if entity_type:
+                    entity_value = ent.text.strip()
+
+                    # Calculate quality-based confidence
+                    calculated_confidence = entity_quality_service.calculate_confidence(
+                        entity_value=entity_value,
+                        entity_type=entity_type,
+                        base_confidence=base_confidence,
+                        language=language
+                    )
+
                     entities.append(ExtractedEntity(
                         entity_type=entity_type,
-                        entity_value=ent.text.strip(),
-                        confidence=confidence,
+                        entity_value=entity_value,
+                        confidence=calculated_confidence,
                         position_start=ent.start_char,
                         position_end=ent.end_char,
                         extraction_method="spacy_ner"
@@ -354,10 +365,18 @@ class EntityExtractionService:
         db: Session
     ) -> List[ExtractedEntity]:
         """
-        Apply database-driven filters to remove low-quality entities
+        Apply simplified filters using quality-based confidence scoring
+
+        Filters applied:
+        1. Field labels (IBAN, Tel, Nr, etc.) - still needed, these are labels not entities
+        2. Confidence threshold (0.75) - now uses calculated confidence from quality service
+        3. Blacklist - user-reported bad entities
+
+        Note: Invalid pattern checks (repetitive chars, short strings, etc.) are now
+        handled by the quality service's confidence calculation, avoiding duplication.
 
         Args:
-            entities: Raw extracted entities
+            entities: Raw extracted entities with calculated confidence scores
             language: Language code
             db: Database session
 
@@ -369,14 +388,14 @@ class EntityExtractionService:
 
         # Load filtering rules from database
         field_labels = self._load_field_labels(db, language)
-        invalid_patterns = self._load_invalid_patterns(db, language)
-        confidence_thresholds = self._load_confidence_thresholds(db, language)
         blacklist = self._load_blacklist(db, language)
+
+        # Unified confidence threshold (stricter than before)
+        CONFIDENCE_THRESHOLD = 0.75
 
         filtered = []
         removed_count = {
             'field_label': 0,
-            'invalid_pattern': 0,
             'low_confidence': 0,
             'blacklisted': 0
         }
@@ -387,26 +406,20 @@ class EntityExtractionService:
             entity.entity_value = normalized
             entity.normalized_value = normalized.lower()
 
-            # Filter 1: Remove field labels
+            # Filter 1: Remove field labels (these are labels, not actual entities)
             if normalized in field_labels:
                 removed_count['field_label'] += 1
                 logger.debug(f"[ENTITY FILTER] Removed field label: {normalized}")
                 continue
 
-            # Filter 2: Remove invalid patterns
-            if self._matches_invalid_pattern(entity, invalid_patterns):
-                removed_count['invalid_pattern'] += 1
-                logger.debug(f"[ENTITY FILTER] Removed invalid pattern: {normalized} (type: {entity.entity_type})")
-                continue
-
-            # Filter 3: Remove low confidence entities
-            min_confidence = confidence_thresholds.get(entity.entity_type, 0.5)
-            if entity.confidence < min_confidence:
+            # Filter 2: Remove low confidence entities (now using quality-based scoring)
+            if entity.confidence < CONFIDENCE_THRESHOLD:
                 removed_count['low_confidence'] += 1
-                logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} (confidence: {entity.confidence}, min: {min_confidence})")
+                logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} "
+                           f"(confidence: {entity.confidence:.2f}, threshold: {CONFIDENCE_THRESHOLD})")
                 continue
 
-            # Filter 4: Remove blacklisted entities
+            # Filter 3: Remove blacklisted entities (user-reported bad entities)
             blacklist_key = (entity.entity_type, normalized.lower())
             if blacklist_key in blacklist:
                 removed_count['blacklisted'] += 1
@@ -421,7 +434,6 @@ class EntityExtractionService:
         if total_removed > 0:
             logger.info(f"[ENTITY FILTER] Removed {total_removed} entities: "
                        f"field_labels={removed_count['field_label']}, "
-                       f"invalid_patterns={removed_count['invalid_pattern']}, "
                        f"low_confidence={removed_count['low_confidence']}, "
                        f"blacklisted={removed_count['blacklisted']}")
 
@@ -463,37 +475,9 @@ class EntityExtractionService:
             logger.warning(f"Failed to load field labels for {language}: {e}")
             return set()
 
-    def _load_invalid_patterns(self, db: Session, language: str) -> List[Tuple[str, str]]:
-        """Load invalid patterns from database"""
-        try:
-            result = db.execute(
-                db.text("""
-                    SELECT entity_type, regex_pattern
-                    FROM entity_invalid_patterns
-                    WHERE language = :language AND enabled = true
-                """),
-                {"language": language}
-            ).fetchall()
-            return [(row[0], row[1]) for row in result]
-        except Exception as e:
-            logger.warning(f"Failed to load invalid patterns for {language}: {e}")
-            return []
-
-    def _load_confidence_thresholds(self, db: Session, language: str) -> Dict[str, float]:
-        """Load confidence thresholds from database"""
-        try:
-            result = db.execute(
-                db.text("""
-                    SELECT entity_type, min_confidence
-                    FROM entity_confidence_thresholds
-                    WHERE language = :language
-                """),
-                {"language": language}
-            ).fetchall()
-            return {row[0]: row[1] for row in result}
-        except Exception as e:
-            logger.warning(f"Failed to load confidence thresholds for {language}: {e}")
-            return {}
+    # NOTE: Removed _load_invalid_patterns, _load_confidence_thresholds, and _matches_invalid_pattern
+    # These are now handled by entity_quality_service.calculate_confidence()
+    # which provides unified quality scoring without duplication
 
     def _load_blacklist(self, db: Session, language: str) -> Set[Tuple[str, str]]:
         """Load blacklisted entities from database"""
@@ -510,19 +494,6 @@ class EntityExtractionService:
         except Exception as e:
             logger.warning(f"Failed to load entity blacklist for {language}: {e}")
             return set()
-
-    def _matches_invalid_pattern(self, entity: ExtractedEntity, patterns: List[Tuple[str, str]]) -> bool:
-        """Check if entity matches any invalid pattern"""
-        for entity_type, pattern in patterns:
-            # Pattern applies to this entity type or all types (empty string)
-            if entity_type == entity.entity_type or entity_type == '':
-                try:
-                    if re.match(pattern, entity.entity_value, re.IGNORECASE):
-                        return True
-                except re.error as e:
-                    logger.warning(f"Invalid regex pattern: {pattern} - {e}")
-                    continue
-        return False
 
     def deduplicate_entities(self, entities: List[ExtractedEntity]) -> List[ExtractedEntity]:
         """Remove duplicate entities, keeping highest confidence"""
