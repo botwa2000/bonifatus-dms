@@ -283,8 +283,8 @@ def upgrade():
 
         -- Authorization labels
         ('fr', 'Autorisation', 'Authorization'),
-        ('fr', 'Code d\'autorisation', 'Authorization code'),
-        ('fr', 'Code d\'approbation', 'Approval code'),
+        ('fr', 'Code d''autorisation', 'Authorization code'),
+        ('fr', 'Code d''approbation', 'Approval code'),
         ('fr', 'Code de réponse', 'Response code'),
         ('fr', 'Trace', 'Trace'),
         ('fr', 'N° de trace', 'Trace number'),
@@ -295,7 +295,7 @@ def upgrade():
         ('fr', 'N° de transaction', 'Transaction number'),
         ('fr', 'Numéro de transaction', 'Transaction number (full)'),
         ('fr', 'Opération', 'Operation'),
-        ('fr', 'N° d\'opération', 'Operation number'),
+        ('fr', 'N° d''opération', 'Operation number'),
 
         -- Location labels
         ('fr', 'Emplacement', 'Location'),
