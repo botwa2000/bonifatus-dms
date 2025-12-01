@@ -37,5 +37,6 @@ fasttext-langdetect==1.0.5
 lingua-language-detector==2.0.2
 # Named Entity Recognition
 spacy>=3.7.0
-# Hunspell: Using system command via subprocess (no Python binding needed)
+# Hunspell dictionary validation
+CyHunspell==2.0.3
 clamd==1.0.2

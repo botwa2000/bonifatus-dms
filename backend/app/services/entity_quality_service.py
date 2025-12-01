@@ -32,12 +32,9 @@ class EntityQualityService:
             return None
 
         try:
-            import hunspell
+            from hunspell import Hunspell
             dict_file, aff_file = self._dict_paths[language]
-            hobj = hunspell.HunSpell(
-                f'/usr/share/hunspell/{dict_file}.dic',
-                f'/usr/share/hunspell/{dict_file}.aff'
-            )
+            hobj = Hunspell(dict_file, hunspell_data_dir='/usr/share/hunspell')
             self._hunspell_cache[language] = hobj
             logger.info(f"✓ Loaded Hunspell dictionary for {language}")
             return hobj
