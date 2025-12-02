@@ -1218,3 +1218,122 @@ class AccountDeletionFeedback(Base):
         Index('idx_acct_delete_feedback_reason', 'reason_category'),
         Index('idx_acct_delete_feedback_tier', 'tier_at_deletion'),
     )
+
+
+# ==================== ML-Based Entity Quality System ====================
+
+
+class EntityQualityConfig(Base, TimestampMixin):
+    """Configuration for entity quality scoring (replaces hardcoded values)"""
+    __tablename__ = "entity_quality_config"
+
+    id = Column(Integer, primary_key=True)
+    config_key = Column(String(100), nullable=False, unique=True, index=True)
+    config_value = Column(Float, nullable=False)
+    category = Column(String(50), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    min_value = Column(Float, nullable=True)
+    max_value = Column(Float, nullable=True)
+
+    __table_args__ = (
+        Index('idx_entity_quality_config_category', 'category'),
+    )
+
+
+class EntityQualityTrainingData(Base):
+    """Training data for ML entity quality models"""
+    __tablename__ = "entity_quality_training_data"
+
+    id = Column(Integer, primary_key=True)
+    entity_value = Column(String(255), nullable=False)
+    entity_type = Column(String(50), nullable=False, index=True)
+    language = Column(String(10), nullable=False, index=True)
+    is_valid = Column(Boolean, nullable=False, index=True)
+    confidence_score = Column(Float, nullable=True)
+    features = Column(JSONB, nullable=True)
+    source = Column(String(50), nullable=False, index=True)  # user_blacklist, manual_label, auto_feedback
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
+    __table_args__ = (
+        Index('idx_training_data_language', 'language'),
+        Index('idx_training_data_source', 'source'),
+        Index('idx_training_data_is_valid', 'is_valid'),
+    )
+
+
+class EntityQualityModel(Base):
+    """Trained sklearn models for entity quality scoring"""
+    __tablename__ = "entity_quality_models"
+
+    id = Column(Integer, primary_key=True)
+    model_version = Column(String(50), nullable=False)
+    language = Column(String(10), nullable=False, index=True)
+    model_type = Column(String(50), nullable=False)  # LogisticRegression, RandomForest, etc.
+    model_data = Column(sa.LargeBinary, nullable=False)  # Pickled sklearn model
+    performance_metrics = Column(JSONB, nullable=True)  # {accuracy, precision, recall, f1}
+    training_samples_count = Column(Integer, nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default='false', index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('idx_models_language_active', 'language', 'is_active'),
+        sa.UniqueConstraint('model_version', 'language', name='uq_model_version_language'),
+    )
+
+
+class SupportedLanguage(Base, TimestampMixin):
+    """Supported languages with dynamic configuration"""
+    __tablename__ = "supported_languages"
+
+    id = Column(Integer, primary_key=True)
+    language_code = Column(String(10), nullable=False, unique=True, index=True)
+    language_name = Column(String(100), nullable=False)
+    hunspell_dict = Column(String(50), nullable=False)
+    spacy_model = Column(String(100), nullable=False)
+    ml_model_available = Column(Boolean, nullable=False, server_default='false')
+    stop_words_count = Column(Integer, nullable=True)
+    field_labels_count = Column(Integer, nullable=True)
+    is_active = Column(Boolean, nullable=False, server_default='true')
+
+
+class EntityQualityFeature(Base):
+    """Feature importance tracking for ML models"""
+    __tablename__ = "entity_quality_features"
+
+    id = Column(Integer, primary_key=True)
+    feature_name = Column(String(100), nullable=False)
+    feature_description = Column(Text, nullable=True)
+    importance_score = Column(Float, nullable=True)
+    language = Column(String(10), nullable=False, index=True)
+    model_version = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('idx_features_language', 'language'),
+        sa.UniqueConstraint('feature_name', 'language', 'model_version', name='uq_feature_language_version'),
+    )
+
+
+class EntityTypePattern(Base):
+    """Type-specific patterns for entity confidence boosting (all languages)"""
+    __tablename__ = "entity_type_patterns"
+
+    id = Column(Integer, primary_key=True)
+    entity_type = Column(String(50), nullable=False, index=True)
+    pattern_value = Column(String(100), nullable=False)
+    pattern_type = Column(String(20), nullable=False)  # suffix, keyword, prefix
+    config_key = Column(String(100), nullable=False)  # References entity_quality_config
+    language = Column(String(10), nullable=False, index=True)
+    is_active = Column(Boolean, nullable=False, server_default='true', index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('idx_type_patterns_entity_lang', 'entity_type', 'language'),
+        Index('idx_type_patterns_active', 'is_active'),
+        sa.UniqueConstraint('entity_type', 'pattern_value', 'language', name='uq_pattern_value_language'),
+    )

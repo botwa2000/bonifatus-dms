@@ -305,6 +305,7 @@ routers = [
     ("app.api.documents", "Documents"),
     ("app.api.security", "Security"),
     ("app.api.translation", "Translation"),
+    ("app.api.entity_quality", "EntityQuality"),
     ("app.api.billing_subscriptions", "Billing"),
     ("app.api.billing_cancellations", "BillingCancellations"),
     ("app.api.webhooks", "Webhooks"),
