@@ -1,7 +1,7 @@
 """add ml entity quality system
 
 Revision ID: 032_ml_entity_quality
-Revises: 028_entity_filtering
+Revises: 031_expand_field_labels
 Create Date: 2025-12-01 00:00:00
 
 ML-Based Entity Quality System:
@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '032_ml_entity_quality'
-down_revision = '028_entity_filtering'
+down_revision = '031_expand_field_labels'
 branch_labels = None
 depends_on = None
 
