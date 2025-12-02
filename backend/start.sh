@@ -130,6 +130,14 @@ else
     done
 fi
 
+# Run database migrations BEFORE loading spaCy models
+echo "[Database] Running migrations..."
+alembic upgrade head || {
+    echo "[Database] ERROR: Migrations failed"
+    exit 1
+}
+echo "[Database] ✓ Migrations complete"
+
 # Download spaCy models from database configuration (no hardcoded languages)
 echo "[spaCy] Loading NER model configuration from database..."
 python -c "
