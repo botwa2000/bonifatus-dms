@@ -168,6 +168,7 @@ class EntityExtractionService:
 
             # Create quality service if db provided
             quality_service = get_entity_quality_service(db) if db else None
+            logger.info(f"[QUALITY DEBUG] db provided: {db is not None}, quality_service created: {quality_service is not None}")
 
             for ent in doc.ents:
                 entity_type = None
@@ -204,9 +205,11 @@ class EntityExtractionService:
                             base_confidence=base_confidence,
                             language=language
                         )
+                        logger.info(f"[QUALITY DEBUG] Entity '{entity_value[:50]}': base={base_confidence:.2f}, calculated={calculated_confidence:.2f}")
                     else:
                         # No quality service, use base confidence
                         calculated_confidence = base_confidence
+                        logger.warning(f"[QUALITY DEBUG] No quality service, using base confidence {base_confidence:.2f} for '{entity_value[:50]}'")
 
                     entities.append(ExtractedEntity(
                         entity_type=entity_type,

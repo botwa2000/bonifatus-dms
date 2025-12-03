@@ -76,6 +76,15 @@ interface Currency {
   sort_order: number
 }
 
+interface EntityQualityConfig {
+  config_key: string
+  config_value: number
+  category: string
+  description: string
+  created_at: string
+  updated_at: string
+}
+
 export default function AdminDashboard() {
   const { user, isLoading, loadUser } = useAuth()
   const router = useRouter()
@@ -85,7 +94,9 @@ export default function AdminDashboard() {
   const [tiers, setTiers] = useState<TierPlan[]>([])
   const [currencies, setCurrencies] = useState<Currency[]>([])
   const [clamavHealth, setClamavHealth] = useState<ClamAVHealth | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates'>('overview')
+  const [entityQualityConfigs, setEntityQualityConfigs] = useState<EntityQualityConfig[]>([])
+  const [editingConfig, setEditingConfig] = useState<{key: string, value: string} | null>(null)
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates' | 'entity-quality'>('overview')
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [editingCurrency, setEditingCurrency] = useState<{code: string, rate: string} | null>(null)
@@ -159,6 +170,10 @@ export default function AdminDashboard() {
       // Load ClamAV health
       const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
+
+      // Load Entity Quality configs
+      const entityQualityData = await apiClient.get<{ configs: EntityQualityConfig[] }>('/api/v1/entity-quality/config')
+      setEntityQualityConfigs(entityQualityData.configs)
 
     } catch (error) {
       console.error('Failed to load admin data:', error)
@@ -264,6 +279,20 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to update user tier:', error)
       alert('Failed to update user tier')
+    }
+  }
+
+  const updateEntityQualityConfig = async (configKey: string, newValue: number) => {
+    try {
+      await apiClient.patch(`/api/v1/entity-quality/config/${configKey}`, {
+        config_value: newValue
+      })
+      await loadData()
+      setEditingConfig(null)
+      alert(`Config ${configKey} updated successfully!`)
+    } catch (error) {
+      console.error('Failed to update entity quality config:', error)
+      alert('Failed to update configuration')
     }
   }
 
@@ -403,6 +432,16 @@ export default function AdminDashboard() {
             }`}
           >
             Email Templates
+          </button>
+          <button
+            onClick={() => setActiveTab('entity-quality')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'entity-quality'
+                ? 'text-admin-primary border-b-2 border-admin-primary'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+            }`}
+          >
+            Entity Quality
           </button>
         </div>
 
@@ -1215,6 +1254,128 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Entity Quality Tab */}
+        {activeTab === 'entity-quality' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Entity Quality ML Configuration" />
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Info Box */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                      <strong>Fine-tune ML entity quality scoring:</strong> Adjust weights and thresholds to filter garbage entities.
+                      <br />
+                      Values are multipliers (0.1 = 90% penalty, 1.0 = no change, 1.3 = 30% bonus).
+                      <br />
+                      <strong>Check dev backend logs</strong> after uploading documents to see detailed scoring calculations for each entity.
+                    </div>
+                  </div>
+
+                  {/* Group configs by category */}
+                  {['length', 'repetitive', 'vowel', 'pattern', 'dictionary', 'entity_type'].map(category => {
+                    const categoryConfigs = entityQualityConfigs.filter(c => c.category === category)
+                    if (categoryConfigs.length === 0) return null
+
+                    return (
+                      <div key={category} className="border border-neutral-300 dark:border-neutral-600 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 capitalize">
+                          {category.replace('_', ' ')} Rules
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-neutral-50 dark:bg-neutral-800">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                  Parameter
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                  Value
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                  Description
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                              {categoryConfigs.map(config => (
+                                <tr key={config.config_key}>
+                                  <td className="px-4 py-3 text-sm font-medium text-neutral-900 dark:text-white">
+                                    {config.config_key.replace(/^(threshold_|pattern_|type_|length_|dict_)/, '')}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {editingConfig?.key === config.config_key ? (
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={editingConfig.value}
+                                        onChange={(e) => setEditingConfig({...editingConfig, value: e.target.value})}
+                                        className="w-24 px-2 py-1 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
+                                      />
+                                    ) : (
+                                      <span className="text-sm font-mono text-neutral-900 dark:text-white">
+                                        {config.config_value}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-400">
+                                    {config.description}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {editingConfig?.key === config.config_key ? (
+                                      <div className="flex space-x-2">
+                                        <Button
+                                          variant="primary"
+                                          size="sm"
+                                          onClick={() => {
+                                            const value = parseFloat(editingConfig.value)
+                                            if (!isNaN(value)) {
+                                              updateEntityQualityConfig(config.config_key, value)
+                                            } else {
+                                              alert('Please enter a valid number')
+                                            }
+                                          }}
+                                        >
+                                          Save
+                                        </Button>
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => setEditingConfig(null)}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setEditingConfig({
+                                          key: config.config_key,
+                                          value: config.config_value.toString()
+                                        })}
+                                      >
+                                        Edit
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>

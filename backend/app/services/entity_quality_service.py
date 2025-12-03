@@ -332,6 +332,9 @@ class EntityQualityService:
         confidence = base_confidence
         length = features['length']
 
+        # Track all applied adjustments for debugging
+        adjustments = []
+
         # 1. Length factor (thresholds from DB)
         length_very_short = self._get_config_value('threshold_length_very_short', 2.0)
         length_short = self._get_config_value('threshold_length_short', 3.0)
@@ -341,19 +344,33 @@ class EntityQualityService:
         length_very_long = self._get_config_value('threshold_length_very_long', 80.0)
 
         if length < length_very_short:
-            confidence *= self._get_config_value('length_very_short_penalty', 0.1)
+            multiplier = self._get_config_value('length_very_short_penalty', 0.1)
+            confidence *= multiplier
+            adjustments.append(f"length_very_short({length}<{length_very_short}): ×{multiplier}")
         elif length < length_short:
-            confidence *= self._get_config_value('length_two_char_penalty', 0.3)
+            multiplier = self._get_config_value('length_two_char_penalty', 0.3)
+            confidence *= multiplier
+            adjustments.append(f"length_short({length}<{length_short}): ×{multiplier}")
         elif length < length_optimal_min:
-            confidence *= self._get_config_value('length_three_char_penalty', 0.6)
+            multiplier = self._get_config_value('length_three_char_penalty', 0.6)
+            confidence *= multiplier
+            adjustments.append(f"length_suboptimal({length}<{length_optimal_min}): ×{multiplier}")
         elif length > length_very_long:
-            confidence *= self._get_config_value('length_very_long_penalty', 0.2)
+            multiplier = self._get_config_value('length_very_long_penalty', 0.2)
+            confidence *= multiplier
+            adjustments.append(f"length_very_long({length}>{length_very_long}): ×{multiplier}")
         elif length > length_long:
-            confidence *= self._get_config_value('length_long_penalty', 0.5)
+            multiplier = self._get_config_value('length_long_penalty', 0.5)
+            confidence *= multiplier
+            adjustments.append(f"length_long({length}>{length_long}): ×{multiplier}")
         elif length_optimal_min <= length <= length_optimal_max:
-            confidence *= self._get_config_value('length_optimal_bonus', 1.0)
+            multiplier = self._get_config_value('length_optimal_bonus', 1.0)
+            confidence *= multiplier
+            adjustments.append(f"length_optimal({length_optimal_min}≤{length}≤{length_optimal_max}): ×{multiplier}")
         else:
-            confidence *= self._get_config_value('fallback_multiplier', 0.8)
+            multiplier = self._get_config_value('fallback_multiplier', 0.8)
+            confidence *= multiplier
+            adjustments.append(f"length_fallback: ×{multiplier}")
 
         # 2. Repetitive character penalties (thresholds from DB)
         rep_score = features['repetitive_char_score']
@@ -362,11 +379,17 @@ class EntityQualityService:
         rep_medium = self._get_config_value('threshold_repetitive_chars_medium', 4.0)
 
         if rep_score >= rep_severe:
-            confidence *= self._get_config_value('pattern_repetitive_severe', 0.1)
+            multiplier = self._get_config_value('pattern_repetitive_severe', 0.1)
+            confidence *= multiplier
+            adjustments.append(f"repetitive_severe({rep_score}≥{rep_severe}): ×{multiplier}")
         elif rep_score >= rep_high:
-            confidence *= self._get_config_value('pattern_repetitive_high', 0.3)
+            multiplier = self._get_config_value('pattern_repetitive_high', 0.3)
+            confidence *= multiplier
+            adjustments.append(f"repetitive_high({rep_score}≥{rep_high}): ×{multiplier}")
         elif rep_score >= rep_medium:
-            confidence *= self._get_config_value('pattern_repetitive_medium', 0.6)
+            multiplier = self._get_config_value('pattern_repetitive_medium', 0.6)
+            confidence *= multiplier
+            adjustments.append(f"repetitive_medium({rep_score}≥{rep_medium}): ×{multiplier}")
 
         # 3. Vowel ratio penalties (thresholds from DB)
         vowel_ratio = features['vowel_ratio']
@@ -379,34 +402,50 @@ class EntityQualityService:
             vowel_high = self._get_config_value('threshold_vowel_ratio_high', 0.75)
 
             if vowel_ratio < vowel_very_low:
-                confidence *= self._get_config_value('pattern_low_vowel_severe', 0.3)
+                multiplier = self._get_config_value('pattern_low_vowel_severe', 0.3)
+                confidence *= multiplier
+                adjustments.append(f"vowel_very_low({vowel_ratio:.2f}<{vowel_very_low}): ×{multiplier}")
             elif vowel_ratio < vowel_low:
-                confidence *= self._get_config_value('pattern_low_vowel_medium', 0.6)
+                multiplier = self._get_config_value('pattern_low_vowel_medium', 0.6)
+                confidence *= multiplier
+                adjustments.append(f"vowel_low({vowel_ratio:.2f}<{vowel_low}): ×{multiplier}")
             elif vowel_ratio > vowel_high:
-                confidence *= self._get_config_value('pattern_high_vowel_penalty', 0.7)
+                multiplier = self._get_config_value('pattern_high_vowel_penalty', 0.7)
+                confidence *= multiplier
+                adjustments.append(f"vowel_high({vowel_ratio:.2f}>{vowel_high}): ×{multiplier}")
 
         # 4. Pure numeric or punctuation
         if re.match(r'^[0-9\W]+$', entity_value):
-            confidence *= self._get_config_value('pattern_numeric_only', 0.1)
+            multiplier = self._get_config_value('pattern_numeric_only', 0.1)
+            confidence *= multiplier
+            adjustments.append(f"numeric_only: ×{multiplier}")
 
         # 5. Mixed case chaos (threshold from DB)
         min_length_case = self._get_config_value('threshold_min_length_for_case_check', 5.0)
         if length > min_length_case and re.search(r'[a-z]{2,}[A-Z]{2,}[a-z]{2,}', entity_value):
-            confidence *= self._get_config_value('pattern_mixed_case_penalty', 0.5)
+            multiplier = self._get_config_value('pattern_mixed_case_penalty', 0.5)
+            confidence *= multiplier
+            adjustments.append(f"mixed_case_chaos: ×{multiplier}")
 
         # 6. Excessive punctuation (threshold from DB)
         special_high = self._get_config_value('threshold_special_char_high', 0.3)
         if features['special_char_ratio'] > special_high:
-            confidence *= self._get_config_value('pattern_excessive_punct', 0.5)
+            multiplier = self._get_config_value('pattern_excessive_punct', 0.5)
+            confidence *= multiplier
+            adjustments.append(f"excessive_punct({features['special_char_ratio']:.2f}>{special_high}): ×{multiplier}")
 
         # 7. Dictionary validation
         dict_valid_ratio = features['dict_valid_ratio']
         threshold = self._get_config_value('dict_validation_threshold', 0.6)
 
         if dict_valid_ratio >= threshold:
-            confidence *= self._get_config_value('dict_all_valid_bonus', 1.3)
+            multiplier = self._get_config_value('dict_all_valid_bonus', 1.3)
+            confidence *= multiplier
+            adjustments.append(f"dict_valid({dict_valid_ratio:.2f}≥{threshold}): ×{multiplier}")
         else:
-            confidence *= self._get_config_value('dict_invalid_penalty', 0.6)
+            multiplier = self._get_config_value('dict_invalid_penalty', 0.6)
+            confidence *= multiplier
+            adjustments.append(f"dict_invalid({dict_valid_ratio:.2f}<{threshold}): ×{multiplier}")
 
         # 8. Entity type patterns from database (NO hardcoded patterns)
         patterns = self._load_entity_type_patterns(entity_type, language)
@@ -418,24 +457,36 @@ class EntityQualityService:
             if pattern_type == 'suffix' and entity_value.endswith(pattern_value):
                 multiplier = self._get_config_value(config_key, 1.0)
                 confidence *= multiplier
+                adjustments.append(f"pattern_{pattern_type}('{pattern_value}'): ×{multiplier}")
                 break
             elif pattern_type == 'keyword' and pattern_value in entity_value:
                 multiplier = self._get_config_value(config_key, 1.0)
                 confidence *= multiplier
+                adjustments.append(f"pattern_{pattern_type}('{pattern_value}'): ×{multiplier}")
                 break
 
         # 9. Title case bonus (threshold from DB)
         min_length_uppercase = self._get_config_value('threshold_min_length_for_uppercase_penalty', 8.0)
 
         if entity_type == 'PERSON' and features['title_case'] == 1.0:
-            confidence *= self._get_config_value('type_person_title_case', 1.2)
+            multiplier = self._get_config_value('type_person_title_case', 1.2)
+            confidence *= multiplier
+            adjustments.append(f"person_title_case: ×{multiplier}")
         elif entity_type == 'PERSON' and entity_value.isupper() and length > min_length_uppercase:
-            confidence *= self._get_config_value('type_person_uppercase_penalty', 0.9)
+            multiplier = self._get_config_value('type_person_uppercase_penalty', 0.9)
+            confidence *= multiplier
+            adjustments.append(f"person_uppercase({length}>{min_length_uppercase}): ×{multiplier}")
         elif entity_type == 'LOCATION' and features['title_case'] == 1.0:
-            confidence *= self._get_config_value('type_location_title_case', 1.1)
+            multiplier = self._get_config_value('type_location_title_case', 1.1)
+            confidence *= multiplier
+            adjustments.append(f"location_title_case: ×{multiplier}")
+
+        # Log all applied adjustments for fine-tuning
+        final_confidence = min(confidence, 1.0)
+        logger.info(f"[RULE-BASED] '{entity_value[:50]}': {base_confidence:.2f} → {final_confidence:.2f} | {' | '.join(adjustments) if adjustments else 'no adjustments'}")
 
         # Cap at 1.0
-        return min(confidence, 1.0)
+        return final_confidence
 
     def calculate_confidence(
         self,
@@ -457,12 +508,15 @@ class EntityQualityService:
             Final confidence score between 0.0 and 1.0
         """
         try:
+            logger.info(f"[QUALITY CALC] Calculating confidence for '{entity_value[:50]}' (type={entity_type}, base={base_confidence:.2f}, lang={language})")
+
             # Extract features for ML model
             features = self.extract_features(entity_value, entity_type, language, base_confidence)
 
             # Check if ML model is available for this language
             languages = self._load_languages()
             ml_available = languages.get(language, {}).get('ml_model_available', False)
+            logger.info(f"[QUALITY CALC] ML available for {language}: {ml_available}")
 
             if ml_available:
                 # Use ML model prediction
@@ -473,17 +527,20 @@ class EntityQualityService:
 
                 if ml_confidence is not None:
                     confidence = ml_confidence
+                    logger.info(f"[QUALITY CALC] Using ML confidence: {confidence:.2f}")
                 else:
                     # ML prediction failed, fall back to rule-based
                     logger.warning(f"ML prediction failed for {language}, using rule-based")
                     confidence = self.calculate_rule_based_confidence(
                         entity_value, entity_type, base_confidence, language, features
                     )
+                    logger.info(f"[QUALITY CALC] Using rule-based confidence (ML failed): {confidence:.2f}")
             else:
                 # Use rule-based approach with DB-driven weights
                 confidence = self.calculate_rule_based_confidence(
                     entity_value, entity_type, base_confidence, language, features
                 )
+                logger.info(f"[QUALITY CALC] Using rule-based confidence: {confidence:.2f}")
 
             return confidence
 
