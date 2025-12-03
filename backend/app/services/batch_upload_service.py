@@ -77,7 +77,7 @@ class BatchUploadService:
             async def analyze_with_semaphore(file_data):
                 async with semaphore:
                     return await self._analyze_single_file(
-                        file_data, user_categories, batch_id
+                        file_data, user_categories, batch_id, session
                     )
             
             # Create tasks
@@ -140,7 +140,8 @@ class BatchUploadService:
         self,
         file_data: Dict,
         user_categories: List[Dict],
-        batch_id: uuid.UUID
+        batch_id: uuid.UUID,
+        session: Session
     ) -> Dict:
         """Analyze single file in batch"""
         try:
@@ -148,7 +149,8 @@ class BatchUploadService:
                 file_content=file_data['content'],
                 file_name=file_data['filename'],
                 mime_type=file_data['mime_type'],
-                user_categories=user_categories
+                user_categories=user_categories,
+                db=session
             )
             
             # Get category code for filename
