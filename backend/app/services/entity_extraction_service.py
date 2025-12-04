@@ -137,16 +137,16 @@ class EntityExtractionService:
 
         # Pattern-based address extraction (works without spaCy)
         if extract_addresses:
-            entities.extend(self._extract_addresses_pattern(text, language))
+            entities.extend(self._extract_addresses_pattern(text, language, db))
 
         # Pattern-based sender/recipient extraction from headers
-        entities.extend(self._extract_from_headers(text, language))
+        entities.extend(self._extract_from_headers(text, language, db))
 
         # Pattern-based email extraction
-        entities.extend(self._extract_emails_pattern(text))
+        entities.extend(self._extract_emails_pattern(text, db, language))
 
         # Pattern-based URL/website extraction
-        entities.extend(self._extract_urls_pattern(text))
+        entities.extend(self._extract_urls_pattern(text, db, language))
 
         logger.info(f"[ENTITY EXTRACTION] Extracted {len(entities)} entities from text (lang: {language})")
 
@@ -227,9 +227,12 @@ class EntityExtractionService:
 
         return entities
 
-    def _extract_addresses_pattern(self, text: str, language: str) -> List[ExtractedEntity]:
-        """Extract addresses using regex patterns"""
+    def _extract_addresses_pattern(self, text: str, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
+        """Extract addresses using regex patterns with quality-based confidence"""
         entities = []
+
+        # Create quality service if db provided
+        quality_service = get_entity_quality_service(db) if db else None
 
         # Pattern for postal codes + city (works for DE, FR, CH, AT, etc.)
         # Examples: "61348 Bad Homburg", "75001 Paris", "8001 Zürich"
@@ -240,10 +243,22 @@ class EntityExtractionService:
             city = match.group(2).strip()
             address_part = f"{postal_code} {city}"
 
+            # Calculate quality-based confidence
+            base_confidence = 0.75
+            if quality_service:
+                calculated_confidence = quality_service.calculate_confidence(
+                    entity_value=address_part,
+                    entity_type="ADDRESS_COMPONENT",
+                    base_confidence=base_confidence,
+                    language=language
+                )
+            else:
+                calculated_confidence = base_confidence
+
             entities.append(ExtractedEntity(
                 entity_type="ADDRESS_COMPONENT",
                 entity_value=address_part,
-                confidence=0.75,
+                confidence=calculated_confidence,
                 position_start=match.start(),
                 position_end=match.end(),
                 extraction_method="pattern_postal"
@@ -258,10 +273,22 @@ class EntityExtractionService:
             number = match.group(2)
             address_part = f"{street} {number}"
 
+            # Calculate quality-based confidence
+            base_confidence = 0.70
+            if quality_service:
+                calculated_confidence = quality_service.calculate_confidence(
+                    entity_value=address_part,
+                    entity_type="ADDRESS_COMPONENT",
+                    base_confidence=base_confidence,
+                    language=language
+                )
+            else:
+                calculated_confidence = base_confidence
+
             entities.append(ExtractedEntity(
                 entity_type="ADDRESS_COMPONENT",
                 entity_value=address_part,
-                confidence=0.70,
+                confidence=calculated_confidence,
                 position_start=match.start(),
                 position_end=match.end(),
                 extraction_method="pattern_street"
@@ -269,9 +296,12 @@ class EntityExtractionService:
 
         return entities
 
-    def _extract_from_headers(self, text: str, language: str) -> List[ExtractedEntity]:
-        """Extract sender/recipient from document headers using patterns"""
+    def _extract_from_headers(self, text: str, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
+        """Extract sender/recipient from document headers using patterns with quality-based confidence"""
         entities = []
+
+        # Create quality service if db provided
+        quality_service = get_entity_quality_service(db) if db else None
 
         # Common header patterns across languages
         patterns = {
@@ -312,10 +342,22 @@ class EntityExtractionService:
                 else:
                     entity_type = "HEADER_FIELD"
 
+                # Calculate quality-based confidence
+                base_confidence = 0.80
+                if quality_service:
+                    calculated_confidence = quality_service.calculate_confidence(
+                        entity_value=value,
+                        entity_type=entity_type,
+                        base_confidence=base_confidence,
+                        language=language
+                    )
+                else:
+                    calculated_confidence = base_confidence
+
                 entities.append(ExtractedEntity(
                     entity_type=entity_type,
                     entity_value=value,
-                    confidence=0.80,
+                    confidence=calculated_confidence,
                     position_start=match.start(),
                     position_end=match.end(),
                     extraction_method="pattern_header"
@@ -323,9 +365,12 @@ class EntityExtractionService:
 
         return entities
 
-    def _extract_emails_pattern(self, text: str) -> List[ExtractedEntity]:
-        """Extract email addresses using regex pattern"""
+    def _extract_emails_pattern(self, text: str, db: Optional[Session] = None, language: str = 'en') -> List[ExtractedEntity]:
+        """Extract email addresses using regex pattern with quality-based confidence"""
         entities = []
+
+        # Create quality service if db provided
+        quality_service = get_entity_quality_service(db) if db else None
 
         # Email pattern (RFC 5322 simplified)
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -333,10 +378,22 @@ class EntityExtractionService:
         for match in re.finditer(email_pattern, text):
             email = match.group(0)
 
+            # Calculate quality-based confidence
+            base_confidence = 0.95
+            if quality_service:
+                calculated_confidence = quality_service.calculate_confidence(
+                    entity_value=email,
+                    entity_type="EMAIL",
+                    base_confidence=base_confidence,
+                    language=language
+                )
+            else:
+                calculated_confidence = base_confidence
+
             entities.append(ExtractedEntity(
                 entity_type="EMAIL",
                 entity_value=email,
-                confidence=0.95,  # High confidence for pattern match
+                confidence=calculated_confidence,
                 position_start=match.start(),
                 position_end=match.end(),
                 extraction_method="pattern_email"
@@ -344,9 +401,12 @@ class EntityExtractionService:
 
         return entities
 
-    def _extract_urls_pattern(self, text: str) -> List[ExtractedEntity]:
-        """Extract URLs and websites using regex pattern"""
+    def _extract_urls_pattern(self, text: str, db: Optional[Session] = None, language: str = 'en') -> List[ExtractedEntity]:
+        """Extract URLs and websites using regex pattern with quality-based confidence"""
         entities = []
+
+        # Create quality service if db provided
+        quality_service = get_entity_quality_service(db) if db else None
 
         # URL pattern (http/https URLs)
         url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
@@ -354,10 +414,22 @@ class EntityExtractionService:
         for match in re.finditer(url_pattern, text):
             url = match.group(0)
 
+            # Calculate quality-based confidence
+            base_confidence = 0.95
+            if quality_service:
+                calculated_confidence = quality_service.calculate_confidence(
+                    entity_value=url,
+                    entity_type="URL",
+                    base_confidence=base_confidence,
+                    language=language
+                )
+            else:
+                calculated_confidence = base_confidence
+
             entities.append(ExtractedEntity(
                 entity_type="URL",
                 entity_value=url,
-                confidence=0.95,
+                confidence=calculated_confidence,
                 position_start=match.start(),
                 position_end=match.end(),
                 extraction_method="pattern_url"
@@ -369,10 +441,22 @@ class EntityExtractionService:
         for match in re.finditer(website_pattern, text):
             website = match.group(0)
 
+            # Calculate quality-based confidence
+            base_confidence = 0.90
+            if quality_service:
+                calculated_confidence = quality_service.calculate_confidence(
+                    entity_value=website,
+                    entity_type="URL",
+                    base_confidence=base_confidence,
+                    language=language
+                )
+            else:
+                calculated_confidence = base_confidence
+
             entities.append(ExtractedEntity(
                 entity_type="URL",
                 entity_value=website,
-                confidence=0.90,  # Slightly lower confidence than full URLs
+                confidence=calculated_confidence,
                 position_start=match.start(),
                 position_end=match.end(),
                 extraction_method="pattern_website"
