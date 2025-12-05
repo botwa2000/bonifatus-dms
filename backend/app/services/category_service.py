@@ -710,6 +710,16 @@ class CategoryService:
                 }
             )
 
+            # Reset user's keyword extraction learning history (TF-IDF corpus stats)
+            # This ensures ML starts fresh with restored categories
+            try:
+                from app.services.keyword_extraction_service import keyword_extraction_service
+                keyword_extraction_service.reset_user_learning(user_id, session)
+                logger.info(f"Reset keyword extraction learning history for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to reset keyword learning history for user {user_id}: {e}")
+                # Don't fail the whole operation if this fails
+
             logger.info(
                 f"Categories restored for user {user_id}: "
                 f"deleted={deleted_count}, created={len(created_names)}, "

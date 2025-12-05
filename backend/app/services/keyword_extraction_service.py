@@ -179,13 +179,16 @@ class KeywordExtractionService:
         max_keywords: int = 50,
         min_frequency: int = 2,
         user_id: str = None,
-        stopwords: set = None
+        stopwords: set = None,
+        rejected_entities: List[Dict] = None
     ) -> List[Tuple[str, int, float]]:
         """
-        Extract keywords using HYBRID approach with CORRECT order:
+        Extract keywords using HYBRID approach with TF-IDF scoring:
         1. Load category keywords FIRST (these must NEVER be filtered)
         2. Filter stopwords BUT preserve category keywords
-        3. Extract keywords with priority scoring
+        3. Extract keywords with TF-IDF relevance scoring
+        4. Convert rejected entities to keywords (if provided)
+        5. Update corpus statistics for ML learning
 
         This ensures important classification terms like "rechnung", "invoice" are
         ALWAYS extracted even if they appear only once or in stopwords.
@@ -194,10 +197,12 @@ class KeywordExtractionService:
             text: Document text
             db: Database session for loading stop words and category keywords
             language: Language code for stop word filtering and tokenization
-            max_keywords: Maximum number of keywords to return (default: 1000)
+            max_keywords: Maximum number of keywords to return (default: 50)
             min_frequency: Minimum frequency for a keyword
-            user_id: User ID to get their category keywords
+            user_id: User ID to get their category keywords and personalized IDF scores
             stopwords: Optional pre-loaded stopwords set (if None, loads from db for language)
+            rejected_entities: List of entities rejected by quality service (e.g., low-confidence ORGs)
+                              Format: [{'entity_value': 'PATIENT', 'entity_type': 'ORGANIZATION', 'confidence': 0.65}, ...]
 
         Returns:
             List of tuples (keyword, frequency, relevance_score)
@@ -314,9 +319,16 @@ class KeywordExtractionService:
             for word in frequency:
                 if word in category_keywords_set:
                     count = frequency[word]
-                    relevance = (count / max_freq) * 100
-                    # Boost relevance for category matches
-                    relevance = min(relevance * 1.5, 100.0)
+
+                    # Calculate TF-IDF relevance
+                    tf = count / total_tokens
+                    idf = self._calculate_idf(word, language, user_id, db)
+                    tfidf_score = tf * idf
+                    relevance = tfidf_score * 100
+
+                    # Boost relevance for category matches (1.5x multiplier)
+                    relevance = min(relevance * 1.5, 150.0)
+
                     keywords.append((word, count, relevance))
                     extracted_words.add(word)
                     category_matches += 1
@@ -338,20 +350,75 @@ class KeywordExtractionService:
                     logger.debug(f"Skipping keyword '{word}' with low frequency: count={count}, min_required={adaptive_min_frequency}")
                     continue
 
-                relevance = (count / max_freq) * 100
+                # Calculate TF-IDF relevance
+                tf = count / total_tokens
+                idf = self._calculate_idf(word, language, user_id, db)
+                tfidf_score = tf * idf
+                relevance = tfidf_score * 100
 
                 # Defensive check: ensure relevance calculation succeeded
                 if relevance is None or not isinstance(relevance, (int, float)):
-                    logger.warning(f"Skipping keyword '{word}' with invalid relevance: relevance={repr(relevance)}, type={type(relevance).__name__ if relevance is not None else 'NoneType'}, count={count}, max_freq={max_freq}")
+                    logger.warning(f"Skipping keyword '{word}' with invalid relevance: relevance={repr(relevance)}, type={type(relevance).__name__ if relevance is not None else 'NoneType'}, count={count}, tf={tf}, idf={idf}")
                     continue
 
                 keywords.append((word, count, relevance))
                 extracted_words.add(word)
 
+            # Priority 3: Convert rejected entities to keywords (if confidence in conversion range)
+            entity_conversions = 0
+            if rejected_entities:
+                from app.database.models import KeywordExtractionConfig
+
+                # Load entity-to-keyword conversion thresholds
+                min_conf_result = db.query(KeywordExtractionConfig).filter(
+                    KeywordExtractionConfig.config_key == 'org_to_keyword_min_confidence'
+                ).first()
+                min_confidence = min_conf_result.config_value if min_conf_result else 0.50
+
+                max_conf_result = db.query(KeywordExtractionConfig).filter(
+                    KeywordExtractionConfig.config_key == 'org_to_keyword_max_confidence'
+                ).first()
+                max_confidence = max_conf_result.config_value if max_conf_result else 0.85
+
+                logger.info(f"[ENTITY→KEYWORD] Processing {len(rejected_entities)} rejected entities (conversion range: {min_confidence}-{max_confidence})")
+
+                for entity in rejected_entities:
+                    entity_value = entity.get('entity_value', '').strip()
+                    entity_type = entity.get('entity_type', '')
+                    confidence = entity.get('confidence', 0.0)
+
+                    # Only convert ORG entities in the confidence range
+                    if entity_type != 'ORGANIZATION':
+                        continue
+
+                    if confidence < min_confidence or confidence >= max_confidence:
+                        continue
+
+                    # Normalize entity value to keyword format (lowercase)
+                    keyword = entity_value.lower()
+
+                    # Skip if already extracted or too short
+                    if keyword in extracted_words or len(keyword) < 3:
+                        continue
+
+                    # Calculate synthetic relevance based on confidence
+                    # Map confidence 0.50-0.85 to relevance 20-50
+                    relevance = 20 + ((confidence - min_confidence) / (max_confidence - min_confidence)) * 30
+
+                    # Add as keyword with frequency=1 (entity appeared once)
+                    keywords.append((keyword, 1, relevance))
+                    extracted_words.add(keyword)
+                    entity_conversions += 1
+
+                logger.info(f"[ENTITY→KEYWORD] Converted {entity_conversions} rejected ORG entities to keywords")
+
             # Sort by relevance (category keywords will be highest due to 1.5x boost)
             keywords.sort(key=lambda x: x[2], reverse=True)
 
-            logger.info(f"Extracted {len(keywords)} keywords from {total_tokens} tokens (lang: {language}, category_matches: {len([k for k in keywords if k[2] > 100])})")
+            # Update corpus statistics for ML learning (after successful extraction)
+            self._update_corpus_stats(filtered_tokens, language, user_id, db)
+
+            logger.info(f"[KEYWORD EXTRACTION] Extracted {len(keywords)} keywords from {total_tokens} tokens (lang: {language}, category_matches: {category_matches}, entity_conversions: {entity_conversions})")
 
             return keywords
 
@@ -409,6 +476,261 @@ class KeywordExtractionService:
         except Exception as e:
             logger.error(f"Phrase extraction failed: {e}")
             return []
+
+    def _calculate_idf(
+        self,
+        word: str,
+        language: str,
+        user_id: str,
+        db: Session
+    ) -> float:
+        """
+        Calculate hybrid IDF score blending global and user corpus statistics
+
+        IDF formula: log((N + smoothing) / (df + smoothing))
+        Hybrid blend: alpha * global_idf + (1-alpha) * user_idf
+
+        Alpha decay: Starts at 0.7 (favor global patterns), decays to 0.3 as user uploads more docs
+
+        Args:
+            word: Word to calculate IDF for
+            language: Language code
+            user_id: User ID (None = global only)
+            db: Database session
+
+        Returns:
+            IDF score (higher = rarer word = more important)
+        """
+        import math
+        from app.database.models import (
+            KeywordExtractionConfig,
+            GlobalCorpusStats,
+            UserCorpusStats
+        )
+
+        try:
+            # Load config
+            config_query = db.query(KeywordExtractionConfig)
+            tfidf_enabled = config_query.filter(
+                KeywordExtractionConfig.config_key == 'tfidf_enabled'
+            ).first()
+
+            # If TF-IDF disabled, return neutral score
+            if not tfidf_enabled or tfidf_enabled.config_value == 0.0:
+                return 1.0
+
+            smoothing = config_query.filter(
+                KeywordExtractionConfig.config_key == 'tfidf_smoothing'
+            ).first()
+            smoothing = smoothing.config_value if smoothing else 1.0
+
+            # Calculate global IDF
+            global_stat = db.query(GlobalCorpusStats).filter(
+                GlobalCorpusStats.word == word.lower(),
+                GlobalCorpusStats.language == language
+            ).first()
+
+            if global_stat and global_stat.total_documents > 0:
+                global_idf = math.log(
+                    (global_stat.total_documents + smoothing) /
+                    (global_stat.document_count + smoothing)
+                )
+            else:
+                # Unknown word = high IDF (rare, likely domain-specific)
+                global_idf = 5.0
+
+            # If no user context, return global IDF only
+            if not user_id:
+                return global_idf
+
+            # Calculate user IDF
+            user_stat = db.query(UserCorpusStats).filter(
+                UserCorpusStats.user_id == user_id,
+                UserCorpusStats.word == word.lower(),
+                UserCorpusStats.language == language
+            ).first()
+
+            if user_stat and user_stat.total_documents > 0:
+                user_idf = math.log(
+                    (user_stat.total_documents + smoothing) /
+                    (user_stat.document_count + smoothing)
+                )
+            else:
+                # New word for user = high IDF
+                user_idf = 5.0
+
+            # Calculate hybrid blending alpha (decays as user uploads more)
+            user_total_docs = user_stat.total_documents if user_stat else 0
+
+            alpha_initial = config_query.filter(
+                KeywordExtractionConfig.config_key == 'ml_blend_alpha_initial'
+            ).first()
+            alpha_initial = alpha_initial.config_value if alpha_initial else 0.7
+
+            alpha_decay = config_query.filter(
+                KeywordExtractionConfig.config_key == 'ml_blend_alpha_decay'
+            ).first()
+            alpha_decay = alpha_decay.config_value if alpha_decay else 0.01
+
+            alpha_min = config_query.filter(
+                KeywordExtractionConfig.config_key == 'ml_blend_alpha_min'
+            ).first()
+            alpha_min = alpha_min.config_value if alpha_min else 0.3
+
+            # Alpha decay formula: starts high (favor global), decays to min (favor user patterns)
+            alpha = max(alpha_min, alpha_initial - (alpha_decay * user_total_docs))
+
+            # Blend global and user IDF
+            hybrid_idf = alpha * global_idf + (1 - alpha) * user_idf
+
+            logger.debug(f"[TF-IDF] '{word}': global_idf={global_idf:.3f}, user_idf={user_idf:.3f}, alpha={alpha:.2f}, hybrid_idf={hybrid_idf:.3f}")
+
+            return hybrid_idf
+
+        except Exception as e:
+            logger.error(f"Failed to calculate IDF for '{word}': {e}")
+            return 1.0  # Fallback to neutral score
+
+    def _update_corpus_stats(
+        self,
+        words: List[str],
+        language: str,
+        user_id: str,
+        db: Session
+    ):
+        """
+        Update both global and user corpus statistics after document processing
+
+        For each unique word:
+        - Increment document_count (how many docs contain this word)
+        - Increment total_documents (total docs processed)
+
+        Args:
+            words: List of all words from the document (may contain duplicates)
+            language: Language code
+            user_id: User ID (None = global only)
+            db: Database session
+        """
+        from app.database.models import (
+            GlobalCorpusStats,
+            UserCorpusStats,
+            KeywordExtractionConfig
+        )
+        from sqlalchemy import func
+        import uuid
+
+        try:
+            # Check privacy settings for global contribution
+            config_query = db.query(KeywordExtractionConfig)
+            min_users = config_query.filter(
+                KeywordExtractionConfig.config_key == 'global_ml_min_users'
+            ).first()
+            min_users = int(min_users.config_value) if min_users else 5
+
+            # Count unique users (privacy check)
+            from app.database.models import User
+            total_users = db.query(func.count(User.id)).scalar()
+
+            # Get unique words from document
+            unique_words = set(word.lower() for word in words if word and len(word) >= 2)
+
+            # Update GLOBAL corpus stats (if privacy threshold met)
+            if total_users >= min_users:
+                for word in unique_words:
+                    global_stat = db.query(GlobalCorpusStats).filter(
+                        GlobalCorpusStats.word == word,
+                        GlobalCorpusStats.language == language
+                    ).first()
+
+                    if global_stat:
+                        # Word exists: increment counts
+                        global_stat.document_count += 1
+                        global_stat.total_documents += 1
+                    else:
+                        # New word: create entry
+                        new_stat = GlobalCorpusStats(
+                            word=word,
+                            language=language,
+                            document_count=1,
+                            total_documents=1
+                        )
+                        db.add(new_stat)
+
+            # Update USER corpus stats (always, regardless of privacy settings)
+            if user_id:
+                user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+
+                for word in unique_words:
+                    user_stat = db.query(UserCorpusStats).filter(
+                        UserCorpusStats.user_id == user_uuid,
+                        UserCorpusStats.word == word,
+                        UserCorpusStats.language == language
+                    ).first()
+
+                    if user_stat:
+                        # Word exists: increment counts
+                        user_stat.document_count += 1
+                        user_stat.total_documents += 1
+                    else:
+                        # New word: create entry
+                        new_stat = UserCorpusStats(
+                            user_id=user_uuid,
+                            word=word,
+                            language=language,
+                            document_count=1,
+                            total_documents=1
+                        )
+                        db.add(new_stat)
+
+            db.commit()
+            logger.info(f"[CORPUS] Updated stats for {len(unique_words)} unique words (lang: {language}, user: {user_id or 'global'})")
+
+        except Exception as e:
+            logger.error(f"Failed to update corpus stats: {e}")
+            db.rollback()
+
+    def reset_user_learning(
+        self,
+        user_id: str,
+        db: Session
+    ):
+        """
+        Clear user's learning history (corpus stats and training data)
+
+        Called when user resets their categories to start fresh.
+        Global corpus stats are NOT affected (shared across all users).
+
+        Args:
+            user_id: User ID to reset
+            db: Database session
+        """
+        from app.database.models import (
+            UserCorpusStats,
+            KeywordTrainingData
+        )
+        import uuid
+
+        try:
+            user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+
+            # Delete user corpus stats
+            deleted_corpus = db.query(UserCorpusStats).filter(
+                UserCorpusStats.user_id == user_uuid
+            ).delete()
+
+            # Delete user training data
+            deleted_training = db.query(KeywordTrainingData).filter(
+                KeywordTrainingData.user_id == user_uuid
+            ).delete()
+
+            db.commit()
+
+            logger.info(f"[RESET] Cleared user learning for user {user_id}: {deleted_corpus} corpus entries, {deleted_training} training entries")
+
+        except Exception as e:
+            logger.error(f"Failed to reset user learning for {user_id}: {e}")
+            db.rollback()
+            raise
 
     def get_keyword_summary(
         self,

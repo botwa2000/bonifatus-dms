@@ -1382,3 +1382,84 @@ class EntityTypePattern(Base):
         Index('idx_type_patterns_active', 'is_active'),
         sa.UniqueConstraint('entity_type', 'pattern_value', 'language', name='uq_pattern_value_language'),
     )
+
+
+# =============================================================================
+# TF-IDF Keyword Extraction Models
+# =============================================================================
+
+class KeywordExtractionConfig(Base):
+    """Configuration parameters for TF-IDF keyword extraction"""
+    __tablename__ = "keyword_extraction_config"
+
+    id = Column(Integer, primary_key=True)
+    config_key = Column(String(100), nullable=False, unique=True, index=True)
+    config_value = Column(Float, nullable=False)
+    category = Column(String(50), nullable=False)
+    description = Column(Text, nullable=True)
+    min_value = Column(Float, nullable=True)
+    max_value = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class GlobalCorpusStats(Base):
+    """Global corpus statistics for IDF calculation (shared across all users)"""
+    __tablename__ = "global_corpus_stats"
+
+    id = Column(Integer, primary_key=True)
+    word = Column(String(100), nullable=False)
+    language = Column(String(10), nullable=False)
+    document_count = Column(Integer, nullable=False, default=0)  # How many docs contain this word
+    total_documents = Column(Integer, nullable=False, default=0)  # Total docs processed
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        sa.UniqueConstraint('word', 'language', name='uq_global_corpus_word_lang'),
+        Index('idx_global_corpus_word_lang', 'word', 'language'),
+    )
+
+
+class UserCorpusStats(Base):
+    """User-specific corpus statistics for personalized IDF calculation"""
+    __tablename__ = "user_corpus_stats"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    word = Column(String(100), nullable=False)
+    language = Column(String(10), nullable=False)
+    document_count = Column(Integer, nullable=False, default=0)  # How many of user's docs contain this word
+    total_documents = Column(Integer, nullable=False, default=0)  # Total docs user uploaded
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="corpus_stats")
+
+    __table_args__ = (
+        sa.UniqueConstraint('user_id', 'word', 'language', name='uq_user_corpus_word_lang'),
+        Index('idx_user_corpus_user_word_lang', 'user_id', 'word', 'language'),
+    )
+
+
+class KeywordTrainingData(Base):
+    """ML feedback tracking for keyword quality learning"""
+    __tablename__ = "keyword_training_data"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    keyword = Column(String(100), nullable=False)
+    language = Column(String(10), nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey('categories.id', ondelete='CASCADE'), nullable=True)
+    feedback_type = Column(String(20), nullable=False)  # 'kept', 'removed', 'added'
+    original_relevance = Column(Float, nullable=True)
+    context = Column(JSONB, default={})  # Additional context (document type, etc.)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="keyword_training")
+    category = relationship("Category", backref="keyword_training")
+
+    __table_args__ = (
+        Index('idx_training_user_keyword', 'user_id', 'keyword', 'language'),
+    )

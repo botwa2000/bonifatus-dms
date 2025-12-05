@@ -111,8 +111,9 @@ class EntityExtractionService:
         text: str,
         language: str = 'en',
         extract_addresses: bool = True,
-        db: Session = None
-    ) -> List[ExtractedEntity]:
+        db: Session = None,
+        return_rejected: bool = False
+    ):
         """
         Extract named entities from text using spaCy NER with database-driven filtering
 
@@ -121,13 +122,20 @@ class EntityExtractionService:
             language: Language code
             extract_addresses: Whether to extract address patterns
             db: Database session for filtering rules (optional)
+            return_rejected: If True, return dict with 'accepted' and 'rejected' lists
 
         Returns:
-            List of extracted and filtered entities
+            If return_rejected=False: List of extracted and filtered entities
+            If return_rejected=True: Dict with keys:
+                - 'accepted': List of entities that passed filters
+                - 'rejected': List of rejected ORG entities suitable for keyword conversion
+                              (confidence 0.50-0.85, not blacklisted, not field labels)
         """
         entities = []
 
         if not text or len(text.strip()) < 10:
+            if return_rejected:
+                return {'accepted': [], 'rejected': []}
             return entities
 
         # Try spaCy NER (requires database for model configuration)
@@ -152,9 +160,21 @@ class EntityExtractionService:
 
         # Apply database-driven filters if database session provided
         if db:
-            entities = self._filter_entities(entities, language, db)
-            logger.info(f"[ENTITY FILTER] After filtering: {len(entities)} entities remain")
+            result = self._filter_entities(entities, language, db, return_rejected=return_rejected)
 
+            if return_rejected:
+                # Result is a dict with 'accepted' and 'rejected' keys
+                logger.info(f"[ENTITY FILTER] After filtering: {len(result['accepted'])} entities accepted, "
+                           f"{len(result['rejected'])} ORG entities rejected for keyword conversion")
+                return result
+            else:
+                # Result is a list of entities
+                entities = result
+                logger.info(f"[ENTITY FILTER] After filtering: {len(entities)} entities remain")
+
+        # Return based on return_rejected flag
+        if return_rejected:
+            return {'accepted': entities, 'rejected': []}
         return entities
 
     def _extract_with_spacy(self, text: str, model, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
@@ -468,8 +488,9 @@ class EntityExtractionService:
         self,
         entities: List[ExtractedEntity],
         language: str,
-        db: Session
-    ) -> List[ExtractedEntity]:
+        db: Session,
+        return_rejected: bool = False
+    ):
         """
         Apply simplified filters using quality-based confidence scoring
 
@@ -477,6 +498,7 @@ class EntityExtractionService:
         1. Field labels (IBAN, Tel, Nr, etc.) - still needed, these are labels not entities
         2. Confidence threshold (0.75) - now uses calculated confidence from quality service
         3. Blacklist - user-reported bad entities
+        4. Collect rejected ORG entities for keyword conversion (if return_rejected=True)
 
         Note: Invalid pattern checks (repetitive chars, short strings, etc.) are now
         handled by the quality service's confidence calculation, avoiding duplication.
@@ -485,11 +507,15 @@ class EntityExtractionService:
             entities: Raw extracted entities with calculated confidence scores
             language: Language code
             db: Database session
+            return_rejected: If True, return dict with 'accepted' and 'rejected' lists
 
         Returns:
-            Filtered entities
+            If return_rejected=False: Filtered entities list
+            If return_rejected=True: Dict with 'accepted' and 'rejected' keys
         """
         if not entities:
+            if return_rejected:
+                return {'accepted': [], 'rejected': []}
             return entities
 
         # Load filtering rules from database
@@ -512,12 +538,25 @@ class EntityExtractionService:
             ORG_CONFIDENCE_THRESHOLD = 0.85
 
         filtered = []
+        rejected_for_keywords = []  # Collect ORG entities suitable for keyword conversion
         removed_count = {
             'field_label': 0,
             'low_confidence': 0,
             'low_confidence_org': 0,  # Track ORG-specific removals separately
+            'low_confidence_org_convertible': 0,  # ORG entities converted to keywords
             'blacklisted': 0
         }
+
+        # Load keyword conversion threshold
+        try:
+            from app.database.models import KeywordExtractionConfig
+            keyword_min_conf_result = db.query(KeywordExtractionConfig).filter(
+                KeywordExtractionConfig.config_key == 'org_to_keyword_min_confidence'
+            ).first()
+            KEYWORD_MIN_CONFIDENCE = keyword_min_conf_result.config_value if keyword_min_conf_result else 0.50
+        except Exception as e:
+            logger.warning(f"Failed to load keyword conversion threshold: {e}")
+            KEYWORD_MIN_CONFIDENCE = 0.50
 
         for entity in entities:
             # Normalize entity value (clean whitespace, line breaks, trailing field labels)
@@ -534,7 +573,18 @@ class EntityExtractionService:
             # Filter 2: Remove low confidence entities (stricter threshold for ORGANIZATION)
             threshold = ORG_CONFIDENCE_THRESHOLD if entity.entity_type == 'ORGANIZATION' else CONFIDENCE_THRESHOLD
             if entity.confidence < threshold:
-                if entity.entity_type == 'ORGANIZATION':
+                # Special handling for ORG entities: check if suitable for keyword conversion
+                if entity.entity_type == 'ORGANIZATION' and entity.confidence >= KEYWORD_MIN_CONFIDENCE:
+                    # This ORG entity is rejected as entity but can be converted to keyword
+                    rejected_for_keywords.append({
+                        'entity_value': normalized,
+                        'entity_type': entity.entity_type,
+                        'confidence': entity.confidence
+                    })
+                    removed_count['low_confidence_org_convertible'] += 1
+                    logger.debug(f"[ENTITY FILTER] Rejected ORG for keyword conversion: {normalized} "
+                               f"(confidence: {entity.confidence:.2f}, threshold: {threshold})")
+                elif entity.entity_type == 'ORGANIZATION':
                     removed_count['low_confidence_org'] += 1
                     logger.debug(f"[ENTITY FILTER] Removed low confidence ORG: {normalized} "
                                f"(confidence: {entity.confidence:.2f}, threshold: {threshold})")
@@ -561,8 +611,14 @@ class EntityExtractionService:
                        f"field_labels={removed_count['field_label']}, "
                        f"low_confidence={removed_count['low_confidence']}, "
                        f"low_confidence_org={removed_count['low_confidence_org']}, "
+                       f"low_confidence_org_convertible={removed_count['low_confidence_org_convertible']}, "
                        f"blacklisted={removed_count['blacklisted']}")
 
+        if return_rejected:
+            return {
+                'accepted': filtered,
+                'rejected': rejected_for_keywords
+            }
         return filtered
 
     def _normalize_entity_value(self, value: str, field_labels: Set[str] = None) -> str:

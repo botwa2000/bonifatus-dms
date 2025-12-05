@@ -137,7 +137,28 @@ class DocumentAnalysisService:
 
             logger.info(f"[STOPWORD DEBUG] Combined {len(combined_stopwords)} stopwords from {len(user_preferred_languages)} languages")
 
-            # Extract keywords ONCE using detected language with combined stopwords
+            # Extract named entities FIRST (people, organizations, addresses)
+            # Request both accepted and rejected entities for keyword conversion
+            from app.services.entity_extraction_service import entity_extraction_service
+            entity_result = entity_extraction_service.extract_entities(
+                text=extracted_text,
+                language=detected_language,
+                extract_addresses=True,
+                db=db,  # Pass database session for filtering
+                return_rejected=True  # Get rejected ORG entities for keyword conversion
+            )
+
+            # Extract accepted and rejected entities from result
+            extracted_entities = entity_result['accepted']
+            rejected_entities = entity_result['rejected']
+
+            # Deduplicate accepted entities
+            extracted_entities = entity_extraction_service.deduplicate_entities(extracted_entities)
+            logger.info(f"[ENTITY DEBUG] Extracted {len(extracted_entities)} unique entities, {len(rejected_entities)} rejected for keyword conversion")
+            for ent in extracted_entities[:5]:  # Log first 5 entities
+                logger.info(f"[ENTITY DEBUG]   - {ent.entity_type}: {ent.entity_value} (confidence: {ent.confidence})")
+
+            # Extract keywords AFTER entity extraction to convert rejected entities
             keywords = keyword_extraction_service.extract_keywords(
                 text=extracted_text,
                 db=db,
@@ -145,25 +166,12 @@ class DocumentAnalysisService:
                 stopwords=combined_stopwords,
                 max_keywords=50,  # Reasonable limit to prevent OCR garbage overload
                 min_frequency=2,  # Filter out rare OCR errors that appear only once
-                user_id=user_id
+                user_id=user_id,
+                rejected_entities=rejected_entities  # Pass rejected ORG entities for conversion
             )
 
             keyword_strings = [kw[0] for kw in keywords]
             logger.info(f"[KEYWORD DEBUG] Extracted {len(keyword_strings)} keywords using combined stopwords, top 10: {keyword_strings[:10]}")
-
-            # Extract named entities (people, organizations, addresses)
-            from app.services.entity_extraction_service import entity_extraction_service
-            extracted_entities = entity_extraction_service.extract_entities(
-                text=extracted_text,
-                language=detected_language,
-                extract_addresses=True,
-                db=db  # Pass database session for filtering
-            )
-            # Deduplicate entities
-            extracted_entities = entity_extraction_service.deduplicate_entities(extracted_entities)
-            logger.info(f"[ENTITY DEBUG] Extracted {len(extracted_entities)} unique entities")
-            for ent in extracted_entities[:5]:  # Log first 5 entities
-                logger.info(f"[ENTITY DEBUG]   - {ent.entity_type}: {ent.entity_value} (confidence: {ent.confidence})")
 
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
