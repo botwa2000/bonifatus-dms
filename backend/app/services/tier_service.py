@@ -708,31 +708,44 @@ class TierService:
             if not usage:
                 return None
 
+            # Convert bytes to MB
+            volume_used_mb = usage.volume_uploaded_bytes / (1024 * 1024)
+            volume_limit_mb = tier.max_monthly_upload_bytes / (1024 * 1024) if tier.max_monthly_upload_bytes else None
+
+            # Calculate remaining values
+            pages_remaining = (tier.max_pages_per_month - usage.pages_processed) if tier.max_pages_per_month else None
+            volume_remaining_mb = (volume_limit_mb - volume_used_mb) if volume_limit_mb else None
+
             return {
                 'tier_id': tier.id,
                 'tier_name': tier.display_name,
                 'month_period': usage.month_period,
                 'period_start': usage.period_start_date.isoformat(),
                 'period_end': usage.period_end_date.isoformat(),
-                'usage': {
-                    'pages_processed': usage.pages_processed,
-                    'pages_limit': tier.max_pages_per_month,
-                    'pages_percentage': (usage.pages_processed / tier.max_pages_per_month * 100) if tier.max_pages_per_month else 0,
 
-                    'volume_uploaded_bytes': usage.volume_uploaded_bytes,
-                    'volume_limit_bytes': tier.max_monthly_upload_bytes,
-                    'volume_percentage': (usage.volume_uploaded_bytes / tier.max_monthly_upload_bytes * 100) if tier.max_monthly_upload_bytes > 0 else 0,
+                # Flatten structure - pages
+                'pages_processed': usage.pages_processed,
+                'pages_limit': tier.max_pages_per_month,
+                'pages_remaining': pages_remaining,
+                'pages_percentage': (usage.pages_processed / tier.max_pages_per_month * 100) if tier.max_pages_per_month else 0,
 
-                    'documents_uploaded': usage.documents_uploaded,
+                # Flatten structure - volume (in MB)
+                'volume_used_mb': round(volume_used_mb, 2),
+                'volume_limit_mb': round(volume_limit_mb, 2) if volume_limit_mb else None,
+                'volume_remaining_mb': round(volume_remaining_mb, 2) if volume_remaining_mb else None,
+                'volume_percentage': (usage.volume_uploaded_bytes / tier.max_monthly_upload_bytes * 100) if tier.max_monthly_upload_bytes > 0 else 0,
 
-                    'translations_used': usage.translations_used,
-                    'translations_limit': tier.max_translations_per_month,
-                    'translations_percentage': (usage.translations_used / tier.max_translations_per_month * 100) if tier.max_translations_per_month else 0,
+                # Other usage metrics
+                'documents_uploaded': usage.documents_uploaded,
 
-                    'api_calls_made': usage.api_calls_made,
-                    'api_calls_limit': tier.max_api_calls_per_month,
-                    'api_calls_percentage': (usage.api_calls_made / tier.max_api_calls_per_month * 100) if tier.max_api_calls_per_month else 0,
-                },
+                'translations_used': usage.translations_used,
+                'translations_limit': tier.max_translations_per_month,
+                'translations_percentage': (usage.translations_used / tier.max_translations_per_month * 100) if tier.max_translations_per_month else 0,
+
+                'api_calls_made': usage.api_calls_made,
+                'api_calls_limit': tier.max_api_calls_per_month,
+                'api_calls_percentage': (usage.api_calls_made / tier.max_api_calls_per_month * 100) if tier.max_api_calls_per_month else 0,
+
                 'features': {
                     'email_to_process': tier.email_to_process_enabled,
                     'folder_to_process': tier.folder_to_process_enabled,

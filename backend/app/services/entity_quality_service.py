@@ -481,6 +481,86 @@ class EntityQualityService:
             confidence *= multiplier
             adjustments.append(f"location_title_case: ×{multiplier}")
 
+        # 10. ORGANIZATION-specific strict quality checks (language-agnostic + database-driven)
+        if entity_type == 'ORGANIZATION':
+            words = re.findall(r'\b[A-Za-zäöüÄÖÜßàâéèêëïîôùûüÿçÀÂÉÈÊËÏÎÔÙÛÜŸÇ]+\b', entity_value)
+            stop_words = self._load_stop_words(language)
+            field_labels = self._load_field_labels(language)
+
+            # PENALTIES: Detect garbage extractions from all-caps forms
+
+            # Check 1: All-caps single common word (biggest source of garbage)
+            if entity_value.isupper() and features['word_count'] == 1.0:
+                if stop_words and entity_value.lower() in stop_words:
+                    multiplier = self._get_config_value('org_allcaps_stopword_penalty', 0.15)
+                    confidence *= multiplier
+                    adjustments.append(f"org_allcaps_stopword: ×{multiplier}")
+                else:
+                    multiplier = self._get_config_value('org_allcaps_single_penalty', 0.4)
+                    confidence *= multiplier
+                    adjustments.append(f"org_allcaps_single: ×{multiplier}")
+
+            # Check 2: All-caps multi-word with high stop word ratio
+            elif entity_value.isupper() and words and stop_words:
+                stop_word_ratio = sum(1 for w in words if w.lower() in stop_words) / len(words)
+                if stop_word_ratio > 0.6:
+                    multiplier = self._get_config_value('org_allcaps_high_stopwords_penalty', 0.2)
+                    confidence *= multiplier
+                    adjustments.append(f"org_allcaps_stopwords({stop_word_ratio:.2f}): ×{multiplier}")
+
+            # Check 3: Contains field labels (form field extraction error)
+            if field_labels and any(label in entity_value.lower() for label in field_labels):
+                multiplier = self._get_config_value('org_contains_field_label_penalty', 0.25)
+                confidence *= multiplier
+                adjustments.append(f"org_field_label: ×{multiplier}")
+
+            # Check 4: Dictionary word that is also a stop word
+            if features['dict_valid_ratio'] > 0.8 and stop_words and features['word_count'] <= 2.0:
+                if words and any(w.lower() in stop_words for w in words):
+                    multiplier = self._get_config_value('org_dict_stopword_penalty', 0.3)
+                    confidence *= multiplier
+                    adjustments.append(f"org_dict_stopword: ×{multiplier}")
+
+            # Check 5: Too short for organization name
+            if length < 3:
+                multiplier = self._get_config_value('org_too_short_penalty', 0.2)
+                confidence *= multiplier
+                adjustments.append(f"org_too_short: ×{multiplier}")
+
+            # Check 6: Too long (likely extraction error)
+            if length > 60:
+                multiplier = self._get_config_value('org_too_long_penalty', 0.3)
+                confidence *= multiplier
+                adjustments.append(f"org_too_long: ×{multiplier}")
+
+            # BONUSES: Boost confidence for real organizations
+
+            # Bonus 1: Multiple capitalized words (proper structure)
+            if features['word_count'] >= 2.0 and words:
+                capital_words = sum(1 for w in words if len(w) > 0 and w[0].isupper())
+                if capital_words >= 2:
+                    multiplier = self._get_config_value('org_multi_capital_bonus', 1.2)
+                    confidence *= multiplier
+                    adjustments.append(f"org_multi_capital: ×{multiplier}")
+
+            # Bonus 2: Legal entity suffix (from database patterns - already exists in migration 032)
+            patterns = self._load_entity_type_patterns('ORGANIZATION', language)
+            for pattern in patterns:
+                if pattern['pattern_type'] in ('suffix', 'legal_suffix'):
+                    suffix = pattern['pattern_value'].lower()
+                    if entity_value.lower().endswith(suffix) or f' {suffix}' in entity_value.lower():
+                        multiplier = self._get_config_value(pattern['config_key'], 1.3)
+                        confidence *= multiplier
+                        adjustments.append(f"org_legal_suffix('{suffix}'): ×{multiplier}")
+                        break
+
+            # Bonus 3: Proper case (not all-caps, not all-lowercase)
+            if not entity_value.isupper() and not entity_value.islower() and features['word_count'] >= 1.0:
+                if words and any(w[0].isupper() for w in words if len(w) > 0):
+                    multiplier = self._get_config_value('org_proper_case_bonus', 1.1)
+                    confidence *= multiplier
+                    adjustments.append(f"org_proper_case: ×{multiplier}")
+
         # Log all applied adjustments for fine-tuning
         final_confidence = min(confidence, 1.0)
         logger.info(f"[RULE-BASED] '{entity_value[:50]}': {base_confidence:.2f} → {final_confidence:.2f} | {' | '.join(adjustments) if adjustments else 'no adjustments'}")

@@ -496,13 +496,26 @@ class EntityExtractionService:
         field_labels = self._load_field_labels(db, language)
         blacklist = self._load_blacklist(db, language)
 
-        # Unified confidence threshold (stricter than before)
+        # Load confidence thresholds from database
+        # General threshold for most entity types
         CONFIDENCE_THRESHOLD = 0.75
+
+        # Stricter threshold for ORGANIZATION entities (to filter garbage from all-caps forms)
+        try:
+            from app.database.models import EntityQualityConfig
+            org_threshold_result = db.query(EntityQualityConfig).filter(
+                EntityQualityConfig.config_key == 'confidence_threshold_organization'
+            ).first()
+            ORG_CONFIDENCE_THRESHOLD = org_threshold_result.config_value if org_threshold_result else 0.85
+        except Exception as e:
+            logger.warning(f"Failed to load ORG confidence threshold from database: {e}")
+            ORG_CONFIDENCE_THRESHOLD = 0.85
 
         filtered = []
         removed_count = {
             'field_label': 0,
             'low_confidence': 0,
+            'low_confidence_org': 0,  # Track ORG-specific removals separately
             'blacklisted': 0
         }
 
@@ -518,11 +531,17 @@ class EntityExtractionService:
                 logger.debug(f"[ENTITY FILTER] Removed field label: {normalized}")
                 continue
 
-            # Filter 2: Remove low confidence entities (now using quality-based scoring)
-            if entity.confidence < CONFIDENCE_THRESHOLD:
-                removed_count['low_confidence'] += 1
-                logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} "
-                           f"(confidence: {entity.confidence:.2f}, threshold: {CONFIDENCE_THRESHOLD})")
+            # Filter 2: Remove low confidence entities (stricter threshold for ORGANIZATION)
+            threshold = ORG_CONFIDENCE_THRESHOLD if entity.entity_type == 'ORGANIZATION' else CONFIDENCE_THRESHOLD
+            if entity.confidence < threshold:
+                if entity.entity_type == 'ORGANIZATION':
+                    removed_count['low_confidence_org'] += 1
+                    logger.debug(f"[ENTITY FILTER] Removed low confidence ORG: {normalized} "
+                               f"(confidence: {entity.confidence:.2f}, threshold: {threshold})")
+                else:
+                    removed_count['low_confidence'] += 1
+                    logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} "
+                               f"(confidence: {entity.confidence:.2f}, threshold: {threshold})")
                 continue
 
             # Filter 3: Remove blacklisted entities (user-reported bad entities)
@@ -541,6 +560,7 @@ class EntityExtractionService:
             logger.info(f"[ENTITY FILTER] Removed {total_removed} entities: "
                        f"field_labels={removed_count['field_label']}, "
                        f"low_confidence={removed_count['low_confidence']}, "
+                       f"low_confidence_org={removed_count['low_confidence_org']}, "
                        f"blacklisted={removed_count['blacklisted']}")
 
         return filtered

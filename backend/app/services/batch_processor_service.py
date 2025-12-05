@@ -11,6 +11,7 @@ import gc
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.database.connection import db_manager
 from app.database.models import UploadBatch
@@ -244,6 +245,7 @@ class BatchProcessorService:
 
                 # Update progress
                 batch.results = results
+                flag_modified(batch, 'results')  # Mark JSONB field as modified for SQLAlchemy
                 session.commit()
 
                 # Force garbage collection after each file to free memory immediately
