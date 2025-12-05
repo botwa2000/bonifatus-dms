@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { useCurrency } from '@/contexts/currency-context'
 import { apiClient } from '@/services/api-client'
-import { Card, CardHeader, CardContent, Button, Input, Select, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Input, Select, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge, UsageMetric } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import CancellationModal from '@/components/CancellationModal'
 
@@ -26,9 +26,21 @@ interface UserProfile {
 
 interface UserStatistics {
   documents_count: number
-  categories_count: number
+  total_categories_count: number
+  custom_categories_count: number
   storage_used_mb: number
   last_activity?: string
+  monthly_usage?: {
+    month_period: string
+    pages_processed: number
+    pages_limit: number | null
+    pages_remaining: number
+    volume_used_mb: number
+    volume_limit_mb: number | null
+    volume_remaining_mb: number
+    period_start: string
+    period_end: string
+  }
 }
 
 interface Subscription {
@@ -405,11 +417,44 @@ export default function ProfilePage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard label="Documents" value={statistics.documents_count} />
-                <StatCard label="Categories" value={statistics.categories_count} />
+                <StatCard
+                  label="Categories"
+                  value={`${statistics.total_categories_count}${statistics.custom_categories_count > 0 ? ` (${statistics.custom_categories_count} custom)` : ''}`}
+                />
                 <StatCard label="Storage Used" value={`${statistics.storage_used_mb} MB`} />
               </div>
             </CardContent>
           </Card>
+
+          {statistics.monthly_usage && (
+            <Card>
+              <CardHeader title="Monthly Usage" />
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-sm text-neutral-600">
+                    Period: {new Date(statistics.monthly_usage.period_start).toLocaleDateString()} - {new Date(statistics.monthly_usage.period_end).toLocaleDateString()}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <UsageMetric
+                      label="Pages Processed"
+                      value={statistics.monthly_usage.pages_processed}
+                      limit={statistics.monthly_usage.pages_limit}
+                      unit="pages"
+                      remaining={statistics.monthly_usage.pages_remaining}
+                    />
+                    <UsageMetric
+                      label="Upload Volume"
+                      value={statistics.monthly_usage.volume_used_mb}
+                      limit={statistics.monthly_usage.volume_limit_mb}
+                      unit="MB"
+                      remaining={statistics.monthly_usage.volume_remaining_mb}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {user?.is_admin && (
             <Card className="border-admin-primary">

@@ -38,6 +38,23 @@ interface User {
   storage_quota_bytes: number
   document_count: number
   created_at: string
+  monthly_usage?: {
+    month_period: string
+    pages_processed: number
+    pages_limit: number | null
+    pages_percent: number
+    volume_uploaded_bytes: number
+    volume_limit_bytes: number | null
+    volume_percent: number
+    documents_uploaded: number
+    translations_used: number
+    translations_limit: number | null
+    api_calls_made: number
+    api_calls_limit: number | null
+    period_start: string | null
+    period_end: string | null
+    admin_unlimited?: boolean
+  }
 }
 
 interface TierPlan {
@@ -553,6 +570,7 @@ export default function AdminDashboard() {
                       </th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Documents</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Storage</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Monthly Usage</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Status</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Actions</th>
                     </tr>
@@ -576,6 +594,26 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.document_count}</td>
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
                           {formatBytes(user.storage_used_bytes)} / {formatBytes(user.storage_quota_bytes)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                          {user.monthly_usage ? (
+                            user.monthly_usage.admin_unlimited ? (
+                              <span className="text-neutral-500">Unlimited</span>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="text-xs">
+                                  Pages: {user.monthly_usage.pages_processed} / {user.monthly_usage.pages_limit || '∞'}
+                                  <span className="text-neutral-500 ml-1">({user.monthly_usage.pages_percent}%)</span>
+                                </div>
+                                <div className="text-xs">
+                                  Volume: {formatBytes(user.monthly_usage.volume_uploaded_bytes)} / {user.monthly_usage.volume_limit_bytes ? formatBytes(user.monthly_usage.volume_limit_bytes) : '∞'}
+                                  <span className="text-neutral-500 ml-1">({user.monthly_usage.volume_percent}%)</span>
+                                </div>
+                              </div>
+                            )
+                          ) : (
+                            <span className="text-neutral-400">No data</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {user.is_active ? (
