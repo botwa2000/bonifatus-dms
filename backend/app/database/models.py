@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Float, Numeric, ForeignKey, Table, UUID as SQLUUID, Index
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Date, Text, Float, Numeric, ForeignKey, Table, UUID as SQLUUID, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Mapped
@@ -37,15 +37,27 @@ class TierPlan(Base, TimestampMixin):
     price_yearly_cents = Column(Integer, nullable=False, server_default='0')
     currency = Column(String(3), nullable=False, server_default='USD')
 
-    # Storage limits
-    storage_quota_bytes = Column(sa.BigInteger, nullable=False)
+    # Monthly limits (reset each month)
+    max_pages_per_month = Column(Integer, nullable=True)  # NULL = unlimited
+    max_monthly_upload_bytes = Column(sa.BigInteger, nullable=False)  # Monthly volume limit
+    max_translations_per_month = Column(Integer, nullable=True)  # NULL = unlimited
+    max_api_calls_per_month = Column(Integer, nullable=True)  # NULL = unlimited
+
+    # Per-file limits
     max_file_size_bytes = Column(sa.BigInteger, nullable=False)
-    max_documents = Column(Integer, nullable=True)  # NULL = unlimited
+
+    # Team/multi-user limits
+    multi_user_enabled = Column(Boolean, nullable=False, server_default='false')
+    max_team_members = Column(Integer, nullable=True)  # NULL = unlimited
 
     # Feature flags
     bulk_operations_enabled = Column(Boolean, nullable=False, server_default='false')
+    email_to_process_enabled = Column(Boolean, nullable=False, server_default='false')
+    folder_to_process_enabled = Column(Boolean, nullable=False, server_default='false')
     api_access_enabled = Column(Boolean, nullable=False, server_default='false')
     priority_support = Column(Boolean, nullable=False, server_default='false')
+
+    # Other limits
     custom_categories_limit = Column(Integer, nullable=True)  # NULL = unlimited
     max_batch_upload_size = Column(Integer, nullable=True, server_default='10')  # NULL = use system default
 
@@ -57,6 +69,38 @@ class TierPlan(Base, TimestampMixin):
     __table_args__ = (
         Index('idx_tier_active', 'is_active', 'sort_order'),
         Index('idx_tier_public', 'is_public'),
+    )
+
+
+class UserMonthlyUsage(Base, TimestampMixin):
+    """Track user's monthly usage against tier limits"""
+    __tablename__ = "user_monthly_usage"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    month_period = Column(String(7), nullable=False)  # Format: "2025-12"
+
+    # Core usage metrics
+    pages_processed = Column(Integer, nullable=False, server_default='0')
+    volume_uploaded_bytes = Column(sa.BigInteger, nullable=False, server_default='0')
+    documents_uploaded = Column(Integer, nullable=False, server_default='0')
+
+    # Feature usage
+    translations_used = Column(Integer, nullable=False, server_default='0')
+    api_calls_made = Column(Integer, nullable=False, server_default='0')
+
+    # Period tracking
+    period_start_date = Column(Date, nullable=False)
+    period_end_date = Column(Date, nullable=False)
+
+    # Timestamps
+    last_updated_at = Column(DateTime(timezone=True), server_default=sa.text('now()'), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'month_period', name='uq_user_month_usage'),
+        Index('idx_usage_user_month', 'user_id', 'month_period'),
+        Index('idx_usage_period', 'month_period'),
+        Index('idx_usage_updated', 'last_updated_at'),
     )
 
 

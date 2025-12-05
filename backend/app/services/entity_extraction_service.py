@@ -507,8 +507,8 @@ class EntityExtractionService:
         }
 
         for entity in entities:
-            # Normalize entity value (clean whitespace, line breaks)
-            normalized = self._normalize_entity_value(entity.entity_value)
+            # Normalize entity value (clean whitespace, line breaks, trailing field labels)
+            normalized = self._normalize_entity_value(entity.entity_value, field_labels)
             entity.entity_value = normalized
             entity.normalized_value = normalized.lower()
 
@@ -545,14 +545,37 @@ class EntityExtractionService:
 
         return filtered
 
-    def _normalize_entity_value(self, value: str) -> str:
-        """Normalize entity value by cleaning whitespace and line breaks"""
+    def _normalize_entity_value(self, value: str, field_labels: Set[str] = None) -> str:
+        """
+        Normalize entity value by cleaning whitespace, line breaks, and trailing field labels
+
+        Args:
+            value: Raw entity value
+            field_labels: Set of field labels from database (language-specific)
+
+        Returns:
+            Cleaned entity value
+        """
         # Remove line breaks and extra whitespace
         normalized = re.sub(r'\s+', ' ', value)
         # Remove leading/trailing whitespace
         normalized = normalized.strip()
         # Remove trailing punctuation
         normalized = re.sub(r'[.,;:!?]+$', '', normalized)
+
+        # Remove trailing field labels from database (language-agnostic, database-driven)
+        if field_labels:
+            # Try each field label as a trailing suffix
+            for label in field_labels:
+                # Case-insensitive check for trailing label
+                # Match: "Frankfurt am Main Tel" → "Frankfurt am Main"
+                # Match: "Address Tel." → "Address"
+                pattern = r'\s+' + re.escape(label) + r'\.?$'
+                if re.search(pattern, normalized, re.IGNORECASE):
+                    normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
+                    normalized = normalized.strip()
+                    break  # Only remove one trailing label
+
         return normalized
 
     def _load_field_labels(self, db: Session, language: str) -> Set[str]:
