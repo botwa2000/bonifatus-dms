@@ -167,7 +167,7 @@ class TierService:
                 quota = UserStorageQuota(
                     user_id=user_id,
                     tier_id=tier.id,
-                    total_quota_bytes=tier.storage_quota_bytes,
+                    total_quota_bytes=tier.max_monthly_upload_bytes,
                     used_bytes=0,
                     document_count=0
                 )
@@ -328,7 +328,7 @@ class TierService:
                 quota = UserStorageQuota(
                     user_id=user_id,
                     tier_id=tier.id,
-                    total_quota_bytes=tier.storage_quota_bytes,
+                    total_quota_bytes=tier.max_monthly_upload_bytes,
                     used_bytes=0,
                     document_count=0
                 )
@@ -398,13 +398,13 @@ class TierService:
 
             if quota:
                 quota.tier_id = new_tier_id
-                quota.total_quota_bytes = new_tier.storage_quota_bytes
+                quota.total_quota_bytes = new_tier.max_monthly_upload_bytes
             else:
                 # Create quota record if it doesn't exist
                 quota = UserStorageQuota(
                     user_id=user_id,
                     tier_id=new_tier_id,
-                    total_quota_bytes=new_tier.storage_quota_bytes,
+                    total_quota_bytes=new_tier.max_monthly_upload_bytes,
                     used_bytes=0,
                     document_count=0
                 )
@@ -442,10 +442,10 @@ class TierService:
                     'tier_id': tier.id,
                     'tier_name': tier.display_name,
                     'used_bytes': 0,
-                    'total_bytes': tier.storage_quota_bytes,
+                    'total_bytes': tier.max_monthly_upload_bytes,
                     'used_percentage': 0,
                     'document_count': 0,
-                    'max_documents': tier.max_documents,
+                    'max_pages_per_month': tier.max_pages_per_month,
                     'max_file_size_bytes': tier.max_file_size_bytes,
                     'features': {
                         'bulk_operations': tier.bulk_operations_enabled,
@@ -461,7 +461,7 @@ class TierService:
                 'total_bytes': quota.total_quota_bytes,
                 'used_percentage': (quota.used_bytes / quota.total_quota_bytes * 100) if quota.total_quota_bytes > 0 else 0,
                 'document_count': quota.document_count,
-                'max_documents': tier.max_documents,
+                'max_pages_per_month': tier.max_pages_per_month,
                 'max_file_size_bytes': tier.max_file_size_bytes,
                 'largest_file_bytes': quota.largest_file_bytes,
                 'features': {

@@ -33,11 +33,17 @@ class TierPlanUpdate(BaseModel):
     display_name: Optional[str] = None
     price_monthly_cents: Optional[int] = None
     price_yearly_cents: Optional[int] = None
-    storage_quota_bytes: Optional[int] = Field(None, description="Storage limit in bytes")
+    max_monthly_upload_bytes: Optional[int] = Field(None, description="Monthly upload volume limit in bytes")
     max_file_size_bytes: Optional[int] = Field(None, description="Max individual file size")
-    max_documents: Optional[int] = Field(None, description="Max document count, null for unlimited")
+    max_pages_per_month: Optional[int] = Field(None, description="Monthly page processing limit, null for unlimited")
+    max_translations_per_month: Optional[int] = Field(None, description="Monthly translation limit, null for unlimited")
+    max_api_calls_per_month: Optional[int] = Field(None, description="Monthly API call limit, null for unlimited")
+    max_team_members: Optional[int] = Field(None, description="Max team members, null for unlimited")
     max_batch_upload_size: Optional[int] = Field(None, description="Max files per batch upload, null for unlimited")
     bulk_operations_enabled: Optional[bool] = None
+    email_to_process_enabled: Optional[bool] = None
+    folder_to_process_enabled: Optional[bool] = None
+    multi_user_enabled: Optional[bool] = None
     api_access_enabled: Optional[bool] = None
     priority_support: Optional[bool] = None
     is_active: Optional[bool] = None
@@ -256,12 +262,12 @@ async def update_user_tier(
 
         if quota:
             quota.tier_id = tier_update.tier_id
-            quota.total_quota_bytes = new_tier.storage_quota_bytes
+            quota.total_quota_bytes = new_tier.max_monthly_upload_bytes
         else:
             quota = UserStorageQuota(
                 user_id=user.id,
                 tier_id=tier_update.tier_id,
-                total_quota_bytes=new_tier.storage_quota_bytes,
+                total_quota_bytes=new_tier.max_monthly_upload_bytes,
                 used_bytes=0,
                 document_count=0
             )
@@ -321,11 +327,17 @@ async def list_tier_plans(
                 "description": tier.description,
                 "price_monthly_cents": tier.price_monthly_cents,
                 "price_yearly_cents": tier.price_yearly_cents,
-                "storage_quota_bytes": tier.storage_quota_bytes,
+                "max_monthly_upload_bytes": tier.max_monthly_upload_bytes,
                 "max_file_size_bytes": tier.max_file_size_bytes,
-                "max_documents": tier.max_documents,
+                "max_pages_per_month": tier.max_pages_per_month,
+                "max_translations_per_month": tier.max_translations_per_month,
+                "max_api_calls_per_month": tier.max_api_calls_per_month,
+                "max_team_members": tier.max_team_members,
                 "max_batch_upload_size": tier.max_batch_upload_size,
                 "bulk_operations_enabled": tier.bulk_operations_enabled,
+                "email_to_process_enabled": tier.email_to_process_enabled,
+                "folder_to_process_enabled": tier.folder_to_process_enabled,
+                "multi_user_enabled": tier.multi_user_enabled,
                 "api_access_enabled": tier.api_access_enabled,
                 "priority_support": tier.priority_support,
                 "is_active": tier.is_active,

@@ -390,8 +390,8 @@ async def handle_subscription_created(event, session: Session):
         support_url = f"{frontend_url}/support"
 
         # Get tier features from database (match front page features)
-        tier_feature_1 = f"{tier.max_documents if tier.max_documents else 'Unlimited'} document uploads"
-        tier_feature_2 = f"{tier.storage_quota_bytes // (1024**3) if tier.storage_quota_bytes else 'Unlimited'} GB cloud storage"
+        tier_feature_1 = f"{tier.max_pages_per_month if tier.max_pages_per_month else 'Unlimited'} pages per month"
+        tier_feature_2 = f"{tier.max_monthly_upload_bytes // (1024**3) if tier.max_monthly_upload_bytes else 'Unlimited'} GB monthly upload volume"
         tier_feature_3 = "Advanced search and categorization"
 
         # Add additional features based on tier capabilities

@@ -14,10 +14,11 @@ from sqlalchemy import select, func, text
 from app.database.models import User, UserSetting, AuditLog, Document, Category, SystemSetting
 from app.database.connection import db_manager
 from app.schemas.user_schemas import (
-    UserProfileUpdate, UserProfileResponse, UserStatistics, 
+    UserProfileUpdate, UserProfileResponse, UserStatistics,
     UserPreferences, UserPreferencesUpdate, AccountDeactivationRequest,
     AccountDeactivationResponse, UserDashboard
 )
+from app.services.tier_service import tier_service
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +99,15 @@ class UserService:
         return language in supported_languages
 
     async def get_user_profile(self, user_id: str) -> Optional[UserProfileResponse]:
-        """Get user profile information"""
+        """Get user profile information with monthly usage stats"""
         session = db_manager.session_local()
         try:
             user = session.get(User, user_id)
             if not user:
                 return None
+
+            # Get monthly usage information
+            monthly_usage = await tier_service.get_monthly_usage_info(user_id, session)
 
             return UserProfileResponse(
                 id=str(user.id),
@@ -115,7 +119,8 @@ class UserService:
                 is_active=user.is_active,
                 last_login_at=user.last_login_at,
                 created_at=user.created_at,
-                updated_at=user.updated_at
+                updated_at=user.updated_at,
+                monthly_usage=monthly_usage
             )
 
         except Exception as e:

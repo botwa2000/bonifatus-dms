@@ -41,6 +41,7 @@ class UserProfileResponse(BaseModel):
     last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
     created_at: datetime = Field(..., description="Account creation timestamp")
     updated_at: datetime = Field(..., description="Last profile update timestamp")
+    monthly_usage: Optional[dict] = Field(None, description="Monthly usage statistics and limits")
 
     class Config:
         json_schema_extra = {
