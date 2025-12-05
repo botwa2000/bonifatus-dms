@@ -136,9 +136,11 @@ async def get_user_statistics(
             # Return empty statistics if none found
             statistics = UserStatistics(
                 documents_count=0,
-                categories_count=0,
+                total_categories_count=0,
+                custom_categories_count=0,
                 storage_used_mb=0,
-                last_activity=None
+                last_activity=None,
+                monthly_usage=None
             )
         
         logger.info(f"Statistics retrieved for user: {current_user.email}")

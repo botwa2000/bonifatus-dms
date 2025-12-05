@@ -9,7 +9,7 @@ import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, or_
 
 from app.database.models import User, UserSetting, AuditLog, Document, Category, SystemSetting
 from app.database.connection import db_manager
@@ -197,11 +197,17 @@ class UserService:
             documents_stmt = select(func.count(Document.id)).where(Document.user_id == user_id)
             documents_count = session.execute(documents_stmt).scalar() or 0
 
-            # Get custom categories count
-            categories_stmt = select(func.count(Category.id)).where(
+            # Get total categories count (system + custom)
+            total_categories_stmt = select(func.count(Category.id)).where(
+                or_(Category.user_id == user_id, Category.is_system == True)
+            )
+            total_categories_count = session.execute(total_categories_stmt).scalar() or 0
+
+            # Get custom categories count only
+            custom_categories_stmt = select(func.count(Category.id)).where(
                 Category.user_id == user_id, Category.is_system == False
             )
-            categories_count = session.execute(categories_stmt).scalar() or 0
+            custom_categories_count = session.execute(custom_categories_stmt).scalar() or 0
 
             # Get storage used (sum of file sizes)
             storage_stmt = select(func.coalesce(func.sum(Document.file_size), 0)).where(
@@ -216,11 +222,16 @@ class UserService:
             )
             last_activity = session.execute(last_activity_stmt).scalar()
 
+            # Get monthly usage information
+            monthly_usage = await tier_service.get_monthly_usage_info(user_id, session)
+
             return UserStatistics(
                 documents_count=documents_count,
-                categories_count=categories_count,
+                total_categories_count=total_categories_count,
+                custom_categories_count=custom_categories_count,
                 storage_used_mb=storage_used_mb,
-                last_activity=last_activity
+                last_activity=last_activity,
+                monthly_usage=monthly_usage
             )
 
         except Exception as e:

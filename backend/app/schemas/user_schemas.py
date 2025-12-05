@@ -63,17 +63,33 @@ class UserProfileResponse(BaseModel):
 class UserStatistics(BaseModel):
     """User statistics and usage information"""
     documents_count: int = Field(..., description="Total documents uploaded")
-    categories_count: int = Field(..., description="Custom categories created")
+    total_categories_count: int = Field(..., description="Total categories (system + custom)")
+    custom_categories_count: int = Field(..., description="Custom categories created by user")
     storage_used_mb: int = Field(..., description="Storage used in megabytes")
     last_activity: Optional[datetime] = Field(None, description="Last user activity")
-    
+
+    # Monthly usage statistics
+    monthly_usage: Optional[Dict[str, Any]] = Field(None, description="Current month usage stats and limits")
+
     class Config:
         json_schema_extra = {
             "example": {
                 "documents_count": 25,
-                "categories_count": 3,
+                "total_categories_count": 15,
+                "custom_categories_count": 3,
                 "storage_used_mb": 1024,
-                "last_activity": "2024-09-21T14:30:00Z"
+                "last_activity": "2024-09-21T14:30:00Z",
+                "monthly_usage": {
+                    "month_period": "2025-12",
+                    "pages_processed": 120,
+                    "pages_limit": 500,
+                    "pages_remaining": 380,
+                    "volume_used_mb": 250,
+                    "volume_limit_mb": 1024,
+                    "volume_remaining_mb": 774,
+                    "period_start": "2025-12-01",
+                    "period_end": "2025-12-31"
+                }
             }
         }
 
