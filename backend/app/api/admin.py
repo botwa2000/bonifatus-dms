@@ -13,10 +13,11 @@ from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, UserStorageQuota, Document, AuditLog, EmailTemplate, Currency
+from app.database.models import User, TierPlan, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency
 from app.database.connection import db_manager
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
+from app.services.tier_service import tier_service
 
 logger = logging.getLogger(__name__)
 
@@ -103,11 +104,21 @@ async def list_users(
     """
     session = db_manager.session_local()
     try:
-        # Build query
-        query = select(User, TierPlan, UserStorageQuota).join(
+        # Build query - join with tier and monthly usage
+        # Get current month period for usage stats
+        from datetime import datetime
+        current_month = datetime.utcnow().strftime("%Y-%m")
+
+        query = select(User, TierPlan, UserStorageQuota, UserMonthlyUsage).join(
             TierPlan, User.tier_id == TierPlan.id
         ).outerjoin(
             UserStorageQuota, UserStorageQuota.user_id == User.id
+        ).outerjoin(
+            UserMonthlyUsage,
+            and_(
+                UserMonthlyUsage.user_id == User.id,
+                UserMonthlyUsage.month_period == current_month
+            )
         )
 
         # Apply filters
@@ -137,7 +148,16 @@ async def list_users(
         results = session.execute(query).all()
 
         users = []
-        for user, tier, quota in results:
+        for user, tier, quota, monthly_usage in results:
+            # Calculate usage percentages
+            pages_percent = 0
+            volume_percent = 0
+            if monthly_usage:
+                if tier.max_pages_per_month:
+                    pages_percent = (monthly_usage.pages_processed / tier.max_pages_per_month * 100)
+                if tier.max_monthly_upload_bytes:
+                    volume_percent = (monthly_usage.volume_uploaded_bytes / tier.max_monthly_upload_bytes * 100)
+
             users.append({
                 "id": str(user.id),
                 "email": user.email,
@@ -146,9 +166,33 @@ async def list_users(
                 "tier_name": tier.display_name,
                 "is_active": user.is_active,
                 "is_admin": user.is_admin,
+
+                # Legacy storage info (deprecated but kept for backward compatibility)
                 "storage_used_bytes": quota.used_bytes if quota else 0,
-                "storage_quota_bytes": quota.total_quota_bytes if quota else tier.storage_quota_bytes,
+                "storage_quota_bytes": quota.total_quota_bytes if quota else 0,
                 "document_count": quota.document_count if quota else 0,
+
+                # Monthly usage stats
+                "monthly_usage": {
+                    "month_period": current_month,
+                    "pages_processed": monthly_usage.pages_processed if monthly_usage else 0,
+                    "pages_limit": tier.max_pages_per_month,
+                    "pages_percent": round(pages_percent, 1),
+                    "volume_uploaded_bytes": monthly_usage.volume_uploaded_bytes if monthly_usage else 0,
+                    "volume_limit_bytes": tier.max_monthly_upload_bytes,
+                    "volume_percent": round(volume_percent, 1),
+                    "documents_uploaded": monthly_usage.documents_uploaded if monthly_usage else 0,
+                    "translations_used": monthly_usage.translations_used if monthly_usage else 0,
+                    "translations_limit": tier.max_translations_per_month,
+                    "api_calls_made": monthly_usage.api_calls_made if monthly_usage else 0,
+                    "api_calls_limit": tier.max_api_calls_per_month,
+                    "period_start": monthly_usage.period_start_date.isoformat() if monthly_usage else None,
+                    "period_end": monthly_usage.period_end_date.isoformat() if monthly_usage else None,
+                } if not user.is_admin else {
+                    "month_period": current_month,
+                    "admin_unlimited": True
+                },
+
                 "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
                 "created_at": user.created_at.isoformat()
             })
