@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '035_org_quality_config'
-down_revision = '034_user_monthly_usage'
+down_revision = '034_usage_tracking'
 branch_labels = None
 depends_on = None
 
