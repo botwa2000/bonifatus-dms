@@ -141,7 +141,6 @@ def upgrade():
         ('führen', 'de', 600, 1000),
         ('sprechen', 'de', 590, 1000),
         ('bringen', 'de', 580, 1000),
-        ('leben', 'de', 570, 1000),
         ('fahren', 'de', 560, 1000),
         ('meinen', 'de', 550, 1000),
         ('fragen', 'de', 540, 1000),
