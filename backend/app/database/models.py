@@ -72,7 +72,7 @@ class TierPlan(Base, TimestampMixin):
     )
 
 
-class UserMonthlyUsage(Base, TimestampMixin):
+class UserMonthlyUsage(Base):
     """Track user's monthly usage against tier limits"""
     __tablename__ = "user_monthly_usage"
 
@@ -95,6 +95,7 @@ class UserMonthlyUsage(Base, TimestampMixin):
 
     # Timestamps
     last_updated_at = Column(DateTime(timezone=True), server_default=sa.text('now()'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=sa.text('now()'), nullable=False)
 
     __table_args__ = (
         UniqueConstraint('user_id', 'month_period', name='uq_user_month_usage'),
