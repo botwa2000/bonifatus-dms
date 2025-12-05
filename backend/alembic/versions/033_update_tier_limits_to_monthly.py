@@ -26,7 +26,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '033_monthly_limits'
-down_revision = '032_add_ml_entity_quality_system'
+down_revision = '032_ml_entity_quality'
 branch_labels = None
 depends_on = None
 
