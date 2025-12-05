@@ -260,71 +260,21 @@ class FileValidationService:
         user_tier: str,
         session: Session
     ) -> ValidationResult:
-        """Check user storage quota with friendly warnings"""
-        warnings = []
-        
-        # Get file size
-        file_content.seek(0, 2)
-        file_size = file_content.tell()
-        file_content.seek(0)
-        
-        # Get current storage usage
-        result = session.execute(
-            text("""
-                SELECT COALESCE(SUM(file_size), 0) as total_size
-                FROM documents
-                WHERE user_id = :user_id
-                AND is_deleted = false
-            """),
-            {'user_id': user_id}
-        ).first()
-        
-        current_usage = result[0] if result else 0
-        
-        # Get storage limit for tier
-        storage_limit_key = f"storage_limit_{user_tier}_tier_mb"
-        storage_limit_mb = await config_service.get_setting(
-            storage_limit_key, 1024, session
-        )
-        storage_limit_bytes = storage_limit_mb * 1024 * 1024
-        
-        # Calculate usage after upload
-        new_usage = current_usage + file_size
-        usage_percent = (new_usage / storage_limit_bytes) * 100
-        
-        # Storage info for response
-        storage_info = {
-            'current_usage_mb': current_usage / (1024 * 1024),
-            'file_size_mb': file_size / (1024 * 1024),
-            'new_usage_mb': new_usage / (1024 * 1024),
-            'limit_mb': storage_limit_mb,
-            'usage_percent': usage_percent,
-            'tier': user_tier
-        }
-        
-        # Check if quota exceeded
-        if new_usage > storage_limit_bytes:
-            return ValidationResult(
-                allowed=False,
-                error_message=f"Storage quota exceeded. You've used {usage_percent:.1f}% of your {storage_limit_mb}MB limit.",
-                storage_info=storage_info
-            )
-        
-        # Friendly warnings at thresholds
-        if usage_percent >= 90:
-            warnings.append(
-                f"⚠️ You're at {usage_percent:.1f}% of your storage limit. "
-                f"Consider upgrading or deleting old files."
-            )
-        elif usage_percent >= 80:
-            warnings.append(
-                f"📊 You've used {usage_percent:.1f}% of your {storage_limit_mb}MB storage."
-            )
-        
+        """
+        Check user storage quota - DEPRECATED
+
+        Monthly page and volume limits are now checked in document_analysis.py endpoints
+        using tier_service.check_monthly_limit() before this validation is called.
+
+        This method is kept for backward compatibility but always returns allowed=True.
+        Limit enforcement happens at the API endpoint level.
+        """
+        logger.debug("Storage quota check skipped - using monthly tier limits instead")
+
+        # Always allow - limits are enforced in document_analysis endpoints
         return ValidationResult(
             allowed=True,
-            warnings=warnings,
-            storage_info=storage_info
+            warnings=[]
         )
     
     async def _validate_content(self, file_content: BinaryIO, filename: str = "", mime_type: str = "") -> ValidationResult:

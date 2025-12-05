@@ -726,14 +726,10 @@ class DocumentService:
             session.commit()
             logger.info(f"[DELETE DEBUG] ✅ Document deleted from database")
 
-            # Update storage quota after successful deletion
-            await tier_service.update_storage_usage(
-                user_id=user_id,
-                file_size_bytes=file_size,
-                session=session,
-                increment=False  # Decrement storage
-            )
-            logger.info(f"[DELETE DEBUG] Storage quota updated: -{file_size} bytes")
+            # NOTE: Monthly usage is NOT decremented on deletion
+            # Monthly usage tracks consumption for the month, not current storage
+            # Deleting documents does not reduce monthly page/volume consumption
+            logger.info(f"[DELETE DEBUG] Document deleted (monthly usage not affected)")
 
             await self._log_document_action(
                 user_id, "document_delete", "document", document_id,

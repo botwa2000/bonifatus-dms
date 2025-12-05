@@ -17,9 +17,12 @@ from app.schemas.user_schemas import (
     AccountDeactivationResponse, UserDashboard, ErrorResponse
 )
 from app.services.user_service import user_service
+from app.services.tier_service import tier_service
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.database.models import User
+from app.database.connection import get_db
 from app.core.config import settings
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -675,4 +678,56 @@ async def export_user_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to export user data"
+        )
+
+
+@router.get(
+    "/usage",
+    responses={
+        200: {"description": "Monthly usage information"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_monthly_usage(
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+) -> JSONResponse:
+    """
+    Get user's current monthly usage and tier limits
+
+    Returns:
+        - Current month period
+        - Pages processed, volume uploaded, documents uploaded
+        - Translations used, API calls made
+        - Tier limits for each metric
+        - Usage percentages
+        - Period start and end dates
+    """
+    try:
+        usage_info = await tier_service.get_monthly_usage_info(
+            user_id=str(current_user.id),
+            session=session
+        )
+
+        if not usage_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usage information not found"
+            )
+
+        logger.info(f"Monthly usage retrieved for user: {current_user.email}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=usage_info
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get monthly usage error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to retrieve usage information"
         )

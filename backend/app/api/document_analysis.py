@@ -23,6 +23,7 @@ from app.services.config_service import config_service
 from app.services.user_service import user_service
 from app.services.tier_service import tier_service, TierLimitExceeded
 from app.services.batch_processor_service import batch_processor_service
+from app.utils.pdf_utils import count_pdf_pages, estimate_pages_from_size
 
 import io
 from app.services.file_validation_service import file_validation_service
@@ -86,6 +87,48 @@ async def analyze_document(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File size exceeds maximum of {max_size / 1024 / 1024:.1f}MB"
             )
+
+        # Count/estimate pages for the document (needed for tracking)
+        if file.content_type == 'application/pdf':
+            page_count = count_pdf_pages(file_content)
+        else:
+            # For images and other formats, estimate 1 page per file
+            page_count = estimate_pages_from_size(len(file_content), file.content_type)
+
+        logger.info(f"Document has {page_count} pages (type: {file.content_type})")
+
+        # TIER ENFORCEMENT: Check monthly limits (pages and volume)
+        # Admin users bypass all tier restrictions
+        if not current_user.is_admin:
+            try:
+                # Check monthly page limit
+                allowed, current_pages, max_pages, resets_at = await tier_service.check_monthly_limit(
+                    user_id=str(current_user.id),
+                    limit_type='pages',
+                    amount=page_count,
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan to continue."
+                )
+
+            try:
+                # Check monthly volume limit
+                allowed, current_volume, max_volume, resets_at = await tier_service.check_monthly_limit(
+                    user_id=str(current_user.id),
+                    limit_type='volume',
+                    amount=len(file_content),
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan to continue."
+                )
 
         # Check for duplicates BEFORE expensive analysis (saves time and resources)
         logger.info(f"[DUPLICATE DEBUG] === Checking for duplicate (single file) ===")
@@ -165,7 +208,8 @@ async def analyze_document(
             'mime_type': file.content_type,
             'user_id': str(current_user.id),
             'expires_at': datetime.utcnow() + timedelta(hours=24),
-            'analysis_result': analysis_result
+            'analysis_result': analysis_result,
+            'page_count': page_count  # Store for monthly usage tracking
         }
         
         # Clean up expired files
@@ -234,7 +278,8 @@ async def confirm_upload(
                 'mime_type': metadata['mime_type'],
                 'user_id': metadata['user_id'],
                 'expires_at': datetime.fromisoformat(metadata['expires_at']),
-                'analysis_result': metadata['analysis_result']
+                'analysis_result': metadata['analysis_result'],
+                'page_count': metadata.get('page_count', 1)  # Default to 1 if not present
             }
 
         # Verify ownership
@@ -279,13 +324,32 @@ async def confirm_upload(
             session=session
         )
 
-        # Update storage quota after successful upload
+        # Update monthly usage after successful upload
         file_size = len(temp_data['file_content'])
-        await tier_service.update_storage_usage(
+        page_count = temp_data.get('page_count', 1)  # Default to 1 if not stored
+
+        # Increment pages processed
+        await tier_service.increment_usage(
             user_id=str(current_user.id),
-            file_size_bytes=file_size,
-            session=session,
-            increment=True
+            limit_type='pages',
+            amount=page_count,
+            session=session
+        )
+
+        # Increment volume uploaded
+        await tier_service.increment_usage(
+            user_id=str(current_user.id),
+            limit_type='volume',
+            amount=file_size,
+            session=session
+        )
+
+        # Increment documents count
+        await tier_service.increment_usage(
+            user_id=str(current_user.id),
+            limit_type='documents',
+            amount=1,
+            session=session
         )
 
         # Clean up temp storage immediately after successful confirmation
@@ -397,45 +461,65 @@ async def analyze_batch(
                     detail="Bulk upload requires Starter plan or higher. Please upgrade or upload files one at a time."
                 )
 
-        # TIER ENFORCEMENT: Check document count limit
-        # Admin users bypass document count limits
-        if not current_user.is_admin:
-            try:
-                await tier_service.check_document_count_limit(
-                    user_id=str(current_user.id),
-                    session=session,
-                    raise_on_exceed=True
-                )
-            except TierLimitExceeded as e:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"{e.message}. Please upgrade your plan or delete some documents."
-                )
-
-        # TIER ENFORCEMENT: Check storage quota for all files
-        # Admin users bypass storage quota limits
+        # TIER ENFORCEMENT: Calculate total pages and volume for batch
+        # Read all files to get sizes and count pages
         total_size = 0
+        total_pages = 0
         file_sizes = []
+        file_page_counts = []
+        file_contents = []
+
         for file in files:
-            # Read file to get size, then reset position
+            # Read file content
             content = await file.read()
             size = len(content)
             await file.seek(0)  # Reset to beginning
-            file_sizes.append(size)
-            total_size += size
 
+            # Count/estimate pages
+            if file.content_type == 'application/pdf':
+                pages = count_pdf_pages(content)
+            else:
+                pages = estimate_pages_from_size(size, file.content_type)
+
+            file_contents.append(content)
+            file_sizes.append(size)
+            file_page_counts.append(pages)
+            total_size += size
+            total_pages += pages
+
+        logger.info(f"Batch upload: {len(files)} files, {total_pages} total pages, {total_size / (1024*1024):.2f} MB")
+
+        # TIER ENFORCEMENT: Check monthly limits
+        # Admin users bypass all tier restrictions
         if not current_user.is_admin:
             try:
-                await tier_service.check_storage_quota(
+                # Check monthly page limit
+                allowed, current_pages, max_pages, resets_at = await tier_service.check_monthly_limit(
                     user_id=str(current_user.id),
-                    file_size_bytes=total_size,
+                    limit_type='pages',
+                    amount=total_pages,
                     session=session,
                     raise_on_exceed=True
                 )
             except TierLimitExceeded as e:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"{e.message}. Please upgrade your plan or delete some documents to free up space."
+                    detail=f"{e.message}. Please upgrade your plan to continue."
+                )
+
+            try:
+                # Check monthly volume limit
+                allowed, current_volume, max_volume, resets_at = await tier_service.check_monthly_limit(
+                    user_id=str(current_user.id),
+                    limit_type='volume',
+                    amount=total_size,
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan to continue."
                 )
 
         # Validate first file to check trust score and CAPTCHA requirement
@@ -726,14 +810,6 @@ async def analyze_batch_async(
                 detail="No categories found. Please create categories first."
             )
 
-        # Check document count limit
-        if not current_user.is_admin:
-            await tier_service.check_document_count_limit(
-                user_id=str(current_user.id),
-                session=session,
-                raise_on_exceed=True
-            )
-
         # Create batch record first to get batch_id
         batch_id = await batch_processor_service.create_batch(
             user_id=str(current_user.id),
@@ -751,6 +827,7 @@ async def analyze_batch_async(
 
         file_paths = []
         total_size = 0
+        total_pages = 0
 
         for idx, file in enumerate(files):
             # Generate safe filename
@@ -759,27 +836,71 @@ async def analyze_batch_async(
 
             # Stream file to disk in chunks (memory-efficient)
             file_size = 0
+            file_chunks = []
             async with aiofiles.open(file_path, 'wb') as f:
                 while chunk := await file.read(1024 * 1024):  # 1MB chunks
                     await f.write(chunk)
+                    file_chunks.append(chunk)
                     file_size += len(chunk)
                 total_size += file_size
+
+            # Count pages from file on disk
+            async with aiofiles.open(file_path, 'rb') as f:
+                file_content = await f.read()
+                if file.content_type == 'application/pdf':
+                    pages = count_pdf_pages(file_content)
+                else:
+                    pages = estimate_pages_from_size(file_size, file.content_type)
+                total_pages += pages
 
             file_paths.append({
                 'path': str(file_path),
                 'original_filename': file.filename,
                 'mime_type': file.content_type,
-                'size': file_size
+                'size': file_size,
+                'page_count': pages
             })
 
-        # Check storage quota AFTER calculating total size
+        logger.info(f"Batch {batch_id}: {len(files)} files, {total_pages} total pages, {total_size / (1024*1024):.2f} MB")
+
+        # TIER ENFORCEMENT: Check monthly limits AFTER calculating totals
+        # Admin users bypass all tier restrictions
         if not current_user.is_admin:
-            await tier_service.check_storage_quota(
-                user_id=str(current_user.id),
-                file_size_bytes=total_size,
-                session=session,
-                raise_on_exceed=True
-            )
+            try:
+                # Check monthly page limit
+                allowed, current_pages, max_pages, resets_at = await tier_service.check_monthly_limit(
+                    user_id=str(current_user.id),
+                    limit_type='pages',
+                    amount=total_pages,
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                # Clean up temp files before raising exception
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan to continue."
+                )
+
+            try:
+                # Check monthly volume limit
+                allowed, current_volume, max_volume, resets_at = await tier_service.check_monthly_limit(
+                    user_id=str(current_user.id),
+                    limit_type='volume',
+                    amount=total_size,
+                    session=session,
+                    raise_on_exceed=True
+                )
+            except TierLimitExceeded as e:
+                # Clean up temp files before raising exception
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"{e.message}. Please upgrade your plan to continue."
+                )
 
         # Start background processing with file paths (non-blocking)
         await batch_processor_service.start_batch_processing(

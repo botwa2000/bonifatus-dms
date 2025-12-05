@@ -124,6 +124,7 @@ class BatchProcessorService:
                 file_path = file_info['path']
                 original_filename = file_info['original_filename']
                 mime_type = file_info['mime_type']
+                page_count = file_info.get('page_count', 1)  # Get page count from file_info
 
                 try:
                     # Update current progress
@@ -192,7 +193,8 @@ class BatchProcessorService:
                         'user_id': user_id,
                         'batch_id': batch_id,
                         'expires_at': (datetime.utcnow() + timedelta(hours=1)).isoformat(),  # 1 hour expiration
-                        'analysis_result': analysis_result
+                        'analysis_result': analysis_result,
+                        'page_count': page_count  # Store for monthly usage tracking
                     }
 
                     async with aiofiles.open(temp_metadata_path, 'w') as f:

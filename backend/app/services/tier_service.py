@@ -5,12 +5,13 @@ Business logic for user tier management, quota enforcement, and feature gating
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from typing import Optional, List, Dict, Any, Tuple
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
-from app.database.models import TierPlan, User, UserStorageQuota, Document
+from app.database.models import TierPlan, User, UserStorageQuota, Document, UserMonthlyUsage
 from app.database.connection import db_manager
 
 logger = logging.getLogger(__name__)
@@ -472,6 +473,276 @@ class TierService:
 
         except Exception as e:
             logger.error(f"Failed to get quota info for user {user_id}: {e}")
+            return None
+
+    async def _get_or_create_monthly_usage(
+        self,
+        user_id: str,
+        session: Session
+    ) -> Optional[UserMonthlyUsage]:
+        """
+        Get or create monthly usage record for current month
+
+        Args:
+            user_id: User ID
+            session: Database session
+
+        Returns:
+            UserMonthlyUsage record or None on error
+        """
+        try:
+            # Get current month period
+            now = datetime.utcnow()
+            month_period = now.strftime("%Y-%m")  # "2025-12"
+
+            # Try to get existing record
+            result = session.execute(
+                select(UserMonthlyUsage).where(
+                    UserMonthlyUsage.user_id == user_id,
+                    UserMonthlyUsage.month_period == month_period
+                )
+            )
+            usage = result.scalar_one_or_none()
+
+            if usage:
+                return usage
+
+            # Create new record for this month
+            period_start = date(now.year, now.month, 1)
+            # Last day of month
+            next_month = period_start + relativedelta(months=1)
+            period_end = next_month - relativedelta(days=1)
+
+            usage = UserMonthlyUsage(
+                user_id=user_id,
+                month_period=month_period,
+                pages_processed=0,
+                volume_uploaded_bytes=0,
+                documents_uploaded=0,
+                translations_used=0,
+                api_calls_made=0,
+                period_start_date=period_start,
+                period_end_date=period_end
+            )
+            session.add(usage)
+            session.flush()
+
+            logger.info(f"Created monthly usage record for user {user_id}, period {month_period}")
+            return usage
+
+        except Exception as e:
+            logger.error(f"Failed to get/create monthly usage for user {user_id}: {e}")
+            return None
+
+    async def check_monthly_limit(
+        self,
+        user_id: str,
+        limit_type: str,
+        amount: int,
+        session: Session,
+        raise_on_exceed: bool = True
+    ) -> Tuple[bool, int, Optional[int], Optional[date]]:
+        """
+        Check if user can perform action within monthly limits
+
+        Args:
+            user_id: User ID
+            limit_type: Type of limit ('pages', 'volume', 'translations', 'api_calls')
+            amount: Amount to add (e.g., number of pages, bytes, translations)
+            session: Database session
+            raise_on_exceed: If True, raises TierLimitExceeded on quota exceeded
+
+        Returns:
+            Tuple of (allowed, current_usage, limit, resets_at)
+            - allowed: True if within limit, False otherwise
+            - current_usage: Current usage for this month
+            - limit: Maximum allowed (None = unlimited)
+            - resets_at: Date when limit resets
+
+        Raises:
+            TierLimitExceeded: If raise_on_exceed=True and limit exceeded
+        """
+        try:
+            # Check if user is admin - admins bypass all limits
+            result = session.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if user and user.is_admin:
+                logger.debug(f"Admin user {user_id} bypassing monthly limit check: {limit_type}")
+                return (True, 0, None, None)
+
+            # Get user's tier
+            tier = await self.get_user_tier(user_id, session)
+            if not tier:
+                logger.error(f"Could not determine tier for user {user_id}")
+                return (False, 0, 0, None)
+
+            # Get or create monthly usage record
+            usage = await self._get_or_create_monthly_usage(user_id, session)
+            if not usage:
+                logger.error(f"Could not get monthly usage for user {user_id}")
+                return (False, 0, 0, None)
+
+            # Map limit types to tier fields and usage fields
+            limit_map = {
+                'pages': (tier.max_pages_per_month, usage.pages_processed),
+                'volume': (tier.max_monthly_upload_bytes, usage.volume_uploaded_bytes),
+                'translations': (tier.max_translations_per_month, usage.translations_used),
+                'api_calls': (tier.max_api_calls_per_month, usage.api_calls_made),
+            }
+
+            if limit_type not in limit_map:
+                logger.error(f"Invalid limit type: {limit_type}")
+                return (False, 0, 0, None)
+
+            max_limit, current_usage = limit_map[limit_type]
+
+            # If limit is None, it's unlimited
+            if max_limit is None:
+                return (True, current_usage, None, usage.period_end_date)
+
+            # Check if adding amount would exceed limit
+            new_total = current_usage + amount
+
+            if new_total > max_limit:
+                # Format appropriate error message based on limit type
+                if limit_type == 'pages':
+                    msg = f"Monthly page limit exceeded: {new_total} pages would exceed limit of {max_limit} pages/month (resets {usage.period_end_date})"
+                elif limit_type == 'volume':
+                    msg = f"Monthly volume limit exceeded: {new_total / (1024*1024):.1f} MB would exceed limit of {max_limit / (1024*1024):.1f} MB/month (resets {usage.period_end_date})"
+                elif limit_type == 'translations':
+                    msg = f"Monthly translation limit exceeded: {new_total} translations would exceed limit of {max_limit} translations/month (resets {usage.period_end_date})"
+                elif limit_type == 'api_calls':
+                    msg = f"Monthly API call limit exceeded: {new_total} calls would exceed limit of {max_limit} calls/month (resets {usage.period_end_date})"
+                else:
+                    msg = f"Monthly limit exceeded for {limit_type}: {new_total} exceeds {max_limit}"
+
+                if raise_on_exceed:
+                    raise TierLimitExceeded(
+                        msg, limit_type,
+                        new_total, max_limit
+                    )
+                logger.warning(f"User {user_id}: {msg}")
+                return (False, current_usage, max_limit, usage.period_end_date)
+
+            return (True, current_usage, max_limit, usage.period_end_date)
+
+        except TierLimitExceeded:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to check monthly limit for user {user_id}, type {limit_type}: {e}")
+            return (False, 0, 0, None)
+
+    async def increment_usage(
+        self,
+        user_id: str,
+        limit_type: str,
+        amount: int,
+        session: Session
+    ) -> bool:
+        """
+        Increment user's monthly usage counter
+
+        Args:
+            user_id: User ID
+            limit_type: Type of usage ('pages', 'volume', 'translations', 'api_calls', 'documents')
+            amount: Amount to increment by
+            session: Database session
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get or create monthly usage record
+            usage = await self._get_or_create_monthly_usage(user_id, session)
+            if not usage:
+                logger.error(f"Could not get monthly usage for user {user_id}")
+                return False
+
+            # Increment appropriate counter
+            if limit_type == 'pages':
+                usage.pages_processed += amount
+            elif limit_type == 'volume':
+                usage.volume_uploaded_bytes += amount
+            elif limit_type == 'documents':
+                usage.documents_uploaded += amount
+            elif limit_type == 'translations':
+                usage.translations_used += amount
+            elif limit_type == 'api_calls':
+                usage.api_calls_made += amount
+            else:
+                logger.error(f"Invalid limit type for increment: {limit_type}")
+                return False
+
+            # Update timestamp
+            usage.last_updated_at = datetime.utcnow()
+            session.commit()
+
+            logger.info(f"Incremented {limit_type} usage for user {user_id} by {amount}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to increment usage for user {user_id}, type {limit_type}: {e}")
+            session.rollback()
+            return False
+
+    async def get_monthly_usage_info(
+        self,
+        user_id: str,
+        session: Session
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get user's current monthly usage and limits
+
+        Returns:
+            Dictionary with usage details or None if not found
+        """
+        try:
+            tier = await self.get_user_tier(user_id, session)
+            if not tier:
+                return None
+
+            usage = await self._get_or_create_monthly_usage(user_id, session)
+            if not usage:
+                return None
+
+            return {
+                'tier_id': tier.id,
+                'tier_name': tier.display_name,
+                'month_period': usage.month_period,
+                'period_start': usage.period_start_date.isoformat(),
+                'period_end': usage.period_end_date.isoformat(),
+                'usage': {
+                    'pages_processed': usage.pages_processed,
+                    'pages_limit': tier.max_pages_per_month,
+                    'pages_percentage': (usage.pages_processed / tier.max_pages_per_month * 100) if tier.max_pages_per_month else 0,
+
+                    'volume_uploaded_bytes': usage.volume_uploaded_bytes,
+                    'volume_limit_bytes': tier.max_monthly_upload_bytes,
+                    'volume_percentage': (usage.volume_uploaded_bytes / tier.max_monthly_upload_bytes * 100) if tier.max_monthly_upload_bytes > 0 else 0,
+
+                    'documents_uploaded': usage.documents_uploaded,
+
+                    'translations_used': usage.translations_used,
+                    'translations_limit': tier.max_translations_per_month,
+                    'translations_percentage': (usage.translations_used / tier.max_translations_per_month * 100) if tier.max_translations_per_month else 0,
+
+                    'api_calls_made': usage.api_calls_made,
+                    'api_calls_limit': tier.max_api_calls_per_month,
+                    'api_calls_percentage': (usage.api_calls_made / tier.max_api_calls_per_month * 100) if tier.max_api_calls_per_month else 0,
+                },
+                'features': {
+                    'email_to_process': tier.email_to_process_enabled,
+                    'folder_to_process': tier.folder_to_process_enabled,
+                    'multi_user': tier.multi_user_enabled,
+                    'max_team_members': tier.max_team_members,
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get monthly usage info for user {user_id}: {e}")
             return None
 
 
