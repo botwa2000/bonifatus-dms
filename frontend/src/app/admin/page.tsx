@@ -1313,7 +1313,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Group configs by category */}
-                  {['length', 'repetitive', 'vowel', 'pattern', 'dictionary', 'entity_type'].map(category => {
+                  {['threshold', 'algorithm', 'feature', 'ml_threshold', 'length', 'pattern', 'dictionary', 'entity_type'].map(category => {
                     const categoryConfigs = entityQualityConfigs.filter(c => c.category === category)
                     if (categoryConfigs.length === 0) return null
 

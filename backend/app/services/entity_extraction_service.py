@@ -659,20 +659,32 @@ class EntityExtractionService:
         field_labels = self._load_field_labels(db, language)
         blacklist = self._load_blacklist(db, language)
 
-        # Load confidence thresholds from database
-        # General threshold for most entity types
-        CONFIDENCE_THRESHOLD = 0.75
-
-        # Stricter threshold for ORGANIZATION entities (to filter garbage from all-caps forms)
+        # Load confidence thresholds from database (entity-type-specific)
         try:
             from app.database.models import EntityQualityConfig
-            org_threshold_result = db.query(EntityQualityConfig).filter(
-                EntityQualityConfig.config_key == 'confidence_threshold_organization'
-            ).first()
-            ORG_CONFIDENCE_THRESHOLD = org_threshold_result.config_value if org_threshold_result else 0.85
+            threshold_configs = db.query(EntityQualityConfig).filter(
+                EntityQualityConfig.config_key.in_([
+                    'address_confidence_threshold',
+                    'email_confidence_threshold',
+                    'url_confidence_threshold',
+                    'confidence_threshold_organization'
+                ])
+            ).all()
+
+            threshold_map = {config.config_key: config.config_value for config in threshold_configs}
+
+            ADDRESS_THRESHOLD = threshold_map.get('address_confidence_threshold', 0.70)
+            EMAIL_THRESHOLD = threshold_map.get('email_confidence_threshold', 0.75)
+            URL_THRESHOLD = threshold_map.get('url_confidence_threshold', 0.75)
+            ORG_CONFIDENCE_THRESHOLD = threshold_map.get('confidence_threshold_organization', 0.85)
+            CONFIDENCE_THRESHOLD = 0.75  # Default fallback for other types
         except Exception as e:
-            logger.warning(f"Failed to load ORG confidence threshold from database: {e}")
+            logger.warning(f"Failed to load confidence thresholds from database: {e}")
+            ADDRESS_THRESHOLD = 0.70
+            EMAIL_THRESHOLD = 0.75
+            URL_THRESHOLD = 0.75
             ORG_CONFIDENCE_THRESHOLD = 0.85
+            CONFIDENCE_THRESHOLD = 0.75
 
         filtered = []
         rejected_for_keywords = []  # Collect ORG entities suitable for keyword conversion
@@ -707,8 +719,18 @@ class EntityExtractionService:
                 logger.debug(f"[ENTITY FILTER] Removed field label: {normalized}")
                 continue
 
-            # Filter 2: Remove low confidence entities (stricter threshold for ORGANIZATION)
-            threshold = ORG_CONFIDENCE_THRESHOLD if entity.entity_type == 'ORGANIZATION' else CONFIDENCE_THRESHOLD
+            # Filter 2: Remove low confidence entities (entity-type-specific thresholds)
+            if entity.entity_type == 'ORGANIZATION':
+                threshold = ORG_CONFIDENCE_THRESHOLD
+            elif entity.entity_type == 'ADDRESS':
+                threshold = ADDRESS_THRESHOLD
+            elif entity.entity_type == 'EMAIL':
+                threshold = EMAIL_THRESHOLD
+            elif entity.entity_type == 'URL':
+                threshold = URL_THRESHOLD
+            else:
+                threshold = CONFIDENCE_THRESHOLD
+
             if entity.confidence < threshold:
                 # Special handling for ORG entities: check if suitable for keyword conversion
                 if entity.entity_type == 'ORGANIZATION' and entity.confidence >= KEYWORD_MIN_CONFIDENCE:
