@@ -248,13 +248,136 @@ class EntityExtractionService:
         return entities
 
     def _extract_addresses_pattern(self, text: str, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
-        """Extract addresses using regex patterns with quality-based confidence"""
+        """
+        Extract addresses using libpostal (primary) or regex patterns (fallback)
+
+        libpostal: Free, open-source, handles 60+ countries and all languages
+        Fallback: Database-driven regex patterns for common address formats
+        """
         entities = []
 
-        # Create quality service if db provided
+        # Check if libpostal is enabled and available
+        libpostal_enabled = False
+        if db:
+            try:
+                from app.database.models import EntityQualityConfig
+                libpostal_config = db.query(EntityQualityConfig).filter(
+                    EntityQualityConfig.config_key == 'libpostal_enabled'
+                ).first()
+                libpostal_enabled = libpostal_config.config_value > 0.5 if libpostal_config else False
+            except Exception as e:
+                logger.warning(f"Failed to check libpostal config: {e}")
+
+        # Try libpostal first (best accuracy)
+        if libpostal_enabled:
+            try:
+                from postal.parser import parse_address
+                entities.extend(self._extract_with_libpostal(text, language, db))
+                logger.info(f"[ADDRESS] Extracted {len(entities)} addresses using libpostal")
+                return entities  # libpostal found addresses, return them
+            except ImportError:
+                logger.warning("[ADDRESS] libpostal not available, using regex fallback")
+            except Exception as e:
+                logger.error(f"[ADDRESS] libpostal extraction failed: {e}, using regex fallback")
+
+        # Fallback: Improved regex patterns with multi-language support
+        entities.extend(self._extract_with_regex_patterns(text, language, db))
+        logger.info(f"[ADDRESS] Extracted {len(entities)} addresses using regex patterns")
+        return entities
+
+    def _extract_with_libpostal(self, text: str, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
+        """Extract addresses using libpostal (high accuracy, all languages)"""
+        from postal.parser import parse_address
+
+        entities = []
         quality_service = get_entity_quality_service(db) if db else None
 
-        # Pattern for postal codes + city (works for DE, FR, CH, AT, etc.)
+        # Load base confidence from database
+        base_confidence = 0.90  # Default for libpostal
+        if db:
+            try:
+                from app.database.models import EntityQualityConfig
+                confidence_config = db.query(EntityQualityConfig).filter(
+                    EntityQualityConfig.config_key == 'address_libpostal_confidence'
+                ).first()
+                if confidence_config:
+                    base_confidence = confidence_config.config_value
+            except Exception as e:
+                logger.warning(f"Failed to load libpostal confidence: {e}")
+
+        # Split text into potential address lines (addresses are usually on separate lines)
+        lines = [line.strip() for line in text.split('\n') if 10 < len(line.strip()) < 300]
+
+        for line in lines:
+            try:
+                parsed = parse_address(line)
+
+                # Check if line contains address components
+                address_components = {}
+                for value, label in parsed:
+                    if label in ('road', 'house_number', 'postcode', 'city', 'state_district', 'state'):
+                        address_components[label] = value
+
+                # Require at least 2 components for valid address
+                if len(address_components) >= 2:
+                    # Build full address from components
+                    parts = []
+                    if 'road' in address_components:
+                        road = address_components['road']
+                        number = address_components.get('house_number', '')
+                        parts.append(f"{road} {number}".strip() if number else road)
+                    if 'postcode' in address_components and 'city' in address_components:
+                        parts.append(f"{address_components['postcode']} {address_components['city']}")
+                    elif 'city' in address_components:
+                        parts.append(address_components['city'])
+
+                    if parts:
+                        full_address = ', '.join(parts)
+
+                        # Calculate quality-based confidence
+                        if quality_service:
+                            calculated_confidence = quality_service.calculate_confidence(
+                                entity_value=full_address,
+                                entity_type="ADDRESS",
+                                base_confidence=base_confidence,
+                                language=language
+                            )
+                        else:
+                            calculated_confidence = base_confidence
+
+                        entities.append(ExtractedEntity(
+                            entity_type="ADDRESS",
+                            entity_value=full_address,
+                            confidence=calculated_confidence,
+                            extraction_method="libpostal"
+                        ))
+                        logger.debug(f"[LIBPOSTAL] Extracted address: {full_address}")
+
+            except Exception as e:
+                logger.debug(f"[LIBPOSTAL] Failed to parse line: {line[:50]}: {e}")
+                continue
+
+        return entities
+
+    def _extract_with_regex_patterns(self, text: str, language: str, db: Optional[Session] = None) -> List[ExtractedEntity]:
+        """Extract addresses using improved regex patterns (fallback when libpostal unavailable)"""
+        entities = []
+        quality_service = get_entity_quality_service(db) if db else None
+
+        # Load base confidence from database
+        base_confidence_regex = 0.70  # Default for regex
+        if db:
+            try:
+                from app.database.models import EntityQualityConfig
+                confidence_config = db.query(EntityQualityConfig).filter(
+                    EntityQualityConfig.config_key == 'address_regex_confidence'
+                ).first()
+                if confidence_config:
+                    base_confidence_regex = confidence_config.config_value
+            except Exception as e:
+                logger.warning(f"Failed to load regex confidence: {e}")
+
+        # Pattern 1: Postal code + City (works for DE, FR, CH, AT, etc.)
         # Examples: "61348 Bad Homburg", "75001 Paris", "8001 Zürich"
         postal_pattern = r'\b(\d{5})\s+([A-ZÄÖÜ][a-zäöüß\s\-]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*)\b'
 
@@ -264,19 +387,18 @@ class EntityExtractionService:
             address_part = f"{postal_code} {city}"
 
             # Calculate quality-based confidence
-            base_confidence = 0.75
             if quality_service:
                 calculated_confidence = quality_service.calculate_confidence(
                     entity_value=address_part,
-                    entity_type="ADDRESS_COMPONENT",
-                    base_confidence=base_confidence,
+                    entity_type="ADDRESS",
+                    base_confidence=base_confidence_regex,
                     language=language
                 )
             else:
-                calculated_confidence = base_confidence
+                calculated_confidence = base_confidence_regex
 
             entities.append(ExtractedEntity(
-                entity_type="ADDRESS_COMPONENT",
+                entity_type="ADDRESS",
                 entity_value=address_part,
                 confidence=calculated_confidence,
                 position_start=match.start(),
@@ -284,35 +406,50 @@ class EntityExtractionService:
                 extraction_method="pattern_postal"
             ))
 
-        # Street address pattern (number + street name)
-        # Examples: "FrolingstraBe 9", "Kaiser-Friedrich-Promenade 8-10"
-        street_pattern = r'\b([A-ZÄÖÜ][a-zäöüß\-]+(?:straße|strasse|str\.|weg|gasse|platz|allee))\s+(\d+(?:\-\d+)?[a-z]?)\b'
+        # Pattern 2: Street address (EXPANDED street types for all languages)
+        # German: straße, strasse, str., weg, gasse, platz, allee, ring, promenade, damm, avenue
+        # English: street, road, avenue, boulevard, drive, lane, way, court, place
+        # French: rue, avenue, boulevard, place, chemin, allée
+        street_types = {
+            'de': r'(?:straße|strasse|str\.|weg|gasse|platz|allee|ring|promenade|damm|avenue)',
+            'en': r'(?:street|st\.|road|rd\.|avenue|ave\.|boulevard|blvd\.|drive|dr\.|lane|ln\.|way|court|ct\.|place|pl\.)',
+            'fr': r'(?:rue|avenue|av\.|boulevard|bd\.|place|pl\.|chemin|allée)',
+            'ru': r'(?:улица|ул\.|проспект|пр\.|переулок|пер\.|площадь|пл\.)'
+        }
 
-        for match in re.finditer(street_pattern, text, re.IGNORECASE):
-            street = match.group(1)
-            number = match.group(2)
-            address_part = f"{street} {number}"
+        street_type_pattern = street_types.get(language, street_types['de'])
 
-            # Calculate quality-based confidence
-            base_confidence = 0.70
-            if quality_service:
-                calculated_confidence = quality_service.calculate_confidence(
+        # German format: "Wilhelminenstraße 9" or "9 Main Street"
+        street_patterns = [
+            rf'\b([A-ZÄÖÜ][a-zäöüß\-]+{street_type_pattern})\s+(\d+(?:\-\d+)?[a-z]?)\b',  # Street first
+            rf'\b(\d+(?:\-\d+)?[a-z]?)\s+([A-Z][a-z\-]+\s+{street_type_pattern})\b'  # Number first
+        ]
+
+        for pattern in street_patterns:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                street = match.group(1)
+                number = match.group(2)
+                address_part = f"{street} {number}"
+
+                # Calculate quality-based confidence
+                if quality_service:
+                    calculated_confidence = quality_service.calculate_confidence(
+                        entity_value=address_part,
+                        entity_type="ADDRESS",
+                        base_confidence=base_confidence_regex,
+                        language=language
+                    )
+                else:
+                    calculated_confidence = base_confidence_regex
+
+                entities.append(ExtractedEntity(
+                    entity_type="ADDRESS",
                     entity_value=address_part,
-                    entity_type="ADDRESS_COMPONENT",
-                    base_confidence=base_confidence,
-                    language=language
-                )
-            else:
-                calculated_confidence = base_confidence
-
-            entities.append(ExtractedEntity(
-                entity_type="ADDRESS_COMPONENT",
-                entity_value=address_part,
-                confidence=calculated_confidence,
-                position_start=match.start(),
-                position_end=match.end(),
-                extraction_method="pattern_street"
-            ))
+                    confidence=calculated_confidence,
+                    position_start=match.start(),
+                    position_end=match.end(),
+                    extraction_method="pattern_street"
+                ))
 
         return entities
 

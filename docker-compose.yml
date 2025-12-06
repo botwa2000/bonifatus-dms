@@ -9,6 +9,26 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true  # Prevent privilege escalation
+    cap_drop:
+      - ALL  # Drop all Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE  # Allow binding to ports < 1024 if needed
+    # Writable tmpfs volumes (rest of filesystem can be read-only in future)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=500m  # Temp files
+      - /app/logs:noexec,nosuid,size=200m  # Application logs
+    # Resource limits to prevent DoS
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -27,6 +47,26 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true  # Prevent privilege escalation
+    cap_drop:
+      - ALL  # Drop all Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE  # Allow binding to port 3000
+    # Writable tmpfs volumes
+    tmpfs:
+      - /tmp:noexec,nosuid,size=200m  # Temp files
+      - /app/.next/cache:noexec,nosuid,size=100m  # Next.js cache
+    # Resource limits to prevent crypto mining
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'  # Prevent 400% CPU usage like we saw
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 100M
 
   libretranslate:
     image: libretranslate/libretranslate:latest

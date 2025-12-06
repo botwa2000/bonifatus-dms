@@ -561,10 +561,11 @@ class EntityQualityService:
                     confidence *= multiplier
                     adjustments.append(f"org_proper_case: ×{multiplier}")
 
-        # 11. Frequency-based penalty using global_corpus_stats (all entity types)
+        # 11. Frequency-based penalty using global_corpus_stats (PERSON, ORGANIZATION, LOCATION only)
         # Penalize entities that match very common words (e.g., "NAME", "PATIENT", "BERUF")
+        # EXCLUDE EMAIL and URL - these are structured identifiers, not generic words
         freq_check_enabled = self._get_config_value('freq_check_enabled', 1.0)
-        if freq_check_enabled > 0.5:  # Feature flag
+        if freq_check_enabled > 0.5 and entity_type not in ('EMAIL', 'URL'):  # Feature flag + type check
             try:
                 from app.database.models import GlobalCorpusStats
 

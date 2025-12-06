@@ -16,7 +16,7 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r bonifatus && useradd -r -g bonifatus bonifatus
 
-# Install system dependencies including Tesseract OCR, Hunspell, and ClamAV
+# Install system dependencies including Tesseract OCR, Hunspell, ClamAV, and libpostal
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
@@ -45,7 +45,23 @@ RUN apt-get update \
         clamav \
         clamav-daemon \
         clamav-freshclam \
+        autoconf \
+        automake \
+        libtool \
+        pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+# Install libpostal for address extraction (60+ countries, all languages)
+RUN curl -L https://github.com/openvenues/libpostal/releases/download/v1.1/libpostal-1.1.tar.gz -o /tmp/libpostal.tar.gz \
+    && cd /tmp \
+    && tar -xzf libpostal.tar.gz \
+    && cd libpostal-1.1 \
+    && ./configure --datadir=/usr/local/share/libpostal \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && cd / \
+    && rm -rf /tmp/libpostal-1.1 /tmp/libpostal.tar.gz
 
 # Configure ClamAV with memory-optimized settings
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
