@@ -21,6 +21,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
         g++ \
+        make \
         libc6-dev \
         curl \
         libmagic1 \
