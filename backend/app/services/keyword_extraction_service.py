@@ -267,33 +267,50 @@ class KeywordExtractionService:
 
             # STEP 3.5: Spell check filter (preserve category keywords)
             # Remove obvious OCR garbage that aren't real words
-            try:
-                from app.services.ocr_service import ocr_service
+            # Load spell check config from database
+            from app.database.models import KeywordExtractionConfig
+            spell_check_enabled_result = db.query(KeywordExtractionConfig).filter(
+                KeywordExtractionConfig.config_key == 'spell_check_enabled'
+            ).first()
+            spell_check_enabled = spell_check_enabled_result.config_value if spell_check_enabled_result else 1.0
 
-                # Call new check_spelling API with set of unique tokens
-                unique_tokens = set(filtered_tokens)
-                misspelled = ocr_service.check_spelling(unique_tokens, language)
+            if spell_check_enabled > 0.5:  # Feature flag
+                try:
+                    from app.services.ocr_service import ocr_service
 
-                spell_filtered_tokens = []
-                ocr_garbage_count = 0
+                    # Load spell check threshold from database
+                    spell_min_freq_result = db.query(KeywordExtractionConfig).filter(
+                        KeywordExtractionConfig.config_key == 'spell_check_min_frequency'
+                    ).first()
+                    spell_check_min_frequency = spell_min_freq_result.config_value if spell_min_freq_result else 1.0
 
-                for token in filtered_tokens:
-                    # Always preserve category keywords (even if "misspelled")
-                    if token in category_keywords_set:
-                        spell_filtered_tokens.append(token)
-                    # Keep words NOT in misspelled set
-                    elif token not in misspelled:
-                        spell_filtered_tokens.append(token)
-                    # Also keep if it appears frequently (likely domain-specific term)
-                    elif filtered_tokens.count(token) >= min_frequency * 2:
-                        spell_filtered_tokens.append(token)
-                    else:
-                        ocr_garbage_count += 1
+                    # Call new check_spelling API with set of unique tokens
+                    unique_tokens = set(filtered_tokens)
+                    misspelled = ocr_service.check_spelling(unique_tokens, language)
 
-                filtered_tokens = spell_filtered_tokens
-                logger.info(f"[KEYWORD EXTRACTION] After spell check: {len(filtered_tokens)} tokens (removed {ocr_garbage_count} OCR garbage words)")
-            except Exception as e:
-                logger.warning(f"[KEYWORD EXTRACTION] Spell check failed, continuing without it: {e}")
+                    spell_filtered_tokens = []
+                    ocr_garbage_count = 0
+
+                    for token in filtered_tokens:
+                        # Always preserve category keywords (even if "misspelled")
+                        if token in category_keywords_set:
+                            spell_filtered_tokens.append(token)
+                        # Keep words NOT in misspelled set
+                        elif token not in misspelled:
+                            spell_filtered_tokens.append(token)
+                        # Also keep if it appears frequently (likely domain-specific term)
+                        # Use adaptive_min_frequency instead of hardcoded min_frequency * 2
+                        elif filtered_tokens.count(token) >= spell_check_min_frequency:
+                            spell_filtered_tokens.append(token)
+                        else:
+                            ocr_garbage_count += 1
+
+                    filtered_tokens = spell_filtered_tokens
+                    logger.info(f"[KEYWORD EXTRACTION] After spell check: {len(filtered_tokens)} tokens (removed {ocr_garbage_count} OCR garbage words, threshold={spell_check_min_frequency})")
+                except Exception as e:
+                    logger.warning(f"[KEYWORD EXTRACTION] Spell check failed, continuing without it: {e}")
+            else:
+                logger.info(f"[KEYWORD EXTRACTION] Spell check disabled (spell_check_enabled={spell_check_enabled})")
 
             if not filtered_tokens:
                 logger.warning("No keywords after filtering")
@@ -305,10 +322,20 @@ class KeywordExtractionService:
 
             # Adaptive min_frequency for short documents
             # Short documents (like invoices) naturally have low word repetition
-            # Use min_frequency=1 for short docs to avoid empty keyword lists
-            adaptive_min_frequency = 1 if total_tokens < 200 else min_frequency
-            if adaptive_min_frequency != min_frequency:
-                logger.info(f"[KEYWORD EXTRACTION] Short document detected ({total_tokens} tokens), using adaptive min_frequency={adaptive_min_frequency} instead of {min_frequency}")
+            # Load thresholds from database
+            min_freq_default_result = db.query(KeywordExtractionConfig).filter(
+                KeywordExtractionConfig.config_key == 'min_frequency_default'
+            ).first()
+            min_freq_default = min_freq_default_result.config_value if min_freq_default_result else 1.0
+
+            short_doc_threshold_result = db.query(KeywordExtractionConfig).filter(
+                KeywordExtractionConfig.config_key == 'min_frequency_short_doc_threshold'
+            ).first()
+            short_doc_threshold = short_doc_threshold_result.config_value if short_doc_threshold_result else 200.0
+
+            # Use min_frequency from DB config, overriding function parameter
+            adaptive_min_frequency = min_freq_default
+            logger.info(f"[KEYWORD EXTRACTION] Using min_frequency={adaptive_min_frequency} from database config (total_tokens={total_tokens})")
 
             # STEP 4: Extract keywords with priority scoring
             keywords = []

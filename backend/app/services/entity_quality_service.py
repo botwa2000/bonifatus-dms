@@ -561,6 +561,43 @@ class EntityQualityService:
                     confidence *= multiplier
                     adjustments.append(f"org_proper_case: ×{multiplier}")
 
+        # 11. Frequency-based penalty using global_corpus_stats (all entity types)
+        # Penalize entities that match very common words (e.g., "NAME", "PATIENT", "BERUF")
+        freq_check_enabled = self._get_config_value('freq_check_enabled', 1.0)
+        if freq_check_enabled > 0.5:  # Feature flag
+            try:
+                from app.database.models import GlobalCorpusStats
+
+                # Check if entity value matches a common word in corpus
+                word_stats = self.db.query(GlobalCorpusStats).filter(
+                    GlobalCorpusStats.word == entity_value.lower(),
+                    GlobalCorpusStats.language == language
+                ).first()
+
+                if word_stats:
+                    # Load thresholds from DB
+                    very_common_threshold = self._get_config_value('freq_very_common_threshold', 700.0)
+                    common_threshold = self._get_config_value('freq_common_threshold', 500.0)
+                    total_docs = self._get_config_value('freq_corpus_total_docs', 1000.0)
+
+                    doc_count = word_stats.document_count
+                    percentage = (doc_count / total_docs) * 100
+
+                    if doc_count >= very_common_threshold:
+                        # Very common word (>70% of documents) - massive penalty
+                        multiplier = self._get_config_value('freq_very_common_penalty', 0.15)
+                        confidence *= multiplier
+                        adjustments.append(f"freq_very_common({doc_count}/{total_docs}={percentage:.0f}%): ×{multiplier}")
+                    elif doc_count >= common_threshold:
+                        # Common word (>50% of documents) - moderate penalty
+                        multiplier = self._get_config_value('freq_common_penalty', 0.5)
+                        confidence *= multiplier
+                        adjustments.append(f"freq_common({doc_count}/{total_docs}={percentage:.0f}%): ×{multiplier}")
+                    # If < common_threshold, no penalty (rare word, likely domain-specific)
+
+            except Exception as e:
+                logger.warning(f"Failed to check frequency for '{entity_value}': {e}")
+
         # Log all applied adjustments for fine-tuning
         final_confidence = min(confidence, 1.0)
         logger.info(f"[RULE-BASED] '{entity_value[:50]}': {base_confidence:.2f} → {final_confidence:.2f} | {' | '.join(adjustments) if adjustments else 'no adjustments'}")
