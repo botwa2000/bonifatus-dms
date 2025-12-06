@@ -20,6 +20,7 @@ services:
     tmpfs:
       - /tmp:noexec,nosuid,size=500m  # Temp files
       - /app/logs:noexec,nosuid,size=200m  # Application logs
+      - /app/temp:noexec,nosuid,size=1G  # Batch processing temp files
     # Resource limits to prevent DoS
     deploy:
       resources:
