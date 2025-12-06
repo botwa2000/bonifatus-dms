@@ -52,10 +52,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install libpostal for address extraction (60+ countries, all languages)
-RUN curl -L https://github.com/openvenues/libpostal/releases/download/v1.1/libpostal-1.1.tar.gz -o /tmp/libpostal.tar.gz \
+RUN curl -L https://github.com/openvenues/libpostal/archive/refs/tags/v1.1.tar.gz -o /tmp/libpostal.tar.gz \
     && cd /tmp \
     && tar -xzf libpostal.tar.gz \
     && cd libpostal-1.1 \
+    && ./bootstrap.sh \
     && ./configure --datadir=/usr/local/share/libpostal \
     && make -j$(nproc) \
     && make install \
