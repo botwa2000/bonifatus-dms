@@ -678,6 +678,8 @@ class EntityExtractionService:
             URL_THRESHOLD = threshold_map.get('url_confidence_threshold', 0.75)
             ORG_CONFIDENCE_THRESHOLD = threshold_map.get('confidence_threshold_organization', 0.85)
             CONFIDENCE_THRESHOLD = 0.75  # Default fallback for other types
+
+            logger.info(f"[THRESHOLD DEBUG] Loaded thresholds: ADDRESS={ADDRESS_THRESHOLD}, EMAIL={EMAIL_THRESHOLD}, URL={URL_THRESHOLD}, ORG={ORG_CONFIDENCE_THRESHOLD}, DEFAULT={CONFIDENCE_THRESHOLD}")
         except Exception as e:
             logger.warning(f"Failed to load confidence thresholds from database: {e}")
             ADDRESS_THRESHOLD = 0.70
@@ -685,6 +687,7 @@ class EntityExtractionService:
             URL_THRESHOLD = 0.75
             ORG_CONFIDENCE_THRESHOLD = 0.85
             CONFIDENCE_THRESHOLD = 0.75
+            logger.info(f"[THRESHOLD DEBUG] Using fallback thresholds: ADDRESS={ADDRESS_THRESHOLD}, EMAIL={EMAIL_THRESHOLD}, URL={URL_THRESHOLD}")
 
         filtered = []
         rejected_for_keywords = []  # Collect ORG entities suitable for keyword conversion
@@ -732,6 +735,11 @@ class EntityExtractionService:
                 threshold = CONFIDENCE_THRESHOLD
 
             if entity.confidence < threshold:
+                # Log EMAIL/URL/ADDRESS rejections at INFO level for debugging
+                if entity.entity_type in ('EMAIL', 'URL', 'ADDRESS'):
+                    logger.info(f"[ENTITY FILTER] ❌ REJECTED {entity.entity_type}: '{normalized}' "
+                               f"(confidence: {entity.confidence:.2f} < threshold: {threshold})")
+
                 # Special handling for ORG entities: check if suitable for keyword conversion
                 if entity.entity_type == 'ORGANIZATION' and entity.confidence >= KEYWORD_MIN_CONFIDENCE:
                     # This ORG entity is rejected as entity but can be converted to keyword
@@ -752,6 +760,11 @@ class EntityExtractionService:
                     logger.debug(f"[ENTITY FILTER] Removed low confidence: {normalized} "
                                f"(confidence: {entity.confidence:.2f}, threshold: {threshold})")
                 continue
+            else:
+                # Log EMAIL/URL/ADDRESS acceptances at INFO level for debugging
+                if entity.entity_type in ('EMAIL', 'URL', 'ADDRESS'):
+                    logger.info(f"[ENTITY FILTER] ✓ ACCEPTED {entity.entity_type}: '{normalized}' "
+                               f"(confidence: {entity.confidence:.2f} >= threshold: {threshold})")
 
             # Filter 3: Remove blacklisted entities (user-reported bad entities)
             blacklist_key = (entity.entity_type, normalized.lower())
