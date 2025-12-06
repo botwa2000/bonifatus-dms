@@ -53,17 +53,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install libpostal for address extraction (60+ countries, all languages)
-RUN curl -L https://github.com/openvenues/libpostal/archive/refs/tags/v1.1.tar.gz -o /tmp/libpostal.tar.gz \
+# Using master branch as v1.1 has incompatible pointer type errors with modern GCC
+RUN curl -L https://github.com/openvenues/libpostal/archive/refs/heads/master.tar.gz -o /tmp/libpostal.tar.gz \
     && cd /tmp \
     && tar -xzf libpostal.tar.gz \
-    && cd libpostal-1.1 \
+    && cd libpostal-master \
     && ./bootstrap.sh \
     && ./configure --datadir=/usr/local/share/libpostal \
     && make -j$(nproc) \
     && make install \
     && ldconfig \
     && cd / \
-    && rm -rf /tmp/libpostal-1.1 /tmp/libpostal.tar.gz
+    && rm -rf /tmp/libpostal-master /tmp/libpostal.tar.gz
 
 # Configure ClamAV with memory-optimized settings
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
