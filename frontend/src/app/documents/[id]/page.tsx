@@ -66,6 +66,10 @@ export default function DocumentDetailPage() {
   const [isEditingKeywords, setIsEditingKeywords] = useState(false)
   const [editedKeywords, setEditedKeywords] = useState<string[]>([])
   const [newKeyword, setNewKeyword] = useState('')
+  const [isEditingEntities, setIsEditingEntities] = useState(false)
+  const [editedEntities, setEditedEntities] = useState<Entity[]>([])
+  const [newEntityValue, setNewEntityValue] = useState('')
+  const [newEntityType, setNewEntityType] = useState('ORGANIZATION')
   const [isSaving, setIsSaving] = useState(false)
   const [deletingDocument, setDeletingDocument] = useState(false)
 
@@ -118,6 +122,7 @@ export default function DocumentDetailPage() {
       }
 
       setEditedKeywords(data.keywords?.map(k => k.keyword) || [])
+      setEditedEntities(data.entities || [])
     } catch (err) {
       setError('Failed to load document')
       console.error('Load document error:', err)
@@ -208,6 +213,49 @@ export default function DocumentDetailPage() {
 
   const handleRemoveKeyword = (keyword: string) => {
     setEditedKeywords(editedKeywords.filter(k => k !== keyword))
+  }
+
+  const handleSaveEntities = async () => {
+    if (!document) return
+
+    try {
+      setIsSaving(true)
+      setError(null)
+
+      await apiClient.put(
+        `/api/v1/documents/${documentId}/entities`,
+        { entities: editedEntities },
+        true
+      )
+
+      setSuccess('Entities updated successfully')
+      setIsEditingEntities(false)
+      await loadDocument()
+    } catch (err) {
+      setError('Failed to update entities')
+      console.error(err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAddEntity = () => {
+    if (newEntityValue.trim()) {
+      const newEntity: Entity = {
+        type: newEntityType,
+        value: newEntityValue.trim(),
+        confidence: 1.0, // User-added entities have full confidence
+        method: 'manual'
+      }
+      setEditedEntities([...editedEntities, newEntity])
+      setNewEntityValue('')
+    }
+  }
+
+  const handleRemoveEntity = (entity: Entity) => {
+    setEditedEntities(editedEntities.filter(e =>
+      !(e.type === entity.type && e.value === entity.value)
+    ))
   }
 
   const handleDeleteDocument = async () => {
@@ -606,11 +654,101 @@ export default function DocumentDetailPage() {
             </div>
 
             {/* Entities Section */}
-            {document.entities && document.entities.length > 0 && (
-              <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                   Extracted Information
                 </h2>
+                {!isEditingEntities && (
+                  <button
+                    onClick={() => setIsEditingEntities(true)}
+                    className="text-sm text-admin-primary hover:underline"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {isEditingEntities ? (
+                <div className="space-y-4">
+                  <div className="flex space-x-2">
+                    <select
+                      value={newEntityType}
+                      onChange={(e) => setNewEntityType(e.target.value)}
+                      className="rounded-md border border-neutral-300 px-3 py-2 focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                    >
+                      <option value="ORGANIZATION">Organization</option>
+                      <option value="PERSON">Person</option>
+                      <option value="LOCATION">Location</option>
+                      <option value="ADDRESS">Address</option>
+                      <option value="EMAIL">Email</option>
+                      <option value="URL">Website</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={newEntityValue}
+                      onChange={(e) => setNewEntityValue(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddEntity()}
+                      placeholder="Add entity value..."
+                      className="flex-1 rounded-md border border-neutral-300 px-3 py-2 focus:border-admin-primary focus:outline-none focus:ring-1 focus:ring-admin-primary"
+                    />
+                    <Button onClick={handleAddEntity}>Add</Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {Object.entries(
+                      editedEntities.reduce((acc, entity) => {
+                        if (!acc[entity.type]) acc[entity.type] = []
+                        acc[entity.type].push(entity)
+                        return acc
+                      }, {} as Record<string, Entity[]>)
+                    ).map(([type, entities]) => (
+                      <div key={type}>
+                        <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
+                          {type.replace(/_/g, ' ')}
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {entities.map((entity, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                            >
+                              <span>{entity.value}</span>
+                              <button
+                                onClick={() => handleRemoveEntity(entity)}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={handleSaveEntities}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setIsEditingEntities(false)
+                        setEditedEntities(document.entities || [])
+                        setNewEntityValue('')
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                {(document.entities && document.entities.length > 0) ? (
                 <div className="space-y-4">
                   {(() => {
                     // Group entities by type
@@ -627,7 +765,8 @@ export default function DocumentDetailPage() {
                       ORGANIZATION: { label: 'Organizations', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', variant: 'info' },
                       PERSON: { label: 'People', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', variant: 'default' },
                       LOCATION: { label: 'Locations', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', variant: 'success' },
-                      ADDRESS_COMPONENT: { label: 'Addresses', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', variant: 'warning' },
+                      ADDRESS: { label: 'Addresses', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', variant: 'warning' },
+                      ADDRESS_COMPONENT: { label: 'Address Components', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', variant: 'warning' },
                       EMAIL: { label: 'Email Addresses', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', variant: 'info' },
                       URL: { label: 'Websites', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9', variant: 'default' },
                       SENDER: { label: 'Senders', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', variant: 'info' },
@@ -689,9 +828,12 @@ export default function DocumentDetailPage() {
                     })
                   })()}
                 </div>
-              </div>
-            )}
-          </div>
+                ) : (
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">No entities extracted</p>
+                )}
+                </>
+              )}
+            </div>
 
           {/* Sidebar */}
           <div className="space-y-6">

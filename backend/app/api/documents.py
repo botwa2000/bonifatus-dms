@@ -5,9 +5,10 @@ REST API for document upload, processing, and management operations
 """
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 import io
 
 from app.schemas.document_schemas import (
@@ -25,6 +26,18 @@ from app.database.models import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/documents", tags=["document_management"])
+
+
+# Entity update models
+class EntityUpdate(BaseModel):
+    type: str
+    value: str
+    confidence: float = 1.0
+    method: str = 'manual'
+
+
+class EntityUpdateRequest(BaseModel):
+    entities: List[EntityUpdate]
 
 
 @router.post(
@@ -264,6 +277,84 @@ async def update_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document update service error"
+        )
+
+
+@router.put(
+    "/{document_id}/entities",
+    responses={
+        200: {"description": "Entities updated successfully"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_document_entities(
+    document_id: str,
+    request: Request,
+    entity_request: EntityUpdateRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Update document entities (add/remove/edit)
+
+    Replaces all entities with the provided list
+    """
+    try:
+        from app.database.connection import SessionLocal
+        from app.database.models import Document, DocumentEntity
+        import uuid
+
+        db = SessionLocal()
+
+        try:
+            # Verify document belongs to user
+            document = db.query(Document).filter(
+                Document.id == uuid.UUID(document_id),
+                Document.user_id == uuid.UUID(str(current_user.id)),
+                Document.is_deleted == False
+            ).first()
+
+            if not document:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Document not found"
+                )
+
+            # Delete existing entities
+            db.query(DocumentEntity).filter(
+                DocumentEntity.document_id == uuid.UUID(document_id)
+            ).delete()
+
+            # Add new entities
+            for entity_data in entity_request.entities:
+                entity = DocumentEntity(
+                    document_id=uuid.UUID(document_id),
+                    entity_type=entity_data.type,
+                    entity_value=entity_data.value,
+                    normalized_value=entity_data.value.lower(),
+                    confidence=entity_data.confidence,
+                    extraction_method=entity_data.method,
+                    language_code=document.primary_language or 'en'
+                )
+                db.add(entity)
+
+            db.commit()
+
+            logger.info(f"Entities updated for document {document_id} by user {current_user.email}: {len(entity_request.entities)} entities")
+
+            return {"success": True, "message": f"Updated {len(entity_request.entities)} entities"}
+
+        finally:
+            db.close()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update entities error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Entity update service error"
         )
 
 

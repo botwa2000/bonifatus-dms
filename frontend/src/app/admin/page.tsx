@@ -1303,12 +1303,60 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   {/* Info Box */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <div className="text-sm text-blue-900 dark:text-blue-100">
-                      <strong>Fine-tune ML entity quality scoring:</strong> Adjust weights and thresholds to filter garbage entities.
-                      <br />
-                      Values are multipliers (0.1 = 90% penalty, 1.0 = no change, 1.3 = 30% bonus).
-                      <br />
-                      <strong>Check dev backend logs</strong> after uploading documents to see detailed scoring calculations for each entity.
+                    <div className="text-sm text-blue-900 dark:text-blue-100 space-y-3">
+                      <div>
+                        <strong className="text-base">📊 Entity Quality Scoring System</strong>
+                        <p className="mt-1">Multi-factor confidence calculation to filter out garbage entities and keep high-quality extractions.</p>
+                      </div>
+
+                      <div>
+                        <strong>How it works:</strong>
+                        <div className="mt-1 font-mono text-xs bg-blue-100 dark:bg-blue-900 p-2 rounded">
+                          Final Confidence = Base Confidence × Multiplier₁ × Multiplier₂ × ... × Multiplierₙ
+                        </div>
+                        <p className="mt-1">Each entity starts with a base confidence (0.85-0.95), then gets multiplied by various factors based on quality checks.</p>
+                      </div>
+
+                      <div>
+                        <strong>Parameter Categories:</strong>
+                        <ul className="mt-1 ml-4 space-y-1">
+                          <li><strong>threshold:</strong> Minimum confidence to accept entity (e.g., ADDRESS ≥ 0.50, EMAIL ≥ 0.50, ORGANIZATION ≥ 0.85)</li>
+                          <li><strong>algorithm:</strong> Base confidence for different extraction methods (libpostal: 0.90, regex: 0.70)</li>
+                          <li><strong>feature:</strong> Feature flags to enable/disable extraction methods (libpostal_enabled: 1.0 = on)</li>
+                          <li><strong>length:</strong> Penalties for too short/long entities (optimal range gets ×1.0, extremes get penalties)</li>
+                          <li><strong>pattern:</strong> Bonuses for recognizing keywords (e.g., "Bank" in organization name: ×1.2)</li>
+                          <li><strong>dictionary:</strong> Bonuses/penalties based on dictionary word validation (valid word: ×1.3, invalid: ×0.6)</li>
+                          <li><strong>entity_type:</strong> Type-specific rules (e.g., all-caps single word ORG: ×0.4 penalty)</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <strong>Multiplier Values:</strong>
+                        <ul className="mt-1 ml-4 space-y-1">
+                          <li>×1.0 = No change (neutral)</li>
+                          <li>×1.3 = 30% bonus (rewards good quality)</li>
+                          <li>×0.6 = 40% penalty (penalizes likely garbage)</li>
+                          <li>×0.4 = 60% penalty (strong filter for all-caps words)</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <strong>Example:</strong>
+                        <div className="mt-1 font-mono text-xs bg-blue-100 dark:bg-blue-900 p-2 rounded space-y-1">
+                          <div>"Kinopolis" (ORGANIZATION):</div>
+                          <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × proper_case(1.1) = <strong>1.00</strong> ✓ ACCEPTED</div>
+                          <div className="mt-2">"KINOPOLIS" (ORGANIZATION):</div>
+                          <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × all_caps_penalty(0.4) = <strong>0.44</strong> ✗ REJECTED (< 0.85)</div>
+                          <div className="mt-2">"info@example.com" (EMAIL):</div>
+                          <div>  Base: 0.95 × length_ok(1.0) × dict_invalid(0.6) = <strong>0.57</strong> ✓ ACCEPTED (≥ 0.50)</div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-blue-300 dark:border-blue-700">
+                        <strong>💡 Debugging:</strong> Check dev backend logs after uploading documents to see detailed scoring for each entity.
+                        <br />
+                        Look for <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">[RULE-BASED]</code> and <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">[ENTITY FILTER]</code> log entries.
+                      </div>
                     </div>
                   </div>
 
