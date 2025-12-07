@@ -902,20 +902,25 @@ async def analyze_batch_async(
                     detail=f"{e.message}. Please upgrade your plan to continue."
                 )
 
-        # Start background processing with file paths (non-blocking)
-        await batch_processor_service.start_batch_processing(
-            batch_id=batch_id,
-            file_paths=file_paths,
-            user_id=str(current_user.id)
-        )
+        # Queue batch processing with Celery (non-blocking)
+        from app.celery_app import process_batch_task, get_queue_stats
 
-        logger.info(f"Async batch {batch_id} created with {len(file_paths)} files")
+        # Send task to Celery queue
+        task = process_batch_task.delay(batch_id, file_paths, str(current_user.id))
+
+        # Get queue statistics
+        queue_stats = get_queue_stats()
+
+        logger.info(f"Async batch {batch_id} queued with {len(file_paths)} files. Queue stats: {queue_stats}")
 
         return {
             'batch_id': batch_id,
-            'status': 'pending',
+            'task_id': task.id,
+            'status': 'queued',
             'total_files': len(file_paths),
-            'message': 'Batch processing started. Use /batch-status/{batch_id} to check progress.'
+            'queue_position': queue_stats['total_pending'] + 1,  # Approximate position
+            'queue_total': queue_stats['total_pending'] + queue_stats['active_tasks'] + 1,
+            'message': 'Batch queued for processing. Use /batch-status/{batch_id} to check progress.'
         }
 
     except HTTPException:
@@ -938,6 +943,7 @@ async def get_batch_status(
     Get current status and progress of a batch processing job
 
     Poll this endpoint to track real-time progress.
+    Includes queue position and estimated wait time for queued batches.
     """
     try:
         status_data = await batch_processor_service.get_batch_status(
@@ -951,6 +957,21 @@ async def get_batch_status(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Batch not found"
             )
+
+        # Add queue information if batch is queued or pending
+        if status_data.get('status') in ['queued', 'pending']:
+            from app.celery_app import get_queue_stats
+
+            queue_stats = get_queue_stats()
+
+            # Estimate position based on when batch was created
+            # More accurate position would require tracking creation time
+            status_data['queue_stats'] = {
+                'active_tasks': queue_stats['active_tasks'],
+                'queued_tasks': queue_stats['queued_tasks'],
+                'total_pending': queue_stats['total_pending'],
+                'estimated_wait_seconds': queue_stats['queued_tasks'] * 60  # Rough estimate: 60s per batch
+            }
 
         return status_data
 

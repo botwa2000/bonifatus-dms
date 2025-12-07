@@ -175,12 +175,21 @@ export default function BatchUploadPage() {
 
         const status = await statusResponse.json()
 
-        // Update progress
-        setBatchProgress({
-          processed: status.processed_files || 0,
-          total: status.total_files || selectedFiles.length,
-          currentFile: status.current_file_name || null
-        })
+        // Update progress - show queue info if queued
+        if (status.status === 'queued' && status.queue_stats) {
+          const waitMinutes = Math.ceil(status.queue_stats.estimated_wait_seconds / 60)
+          setBatchProgress({
+            processed: 0,
+            total: status.total_files || selectedFiles.length,
+            currentFile: `Queued - ${status.queue_stats.queued_tasks} waiting, ~${waitMinutes}min`
+          })
+        } else {
+          setBatchProgress({
+            processed: status.processed_files || 0,
+            total: status.total_files || selectedFiles.length,
+            currentFile: status.current_file_name || null
+          })
+        }
 
         console.log(`[Batch ${batchId}] Status: ${status.status}, Progress: ${status.processed_files}/${status.total_files}`)
 
@@ -204,11 +213,22 @@ export default function BatchUploadPage() {
 
       } catch (error) {
         console.error(`[Batch ${batchId}] Polling error:`, error)
+
+        // For network errors, continue polling (don't throw immediately)
+        // The upload might have completed successfully despite the polling error
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('ERR_FAILED')) {
+          console.log(`[Batch ${batchId}] Network error during polling, will retry...`)
+          await new Promise(resolve => setTimeout(resolve, pollInterval))
+          continue
+        }
+
+        // For other errors, throw immediately
         throw error
       }
     }
 
-    throw new Error('Batch processing timeout - exceeded maximum wait time')
+    throw new Error('Status check timeout - processing may still be in progress. Please check your documents page.')
   }
 
   const handleAnalyzeBatch = async () => {
@@ -291,6 +311,19 @@ export default function BatchUploadPage() {
       }
 
       const initialResult = await response.json()
+
+      // Show queue position if provided
+      if (initialResult.status === 'queued' && initialResult.queue_position) {
+        setBatchProgress({
+          processed: 0,
+          total: selectedFiles.length,
+          currentFile: `Queued - Position ${initialResult.queue_position} of ${initialResult.queue_total}`
+        })
+        setMessage({
+          type: 'info',
+          text: `Your upload is queued (position ${initialResult.queue_position}). Processing will start automatically.`
+        })
+      }
 
       // Get batch_id from async response and poll for status until completion
       const result = await pollBatchStatus(initialResult.batch_id)
@@ -393,7 +426,33 @@ export default function BatchUploadPage() {
       let errorMessage: string | React.ReactNode = 'Analysis failed. Please try again.'
 
       if (error instanceof Error) {
-        errorMessage = error.message
+        const rawMessage = error.message
+
+        // Handle network/timeout errors
+        if (rawMessage.includes('Failed to fetch') || rawMessage.includes('NetworkError')) {
+          errorMessage = (
+            <div>
+              <p className="font-medium mb-2">Connection Error</p>
+              <p className="mb-3">Unable to connect to the server. This could be due to:</p>
+              <ul className="list-disc list-inside mb-3 space-y-1">
+                <li>Network connectivity issues</li>
+                <li>Server temporarily unavailable</li>
+                <li>Processing is taking longer than expected</li>
+              </ul>
+              <p className="text-sm">Please check your documents page - your upload may have completed successfully despite this error.</p>
+            </div>
+          )
+        } else if (rawMessage.includes('timeout') || rawMessage.includes('Timeout')) {
+          errorMessage = (
+            <div>
+              <p className="font-medium mb-2">Processing Timeout</p>
+              <p className="mb-3">The server is taking longer than expected to process your documents.</p>
+              <p className="text-sm">Your upload may still be processing. Please check your documents page in a few minutes.</p>
+            </div>
+          )
+        } else {
+          errorMessage = rawMessage
+        }
       } else if (typeof error === 'object' && error !== null) {
         const errorObj = error as ErrorResponse
         errorMessage = errorObj.detail || errorObj.message || JSON.stringify(error)

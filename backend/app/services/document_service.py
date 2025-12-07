@@ -467,6 +467,19 @@ class DocumentService:
             logger.info(f"  - processing_status: {document.processing_status}")
             logger.info(f"  - primary_language: {document.primary_language}")
 
+            # DEBUG: Log entities being returned
+            if parsed_entities:
+                logger.info(f"  - entities (count): {len(parsed_entities)}")
+                entity_by_type = {}
+                for e in parsed_entities:
+                    if e.type not in entity_by_type:
+                        entity_by_type[e.type] = []
+                    entity_by_type[e.type].append(f"{e.value} ({e.confidence:.2f})")
+                for entity_type, values in entity_by_type.items():
+                    logger.info(f"    {entity_type}: {values}")
+            else:
+                logger.info(f"  - entities: None")
+
             return DocumentResponse(
                 id=str(document.id),
                 title=document.title,

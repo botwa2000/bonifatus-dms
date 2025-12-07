@@ -89,3 +89,60 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s  # LibreTranslate needs time to load models
+
+  redis:
+    image: redis:7-alpine
+    container_name: bonifatus-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible from localhost
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 50M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  celery-worker:
+    build: ./backend
+    container_name: bonifatus-celery-worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Writable tmpfs volumes (same as backend)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=500m
+      - /app/logs:noexec,nosuid,size=200m
+      - /app/temp:noexec,nosuid,size=1G
+    # Resource limits (same as backend for processing)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M

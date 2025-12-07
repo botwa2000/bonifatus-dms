@@ -104,6 +104,21 @@ export default function DocumentDetailPage() {
       console.log('[DOCUMENT DETAIL] category_id:', data.category_id)
       console.log('[DOCUMENT DETAIL] category_name:', data.category_name)
 
+      // DEBUG: Log entities received from API
+      if (data.entities) {
+        console.log('[DOCUMENT DETAIL] ✓ Entities received from API:', data.entities.length, 'total')
+        const entityByType: Record<string, any[]> = {}
+        data.entities.forEach((e: any) => {
+          if (!entityByType[e.type]) entityByType[e.type] = []
+          entityByType[e.type].push(e)
+        })
+        Object.entries(entityByType).forEach(([type, entities]) => {
+          console.log(`  - ${type}: ${entities.length} entities`, entities.map((e: any) => `${e.value} (${e.confidence})`))
+        })
+      } else {
+        console.log('[DOCUMENT DETAIL] ❌ No entities received from API')
+      }
+
       setDocument(data)
 
       // Set selected categories from the categories array
@@ -759,6 +774,13 @@ export default function DocumentDetailPage() {
                       acc[entity.type].push(entity)
                       return acc
                     }, {} as Record<string, Entity[]>) || {}
+
+                    // DEBUG: Log what's being rendered
+                    console.log('[DOCUMENT DETAIL] 🎨 Rendering entities to UI:')
+                    console.log('  - entityGroups:', Object.keys(entityGroups))
+                    Object.entries(entityGroups).forEach(([type, entities]) => {
+                      console.log(`  - Rendering ${type}: ${entities.length} entities`, entities.map(e => e.value))
+                    })
 
                     // Entity type display configuration
                     const entityConfig: Record<string, { label: string; icon: string; variant: BadgeVariant }> = {
