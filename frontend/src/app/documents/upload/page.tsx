@@ -320,7 +320,7 @@ export default function BatchUploadPage() {
           currentFile: `Queued - Position ${initialResult.queue_position} of ${initialResult.queue_total}`
         })
         setMessage({
-          type: 'info',
+          type: 'success',
           text: `Your upload is queued (position ${initialResult.queue_position}). Processing will start automatically.`
         })
       }
