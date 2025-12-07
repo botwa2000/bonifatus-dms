@@ -106,8 +106,7 @@ def process_batch_task(self, batch_id: str, file_paths: list, user_id: str):
 
     try:
         # Initialize services
-        db_manager = DatabaseManager()
-        batch_processor = BatchProcessorService(db_manager)
+        batch_processor = BatchProcessorService()
 
         # Run async batch processing in sync context
         loop = asyncio.new_event_loop()
