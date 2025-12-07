@@ -45,5 +45,5 @@ clamd==1.0.2
 # Address extraction with libpostal
 postal==1.1.10
 # Task Queue
-celery[redis]==5.3.4
-redis==5.0.1
+celery[redis]==5.6.0
+redis==5.2.1

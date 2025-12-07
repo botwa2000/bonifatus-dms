@@ -42,8 +42,23 @@ ssh root@91.99.212.17
 # Navigate to dev directory
 cd /opt/bonifatus-dms-dev
 
+# ⚠️ IMPORTANT: Handle local changes (dev-specific API URL)
+# Check if there are local changes
+git status
+
+# If docker-compose.yml has local changes, stash them
+git stash
+
 # Pull latest code
 git pull origin main
+
+# Restore dev-specific configuration (API URL fix)
+git stash pop
+
+# If conflict, keep dev API URL:
+# Edit docker-compose.yml and ensure:
+#   NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com
+# Then: git add docker-compose.yml && git stash drop
 
 # Rebuild containers
 docker compose build
