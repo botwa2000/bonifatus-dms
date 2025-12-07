@@ -160,9 +160,7 @@ def process_batch_task(self, batch_id: str, file_paths: list, user_id: str):
 # Helper function to get queue stats
 def get_queue_stats():
     """Get current queue statistics"""
-    from celery.task.control import inspect
-
-    i = inspect(app=celery_app)
+    i = celery_app.control.inspect()
 
     # Get active tasks
     active = i.active()

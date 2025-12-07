@@ -66,8 +66,11 @@ docker compose build
 # Restart containers
 docker compose up -d
 
-# ⚠️ CRITICAL: Reload nginx (maintains IP whitelist)
+# ⚠️⚠️⚠️ CRITICAL: ALWAYS RELOAD NGINX AFTER CONTAINER RESTART ⚠️⚠️⚠️
+# Why: Docker restarts can cause nginx routing to break, preventing dev access
+# This MUST be run every time containers are restarted or rebuilt
 nginx -t && systemctl reload nginx
+echo "✓ Nginx reloaded - dev site should be accessible"
 
 # Run migrations if needed
 docker exec bonifatus-backend-dev alembic upgrade head
