@@ -834,6 +834,7 @@ export default function DocumentDetailPage() {
                 </>
               )}
             </div>
+          </div>
 
           {/* Sidebar */}
           <div className="space-y-6">

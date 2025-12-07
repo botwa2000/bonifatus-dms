@@ -1324,7 +1324,7 @@ export default function AdminDashboard() {
                           <li><strong>algorithm:</strong> Base confidence for different extraction methods (libpostal: 0.90, regex: 0.70)</li>
                           <li><strong>feature:</strong> Feature flags to enable/disable extraction methods (libpostal_enabled: 1.0 = on)</li>
                           <li><strong>length:</strong> Penalties for too short/long entities (optimal range gets ×1.0, extremes get penalties)</li>
-                          <li><strong>pattern:</strong> Bonuses for recognizing keywords (e.g., "Bank" in organization name: ×1.2)</li>
+                          <li><strong>pattern:</strong> Bonuses for recognizing keywords (e.g., &quot;Bank&quot; in organization name: ×1.2)</li>
                           <li><strong>dictionary:</strong> Bonuses/penalties based on dictionary word validation (valid word: ×1.3, invalid: ×0.6)</li>
                           <li><strong>entity_type:</strong> Type-specific rules (e.g., all-caps single word ORG: ×0.4 penalty)</li>
                         </ul>
@@ -1343,11 +1343,11 @@ export default function AdminDashboard() {
                       <div>
                         <strong>Example:</strong>
                         <div className="mt-1 font-mono text-xs bg-blue-100 dark:bg-blue-900 p-2 rounded space-y-1">
-                          <div>"Kinopolis" (ORGANIZATION):</div>
+                          <div>&quot;Kinopolis&quot; (ORGANIZATION):</div>
                           <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × proper_case(1.1) = <strong>1.00</strong> ✓ ACCEPTED</div>
-                          <div className="mt-2">"KINOPOLIS" (ORGANIZATION):</div>
-                          <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × all_caps_penalty(0.4) = <strong>0.44</strong> ✗ REJECTED (< 0.85)</div>
-                          <div className="mt-2">"info@example.com" (EMAIL):</div>
+                          <div className="mt-2">&quot;KINOPOLIS&quot; (ORGANIZATION):</div>
+                          <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × all_caps_penalty(0.4) = <strong>0.44</strong> ✗ REJECTED (&lt; 0.85)</div>
+                          <div className="mt-2">&quot;info@example.com&quot; (EMAIL):</div>
                           <div>  Base: 0.95 × length_ok(1.0) × dict_invalid(0.6) = <strong>0.57</strong> ✓ ACCEPTED (≥ 0.50)</div>
                         </div>
                       </div>
