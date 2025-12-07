@@ -107,13 +107,13 @@ export default function DocumentDetailPage() {
       // DEBUG: Log entities received from API
       if (data.entities) {
         console.log('[DOCUMENT DETAIL] ✓ Entities received from API:', data.entities.length, 'total')
-        const entityByType: Record<string, any[]> = {}
-        data.entities.forEach((e: any) => {
+        const entityByType: Record<string, Entity[]> = {}
+        data.entities.forEach((e: Entity) => {
           if (!entityByType[e.type]) entityByType[e.type] = []
           entityByType[e.type].push(e)
         })
         Object.entries(entityByType).forEach(([type, entities]) => {
-          console.log(`  - ${type}: ${entities.length} entities`, entities.map((e: any) => `${e.value} (${e.confidence})`))
+          console.log(`  - ${type}: ${entities.length} entities`, entities.map((e: Entity) => `${e.value} (${e.confidence})`))
         })
       } else {
         console.log('[DOCUMENT DETAIL] ❌ No entities received from API')
