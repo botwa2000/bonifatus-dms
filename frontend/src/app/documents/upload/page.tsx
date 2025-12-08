@@ -185,7 +185,7 @@ export default function BatchUploadPage() {
           })
         } else {
           setBatchProgress({
-            processed: status.processed_files || 0,
+            processed: status.current_file_index || status.processed_files || 0,
             total: status.total_files || selectedFiles.length,
             currentFile: status.current_file_name || null
           })

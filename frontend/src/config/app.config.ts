@@ -31,8 +31,11 @@ export const ENTITY_TYPES = {
   RECIPIENT: { label: 'Recipient', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
   ORGANIZATION: { label: 'Organizations', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
   PERSON: { label: 'People', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
-  LOCATION: { label: 'Addresses', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
-  ADDRESS_COMPONENT: { label: 'Addresses', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' }
+  LOCATION: { label: 'Locations', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  ADDRESS: { label: 'Addresses', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  ADDRESS_COMPONENT: { label: 'Address Components', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  EMAIL: { label: 'Email Addresses', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200' },
+  URL: { label: 'Websites', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' }
 } as const
 
 // Helper functions
