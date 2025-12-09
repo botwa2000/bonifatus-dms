@@ -1,7 +1,7 @@
 """add address quality validation config
 
 Revision ID: 039_add_address_quality
-Revises: 038_add_libpostal
+Revises: 038_libpostal_addresses
 Create Date: 2025-12-09 00:00:00
 
 Add comprehensive ADDRESS quality validation and entity boundary cleaning:
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '039_add_address_quality'
-down_revision = '038_add_libpostal'
+down_revision = '038_libpostal_addresses'
 branch_labels = None
 depends_on = None
 
