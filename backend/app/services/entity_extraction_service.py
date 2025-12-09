@@ -158,6 +158,13 @@ class EntityExtractionService:
 
         logger.info(f"[ENTITY EXTRACTION] Extracted {len(entities)} entities from text (lang: {language})")
 
+        # Deduplicate entities (e.g., "Frankfurt am Main" extracted twice → keep one with highest confidence)
+        if entities:
+            entities_before_dedup = len(entities)
+            entities = self.deduplicate_entities(entities)
+            if len(entities) < entities_before_dedup:
+                logger.info(f"[ENTITY DEDUP] Removed {entities_before_dedup - len(entities)} duplicate entities, {len(entities)} unique remain")
+
         # Apply database-driven filters if database session provided
         if db:
             result = self._filter_entities(entities, language, db, return_rejected=return_rejected)
@@ -657,6 +664,7 @@ class EntityExtractionService:
 
         # Load filtering rules from database
         field_labels = self._load_field_labels(db, language)
+        stop_words = self._load_stop_words(db, language)
         blacklist = self._load_blacklist(db, language)
 
         # Load confidence thresholds from database (entity-type-specific)
@@ -711,8 +719,8 @@ class EntityExtractionService:
             KEYWORD_MIN_CONFIDENCE = 0.50
 
         for entity in entities:
-            # Normalize entity value (clean whitespace, line breaks, trailing field labels)
-            normalized = self._normalize_entity_value(entity.entity_value, field_labels)
+            # Normalize entity value (clean whitespace, line breaks, trailing field labels and stop words)
+            normalized = self._normalize_entity_value(entity.entity_value, field_labels, stop_words)
             entity.entity_value = normalized
             entity.normalized_value = normalized.lower()
 
@@ -793,13 +801,14 @@ class EntityExtractionService:
             }
         return filtered
 
-    def _normalize_entity_value(self, value: str, field_labels: Set[str] = None) -> str:
+    def _normalize_entity_value(self, value: str, field_labels: Set[str] = None, stop_words: Set[str] = None) -> str:
         """
-        Normalize entity value by cleaning whitespace, line breaks, and trailing field labels
+        Normalize entity value by cleaning whitespace, line breaks, trailing field labels and stop words
 
         Args:
             value: Raw entity value
             field_labels: Set of field labels from database (language-specific)
+            stop_words: Set of stop words from database (language-specific)
 
         Returns:
             Cleaned entity value
@@ -811,18 +820,33 @@ class EntityExtractionService:
         # Remove trailing punctuation
         normalized = re.sub(r'[.,;:!?]+$', '', normalized)
 
-        # Remove trailing field labels from database (language-agnostic, database-driven)
-        if field_labels:
-            # Try each field label as a trailing suffix
-            for label in field_labels:
-                # Case-insensitive check for trailing label
-                # Match: "Frankfurt am Main Tel" → "Frankfurt am Main"
-                # Match: "Address Tel." → "Address"
-                pattern = r'\s+' + re.escape(label) + r'\.?$'
-                if re.search(pattern, normalized, re.IGNORECASE):
-                    normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
-                    normalized = normalized.strip()
-                    break  # Only remove one trailing label
+        # Remove trailing field labels and stop words from database (industry-standard boundary cleaning)
+        # Iterate multiple times to handle cases like "Frankfurt am Main Tel Fax" → "Frankfurt am Main"
+        max_iterations = 3  # Prevent infinite loop
+        for _ in range(max_iterations):
+            original = normalized
+
+            # Remove trailing field labels
+            if field_labels:
+                for label in field_labels:
+                    # Case-insensitive check for trailing label
+                    # Match: "Frankfurt am Main Tel" → "Frankfurt am Main"
+                    pattern = r'\s+' + re.escape(label) + r'\.?$'
+                    if re.search(pattern, normalized, re.IGNORECASE):
+                        normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
+                        normalized = normalized.strip()
+                        break
+
+            # Remove trailing stop words
+            if stop_words:
+                words = normalized.split()
+                if words and words[-1].lower() in stop_words:
+                    words.pop()
+                    normalized = ' '.join(words).strip()
+
+            # If no changes made, we're done
+            if normalized == original:
+                break
 
         return normalized
 
@@ -855,6 +879,19 @@ class EntityExtractionService:
     # NOTE: Removed _load_invalid_patterns, _load_confidence_thresholds, and _matches_invalid_pattern
     # These are now handled by entity_quality_service.calculate_confidence()
     # which provides unified quality scoring without duplication
+
+    def _load_stop_words(self, db: Session, language: str) -> Set[str]:
+        """Load stop words from database for entity boundary cleaning"""
+        try:
+            from app.database.models import StopWord
+            stop_words = db.query(StopWord).filter(
+                StopWord.language_code == language,
+                StopWord.is_active == True
+            ).all()
+            return {sw.word.lower() for sw in stop_words}
+        except Exception as e:
+            logger.warning(f"Failed to load stop words for {language}: {e}")
+            return set()
 
     def _load_blacklist(self, db: Session, language: str) -> Set[Tuple[str, str]]:
         """Load blacklisted entities from database"""

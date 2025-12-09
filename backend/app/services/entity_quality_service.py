@@ -561,7 +561,108 @@ class EntityQualityService:
                     confidence *= multiplier
                     adjustments.append(f"org_proper_case: ×{multiplier}")
 
-        # 11. Frequency-based penalty using global_corpus_stats (PERSON, ORGANIZATION, LOCATION only)
+        # 11. ADDRESS-specific strict quality checks (language-agnostic + database-driven)
+        if entity_type == 'ADDRESS':
+            # PENALTIES: Detect garbage extractions from date/time fields and invalid patterns
+
+            # Check 1: Date/time pattern detection (language-agnostic regex)
+            # Matches: "3.04.23", "16:28", "3.04.23 13 23", "16 28", etc.
+            date_pattern = r'\d{1,2}[.:/\-]\d{1,2}([.:/\-]\d{2,4})?'
+            time_pattern = r'\d{1,2}:\d{2}'
+            datetime_pattern = r'\d{1,2}[.:/\-]\d{1,2}[.:/\-]\d{2,4}\s+\d{1,2}[\s:]\d{2}'
+
+            has_datetime = re.search(datetime_pattern, entity_value)
+            has_date = re.search(date_pattern, entity_value)
+            has_time = re.search(time_pattern, entity_value)
+
+            if has_datetime or (has_date and has_time):
+                # Definite date/time field - massive penalty
+                multiplier = self._get_config_value('addr_datetime_penalty', 0.05)
+                confidence *= multiplier
+                adjustments.append(f"addr_datetime: ×{multiplier}")
+            elif has_date:
+                # Likely date field - severe penalty
+                multiplier = self._get_config_value('addr_date_penalty', 0.10)
+                confidence *= multiplier
+                adjustments.append(f"addr_date: ×{multiplier}")
+
+            # Check 2: Structural validation - require at least ONE alphabetic word
+            words = re.findall(r'\b[A-Za-zäöüÄÖÜßàâéèêëïîôùûüÿçÀÂÉÈÊËÏÎÔÙÛÜŸÇ]+\b', entity_value)
+
+            if not words:
+                # No alphabetic words - not a real address
+                multiplier = self._get_config_value('addr_no_letters_penalty', 0.05)
+                confidence *= multiplier
+                adjustments.append(f"addr_no_letters: ×{multiplier}")
+            elif len(words) == 1 and len(words[0]) <= 3:
+                # Only one very short word - likely garbage
+                multiplier = self._get_config_value('addr_single_short_word_penalty', 0.20)
+                confidence *= multiplier
+                adjustments.append(f"addr_single_short: ×{multiplier}")
+
+            # Check 3: Field label prefix detection (database-driven, language-specific)
+            field_labels = self._load_field_labels(language)
+            if field_labels:
+                # Check if address starts with a field label
+                first_word = entity_value.split()[0].lower() if entity_value.split() else ''
+                # Remove common punctuation from first word
+                first_word_clean = re.sub(r'[:\.,;]$', '', first_word)
+
+                if first_word_clean in field_labels:
+                    # Starts with field label like "von:", "bis:", "tel:", "min."
+                    multiplier = self._get_config_value('addr_field_label_prefix_penalty', 0.10)
+                    confidence *= multiplier
+                    adjustments.append(f"addr_field_label('{first_word_clean}'): ×{multiplier}")
+
+            # Check 4: Minimum meaningful length
+            if length < 8:
+                # Too short for meaningful address
+                multiplier = self._get_config_value('addr_too_short_penalty', 0.30)
+                confidence *= multiplier
+                adjustments.append(f"addr_too_short({length}<8): ×{multiplier}")
+
+            # Check 5: Digit-only with insufficient length for postal code
+            # Valid postal codes: 5-10 characters, purely numeric
+            if re.match(r'^\d+$', entity_value):
+                if 5 <= length <= 10:
+                    # Valid postal code format - boost confidence
+                    multiplier = self._get_config_value('addr_postal_code_bonus', 1.2)
+                    confidence *= multiplier
+                    adjustments.append(f"addr_postal_code: ×{multiplier}")
+                else:
+                    # Invalid numeric format
+                    multiplier = self._get_config_value('addr_invalid_numeric_penalty', 0.15)
+                    confidence *= multiplier
+                    adjustments.append(f"addr_invalid_numeric: ×{multiplier}")
+
+            # Check 6: Excessive digit ratio (addresses have mostly text)
+            if features['digit_ratio'] > 0.7:
+                # More than 70% digits - likely not an address
+                multiplier = self._get_config_value('addr_excessive_digits_penalty', 0.25)
+                confidence *= multiplier
+                adjustments.append(f"addr_excessive_digits({features['digit_ratio']:.2f}): ×{multiplier}")
+
+            # BONUSES: Boost confidence for real addresses
+
+            # Bonus 1: Proper address structure (number + street OR postal + city)
+            # Pattern: house number followed by street name, or postal code followed by city
+            proper_structure_pattern = r'(\d+\s+[A-Za-zäöüÄÖÜß]+|[A-Za-zäöüÄÖÜß]+\s+\d+[A-Za-z]?|\d{4,6}\s+[A-Za-zäöüÄÖÜß]+)'
+            if re.search(proper_structure_pattern, entity_value):
+                multiplier = self._get_config_value('addr_proper_structure_bonus', 1.2)
+                confidence *= multiplier
+                adjustments.append(f"addr_structure: ×{multiplier}")
+
+            # Bonus 2: Valid components (postal code OR city detected)
+            # This indicates libpostal successfully identified address components
+            has_postal_pattern = re.search(r'\b\d{4,6}\b', entity_value)
+            has_city_pattern = len(words) >= 2  # At least 2 words suggests city name
+
+            if has_postal_pattern or has_city_pattern:
+                multiplier = self._get_config_value('addr_valid_components_bonus', 1.3)
+                confidence *= multiplier
+                adjustments.append(f"addr_valid_components: ×{multiplier}")
+
+        # 12. Frequency-based penalty using global_corpus_stats (PERSON, ORGANIZATION, LOCATION only)
         # Penalize entities that match very common words (e.g., "NAME", "PATIENT", "BERUF")
         # EXCLUDE EMAIL and URL - these are structured identifiers, not generic words
         freq_check_enabled = self._get_config_value('freq_check_enabled', 1.0)
