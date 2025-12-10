@@ -2,15 +2,18 @@
 """
 Bonifatus DMS - Authentication Middleware
 JWT token validation from httpOnly cookies (Phase 1 security implementation)
+Activity tracking for inactivity timeout (30 minutes)
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import settings
 from app.database.models import User
+from app.database.database import get_db
 from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
@@ -22,15 +25,20 @@ async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
-    """Get current authenticated user from JWT token in httpOnly cookie or Authorization header"""
-    
+    """Get current authenticated user from JWT token in httpOnly cookie or Authorization header
+
+    Implements inactivity timeout:
+    - Checks if user has been inactive for > 30 minutes
+    - Updates last_activity_at on every API call (activity tracking)
+    """
+
     # Priority 1: Check httpOnly cookie (Phase 1 security implementation)
     token = request.cookies.get("access_token")
-    
+
     # Priority 2: Fallback to Authorization header for backwards compatibility
     if not token and credentials:
         token = credentials.credentials
-    
+
     if not token:
         # Don't log for /auth/me endpoint - too noisy for public page checks
         if request.url.path != "/api/v1/auth/me":
@@ -42,7 +50,7 @@ async def get_current_user(
         )
 
     user = await auth_service.get_current_user(token)
-    
+
     if not user:
         logger.warning(f"Invalid token for {request.url.path}")
         raise HTTPException(
@@ -50,6 +58,34 @@ async def get_current_user(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Check inactivity timeout (30 minutes of no API calls)
+    if user.last_activity_at:
+        inactive_seconds = (datetime.now(timezone.utc) - user.last_activity_at).total_seconds()
+        inactive_minutes = inactive_seconds / 60
+
+        if inactive_minutes > settings.security.inactivity_timeout_minutes:
+            logger.warning(f"User {user.email} inactive for {inactive_minutes:.1f} minutes - forcing logout")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Session expired due to inactivity ({settings.security.inactivity_timeout_minutes} minutes)",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    # Update activity timestamp (track user activity)
+    # Use synchronous database session for activity update
+    from sqlalchemy.orm import Session
+    db: Session = next(get_db())
+    try:
+        db_user = db.query(User).filter(User.id == user.id).first()
+        if db_user:
+            db_user.last_activity_at = datetime.now(timezone.utc)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update last_activity_at for user {user.email}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
     logger.info(f"Authenticated user {user.email} for {request.url.path}")
     return user
