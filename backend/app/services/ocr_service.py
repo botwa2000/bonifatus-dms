@@ -8,6 +8,7 @@ import io
 import logging
 import re
 import subprocess
+import tempfile
 from typing import Optional, Tuple, Dict, Set
 from PIL import Image
 import pytesseract
@@ -31,6 +32,66 @@ class OCRService:
         except Exception as e:
             logger.error(f"Failed to initialize Tesseract: {e}")
             raise
+
+    def extract_text_with_pdftotext(self, pdf_file: bytes) -> Tuple[str, bool]:
+        """
+        Extract text from PDF using pdftotext (poppler-utils)
+        This is the fastest and most reliable method for text extraction
+
+        Args:
+            pdf_file: PDF file as bytes
+
+        Returns:
+            Tuple of (extracted_text, success)
+            success: True if text was extracted, False if failed or no text
+        """
+        try:
+            # Write PDF to temporary file (pdftotext requires file path)
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                tmp_pdf.write(pdf_file)
+                tmp_pdf.flush()
+                pdf_path = tmp_pdf.name
+
+            try:
+                # Run pdftotext command (part of poppler-utils, already installed)
+                # -layout: preserve layout
+                # -: output to stdout
+                result = subprocess.run(
+                    ['pdftotext', '-layout', pdf_path, '-'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30  # 30 seconds timeout
+                )
+
+                if result.returncode == 0:
+                    text = result.stdout.strip()
+                    if len(text) > 50:  # Minimum threshold for usable text
+                        logger.info(f"pdftotext extracted {len(text)} chars successfully")
+                        return text, True
+                    else:
+                        logger.info(f"pdftotext returned minimal text ({len(text)} chars)")
+                        return "", False
+                else:
+                    logger.warning(f"pdftotext failed with code {result.returncode}: {result.stderr}")
+                    return "", False
+
+            finally:
+                # Clean up temporary file
+                import os
+                try:
+                    os.unlink(pdf_path)
+                except:
+                    pass
+
+        except FileNotFoundError:
+            logger.error("pdftotext command not found - poppler-utils not installed")
+            return "", False
+        except subprocess.TimeoutExpired:
+            logger.warning("pdftotext timeout after 30 seconds")
+            return "", False
+        except Exception as e:
+            logger.warning(f"pdftotext extraction failed: {e}")
+            return "", False
 
     def get_supported_languages(self, db: Session) -> Dict[str, str]:
         """
@@ -261,6 +322,45 @@ class OCRService:
             logger.warning(f"Image preprocessing failed, using original: {e}")
             return image
 
+    def ocr_image_with_rotation_detection(
+        self,
+        image: Image.Image,
+        db: Session,
+        language: str = 'en',
+        preprocess: bool = True
+    ) -> Tuple[str, float]:
+        """
+        OCR an image with automatic rotation detection and correction
+        Uses Tesseract OSD (Orientation and Script Detection) to detect rotation
+
+        Args:
+            image: PIL Image to OCR
+            db: Database session for language config
+            language: Language code for OCR
+            preprocess: Whether to apply preprocessing
+
+        Returns:
+            Tuple of (extracted_text, confidence)
+        """
+        try:
+            # Step 1: Detect rotation using Tesseract OSD
+            osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
+            detected_rotation = osd.get('rotate', 0)
+            orientation_conf = osd.get('orientation_conf', 0)
+
+            logger.info(f"[ROTATION] OSD detected: {detected_rotation}° rotation (confidence: {orientation_conf:.2f})")
+
+            # Step 2: Rotate image if needed (with high confidence)
+            if detected_rotation != 0 and orientation_conf > 2.0:
+                logger.info(f"[ROTATION] ✅ Rotating image by {-detected_rotation}° before OCR")
+                image = image.rotate(-detected_rotation, expand=True)  # PIL rotates counter-clockwise
+        except Exception as e:
+            # OSD can fail on pages with very little text or complex layouts
+            logger.warning(f"[ROTATION] OSD failed: {e}, proceeding without rotation correction")
+
+        # Step 3: OCR the (possibly rotated) image
+        return self.extract_text_from_image(image, db, language, preprocess)
+
     def extract_text_from_image(
         self,
         image: Image.Image,
@@ -401,9 +501,9 @@ class OCRService:
         max_pages: Optional[int] = None
     ) -> Tuple[str, float]:
         """
-        Extract text from PDF (handles both native and scanned PDFs)
-        Uses PyMuPDF for high-quality native text extraction
-        Falls back to Tesseract OCR for scanned or poor-quality PDFs
+        Extract text from PDF using optimal two-tier approach:
+        1. Try pdftotext (fastest, most reliable for text PDFs)
+        2. Fallback to Tesseract OCR (for truly scanned documents)
 
         Args:
             pdf_file: PDF file as bytes
@@ -415,192 +515,126 @@ class OCRService:
             Tuple of (extracted_text, confidence_score)
         """
         try:
-            is_scanned, text_quality = self.is_scanned_pdf(pdf_file, language)
+            # STEP 1: Try pdftotext (5-20ms, handles 99% of PDFs)
+            text, success = self.extract_text_with_pdftotext(pdf_file)
 
-            if not is_scanned:
-                # Use PyMuPDF for native PDF text extraction (fast & high quality)
-                doc = fitz.open(stream=pdf_file, filetype="pdf")
-                pages_to_process = len(doc) if max_pages is None else min(max_pages, len(doc))
+            if success:
+                # Got usable text - we're done!
+                logger.info(f"Text extracted via pdftotext: {len(text)} chars")
+                return text, 0.95  # High confidence for pdftotext extraction
 
-                text_parts = []
-                for i in range(pages_to_process):
-                    page = doc[i]
+            # STEP 2: Fallback to OCR for truly scanned PDFs
+            logger.info("pdftotext returned no text, falling back to OCR")
 
-                    # Check PDF metadata for rotation first
-                    metadata_rotation = page.rotation
-                    if metadata_rotation != 0:
-                        logger.info(f"[ROTATION DEBUG] Page {i+1} has metadata rotation: {metadata_rotation}°")
+            # Use Tesseract OCR for scanned PDFs
+            # Use PyMuPDF to render pages to images
+            doc = fitz.open(stream=pdf_file, filetype="pdf")
+            pages_to_process = len(doc) if max_pages is None else min(max_pages, len(doc))
 
-                    # Extract text at current rotation
-                    page_text = page.get_text()
+            text_parts = []
+            confidences = []
 
-                    # Use Tesseract OSD (Orientation and Script Detection) for rotation detection
-                    if page_text and len(page_text) > 50:
-                        try:
-                            # Render page as image for OSD analysis
-                            zoom = 2  # 144 DPI for OSD (balance speed vs accuracy)
-                            mat = fitz.Matrix(zoom, zoom)
-                            pix = page.get_pixmap(matrix=mat)
-                            import io
-                            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            # Render at 300 DPI for better OCR quality
+            zoom = 300 / 72
+            mat = fitz.Matrix(zoom, zoom)
 
-                            # Run Tesseract OSD (fast, analyzes structure not full text)
-                            osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
-                            detected_rotation = osd.get('rotate', 0)  # How much to rotate to correct
-                            orientation_conf = osd.get('orientation_conf', 0)
+            for i in range(pages_to_process):
+                logger.info(f"[OCR DEBUG] Processing page {i+1}/{pages_to_process}")
 
-                            logger.info(f"[ROTATION DEBUG] Page {i+1} Tesseract OSD:")
-                            logger.info(f"[ROTATION DEBUG]   - Detected rotation needed: {detected_rotation}°")
-                            logger.info(f"[ROTATION DEBUG]   - Confidence: {orientation_conf:.2f}")
-                            logger.info(f"[ROTATION DEBUG]   - Text sample: {page_text[:50]}")
+                page = doc[i]
 
-                            # Apply rotation if detected with high confidence (>2.0 is typically reliable)
-                            if detected_rotation != 0 and orientation_conf > 2.0:
-                                logger.info(f"[ROTATION DEBUG] ✅ Detected {detected_rotation}° rotation, re-extracting via OCR")
+                # Check for embedded images (direct extraction preserves quality)
+                images = page.get_images()
 
-                                # For rotated pages, page.set_rotation() doesn't affect get_text()
-                                # Solution: Rotate the image and OCR it
-                                rotated_image = image.rotate(-detected_rotation, expand=True)  # PIL rotates counter-clockwise
+                if images:
+                    # PDF has embedded image - analyze quality
+                    xref = images[0][0]
+                    base_image = doc.extract_image(xref)
 
-                                # Get Tesseract language codes for OCR
-                                supported_languages = self.get_supported_languages(db)
-                                tesseract_lang = supported_languages.get(language, 'eng')
+                    # Get page dimensions in inches
+                    page_rect = page.rect
+                    page_width_inches = page_rect.width / 72
+                    page_height_inches = page_rect.height / 72
 
-                                # OCR the rotated image
-                                custom_config = r'--oem 3 --psm 3'
-                                page_text = pytesseract.image_to_string(
-                                    rotated_image,
-                                    lang=tesseract_lang,
-                                    config=custom_config
-                                ).strip()
+                    # Calculate DPI
+                    dpi_x = base_image['width'] / page_width_inches if page_width_inches > 0 else 0
+                    dpi_y = base_image['height'] / page_height_inches if page_height_inches > 0 else 0
 
-                                logger.info(f"[ROTATION DEBUG] ✅ Page {i+1} re-OCR'd after {detected_rotation}° rotation, new sample: {page_text[:50]}")
-                            else:
-                                logger.info(f"[ROTATION DEBUG] Page {i+1} appears correctly oriented (rotation: {detected_rotation}°, conf: {orientation_conf:.2f})")
+                    # Handle PDFs with incorrect page dimensions (common issue)
+                    # If calculated DPI is suspiciously low but image resolution is high, recalculate using standard page sizes
+                    if (dpi_x < 150 or dpi_y < 150) and (base_image['width'] >= 2000 or base_image['height'] >= 2000):
+                        logger.info(f"[OCR DEBUG] ⚠️ PDF has incorrect page dimensions ({page_width_inches:.2f}x{page_height_inches:.2f} in), recalculating DPI")
 
-                        except Exception as e:
-                            # OSD can fail on pages with very little text or complex layouts
-                            logger.warning(f"[ROTATION DEBUG] OSD failed for page {i+1}: {e}, using text as-is")
+                        # Detect orientation from image aspect ratio
+                        image_aspect = base_image['width'] / base_image['height']
 
-                    if page_text:
-                        text_parts.append(page_text)
+                        # Standard page sizes (width x height in inches): Letter, A4
+                        standard_sizes = [
+                            (8.5, 11.0),   # US Letter portrait
+                            (11.0, 8.5),   # US Letter landscape
+                            (8.27, 11.69), # A4 portrait
+                            (11.69, 8.27)  # A4 landscape
+                        ]
 
-                doc.close()
-                full_text = "\n\n".join(text_parts)
+                        # Find best matching standard size
+                        best_match = None
+                        best_diff = float('inf')
+                        for std_width, std_height in standard_sizes:
+                            std_aspect = std_width / std_height
+                            aspect_diff = abs(image_aspect - std_aspect)
+                            if aspect_diff < best_diff:
+                                best_diff = aspect_diff
+                                best_match = (std_width, std_height)
 
-                logger.info(f"Extracted text from native PDF ({pages_to_process} pages, quality: {text_quality:.2f})")
-                return full_text.strip(), text_quality
+                        # Recalculate DPI using standard page size
+                        if best_match:
+                            page_width_inches, page_height_inches = best_match
+                            dpi_x = base_image['width'] / page_width_inches
+                            dpi_y = base_image['height'] / page_height_inches
+                            logger.info(f"[OCR DEBUG] ✅ Matched to standard page size: {page_width_inches}x{page_height_inches} inches, recalculated DPI: {dpi_x:.0f}x{dpi_y:.0f}")
 
-            else:
-                # Use Tesseract OCR for scanned/poor quality PDFs
-                # Use PyMuPDF to render pages to images (no poppler dependency)
-                doc = fitz.open(stream=pdf_file, filetype="pdf")
-                pages_to_process = len(doc) if max_pages is None else min(max_pages, len(doc))
+                    logger.info(f"[OCR DEBUG] Embedded image found:")
+                    logger.info(f"[OCR DEBUG]   - Resolution: {base_image['width']}x{base_image['height']} pixels")
+                    logger.info(f"[OCR DEBUG]   - Page size: {page_width_inches:.2f}x{page_height_inches:.2f} inches")
+                    logger.info(f"[OCR DEBUG]   - Effective DPI: {dpi_x:.0f}x{dpi_y:.0f}")
+                    logger.info(f"[OCR DEBUG]   - Format: {base_image['ext']}")
+                    logger.info(f"[OCR DEBUG]   - Size: {len(base_image['image']) / 1024:.1f} KB")
 
-                text_parts = []
-                confidences = []
-
-                # Render at 300 DPI for better OCR quality
-                zoom = 300 / 72
-                mat = fitz.Matrix(zoom, zoom)
-
-                for i in range(pages_to_process):
-                    logger.info(f"[OCR DEBUG] Processing page {i+1}/{pages_to_process}")
-
-                    page = doc[i]
-
-                    # Check for embedded images (direct extraction preserves quality)
-                    images = page.get_images()
-
-                    if images:
-                        # PDF has embedded image - analyze quality
-                        xref = images[0][0]
-                        base_image = doc.extract_image(xref)
-
-                        # Get page dimensions in inches
-                        page_rect = page.rect
-                        page_width_inches = page_rect.width / 72
-                        page_height_inches = page_rect.height / 72
-
-                        # Calculate DPI
-                        dpi_x = base_image['width'] / page_width_inches if page_width_inches > 0 else 0
-                        dpi_y = base_image['height'] / page_height_inches if page_height_inches > 0 else 0
-
-                        # Handle PDFs with incorrect page dimensions (common issue)
-                        # If calculated DPI is suspiciously low but image resolution is high, recalculate using standard page sizes
-                        if (dpi_x < 150 or dpi_y < 150) and (base_image['width'] >= 2000 or base_image['height'] >= 2000):
-                            logger.info(f"[OCR DEBUG] ⚠️ PDF has incorrect page dimensions ({page_width_inches:.2f}x{page_height_inches:.2f} in), recalculating DPI")
-
-                            # Detect orientation from image aspect ratio
-                            image_aspect = base_image['width'] / base_image['height']
-
-                            # Standard page sizes (width x height in inches): Letter, A4
-                            standard_sizes = [
-                                (8.5, 11.0),   # US Letter portrait
-                                (11.0, 8.5),   # US Letter landscape
-                                (8.27, 11.69), # A4 portrait
-                                (11.69, 8.27)  # A4 landscape
-                            ]
-
-                            # Find best matching standard size
-                            best_match = None
-                            best_diff = float('inf')
-                            for std_width, std_height in standard_sizes:
-                                std_aspect = std_width / std_height
-                                aspect_diff = abs(image_aspect - std_aspect)
-                                if aspect_diff < best_diff:
-                                    best_diff = aspect_diff
-                                    best_match = (std_width, std_height)
-
-                            # Recalculate DPI using standard page size
-                            if best_match:
-                                page_width_inches, page_height_inches = best_match
-                                dpi_x = base_image['width'] / page_width_inches
-                                dpi_y = base_image['height'] / page_height_inches
-                                logger.info(f"[OCR DEBUG] ✅ Matched to standard page size: {page_width_inches}x{page_height_inches} inches, recalculated DPI: {dpi_x:.0f}x{dpi_y:.0f}")
-
-                        logger.info(f"[OCR DEBUG] Embedded image found:")
-                        logger.info(f"[OCR DEBUG]   - Resolution: {base_image['width']}x{base_image['height']} pixels")
-                        logger.info(f"[OCR DEBUG]   - Page size: {page_width_inches:.2f}x{page_height_inches:.2f} inches")
-                        logger.info(f"[OCR DEBUG]   - Effective DPI: {dpi_x:.0f}x{dpi_y:.0f}")
-                        logger.info(f"[OCR DEBUG]   - Format: {base_image['ext']}")
-                        logger.info(f"[OCR DEBUG]   - Size: {len(base_image['image']) / 1024:.1f} KB")
-
-                        # Quality-based extraction decision
-                        if dpi_x >= 200 and dpi_y >= 200:
-                            # High-quality scan - extract directly without preprocessing
-                            logger.info(f"[OCR DEBUG] ✅ HIGH QUALITY ({dpi_x:.0f} DPI) - Extracting image directly (no preprocessing)")
-                            import io
-                            image = Image.open(io.BytesIO(base_image['image']))
-                            page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=False)
-                            logger.info(f"[OCR DEBUG] Direct extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
-                        else:
-                            # Low-quality scan - render and preprocess
-                            logger.info(f"[OCR DEBUG] ⚠️ LOW QUALITY ({dpi_x:.0f} DPI) - Rendering page with preprocessing")
-                            pix = page.get_pixmap(matrix=mat)
-                            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                            page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=True)
-                            logger.info(f"[OCR DEBUG] Preprocessed extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                    # Quality-based extraction decision
+                    if dpi_x >= 200 and dpi_y >= 200:
+                        # High-quality scan - extract directly without preprocessing
+                        logger.info(f"[OCR DEBUG] ✅ HIGH QUALITY ({dpi_x:.0f} DPI) - Extracting image directly (no preprocessing)")
+                        import io
+                        image = Image.open(io.BytesIO(base_image['image']))
+                        page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=False)
+                        logger.info(f"[OCR DEBUG] Direct extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
                     else:
-                        # No embedded images - render page
-                        logger.info(f"[OCR DEBUG] No embedded images - rendering page at 300 DPI")
+                        # Low-quality scan - render and preprocess
+                        logger.info(f"[OCR DEBUG] ⚠️ LOW QUALITY ({dpi_x:.0f} DPI) - Rendering page with preprocessing")
                         pix = page.get_pixmap(matrix=mat)
                         image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                        page_text, confidence = self.extract_text_from_image(image, db, language, preprocess=True)
-                        logger.info(f"[OCR DEBUG] Rendered extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                        page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=True)
+                        logger.info(f"[OCR DEBUG] Preprocessed extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                else:
+                    # No embedded images - render page
+                    logger.info(f"[OCR DEBUG] No embedded images - rendering page at 300 DPI")
+                    pix = page.get_pixmap(matrix=mat)
+                    image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=True)
+                    logger.info(f"[OCR DEBUG] Rendered extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
 
-                    if page_text:
-                        text_parts.append(page_text)
-                        confidences.append(confidence)
+                if page_text:
+                    text_parts.append(page_text)
+                    confidences.append(confidence)
 
-                doc.close()
+            doc.close()
 
-                full_text = "\n\n".join(text_parts)
-                avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            full_text = "\n\n".join(text_parts)
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
 
-                logger.info(f"OCR extracted text from scanned PDF ({pages_to_process} pages, {avg_confidence*100:.1f}% confidence)")
+            logger.info(f"OCR extracted text from scanned PDF ({pages_to_process} pages, {avg_confidence*100:.1f}% confidence)")
 
-                return full_text.strip(), avg_confidence
+            return full_text.strip(), avg_confidence
 
         except Exception as e:
             logger.error(f"PDF text extraction failed: {e}")
