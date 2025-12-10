@@ -106,11 +106,11 @@ class UserMonthlyUsage(Base):
 
 
 class User(Base, TimestampMixin):
-    """User account with Google OAuth integration"""
+    """User account with multi-provider authentication"""
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    google_id = Column(String(50), unique=True, nullable=False, index=True)
+    google_id = Column(String(50), unique=True, nullable=True, index=True)  # Nullable for email/password users
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
     profile_picture = Column(Text, nullable=True)
@@ -121,6 +121,14 @@ class User(Base, TimestampMixin):
     preferred_doc_languages = Column(JSONB, nullable=False, server_default='["en"]')
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)
+
+    # Multi-provider authentication fields
+    password_hash = Column(String(255), nullable=True)  # bcrypt hash for email/password auth
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    auth_provider = Column(String(50), default='google', nullable=False)  # google, email, microsoft, facebook, apple
+    two_factor_enabled = Column(Boolean, default=False, nullable=False)
+    two_factor_secret = Column(String(255), nullable=True)  # TOTP secret (encrypted)
 
     # Security columns
     drive_refresh_token_encrypted = Column(Text, nullable=True)
