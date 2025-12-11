@@ -65,7 +65,7 @@ class SessionService:
                 created_at=datetime.now(timezone.utc),
                 last_activity_at=datetime.now(timezone.utc),
                 expires_at=expires_at,
-                is_revoked=False
+                is_active=True
             )
             
             session.add(user_session)
@@ -113,7 +113,7 @@ class SessionService:
             result = session.execute(
                 select(UserSession).where(
                     UserSession.refresh_token == token_hash,
-                    UserSession.is_revoked == False,
+                    UserSession.is_active == True,
                     UserSession.expires_at > datetime.now(timezone.utc)
                 )
             ).scalar_one_or_none()
@@ -165,16 +165,12 @@ class SessionService:
             result = session.execute(
                 text("""
                     UPDATE user_sessions
-                    SET is_revoked = true,
-                        revoked_at = :now,
-                        revoked_reason = :reason
+                    SET is_active = false
                     WHERE id = :session_id
-                    AND is_revoked = false
+                    AND is_active = true
                 """),
                 {
-                    'session_id': session_id,
-                    'reason': reason,
-                    'now': datetime.now(timezone.utc)
+                    'session_id': session_id
                 }
             )
             
@@ -222,17 +218,13 @@ class SessionService:
         try:
             query = """
                 UPDATE user_sessions
-                SET is_revoked = true,
-                    revoked_at = :now,
-                    revoked_reason = :reason
+                SET is_active = false
                 WHERE user_id = :user_id
-                AND is_revoked = false
+                AND is_active = true
             """
-            
+
             params = {
-                'user_id': user_id,
-                'reason': reason,
-                'now': datetime.now(timezone.utc)
+                'user_id': user_id
             }
             
             if except_session_id:
@@ -278,7 +270,7 @@ class SessionService:
             results = session.execute(
                 select(UserSession).where(
                     UserSession.user_id == uuid.UUID(user_id),
-                    UserSession.is_revoked == False,
+                    UserSession.is_active == True,
                     UserSession.expires_at > datetime.now(timezone.utc)
                 ).order_by(UserSession.last_activity_at.desc())
             ).scalars().all()
@@ -326,11 +318,10 @@ class SessionService:
                 text("""
                     DELETE FROM user_sessions
                     WHERE expires_at < :now
-                    OR (is_revoked = true AND revoked_at < :cutoff)
+                    OR is_active = false
                 """),
                 {
-                    'now': datetime.now(timezone.utc),
-                    'cutoff': datetime.now(timezone.utc) - timedelta(days=30)
+                    'now': datetime.now(timezone.utc)
                 }
             )
             
