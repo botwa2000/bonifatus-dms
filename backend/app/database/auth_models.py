@@ -91,7 +91,7 @@ class UserSession(Base, TimestampMixin):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     # Relationships
-    user = relationship("User", backref="sessions")
+    user = relationship("User", back_populates="sessions")
     device = relationship("RegisteredDevice", backref="sessions")
 
 
