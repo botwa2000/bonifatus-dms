@@ -9,7 +9,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/contexts/auth-context'
 import { useCurrency } from '@/contexts/currency-context'
@@ -130,7 +129,9 @@ export default function HomePage() {
                 <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Pricing</a>
                 <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">About</Link>
                 <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Contact</Link>
-                <GoogleLoginButton size="sm">Sign In</GoogleLoginButton>
+                <Link href="/login">
+                  <Button size="sm">Sign In</Button>
+                </Link>
               </div>
 
               <div className="md:hidden">
@@ -158,9 +159,11 @@ export default function HomePage() {
               No manual filing, ever again.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <GoogleLoginButton size="lg" className="min-w-[200px]">
-                Start Free - 50 Pages/Month
-              </GoogleLoginButton>
+              <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
+                <Button size="lg" className="min-w-[200px]">
+                  Start Free - 50 Pages/Month
+                </Button>
+              </Link>
               <a href="#pricing">
                 <Button variant="secondary" size="lg" className="min-w-[200px]">
                   View Pricing
@@ -569,14 +572,14 @@ export default function HomePage() {
                         Coming Soon
                       </Button>
                     ) : (
-                      <GoogleLoginButton
-                        className="w-full"
-                        variant="secondary"
-                        tierId={tier.id}
-                        billingCycle={billingCycle}
-                      >
-                        {isFree ? 'Start Free' : 'Get Started'}
-                      </GoogleLoginButton>
+                      <Link href={`/signup?tier_id=${tier.id}&tier_name=${encodeURIComponent(tier.display_name)}&billing_cycle=${billingCycle}`}>
+                        <Button
+                          className="w-full"
+                          variant="secondary"
+                        >
+                          {isFree ? 'Start Free' : 'Get Started'}
+                        </Button>
+                      </Link>
                     )}
 
                     {!isPro && (
@@ -615,9 +618,11 @@ export default function HomePage() {
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Start free with 50 pages/month. No credit card required.
           </p>
-          <GoogleLoginButton size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
-            Get Started Free
-          </GoogleLoginButton>
+          <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
+            <Button size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
+              Get Started Free
+            </Button>
+          </Link>
         </div>
       </section>
 

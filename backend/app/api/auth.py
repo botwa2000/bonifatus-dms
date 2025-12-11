@@ -623,3 +623,479 @@ async def auth_service_health():
                 "timestamp": time.time()
             }
         )
+
+
+# ============================================================================
+# EMAIL/PASSWORD AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+from pydantic import EmailStr, Field
+from app.services.email_auth_service import email_auth_service
+from datetime import datetime, timezone
+
+class RegisterRequest(BaseModel):
+    """User registration request"""
+    email: EmailStr
+    password: str = Field(..., min_length=12, description="Password (min 12 characters)")
+    full_name: str = Field(..., min_length=1, max_length=255)
+
+
+class RegisterResponse(BaseModel):
+    """User registration response"""
+    success: bool
+    message: str
+    user_id: Optional[str] = None
+    verification_code_id: Optional[str] = None
+    errors: Optional[list] = None
+
+
+class LoginEmailRequest(BaseModel):
+    """Email/password login request"""
+    email: EmailStr
+    password: str
+    remember_me: bool = False
+
+
+class LoginEmailResponse(BaseModel):
+    """Email/password login response"""
+    success: bool
+    message: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    user: Optional[dict] = None
+    requires_verification: Optional[bool] = None
+    user_id: Optional[str] = None
+
+
+class VerifyEmailRequest(BaseModel):
+    """Email verification request"""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6, pattern="^[0-9]{6}$")
+
+
+class VerifyEmailResponse(BaseModel):
+    """Email verification response"""
+    success: bool
+    message: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+
+
+class ResendCodeRequest(BaseModel):
+    """Resend verification code request"""
+    email: EmailStr
+    purpose: str = Field(..., pattern="^(registration|password_reset|email_change)$")
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request"""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password request"""
+    token: str = Field(..., min_length=64, max_length=64)
+    new_password: str = Field(..., min_length=12)
+
+
+class PasswordStrengthRequest(BaseModel):
+    """Password strength check request"""
+    password: str
+
+
+class PasswordStrengthResponse(BaseModel):
+    """Password strength check response"""
+    valid: bool
+    errors: list[str]
+
+
+@router.post(
+    "/email/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"model": RegisterResponse, "description": "Registration successful"},
+        400: {"model": ErrorResponse, "description": "Invalid input or email already registered"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Register with Email/Password",
+    description="Register new user with email and password (min 12 chars, mixed case, numbers, special chars)"
+)
+async def register_email(request_data: RegisterRequest, db = Depends(get_db)):
+    """
+    Register new user with email/password
+
+    - **email**: Valid email address
+    - **password**: Strong password (min 12 chars, uppercase, lowercase, digit, special char)
+    - **full_name**: User's full name
+    """
+    from app.database.connection import get_db as get_db_func
+
+    result = await email_auth_service.register_user(
+        email=request_data.email,
+        password=request_data.password,
+        full_name=request_data.full_name,
+        session=db
+    )
+
+    if not result['success']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result
+        )
+
+    # TODO: Send verification email with code
+    logger.info(f"New user registered: {request_data.email}")
+
+    return RegisterResponse(**result)
+
+
+@router.post(
+    "/email/login",
+    response_model=LoginEmailResponse,
+    responses={
+        200: {"model": LoginEmailResponse, "description": "Login successful"},
+        401: {"model": ErrorResponse, "description": "Invalid credentials or account locked"},
+        422: {"model": ErrorResponse, "description": "Invalid request data"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Login with Email/Password",
+    description="Authenticate user with email and password"
+)
+async def login_email(
+    request_data: LoginEmailRequest,
+    http_request: Request,
+    response: Response,
+    db = Depends(get_db)
+):
+    """
+    Login with email/password
+
+    - **email**: Registered email address
+    - **password**: User password
+    - **remember_me**: Keep user logged in for 30 days
+    """
+    # Get client info
+    ip_address = get_client_ip(http_request)
+    user_agent = http_request.headers.get("User-Agent", "unknown")
+
+    result = await email_auth_service.login_user(
+        email=request_data.email,
+        password=request_data.password,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        session=db
+    )
+
+    if not result['success']:
+        # Return appropriate response
+        if result.get('requires_verification'):
+            return LoginEmailResponse(**result)
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result
+        )
+
+    # Generate JWT tokens
+    from app.services.jwt_service import jwt_service
+    from app.services.session_service import session_service
+
+    user = result['user']
+    access_token = jwt_service.create_access_token(
+        user_id=str(user.id),
+        email=user.email
+    )
+
+    # Create session with refresh token
+    session_result = await session_service.create_session(
+        user_id=str(user.id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        session=db
+    )
+
+    # Set tokens in httpOnly cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        domain=".bonidoc.com",
+        max_age=settings.security.access_token_expire_minutes * 60,
+        path="/"
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=session_result['refresh_token'],
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        domain=".bonidoc.com",
+        max_age=604800,  # 7 days
+        path="/"
+    )
+
+    logger.info(f"User logged in via email: {request_data.email}")
+
+    return LoginEmailResponse(
+        success=True,
+        message="Login successful",
+        access_token=access_token,
+        refresh_token=session_result['refresh_token'],
+        user={
+            'id': str(user.id),
+            'email': user.email,
+            'full_name': user.full_name,
+            'profile_picture': user.profile_picture,
+            'tier_id': user.tier_id,
+            'is_admin': user.is_admin
+        }
+    )
+
+
+@router.post(
+    "/email/verify",
+    response_model=VerifyEmailResponse,
+    responses={
+        200: {"model": VerifyEmailResponse, "description": "Email verified"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired code"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Verify Email with Code",
+    description="Verify email address with 6-digit code sent via email"
+)
+async def verify_email(
+    request_data: VerifyEmailRequest,
+    response: Response,
+    db = Depends(get_db)
+):
+    """
+    Verify email address with 6-digit code
+
+    - **email**: Email address
+    - **code**: 6-digit verification code
+    """
+    result = await email_auth_service.verify_code(
+        email=request_data.email,
+        code=request_data.code,
+        purpose='registration',
+        session=db
+    )
+
+    if not result['valid']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={'message': result['message']}
+        )
+
+    # Mark user as verified
+    from app.database.models import User
+    from sqlalchemy import select, update
+    from uuid import UUID
+
+    user_id = result.get('user_id')
+    if user_id:
+        await db.execute(
+            update(User)
+            .where(User.id == UUID(user_id))
+            .values(
+                email_verified=True,
+                email_verified_at=datetime.now(timezone.utc)
+            )
+        )
+        db.commit()
+
+        # Get user for token generation
+        user = db.execute(
+            select(User).where(User.id == UUID(user_id))
+        ).scalar_one()
+
+        # Generate tokens
+        from app.services.jwt_service import jwt_service
+        from app.services.session_service import session_service
+
+        access_token = jwt_service.create_access_token(
+            user_id=str(user.id),
+            email=user.email
+        )
+
+        session_result = await session_service.create_session(
+            user_id=str(user.id),
+            session=db
+        )
+
+        # Set cookies
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            domain=".bonidoc.com",
+            max_age=settings.security.access_token_expire_minutes * 60,
+            path="/"
+        )
+
+        response.set_cookie(
+            key="refresh_token",
+            value=session_result['refresh_token'],
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            domain=".bonidoc.com",
+            max_age=604800,
+            path="/"
+        )
+
+        logger.info(f"Email verified: {request_data.email}")
+
+        return VerifyEmailResponse(
+            success=True,
+            message="Email verified successfully",
+            access_token=access_token,
+            refresh_token=session_result['refresh_token']
+        )
+
+    return VerifyEmailResponse(
+        success=True,
+        message="Email verified successfully"
+    )
+
+
+@router.post(
+    "/email/resend-code",
+    responses={
+        200: {"description": "Verification code sent"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Resend Verification Code",
+    description="Resend verification code to email"
+)
+async def resend_verification_code(request_data: ResendCodeRequest, db = Depends(get_db)):
+    """
+    Resend verification code to email
+
+    - **email**: Email address
+    - **purpose**: Code purpose (registration, password_reset, email_change)
+    """
+    # Find user
+    from app.database.models import User
+    from sqlalchemy import select
+
+    user = db.execute(
+        select(User).where(User.email == request_data.email.lower())
+    ).scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={'message': 'User not found'}
+        )
+
+    # Generate new code
+    result = await email_auth_service.generate_verification_code(
+        user_id=str(user.id),
+        email=request_data.email,
+        purpose=request_data.purpose,
+        session=db
+    )
+
+    # TODO: Send verification email with code
+    logger.info(f"Verification code resent to: {request_data.email}")
+
+    return {
+        'success': True,
+        'message': 'Verification code sent',
+        'expires_at': result['expires_at']
+    }
+
+
+@router.post(
+    "/email/forgot-password",
+    responses={
+        200: {"description": "Reset instructions sent"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Request Password Reset",
+    description="Request password reset link via email"
+)
+async def forgot_password(request_data: ForgotPasswordRequest, db = Depends(get_db)):
+    """
+    Request password reset link
+
+    - **email**: Registered email address
+    """
+    result = await email_auth_service.generate_password_reset_token(
+        email=request_data.email,
+        session=db
+    )
+
+    # Always return success (don't reveal if email exists)
+    # TODO: Send password reset email with token
+    logger.info(f"Password reset requested for: {request_data.email}")
+
+    return {
+        'success': True,
+        'message': 'If your email is registered, you will receive a password reset link'
+    }
+
+
+@router.post(
+    "/email/reset-password",
+    responses={
+        200: {"description": "Password reset successful"},
+        400: {"model": ErrorResponse, "description": "Invalid token or weak password"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Reset Password",
+    description="Reset password using token from email"
+)
+async def reset_password(request_data: ResetPasswordRequest, db = Depends(get_db)):
+    """
+    Reset password with token
+
+    - **token**: Password reset token from email (64 characters)
+    - **new_password**: New strong password (min 12 chars)
+    """
+    result = await email_auth_service.reset_password(
+        token=request_data.token,
+        new_password=request_data.new_password,
+        session=db
+    )
+
+    if not result['success']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result
+        )
+
+    logger.info("Password reset successful")
+
+    return result
+
+
+@router.post(
+    "/email/check-password-strength",
+    response_model=PasswordStrengthResponse,
+    responses={
+        200: {"model": PasswordStrengthResponse, "description": "Password strength validated"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Check Password Strength",
+    description="Validate password meets security requirements"
+)
+async def check_password_strength(request_data: PasswordStrengthRequest):
+    """
+    Check password strength
+
+    - **password**: Password to validate
+
+    Returns validation result with specific error messages if password is weak.
+    """
+    result = email_auth_service.validate_password_strength(request_data.password)
+
+    return PasswordStrengthResponse(**result)
