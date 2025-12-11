@@ -13,7 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import settings
 from app.database.models import User
-from app.database.database import get_db
+from app.database.connection import get_db
 from app.services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
