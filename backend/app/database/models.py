@@ -121,6 +121,7 @@ class User(Base, TimestampMixin):
     preferred_doc_languages = Column(JSONB, nullable=False, server_default='["en"]')
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)
+    last_activity_at = Column(DateTime(timezone=True), nullable=True)  # For inactivity timeout (30 min)
 
     # Multi-provider authentication fields
     password_hash = Column(String(255), nullable=True)  # bcrypt hash for email/password auth
