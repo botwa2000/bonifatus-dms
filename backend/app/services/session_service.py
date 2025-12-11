@@ -59,7 +59,7 @@ class SessionService:
             user_session = UserSession(
                 id=uuid.uuid4(),
                 user_id=uuid.UUID(user_id),
-                refresh_token_hash=token_hash,
+                refresh_token=token_hash,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 created_at=datetime.now(timezone.utc),
@@ -112,7 +112,7 @@ class SessionService:
             
             result = session.execute(
                 select(UserSession).where(
-                    UserSession.refresh_token_hash == token_hash,
+                    UserSession.refresh_token == token_hash,
                     UserSession.is_revoked == False,
                     UserSession.expires_at > datetime.now(timezone.utc)
                 )
