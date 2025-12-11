@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
                   Forgot your password?
                 </h1>
                 <p className="text-neutral-600 dark:text-neutral-400">
-                  No worries! Enter your email and we'll send you reset instructions.
+                  No worries! Enter your email and we&apos;ll send you reset instructions.
                 </p>
               </div>
 
@@ -157,14 +157,14 @@ export default function ForgotPasswordPage() {
                   Check your email
                 </h1>
                 <p className="text-neutral-600 dark:text-neutral-400">
-                  If an account exists for <span className="font-medium text-neutral-900 dark:text-white">{email}</span>, you'll receive password reset instructions shortly.
+                  If an account exists for <span className="font-medium text-neutral-900 dark:text-white">{email}</span>, you&apos;ll receive password reset instructions shortly.
                 </p>
               </div>
 
               {/* Info Box */}
               <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  <strong className="text-neutral-900 dark:text-white">Didn't receive the email?</strong><br />
+                  <strong className="text-neutral-900 dark:text-white">Didn&apos;t receive the email?</strong><br />
                   Check your spam folder. The link expires in 1 hour.
                 </p>
               </div>

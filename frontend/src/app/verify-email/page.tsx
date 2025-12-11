@@ -244,7 +244,7 @@ function VerifyEmailContent() {
               disabled={resendLoading}
               className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-admin-primary disabled:opacity-50"
             >
-              {resendLoading ? 'Sending...' : "Didn't receive the code? Resend"}
+              {resendLoading ? 'Sending...' : 'Didn&apos;t receive the code? Resend'}
             </button>
           </div>
 
