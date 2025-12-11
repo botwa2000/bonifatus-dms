@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 import uuid
 
 from app.database.connection import db_manager
-from app.database.models import UserSession, User
+from app.database.auth_models import UserSession
+from app.database.models import User
 from app.services.encryption_service import encryption_service
 
 logger = logging.getLogger(__name__)
