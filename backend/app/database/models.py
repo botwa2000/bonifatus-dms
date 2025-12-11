@@ -163,24 +163,6 @@ class User(Base, TimestampMixin):
     )
 
 
-class UserSession(Base):
-    """User authentication sessions"""
-    __tablename__ = 'user_sessions'
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    refresh_token_hash = Column(String(64), unique=True, nullable=False)
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    last_activity_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_revoked = Column(Boolean, default=False, nullable=False)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_reason = Column(String(100), nullable=True)
-    
-    user = relationship('User', back_populates='sessions')
-
 class Category(Base, TimestampMixin):
     """Category with dynamic multilingual support"""
     __tablename__ = "categories"
@@ -1471,3 +1453,8 @@ class KeywordTrainingData(Base):
     __table_args__ = (
         Index('idx_training_user_keyword', 'user_id', 'keyword', 'language'),
     )
+
+
+# Import auth models to register them with Base.metadata
+# This ensures SQLAlchemy knows about these tables and relationships
+from app.database import auth_models  # noqa: F401, E402
