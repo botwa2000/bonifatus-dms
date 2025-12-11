@@ -52,15 +52,20 @@ class SessionService:
             close_session = True
         
         try:
+            # Generate both session token and refresh token
+            session_token = encryption_service.generate_secure_token(32)
+            session_token_hash = encryption_service.hash_token(session_token)
+
             refresh_token = encryption_service.generate_secure_token(32)
-            token_hash = encryption_service.hash_token(refresh_token)
-            
+            refresh_token_hash = encryption_service.hash_token(refresh_token)
+
             expires_at = datetime.now(timezone.utc) + timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS)
-            
+
             user_session = UserSession(
                 id=uuid.uuid4(),
                 user_id=uuid.UUID(user_id),
-                refresh_token=token_hash,
+                session_token=session_token_hash,
+                refresh_token=refresh_token_hash,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 created_at=datetime.now(timezone.utc),
