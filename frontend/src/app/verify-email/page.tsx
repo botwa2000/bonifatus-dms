@@ -259,7 +259,7 @@ function VerifyEmailContent() {
         {/* Help Text */}
         <div className="mt-8 text-center">
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Check your spam folder if you don't see the email.
+            Check your spam folder if you don&apos;t see the email.
           </p>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2">
             The code expires in 15 minutes.
