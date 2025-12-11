@@ -182,7 +182,7 @@ export default function ForgotPasswordPage() {
 
                 <Link href="/login">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="lg"
                     className="w-full"
                   >
