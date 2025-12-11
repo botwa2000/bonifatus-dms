@@ -8,6 +8,7 @@ Production-grade implementation with comprehensive security
 import logging
 import time
 from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
