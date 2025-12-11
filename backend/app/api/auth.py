@@ -23,17 +23,20 @@ from app.schemas.auth_schemas import (
     GoogleOAuthConfigResponse
 )
 from app.services.auth_service import auth_service
+from app.services.email_auth_service import EmailAuthService
 from app.middleware.auth_middleware import (
-    get_current_active_user, 
+    get_current_active_user,
     get_current_admin_user,
     get_client_ip,
     optional_current_user
 )
 from app.database.models import User
+from app.database.connection import get_db
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
+email_auth_service = EmailAuthService()
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
