@@ -165,7 +165,8 @@ class EmailAuthService:
                 auth_provider='email',
                 email_verified=False,
                 tier_id=0,  # Free tier
-                is_active=True
+                is_active=True,
+                preferred_doc_languages=["en"]  # Default to English
             )
 
             session.add(user)
