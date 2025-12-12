@@ -749,7 +749,37 @@ async def register_email(request_data: RegisterRequest, db = Depends(get_db)):
             detail=result
         )
 
-    # TODO: Send verification email with code
+    # Send verification email with code
+    try:
+        from app.database.models import User
+        from app.database.auth_models import EmailVerificationCode
+        from sqlalchemy import select
+
+        # Get the verification code that was just created
+        verification_code_id = result.get('verification_code_id')
+        if verification_code_id:
+            code_record = db.execute(
+                select(EmailVerificationCode).where(
+                    EmailVerificationCode.id == verification_code_id
+                )
+            ).scalar_one_or_none()
+
+            if code_record:
+                # Send verification email
+                await email_service.send_verification_code_email(
+                    to_email=request_data.email,
+                    user_name=request_data.full_name or request_data.email,
+                    verification_code=code_record.code
+                )
+                logger.info(f"Verification email sent to: {request_data.email}")
+            else:
+                logger.error(f"Verification code not found for: {request_data.email}")
+        else:
+            logger.error(f"No verification_code_id returned for: {request_data.email}")
+    except Exception as e:
+        # Log error but don't fail the registration
+        logger.error(f"Failed to send verification email to {request_data.email}: {e}")
+
     logger.info(f"New user registered: {request_data.email}")
 
     return RegisterResponse(**result)
@@ -1045,7 +1075,29 @@ async def resend_verification_code(request_data: ResendCodeRequest, db = Depends
         session=db
     )
 
-    # TODO: Send verification email with code
+    # Send verification email with code
+    try:
+        from app.database.auth_models import EmailVerificationCode
+        from sqlalchemy import select
+
+        code_record = db.execute(
+            select(EmailVerificationCode).where(
+                EmailVerificationCode.id == result['code_id']
+            )
+        ).scalar_one_or_none()
+
+        if code_record:
+            await email_service.send_verification_code_email(
+                to_email=request_data.email,
+                user_name=user.full_name or user.email,
+                verification_code=code_record.code
+            )
+            logger.info(f"Verification email sent to: {request_data.email}")
+        else:
+            logger.error(f"Verification code not found for: {request_data.email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {request_data.email}: {e}")
+
     logger.info(f"Verification code resent to: {request_data.email}")
 
     return {
@@ -1075,8 +1127,31 @@ async def forgot_password(request_data: ForgotPasswordRequest, db = Depends(get_
         session=db
     )
 
+    # Send password reset email if user exists
+    if result:
+        try:
+            from app.database.models import User
+            from sqlalchemy import select
+
+            user = db.execute(
+                select(User).where(User.id == result['user_id'])
+            ).scalar_one_or_none()
+
+            if user:
+                # Build reset URL
+                reset_url = f"https://{'dev.' if settings.environment == 'development' else ''}bonidoc.com/reset-password?token={result['token']}"
+
+                await email_service.send_password_reset_email(
+                    to_email=request_data.email,
+                    user_name=user.full_name or user.email,
+                    reset_token=result['token'],
+                    reset_url=reset_url
+                )
+                logger.info(f"Password reset email sent to: {request_data.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {request_data.email}: {e}")
+
     # Always return success (don't reveal if email exists)
-    # TODO: Send password reset email with token
     logger.info(f"Password reset requested for: {request_data.email}")
 
     return {
