@@ -138,9 +138,31 @@ class EmailAuthService:
             ).scalar_one_or_none()
 
             if existing_user:
+                # If user exists but email not verified, allow resending verification
+                if not existing_user.email_verified:
+                    # Generate new verification code
+                    code_result = await self.generate_verification_code(
+                        user_id=str(existing_user.id),
+                        email=email.lower(),
+                        purpose='registration',
+                        session=session
+                    )
+
+                    return {
+                        'success': False,
+                        'message': 'This email is already registered but not verified. We\'ve sent a new verification code to your email.',
+                        'requires_verification': True,
+                        'email': email.lower(),
+                        'verification_code_id': code_result['code_id'],
+                        'user_friendly': True
+                    }
+
+                # Email verified - user should login
                 return {
                     'success': False,
-                    'message': 'Email already registered'
+                    'message': 'This email is already registered. Please log in or use "Forgot Password" if you need to reset your password.',
+                    'requires_login': True,
+                    'user_friendly': True
                 }
 
             # Validate password strength

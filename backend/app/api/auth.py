@@ -743,13 +743,52 @@ async def register_email(request_data: RegisterRequest, db = Depends(get_db)):
         session=db
     )
 
+    # Handle special cases (existing email)
     if not result['success']:
+        # If user-friendly error (already registered), send email if needed
+        if result.get('user_friendly'):
+            # If unverified account, send verification email
+            if result.get('requires_verification'):
+                try:
+                    from app.database.auth_models import EmailVerificationCode
+                    from sqlalchemy import select
+
+                    verification_code_id = result.get('verification_code_id')
+                    if verification_code_id:
+                        code_record = db.execute(
+                            select(EmailVerificationCode).where(
+                                EmailVerificationCode.id == verification_code_id
+                            )
+                        ).scalar_one_or_none()
+
+                        if code_record:
+                            await email_service.send_verification_code_email(
+                                to_email=result['email'],
+                                user_name=request_data.full_name or result['email'],
+                                verification_code=code_record.code
+                            )
+                            logger.info(f"Verification email sent to existing unverified user: {result['email']}")
+                except Exception as e:
+                    logger.error(f"Failed to send verification email: {e}")
+
+            # Return user-friendly error with proper message
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    'message': result['message'],
+                    'requires_verification': result.get('requires_verification', False),
+                    'requires_login': result.get('requires_login', False),
+                    'email': result.get('email')
+                }
+            )
+
+        # Generic error
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result
         )
 
-    # Send verification email with code
+    # Send verification email with code for new registrations
     try:
         from app.database.models import User
         from app.database.auth_models import EmailVerificationCode
