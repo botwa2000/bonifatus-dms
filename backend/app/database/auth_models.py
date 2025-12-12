@@ -128,7 +128,7 @@ class EmailSettings(Base, TimestampMixin):
     user = relationship("User", backref="email_settings", uselist=False)
 
 
-class AllowedSender(Base, TimestampMixin):
+class AllowedSender(Base):
     """Whitelist of email addresses for email-to-process"""
     __tablename__ = "allowed_senders"
 
@@ -141,6 +141,7 @@ class AllowedSender(Base, TimestampMixin):
     trust_level = Column(String(20), default='normal', nullable=False)  # high, normal, low
     notes = Column(Text, nullable=True)
     last_email_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     user = relationship("User", backref="allowed_senders")
