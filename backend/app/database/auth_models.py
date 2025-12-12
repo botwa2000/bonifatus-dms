@@ -48,7 +48,7 @@ class PasswordResetToken(Base):
     user = relationship("User", backref="reset_tokens")
 
 
-class RegisteredDevice(Base, TimestampMixin):
+class RegisteredDevice(Base):
     """Trusted devices for biometric/passcode authentication"""
     __tablename__ = "registered_devices"
 
@@ -70,6 +70,7 @@ class RegisteredDevice(Base, TimestampMixin):
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     last_ip_address = Column(String(45), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     user = relationship("User", backref="devices")
