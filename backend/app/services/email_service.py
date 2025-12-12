@@ -812,6 +812,78 @@ class EmailService:
             logger.error(f"Failed to send billing cycle change email to {user_email}: {e}")
             return False
 
+    async def send_admin_new_user_notification(
+        self,
+        admin_email: str,
+        admin_name: str,
+        new_user_name: str,
+        new_user_id: int,
+        new_user_email: str,
+        tier_name: str,
+        registration_date: str
+    ) -> bool:
+        """
+        Send notification to admin when new user registers
+
+        Args:
+            admin_email: Admin email address
+            admin_name: Admin name
+            new_user_name: New user's full name
+            new_user_id: New user's ID
+            new_user_email: New user's email
+            tier_name: Selected subscription tier
+            registration_date: Date of registration
+
+        Returns:
+            True if email sent successfully
+        """
+        subject = f"New User Registration: {new_user_name}"
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2>New User Registration</h2>
+            <p>Hello {admin_name},</p>
+            <p>A new user has completed registration on BoniDoc.</p>
+
+            <h3>User Details:</h3>
+            <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px; font-weight: bold;">Name:</td>
+                    <td style="padding: 8px;">{new_user_name}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px; font-weight: bold;">User ID:</td>
+                    <td style="padding: 8px;">{new_user_id}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px; font-weight: bold;">Email:</td>
+                    <td style="padding: 8px;">{new_user_email}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 8px; font-weight: bold;">Package:</td>
+                    <td style="padding: 8px;"><strong>{tier_name}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; font-weight: bold;">Registration Date:</td>
+                    <td style="padding: 8px;">{registration_date}</td>
+                </tr>
+            </table>
+
+            <p style="margin-top: 20px;">This is an automated notification from the BoniDoc system.</p>
+
+            <p>Best regards,<br>BoniDoc Admin System</p>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(
+            to_email=admin_email,
+            to_name=admin_name,
+            subject=subject,
+            html_content=html_content,
+            from_email=settings.email.email_from_noreply
+        )
+
 
 # Global email service instance
 email_service = EmailService()

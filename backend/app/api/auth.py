@@ -24,6 +24,7 @@ from app.schemas.auth_schemas import (
 )
 from app.services.auth_service import auth_service
 from app.services.email_auth_service import EmailAuthService
+from app.services.email_service import email_service
 from app.middleware.auth_middleware import (
     get_current_active_user,
     get_current_admin_user,
@@ -955,6 +956,42 @@ async def verify_email(
         )
 
         logger.info(f"Email verified: {request_data.email}")
+
+        # Send admin notification emails (async, don't block response)
+        try:
+            from app.database.models import TierPlan
+            from sqlalchemy import select as sql_select
+            import asyncio
+
+            # Get all admin users
+            admin_users = db.execute(
+                sql_select(User).where(User.is_admin == True)
+            ).scalars().all()
+
+            # Get tier name
+            tier = db.execute(
+                sql_select(TierPlan).where(TierPlan.id == user.tier_id)
+            ).scalar_one_or_none()
+            tier_name = tier.display_name if tier else "Free"
+
+            # Send notification to each admin (don't await - run in background)
+            registration_date = user.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+            for admin in admin_users:
+                asyncio.create_task(
+                    email_service.send_admin_new_user_notification(
+                        admin_email=admin.email,
+                        admin_name=admin.full_name or admin.email,
+                        new_user_name=user.full_name or user.email,
+                        new_user_id=user.id,
+                        new_user_email=user.email,
+                        tier_name=tier_name,
+                        registration_date=registration_date
+                    )
+                )
+            logger.info(f"Queued admin notifications for new user: {user.email}")
+        except Exception as e:
+            # Log error but don't fail the verification
+            logger.error(f"Failed to send admin notifications for {user.email}: {e}")
 
         return VerifyEmailResponse(
             success=True,
