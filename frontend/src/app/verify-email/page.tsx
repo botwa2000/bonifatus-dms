@@ -14,14 +14,24 @@ import { Button } from '@/components/ui/Button'
 
 function VerifyEmailContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const email = searchParams.get('email') || ''
+  const [email, setEmail] = useState('')
 
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
+
+  // Get email from sessionStorage on mount
+  useEffect(() => {
+    const storedEmail = sessionStorage.getItem('verification_email')
+    if (!storedEmail) {
+      // No email found, redirect to login
+      router.push('/login')
+      return
+    }
+    setEmail(storedEmail)
+  }, [router])
 
   // Auto-focus first input
   useEffect(() => {
@@ -93,7 +103,8 @@ function VerifyEmailContent() {
         const selectedTierId = sessionStorage.getItem('selected_tier_id')
         const selectedBillingCycle = sessionStorage.getItem('selected_billing_cycle')
 
-        // Clear stored tier selection
+        // Clear all verification-related data from sessionStorage
+        sessionStorage.removeItem('verification_email')
         sessionStorage.removeItem('selected_tier_id')
         sessionStorage.removeItem('selected_billing_cycle')
 

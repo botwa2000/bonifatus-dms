@@ -977,7 +977,7 @@ async def verify_email(
 
     user_id = result.get('user_id')
     if user_id:
-        await db.execute(
+        db.execute(
             update(User)
             .where(User.id == UUID(user_id))
             .values(

@@ -104,8 +104,11 @@ function SignupContent() {
           sessionStorage.setItem('selected_billing_cycle', billingCycle)
         }
 
-        // Redirect to email verification page
-        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+        // Store email securely in sessionStorage (not in URL)
+        sessionStorage.setItem('verification_email', formData.email)
+
+        // Redirect to email verification page (no email in URL)
+        router.push('/verify-email')
       } else {
         setError(data.message || 'Registration failed. Please try again.')
       }

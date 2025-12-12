@@ -62,7 +62,9 @@ export default function LoginPageContent() {
         router.push('/dashboard')
       } else if (data.requires_verification) {
         // Email not verified - redirect to verification page
-        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+        // Store email securely in sessionStorage (not in URL)
+        sessionStorage.setItem('verification_email', formData.email)
+        router.push('/verify-email')
       } else {
         setError(data.message || 'Login failed. Please try again.')
       }
