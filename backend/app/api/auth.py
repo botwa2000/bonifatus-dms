@@ -872,13 +872,11 @@ async def login_email(
         )
 
     # Generate JWT tokens
-    from app.services.jwt_service import jwt_service
     from app.services.session_service import session_service
 
     user = result['user']
-    access_token = jwt_service.create_access_token(
-        user_id=str(user.id),
-        email=user.email
+    access_token = auth_service.create_access_token(
+        data={"sub": str(user.id)}
     )
 
     # Create session with refresh token
@@ -993,12 +991,10 @@ async def verify_email(
         ).scalar_one()
 
         # Generate tokens
-        from app.services.jwt_service import jwt_service
         from app.services.session_service import session_service
 
-        access_token = jwt_service.create_access_token(
-            user_id=str(user.id),
-            email=user.email
+        access_token = auth_service.create_access_token(
+            data={"sub": str(user.id)}
         )
 
         session_result = await session_service.create_session(
