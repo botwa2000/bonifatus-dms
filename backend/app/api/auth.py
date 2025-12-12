@@ -1032,7 +1032,7 @@ async def verify_email(
         # Send welcome email to new user
         try:
             import asyncio
-            dashboard_url = f"https://{'dev.' if settings.environment == 'development' else ''}bonidoc.com/dashboard"
+            dashboard_url = f"https://{'dev.' if settings.is_development else ''}bonidoc.com/dashboard"
             asyncio.create_task(
                 email_service.send_user_created_notification(
                     to_email=user.email,
