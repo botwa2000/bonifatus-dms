@@ -1029,6 +1029,22 @@ async def verify_email(
 
         logger.info(f"Email verified: {request_data.email}")
 
+        # Send welcome email to new user
+        try:
+            import asyncio
+            dashboard_url = f"https://{'dev.' if settings.environment == 'development' else ''}bonidoc.com/dashboard"
+            asyncio.create_task(
+                email_service.send_user_created_notification(
+                    to_email=user.email,
+                    user_name=user.full_name or user.email,
+                    dashboard_url=dashboard_url,
+                    user_can_receive_marketing=user.email_marketing_enabled if hasattr(user, 'email_marketing_enabled') else True
+                )
+            )
+            logger.info(f"Queued welcome email for new user: {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to queue welcome email for {user.email}: {e}")
+
         # Send admin notification emails (async, don't block response)
         try:
             from app.database.models import TierPlan
