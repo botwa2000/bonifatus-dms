@@ -944,6 +944,7 @@ async def login_email(
 async def verify_email(
     request_data: VerifyEmailRequest,
     response: Response,
+    http_request: Request,
     db = Depends(get_db)
 ):
     """
@@ -952,6 +953,10 @@ async def verify_email(
     - **email**: Email address
     - **code**: 6-digit verification code
     """
+    # Get client info
+    ip_address = get_client_ip(http_request)
+    user_agent = http_request.headers.get("User-Agent", "unknown")
+
     result = await email_auth_service.verify_code(
         email=request_data.email,
         code=request_data.code,
@@ -998,6 +1003,8 @@ async def verify_email(
 
         session_result = await session_service.create_session(
             user_id=str(user.id),
+            ip_address=ip_address,
+            user_agent=user_agent,
             session=db
         )
 
