@@ -389,16 +389,16 @@ async def handle_subscription_created(event, session: Session):
         dashboard_url = f"{frontend_url}/dashboard"
         support_url = f"{frontend_url}/support"
 
-        # Get tier features from database (match front page features)
+        # Get tier features from database (match actual tier capabilities)
         tier_feature_1 = f"{tier.max_pages_per_month if tier.max_pages_per_month else 'Unlimited'} pages per month"
         tier_feature_2 = f"{tier.max_monthly_upload_bytes // (1024**3) if tier.max_monthly_upload_bytes else 'Unlimited'} GB monthly upload volume"
         tier_feature_3 = "Advanced search and categorization"
 
         # Add additional features based on tier capabilities
-        if tier.bulk_operations_enabled:
-            tier_feature_3 = "Bulk operations and batch uploads"
-        if tier.priority_support:
-            tier_feature_3 = "Priority customer support"
+        if tier.multi_user_enabled:
+            tier_feature_3 = f"Multi-user collaboration (up to {tier.max_team_members} team members)" if tier.max_team_members else "Multi-user collaboration"
+        if tier.email_to_process_enabled:
+            tier_feature_3 = "Email-to-document processing (send docs via email)"
 
         # Send email
         asyncio.create_task(
