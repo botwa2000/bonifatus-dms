@@ -537,7 +537,7 @@ export default function ProfilePage() {
                         .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== subscription.tier_id)
                         .map(tier => {
                           const isPro = tier.name.toLowerCase() === 'pro'
-                          const isComingSoon = isPro
+                          const isComingSoon = false // Pro tier is now available
                           const isUpgrade = tier.id > subscription.tier_id
 
                           return (
@@ -744,7 +744,7 @@ export default function ProfilePage() {
                       .filter(tier => tier.name.toLowerCase() !== 'free')
                       .map(tier => {
                         const isPro = tier.name.toLowerCase() === 'pro'
-                        const isComingSoon = isPro
+                        const isComingSoon = false // Pro tier is now available
 
                         // Convert prices from base currency (EUR cents) to selected currency
                         const priceMonthlyInEur = tier.price_monthly_cents / 100

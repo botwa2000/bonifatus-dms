@@ -453,17 +453,10 @@ export default function HomePage() {
                     key={tier.id}
                     className={`bg-white dark:bg-neutral-900 rounded-xl p-8 relative ${
                       isPro
-                        ? 'border-2 border-orange-500 opacity-75'
+                        ? 'border-2 border-orange-500'
                         : 'border border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    {isPro && (
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-orange-500 text-white px-4 py-1 rounded-full text-sm font-medium">
-                          Coming Soon
-                        </span>
-                      </div>
-                    )}
 
                     <div className="text-center mb-8">
                       <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
@@ -567,26 +560,18 @@ export default function HomePage() {
                       )}
                     </ul>
 
-                    {isPro ? (
-                      <Button className="w-full" variant="secondary" disabled>
-                        Coming Soon
+                    <Link href={`/signup?tier_id=${tier.id}&tier_name=${encodeURIComponent(tier.display_name)}&billing_cycle=${billingCycle}`}>
+                      <Button
+                        className="w-full"
+                        variant="secondary"
+                      >
+                        {isFree ? 'Start Free' : 'Get Started'}
                       </Button>
-                    ) : (
-                      <Link href={`/signup?tier_id=${tier.id}&tier_name=${encodeURIComponent(tier.display_name)}&billing_cycle=${billingCycle}`}>
-                        <Button
-                          className="w-full"
-                          variant="secondary"
-                        >
-                          {isFree ? 'Start Free' : 'Get Started'}
-                        </Button>
-                      </Link>
-                    )}
+                    </Link>
 
-                    {!isPro && (
-                      <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
-                        Risk-free • Cancel anytime
-                      </p>
-                    )}
+                    <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                      Risk-free • Cancel anytime
+                    </p>
                   </div>
                 )
               })
