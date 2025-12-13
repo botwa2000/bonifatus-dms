@@ -61,14 +61,39 @@ interface TierPlan {
   id: number
   name: string
   display_name: string
+  description: string | null
   price_monthly_cents: number
   price_yearly_cents: number
-  storage_quota_bytes: number
+  currency: string
+
+  // Monthly limits
+  max_pages_per_month: number | null
+  max_monthly_upload_bytes: number
+  max_translations_per_month: number | null
+
+  // Per-file limits
   max_file_size_bytes: number
-  max_documents: number | null
   max_batch_upload_size: number | null
+
+  // Legacy field (keep for compatibility)
+  storage_quota_bytes?: number
+  max_documents?: number | null
+
+  // Team/multi-user limits
+  multi_user_enabled: boolean
+  max_team_members: number | null
+
+  // Feature flags
   bulk_operations_enabled: boolean
+  email_to_process_enabled: boolean
+
+  // Other limits
+  custom_categories_limit: number | null
+
+  // Display
+  sort_order: number
   is_active: boolean
+  is_public: boolean
 }
 
 interface ClamAVHealth {
@@ -763,8 +788,88 @@ export default function AdminDashboard() {
                             />
                           )}
                         </div>
+                        <div>
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.max_pages_per_month === null}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_pages_per_month: e.target.checked ? null : 500 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Pages/Month</span>
+                          </label>
+                          {editingTier.max_pages_per_month !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.max_pages_per_month}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_pages_per_month: parseInt(e.target.value) || 0 })}
+                              placeholder="Max pages per month"
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.max_translations_per_month === null}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_translations_per_month: e.target.checked ? null : 100 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Translations/Month</span>
+                          </label>
+                          {editingTier.max_translations_per_month !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.max_translations_per_month}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_translations_per_month: parseInt(e.target.value) || 0 })}
+                              placeholder="Max translations per month"
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.max_team_members === null}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_team_members: e.target.checked ? null : 3 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Team Members</span>
+                          </label>
+                          {editingTier.max_team_members !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.max_team_members}
+                              onChange={(e) => setEditingTier({ ...editingTier, max_team_members: parseInt(e.target.value) || 0 })}
+                              placeholder="Max team members"
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={editingTier.custom_categories_limit === null}
+                              onChange={(e) => setEditingTier({ ...editingTier, custom_categories_limit: e.target.checked ? null : 25 })}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Categories</span>
+                          </label>
+                          {editingTier.custom_categories_limit !== null && (
+                            <input
+                              type="number"
+                              value={editingTier.custom_categories_limit}
+                              onChange={(e) => setEditingTier({ ...editingTier, custom_categories_limit: parseInt(e.target.value) || 0 })}
+                              placeholder="Max custom categories"
+                              className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
+                            />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center flex-wrap gap-4">
                         <label className="flex items-center space-x-2">
                           <input
                             type="checkbox"
@@ -777,11 +882,38 @@ export default function AdminDashboard() {
                         <label className="flex items-center space-x-2">
                           <input
                             type="checkbox"
+                            checked={editingTier.email_to_process_enabled}
+                            onChange={(e) => setEditingTier({ ...editingTier, email_to_process_enabled: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Email-to-Document</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={editingTier.multi_user_enabled}
+                            onChange={(e) => setEditingTier({ ...editingTier, multi_user_enabled: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Multi-User</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
                             checked={editingTier.is_active}
                             onChange={(e) => setEditingTier({ ...editingTier, is_active: e.target.checked })}
                             className="rounded"
                           />
                           <span className="text-sm text-neutral-700 dark:text-neutral-300">Active</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={editingTier.is_public}
+                            onChange={(e) => setEditingTier({ ...editingTier, is_public: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Public (shown on pricing page)</span>
                         </label>
                       </div>
                       <Button onClick={() => updateTier(tier.id, editingTier)}>
@@ -790,48 +922,71 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     /* View Mode */
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Monthly Price</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {formatPrice(tier.price_monthly_cents)}/month
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Monthly Price</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {formatPrice(tier.price_monthly_cents)}/month
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Annual Price</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {formatPrice(tier.price_yearly_cents)}/year
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Monthly Upload Volume</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {formatBytes(tier.max_monthly_upload_bytes || tier.storage_quota_bytes || 0)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Max File Size</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {formatBytes(tier.max_file_size_bytes)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Pages/Month</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {tier.max_pages_per_month ?? tier.max_documents ?? 'Unlimited'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Batch Upload</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {tier.max_batch_upload_size || 'Unlimited'} files
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Translations/Month</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {tier.max_translations_per_month || 'Unlimited'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Team Members</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {tier.max_team_members || 'Unlimited'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-600 dark:text-neutral-400">Custom Categories</div>
+                          <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                            {tier.custom_categories_limit || 'Unlimited'}
+                          </div>
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Annual Price</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {formatPrice(tier.price_yearly_cents)}/year
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Storage Quota</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {formatBytes(tier.storage_quota_bytes)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Max File Size</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {formatBytes(tier.max_file_size_bytes)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Documents</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {tier.max_documents || 'Unlimited'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Max Batch Upload</div>
-                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
-                          {tier.max_batch_upload_size || 'Unlimited'} files
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Features</div>
-                        <div className="text-sm text-neutral-700 dark:text-neutral-300 space-x-2">
-                          {tier.bulk_operations_enabled && <Badge variant="success">Bulk</Badge>}
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Features</div>
+                        <div className="flex flex-wrap gap-2">
+                          {tier.bulk_operations_enabled && <Badge variant="success">Bulk Operations</Badge>}
+                          {tier.email_to_process_enabled && <Badge variant="success">Email-to-Document</Badge>}
+                          {tier.multi_user_enabled && <Badge variant="success">Multi-User</Badge>}
                           {tier.is_active && <Badge variant="info">Active</Badge>}
+                          {tier.is_public && <Badge variant="info">Public</Badge>}
                         </div>
                       </div>
                     </div>

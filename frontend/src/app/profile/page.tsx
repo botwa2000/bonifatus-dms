@@ -22,6 +22,8 @@ interface UserProfile {
   updated_at: string
   trial_start_date?: string
   trial_end_date?: string
+  email_processing_address?: string
+  email_processing_enabled?: boolean
 }
 
 interface UserStatistics {
@@ -406,6 +408,17 @@ export default function ProfilePage() {
                       <p className="text-xs text-neutral-500 mt-1">Email cannot be changed (linked to Google account)</p>
                     </>
                   } />
+                  {profile.email_processing_enabled && profile.email_processing_address && (
+                    <InfoRow label="Document Processing Email" value={
+                      <>
+                        <span className="font-mono text-sm">{profile.email_processing_address}</span>
+                        <p className="text-xs text-neutral-500 mt-1">
+                          Send documents to this email address to automatically process them.
+                          Attachments will be extracted, analyzed, and added to your account.
+                        </p>
+                      </>
+                    } />
+                  )}
                   <InfoRow label="Member Since" value={formatDate(profile.created_at)} />
                 </>
               )}
