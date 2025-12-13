@@ -42,7 +42,6 @@ class TierPlan(Base, TimestampMixin):
     max_monthly_upload_bytes = Column(sa.BigInteger, nullable=False)  # Monthly volume limit
     max_translations_per_month = Column(Integer, nullable=True)  # NULL = unlimited
     max_api_calls_per_month = Column(Integer, nullable=True)  # NULL = unlimited
-    max_email_documents_per_month = Column(Integer, nullable=True)  # NULL = unlimited, for email-to-process feature
 
     # Per-file limits
     max_file_size_bytes = Column(sa.BigInteger, nullable=False)
