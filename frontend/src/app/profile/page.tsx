@@ -71,6 +71,7 @@ interface TierPlan {
   currency: string
   currency_symbol: string
   description: string
+  email_to_process_enabled?: boolean
 }
 
 export default function ProfilePage() {
@@ -81,6 +82,12 @@ export default function ProfilePage() {
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [fullName, setFullName] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteFeedback, setDeleteFeedback] = useState('')
@@ -91,6 +98,7 @@ export default function ProfilePage() {
   const [availableTiers, setAvailableTiers] = useState<TierPlan[]>([])
   const [loadingSubscription, setLoadingSubscription] = useState(true)
   const [processingSubscription, setProcessingSubscription] = useState(false)
+  const [enablingEmailProcessing, setEnablingEmailProcessing] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
@@ -164,18 +172,53 @@ export default function ProfilePage() {
 
   const handleUpdateProfile = async () => {
     if (!profile) return
-    
+
+    // Validate password fields if attempting to change password
+    if (newPassword || confirmPassword || currentPassword) {
+      if (!currentPassword) {
+        setMessage({ type: 'error', text: 'Current password is required to change password' })
+        return
+      }
+      if (!newPassword) {
+        setMessage({ type: 'error', text: 'New password is required' })
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        setMessage({ type: 'error', text: 'New passwords do not match' })
+        return
+      }
+      if (newPassword.length < 8) {
+        setMessage({ type: 'error', text: 'Password must be at least 8 characters long' })
+        return
+      }
+    }
+
     setSaving(true)
     setMessage(null)
-    
+
     try {
-      await apiClient.put('/api/v1/users/profile', { full_name: fullName }, true)
-      setMessage({ type: 'success', text: 'Profile updated successfully' })
+      const updateData: any = { full_name: fullName }
+
+      // Add password change if provided
+      if (currentPassword && newPassword) {
+        updateData.current_password = currentPassword
+        updateData.new_password = newPassword
+      }
+
+      await apiClient.put('/api/v1/users/profile', updateData, true)
+
+      setMessage({
+        type: 'success',
+        text: currentPassword && newPassword ? 'Profile and password updated successfully' : 'Profile updated successfully'
+      })
       setEditMode(false)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
       await loadProfileData()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update profile:', error)
-      setMessage({ type: 'error', text: 'Failed to update profile' })
+      setMessage({ type: 'error', text: error?.response?.data?.detail || 'Failed to update profile' })
     } finally {
       setSaving(false)
     }
@@ -267,6 +310,30 @@ export default function ProfilePage() {
     setMessage({ type: 'success', text: 'Subscription canceled successfully' })
     await loadSubscriptionData()
     await loadProfileData()
+  }
+
+  const enableEmailProcessing = async () => {
+    setEnablingEmailProcessing(true)
+    setMessage(null)
+
+    try {
+      const response = await apiClient.post<{ enabled: boolean, email_address: string | null, message: string }>(
+        '/api/v1/email-processing/enable',
+        { enable: true },
+        true
+      )
+
+      if (response.enabled && response.email_address) {
+        setMessage({ type: 'success', text: response.message })
+        // Reload profile to get updated email processing address
+        await loadProfileData()
+      }
+    } catch (error) {
+      console.error('Failed to enable email processing:', error)
+      setMessage({ type: 'error', text: 'Failed to enable email processing' })
+    } finally {
+      setEnablingEmailProcessing(false)
+    }
   }
 
   const handleUpdatePaymentMethod = async () => {
@@ -384,15 +451,104 @@ export default function ProfilePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                   />
+
+                  {!profile.google_id && (
+                    <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+                      <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">Change Password (optional)</h4>
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Input
+                            label="Current Password"
+                            type={showCurrentPassword ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                          >
+                            {showCurrentPassword ? (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <Input
+                            label="New Password"
+                            type={showNewPassword ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password (min 8 characters)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                          >
+                            {showNewPassword ? (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="relative">
+                          <Input
+                            label="Confirm New Password"
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                          >
+                            {showConfirmPassword ? (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex space-x-3 pt-4">
                     <Button onClick={handleUpdateProfile} disabled={saving}>
                       {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
-                    <Button 
-                      variant="secondary" 
+                    <Button
+                      variant="secondary"
                       onClick={() => {
                         setEditMode(false)
                         setFullName(profile.full_name)
+                        setCurrentPassword('')
+                        setNewPassword('')
+                        setConfirmPassword('')
                       }}
                     >
                       Cancel
@@ -405,20 +561,53 @@ export default function ProfilePage() {
                   <InfoRow label="Email Address" value={
                     <>
                       {profile.email}
-                      <p className="text-xs text-neutral-500 mt-1">Email cannot be changed (linked to Google account)</p>
+                      {profile.google_id && (
+                        <p className="text-xs text-neutral-500 mt-1">Email cannot be changed (linked to Google account)</p>
+                      )}
                     </>
                   } />
-                  {profile.email_processing_enabled && profile.email_processing_address && (
-                    <InfoRow label="Document Processing Email" value={
-                      <>
-                        <span className="font-mono text-sm">{profile.email_processing_address}</span>
-                        <p className="text-xs text-neutral-500 mt-1">
-                          Send documents to this email address to automatically process them.
-                          Attachments will be extracted, analyzed, and added to your account.
-                        </p>
-                      </>
-                    } />
-                  )}
+                  {(() => {
+                    // Check if user's tier supports email processing
+                    const userTier = subscription ? availableTiers.find(t => t.id === subscription.tier_id) : null
+                    const tierSupportsEmailProcessing = userTier?.email_to_process_enabled
+
+                    if (profile.email_processing_enabled && profile.email_processing_address) {
+                      // Email processing is already enabled - show the address
+                      return (
+                        <InfoRow label="Document Processing Email" value={
+                          <>
+                            <span className="font-mono text-sm">{profile.email_processing_address}</span>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Send documents to this email address to automatically process them.
+                              Attachments will be extracted, analyzed, and added to your account.
+                            </p>
+                          </>
+                        } />
+                      )
+                    } else if (tierSupportsEmailProcessing && !profile.email_processing_enabled) {
+                      // Tier supports it but not enabled yet - show enable button
+                      return (
+                        <InfoRow label="Document Processing Email" value={
+                          <>
+                            <p className="text-sm text-neutral-600 mb-2">
+                              Your {userTier?.display_name} plan includes email-to-document processing.
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={enableEmailProcessing}
+                              disabled={enablingEmailProcessing}
+                            >
+                              {enablingEmailProcessing ? 'Enabling...' : 'Enable Email Processing'}
+                            </Button>
+                            <p className="text-xs text-neutral-500 mt-2">
+                              Get a unique email address to send documents for automatic processing.
+                            </p>
+                          </>
+                        } />
+                      )
+                    }
+                    return null
+                  })()}
                   <InfoRow label="Member Since" value={formatDate(profile.created_at)} />
                 </>
               )}
