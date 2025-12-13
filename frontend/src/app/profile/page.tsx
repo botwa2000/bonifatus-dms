@@ -197,7 +197,7 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      const updateData: any = { full_name: fullName }
+      const updateData: Record<string, string> = { full_name: fullName }
 
       // Add password change if provided
       if (currentPassword && newPassword) {
@@ -216,9 +216,12 @@ export default function ProfilePage() {
       setNewPassword('')
       setConfirmPassword('')
       await loadProfileData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update profile:', error)
-      setMessage({ type: 'error', text: error?.response?.data?.detail || 'Failed to update profile' })
+      const errorMessage = error && typeof error === 'object' && 'response' in error
+        ? ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to update profile')
+        : 'Failed to update profile'
+      setMessage({ type: 'error', text: errorMessage })
     } finally {
       setSaving(false)
     }
