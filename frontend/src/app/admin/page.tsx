@@ -712,8 +712,8 @@ export default function AdminDashboard() {
                           <div className="flex gap-2">
                             <input
                               type="number"
-                              value={bytesToUnit(editingTier.storage_quota_bytes, storageUnit)}
-                              onChange={(e) => setEditingTier({ ...editingTier, storage_quota_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit) })}
+                              value={bytesToUnit(editingTier.storage_quota_bytes || editingTier.max_monthly_upload_bytes || 0, storageUnit)}
+                              onChange={(e) => setEditingTier({ ...editingTier, storage_quota_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit), max_monthly_upload_bytes: unitToBytes(parseFloat(e.target.value) || 0, storageUnit) })}
                               className="flex-1 px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white"
                             />
                             <select
