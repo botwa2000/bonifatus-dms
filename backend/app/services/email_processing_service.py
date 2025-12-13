@@ -1,0 +1,852 @@
+"""
+Email Processing Service
+Handles incoming emails sent to @doc.bonidoc.com addresses
+"""
+
+import logging
+import imaplib
+import email
+from email.header import decode_header
+from email.utils import parseaddr
+import os
+import secrets
+import json
+import asyncio
+from typing import Optional, List, Dict, Any, Tuple
+from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from app.core.config import settings
+from app.database.auth_models import AllowedSender, EmailProcessingLog, EmailSettings
+from app.database.models import User, Document, UserMonthlyUsage
+from app.services.email_service import EmailService
+from app.services.document_upload_service import DocumentUploadService
+
+logger = logging.getLogger(__name__)
+
+
+class EmailProcessingService:
+    """Service for processing incoming emails and converting them to documents"""
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.email_service = EmailService()
+        self.imap_host = settings.email_processing.imap_host
+        self.imap_port = settings.email_processing.imap_port
+        self.imap_user = settings.email_processing.imap_user
+        self.imap_password = settings.email_processing.imap_password
+        self.imap_use_ssl = settings.email_processing.imap_use_ssl
+        self.doc_domain = settings.email_processing.doc_domain
+        self.temp_storage_path = settings.email_processing.temp_storage_path
+
+        # Ensure temp storage directory exists
+        os.makedirs(self.temp_storage_path, exist_ok=True)
+
+    def generate_user_email_address(self, user_id: str) -> str:
+        """
+        Generate a unique email address for a user
+        Format: {random-token}@doc.bonidoc.com
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Unique email address
+        """
+        # Generate cryptographically secure random token (8 characters)
+        token = secrets.token_urlsafe(6)[:8].lower()
+        return f"{token}@{self.doc_domain}"
+
+    def enable_email_processing_for_user(self, user_id: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Enable email processing for a user and assign unique email address
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Tuple of (success, email_address, error_message)
+        """
+        try:
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False, None, "User not found"
+
+            # Check if already enabled
+            if user.email_processing_enabled and user.email_processing_address:
+                return True, user.email_processing_address, None
+
+            # Generate unique email address
+            max_attempts = 10
+            for _ in range(max_attempts):
+                email_address = self.generate_user_email_address(user_id)
+
+                # Check if email address already exists
+                existing = self.db.query(User).filter(
+                    User.email_processing_address == email_address
+                ).first()
+
+                if not existing:
+                    break
+            else:
+                return False, None, "Failed to generate unique email address"
+
+            # Update user
+            user.email_processing_address = email_address
+            user.email_processing_enabled = True
+
+            # Create email settings
+            email_settings = EmailSettings(
+                user_id=user_id,
+                email_address=email_address,
+                is_enabled=True,
+                daily_email_limit=50,  # Default, can be overridden by tier
+                max_attachment_size_mb=20,
+                auto_categorize=True,
+                send_confirmation_email=True
+            )
+            self.db.add(email_settings)
+            self.db.commit()
+
+            logger.info(f"Email processing enabled for user {user_id}: {email_address}")
+            return True, email_address, None
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error enabling email processing for user {user_id}: {str(e)}")
+            return False, None, str(e)
+
+    def connect_to_imap(self) -> Optional[imaplib.IMAP4_SSL]:
+        """
+        Connect to IMAP server
+
+        Returns:
+            IMAP connection or None if failed
+        """
+        try:
+            if self.imap_use_ssl:
+                imap = imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
+            else:
+                imap = imaplib.IMAP4(self.imap_host, self.imap_port)
+
+            imap.login(self.imap_user, self.imap_password)
+            logger.info(f"Connected to IMAP server {self.imap_host}")
+            return imap
+
+        except Exception as e:
+            logger.error(f"Failed to connect to IMAP server: {str(e)}")
+            return None
+
+    def is_doc_email(self, recipient: str) -> bool:
+        """
+        Check if email is sent to @doc.bonidoc.com domain
+
+        Args:
+            recipient: Email address
+
+        Returns:
+            True if recipient is @doc.bonidoc.com
+        """
+        if not recipient:
+            return False
+
+        domain = recipient.split('@')[-1].lower() if '@' in recipient else ''
+        return domain == self.doc_domain
+
+    def extract_email_address(self, email_str: str) -> str:
+        """
+        Extract email address from 'Name <email@domain.com>' format
+
+        Args:
+            email_str: Email string
+
+        Returns:
+            Email address only
+        """
+        name, addr = parseaddr(email_str)
+        return addr.lower().strip()
+
+    def decode_email_header(self, header: str) -> str:
+        """
+        Decode email header (handles MIME encoding)
+
+        Args:
+            header: Email header string
+
+        Returns:
+            Decoded string
+        """
+        if not header:
+            return ""
+
+        decoded_parts = decode_header(header)
+        result = []
+
+        for part, encoding in decoded_parts:
+            if isinstance(part, bytes):
+                try:
+                    result.append(part.decode(encoding or 'utf-8', errors='ignore'))
+                except:
+                    result.append(part.decode('utf-8', errors='ignore'))
+            else:
+                result.append(str(part))
+
+        return ''.join(result)
+
+    def find_user_by_email_address(self, recipient_email: str) -> Optional[User]:
+        """
+        Find user by their email processing address
+
+        Args:
+            recipient_email: Recipient email address
+
+        Returns:
+            User or None
+        """
+        return self.db.query(User).filter(
+            User.email_processing_address == recipient_email,
+            User.email_processing_enabled == True
+        ).first()
+
+    def is_sender_allowed(self, user_id: str, sender_email: str) -> Tuple[bool, Optional[AllowedSender]]:
+        """
+        Check if sender is in user's whitelist
+
+        Args:
+            user_id: User UUID
+            sender_email: Sender email address
+
+        Returns:
+            Tuple of (is_allowed, allowed_sender_record)
+        """
+        allowed_sender = self.db.query(AllowedSender).filter(
+            AllowedSender.user_id == user_id,
+            AllowedSender.sender_email == sender_email,
+            AllowedSender.is_active == True
+        ).first()
+
+        return (allowed_sender is not None, allowed_sender)
+
+    def check_monthly_quota(self, user_id: str) -> Tuple[bool, str]:
+        """
+        Check if user has quota remaining for email processing
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Tuple of (has_quota, error_message)
+        """
+        try:
+            user = self.db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False, "User not found"
+
+            # Check if feature is enabled for user's tier
+            if not user.tier.email_to_process_enabled:
+                return False, f"Email processing not available on {user.tier.name} tier"
+
+            # Get current month period
+            now = datetime.utcnow()
+            month_period = now.strftime("%Y-%m")
+
+            # Get or create usage record
+            usage = self.db.query(UserMonthlyUsage).filter(
+                UserMonthlyUsage.user_id == user_id,
+                UserMonthlyUsage.month_period == month_period
+            ).first()
+
+            if not usage:
+                return True, ""  # No usage yet, quota available
+
+            # Check quota limit
+            max_emails = user.tier.max_email_documents_per_month
+            if max_emails is None:
+                return True, ""  # Unlimited
+
+            if usage.email_documents_processed >= max_emails:
+                return False, f"Monthly email processing quota exceeded ({max_emails} documents/month)"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error checking quota for user {user_id}: {str(e)}")
+            return False, str(e)
+
+    def create_processing_log(
+        self,
+        user_id: str,
+        sender_email: str,
+        recipient_email: str,
+        subject: Optional[str],
+        message_id: Optional[str],
+        uid: Optional[str],
+        attachment_count: int,
+        total_size_bytes: int,
+        status: str,
+        rejection_reason: Optional[str] = None
+    ) -> EmailProcessingLog:
+        """
+        Create email processing log entry
+
+        Args:
+            All email processing details
+
+        Returns:
+            Created log entry
+        """
+        log = EmailProcessingLog(
+            user_id=user_id,
+            sender_email=sender_email,
+            recipient_email=recipient_email,
+            subject=subject,
+            email_message_id=message_id,
+            email_uid=uid,
+            attachment_count=attachment_count,
+            total_size_bytes=total_size_bytes,
+            status=status,
+            rejection_reason=rejection_reason,
+            received_at=datetime.utcnow()
+        )
+        self.db.add(log)
+        self.db.commit()
+        self.db.refresh(log)
+
+        return log
+
+    def extract_attachments(self, email_message) -> List[Dict[str, Any]]:
+        """
+        Extract attachments from email message
+
+        Args:
+            email_message: Parsed email message
+
+        Returns:
+            List of attachment info dictionaries
+        """
+        attachments = []
+
+        for part in email_message.walk():
+            if part.get_content_maintype() == 'multipart':
+                continue
+            if part.get('Content-Disposition') is None:
+                continue
+
+            filename = part.get_filename()
+            if not filename:
+                continue
+
+            # Decode filename
+            filename = self.decode_email_header(filename)
+
+            # Get file content
+            file_data = part.get_payload(decode=True)
+            if not file_data:
+                continue
+
+            attachments.append({
+                'filename': filename,
+                'data': file_data,
+                'size': len(file_data),
+                'content_type': part.get_content_type()
+            })
+
+        return attachments
+
+    def save_attachment_to_temp(self, attachment: Dict[str, Any]) -> Optional[str]:
+        """
+        Save attachment to temporary storage
+
+        Args:
+            attachment: Attachment dictionary
+
+        Returns:
+            Path to saved file or None if failed
+        """
+        try:
+            # Generate unique filename
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            safe_filename = f"{timestamp}_{secrets.token_hex(4)}_{attachment['filename']}"
+            filepath = os.path.join(self.temp_storage_path, safe_filename)
+
+            # Save file
+            with open(filepath, 'wb') as f:
+                f.write(attachment['data'])
+
+            logger.info(f"Saved attachment to temp: {filepath}")
+            return filepath
+
+        except Exception as e:
+            logger.error(f"Failed to save attachment: {str(e)}")
+            return None
+
+    def cleanup_temp_files(self, filepaths: List[str]):
+        """
+        Delete temporary files
+
+        Args:
+            filepaths: List of file paths to delete
+        """
+        for filepath in filepaths:
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    logger.info(f"Deleted temp file: {filepath}")
+            except Exception as e:
+                logger.error(f"Failed to delete temp file {filepath}: {str(e)}")
+
+    def delete_email_from_inbox(self, imap, email_id: bytes):
+        """
+        Delete email from inbox
+
+        Args:
+            imap: IMAP connection
+            email_id: Email ID to delete
+        """
+        try:
+            # Mark for deletion
+            imap.store(email_id, '+FLAGS', '\\Deleted')
+            # Expunge to permanently delete
+            imap.expunge()
+            logger.info(f"Deleted email {email_id} from inbox")
+        except Exception as e:
+            logger.error(f"Failed to delete email {email_id}: {str(e)}")
+
+    def increment_monthly_usage(self, user_id: str, document_count: int):
+        """
+        Increment user's monthly email processing usage
+
+        Args:
+            user_id: User UUID
+            document_count: Number of documents processed
+        """
+        try:
+            now = datetime.utcnow()
+            month_period = now.strftime("%Y-%m")
+            first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_day_month = (first_day.replace(month=first_day.month % 12 + 1, day=1) if first_day.month < 12
+                            else first_day.replace(year=first_day.year + 1, month=1, day=1))
+            last_day = last_day_month.replace(day=1) - timedelta(days=1)
+
+            # Get or create usage record
+            usage = self.db.query(UserMonthlyUsage).filter(
+                UserMonthlyUsage.user_id == user_id,
+                UserMonthlyUsage.month_period == month_period
+            ).first()
+
+            if not usage:
+                usage = UserMonthlyUsage(
+                    user_id=user_id,
+                    month_period=month_period,
+                    period_start_date=first_day.date(),
+                    period_end_date=last_day.date(),
+                    email_documents_processed=document_count
+                )
+                self.db.add(usage)
+            else:
+                usage.email_documents_processed += document_count
+                usage.last_updated_at = now
+
+            self.db.commit()
+            logger.info(f"Updated monthly usage for user {user_id}: +{document_count} email documents")
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to update monthly usage: {str(e)}")
+
+    def update_allowed_sender_stats(self, allowed_sender: AllowedSender):
+        """
+        Update allowed sender statistics
+
+        Args:
+            allowed_sender: AllowedSender record
+        """
+        try:
+            allowed_sender.use_count += 1
+            allowed_sender.last_email_at = datetime.utcnow()
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to update allowed sender stats: {str(e)}")
+
+    async def send_rejection_notification(
+        self,
+        user_email: str,
+        sender_email: str,
+        subject: str,
+        rejection_reason: str
+    ):
+        """
+        Send rejection notification to user
+
+        Args:
+            user_email: User's email address
+            sender_email: Sender who was rejected
+            subject: Original email subject
+            rejection_reason: Why it was rejected
+        """
+        try:
+            html_content = f"""
+            <h2>Document Processing Failed</h2>
+            <p>An email from <strong>{sender_email}</strong> was rejected and not processed.</p>
+            <p><strong>Subject:</strong> {subject}</p>
+            <p><strong>Reason:</strong> {rejection_reason}</p>
+            <p>If you want to accept documents from this sender, please add them to your allowed senders list in your account settings.</p>
+            """
+
+            await self.email_service.send_email(
+                to_email=user_email,
+                to_name=None,
+                subject=f"Document Processing Failed - {sender_email}",
+                html_content=html_content
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send rejection notification: {str(e)}")
+
+    async def send_completion_notification(
+        self,
+        user_email: str,
+        sender_email: str,
+        subject: str,
+        documents_created: int
+    ):
+        """
+        Send completion notification to user
+
+        Args:
+            user_email: User's email address
+            sender_email: Sender email
+            subject: Original email subject
+            documents_created: Number of documents created
+        """
+        try:
+            html_content = f"""
+            <h2>Documents Processed Successfully</h2>
+            <p>Your email from <strong>{sender_email}</strong> has been processed.</p>
+            <p><strong>Subject:</strong> {subject}</p>
+            <p><strong>Documents Created:</strong> {documents_created}</p>
+            <p>Your documents are now available in your dashboard.</p>
+            """
+
+            await self.email_service.send_email(
+                to_email=user_email,
+                to_name=None,
+                subject=f"Documents Processed - {documents_created} file(s)",
+                html_content=html_content
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send completion notification: {str(e)}")
+
+    def poll_inbox(self) -> int:
+        """
+        Poll IMAP inbox for new emails sent to @doc.bonidoc.com
+
+        Returns:
+            Number of emails processed
+        """
+        imap = None
+        processed_count = 0
+
+        try:
+            # Connect to IMAP
+            imap = self.connect_to_imap()
+            if not imap:
+                return 0
+
+            # Select inbox
+            imap.select('INBOX')
+
+            # Search for unread emails
+            status, messages = imap.search(None, 'UNSEEN')
+            if status != 'OK':
+                logger.error("Failed to search for emails")
+                return 0
+
+            email_ids = messages[0].split()
+            logger.info(f"Found {len(email_ids)} unread emails")
+
+            for email_id in email_ids:
+                try:
+                    # Fetch email
+                    status, msg_data = imap.fetch(email_id, '(RFC822)')
+                    if status != 'OK':
+                        continue
+
+                    # Parse email
+                    email_body = msg_data[0][1]
+                    email_message = email.message_from_bytes(email_body)
+
+                    # Extract headers
+                    recipient_raw = email_message.get('To', '')
+                    sender_raw = email_message.get('From', '')
+                    subject_raw = email_message.get('Subject', '')
+                    message_id = email_message.get('Message-ID', '')
+
+                    # Decode
+                    recipient_email = self.extract_email_address(recipient_raw)
+                    sender_email = self.extract_email_address(sender_raw)
+                    subject = self.decode_email_header(subject_raw)
+
+                    logger.info(f"Processing email: {sender_email} -> {recipient_email}")
+
+                    # CRITICAL FILTER: Only process @doc.bonidoc.com emails
+                    if not self.is_doc_email(recipient_email):
+                        logger.info(f"Skipping non-doc email: {recipient_email}")
+                        continue
+
+                    # Extract attachments
+                    attachments = self.extract_attachments(email_message)
+                    attachment_count = len(attachments)
+                    total_size = sum(att['size'] for att in attachments)
+
+                    # SECURITY GATE #1: Find user by email address
+                    user = self.find_user_by_email_address(recipient_email)
+                    if not user:
+                        logger.warning(f"No user found for address: {recipient_email}")
+                        # Delete email and continue
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    # SECURITY GATE #2 & #3: Check sender is allowed and active
+                    is_allowed, allowed_sender = self.is_sender_allowed(str(user.id), sender_email)
+                    if not is_allowed:
+                        rejection_reason = f"Sender {sender_email} not in whitelist"
+                        logger.warning(f"Rejected email from {sender_email} for user {user.id}")
+
+                        # Create log
+                        self.create_processing_log(
+                            user_id=str(user.id),
+                            sender_email=sender_email,
+                            recipient_email=recipient_email,
+                            subject=subject,
+                            message_id=message_id,
+                            uid=str(email_id),
+                            attachment_count=attachment_count,
+                            total_size_bytes=total_size,
+                            status='rejected',
+                            rejection_reason=rejection_reason
+                        )
+
+                        # Send notification
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, rejection_reason
+                        ))
+
+                        # Delete email
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    # SECURITY GATE #4 & #5: Check quota
+                    has_quota, quota_error = self.check_monthly_quota(str(user.id))
+                    if not has_quota:
+                        logger.warning(f"Quota exceeded for user {user.id}: {quota_error}")
+
+                        # Create log
+                        self.create_processing_log(
+                            user_id=str(user.id),
+                            sender_email=sender_email,
+                            recipient_email=recipient_email,
+                            subject=subject,
+                            message_id=message_id,
+                            uid=str(email_id),
+                            attachment_count=attachment_count,
+                            total_size_bytes=total_size,
+                            status='rejected',
+                            rejection_reason=quota_error
+                        )
+
+                        # Send notification
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, quota_error
+                        ))
+
+                        # Delete email
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    # SECURITY GATE #6: Check attachment count
+                    if attachment_count == 0:
+                        logger.warning(f"No attachments in email from {sender_email}")
+                        rejection_reason = "No attachments found in email"
+
+                        self.create_processing_log(
+                            user_id=str(user.id),
+                            sender_email=sender_email,
+                            recipient_email=recipient_email,
+                            subject=subject,
+                            message_id=message_id,
+                            uid=str(email_id),
+                            attachment_count=0,
+                            total_size_bytes=0,
+                            status='rejected',
+                            rejection_reason=rejection_reason
+                        )
+
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, rejection_reason
+                        ))
+
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    if attachment_count > settings.email_processing.max_attachments_per_email:
+                        rejection_reason = f"Too many attachments ({attachment_count} > {settings.email_processing.max_attachments_per_email})"
+                        logger.warning(f"Too many attachments from {sender_email}")
+
+                        self.create_processing_log(
+                            user_id=str(user.id),
+                            sender_email=sender_email,
+                            recipient_email=recipient_email,
+                            subject=subject,
+                            message_id=message_id,
+                            uid=str(email_id),
+                            attachment_count=attachment_count,
+                            total_size_bytes=total_size,
+                            status='rejected',
+                            rejection_reason=rejection_reason
+                        )
+
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, rejection_reason
+                        ))
+
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    # SECURITY GATE #7: Check total size
+                    max_size_bytes = settings.email_processing.max_attachment_size_mb * 1024 * 1024
+                    if total_size > max_size_bytes:
+                        rejection_reason = f"Attachments too large ({total_size / 1024 / 1024:.1f}MB > {settings.email_processing.max_attachment_size_mb}MB)"
+                        logger.warning(f"Attachments too large from {sender_email}")
+
+                        self.create_processing_log(
+                            user_id=str(user.id),
+                            sender_email=sender_email,
+                            recipient_email=recipient_email,
+                            subject=subject,
+                            message_id=message_id,
+                            uid=str(email_id),
+                            attachment_count=attachment_count,
+                            total_size_bytes=total_size,
+                            status='rejected',
+                            rejection_reason=rejection_reason
+                        )
+
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, rejection_reason
+                        ))
+
+                        self.delete_email_from_inbox(imap, email_id)
+                        continue
+
+                    # Create processing log
+                    log = self.create_processing_log(
+                        user_id=str(user.id),
+                        sender_email=sender_email,
+                        recipient_email=recipient_email,
+                        subject=subject,
+                        message_id=message_id,
+                        uid=str(email_id),
+                        attachment_count=attachment_count,
+                        total_size_bytes=total_size,
+                        status='processing'
+                    )
+
+                    # Save attachments to temp storage
+                    temp_files = []
+                    filenames = []
+                    for attachment in attachments:
+                        filepath = self.save_attachment_to_temp(attachment)
+                        if filepath:
+                            temp_files.append(filepath)
+                            filenames.append(attachment['filename'])
+
+                    # Update log with filenames
+                    log.attachment_filenames = json.dumps(filenames)
+                    log.processing_started_at = datetime.utcnow()
+                    self.db.commit()
+
+                    # SECURITY GATE #8: Malware scanning (ClamAV)
+                    # TODO: Integrate ClamAV scanning here
+                    # For now, assume files are clean
+                    malware_detected = False
+
+                    if malware_detected:
+                        logger.error(f"Malware detected in attachments from {sender_email}")
+
+                        # Update log
+                        log.status = 'rejected'
+                        log.rejection_reason = 'Malware detected in attachments'
+                        log.error_code = 'MALWARE_DETECTED'
+                        log.processing_completed_at = datetime.utcnow()
+                        self.db.commit()
+
+                        # Cleanup
+                        self.cleanup_temp_files(temp_files)
+                        self.delete_email_from_inbox(imap, email_id)
+
+                        # Notify user
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, 'Malware detected in attachments'
+                        ))
+                        continue
+
+                    # Process documents (upload to Drive, AI categorization)
+                    # TODO: Integrate with document upload service
+                    documents_created = len(temp_files)
+
+                    # Update usage
+                    self.increment_monthly_usage(str(user.id), documents_created)
+
+                    # Update allowed sender stats
+                    if allowed_sender:
+                        self.update_allowed_sender_stats(allowed_sender)
+
+                    # Update log
+                    log.status = 'completed'
+                    log.documents_created = documents_created
+                    log.processing_completed_at = datetime.utcnow()
+                    log.processing_time_ms = int((log.processing_completed_at - log.processing_started_at).total_seconds() * 1000)
+                    self.db.commit()
+
+                    # Send completion notification
+                    asyncio.run(self.send_completion_notification(
+                        user.email, sender_email, subject, documents_created
+                    ))
+
+                    # CRITICAL CLEANUP: Delete email and temp files
+                    self.cleanup_temp_files(temp_files)
+                    self.delete_email_from_inbox(imap, email_id)
+
+                    processed_count += 1
+                    logger.info(f"Successfully processed email from {sender_email}: {documents_created} documents created")
+
+                except Exception as e:
+                    logger.error(f"Error processing email {email_id}: {str(e)}")
+                    # Cleanup any temp files
+                    if 'temp_files' in locals():
+                        self.cleanup_temp_files(temp_files)
+                    continue
+
+            return processed_count
+
+        except Exception as e:
+            logger.error(f"Error polling inbox: {str(e)}")
+            return 0
+
+        finally:
+            if imap:
+                try:
+                    imap.close()
+                    imap.logout()
+                except:
+                    pass
+
+
+# Global instance
+def get_email_processing_service(db: Session) -> EmailProcessingService:
+    """Get email processing service instance"""
+    return EmailProcessingService(db)

@@ -42,6 +42,7 @@ class TierPlan(Base, TimestampMixin):
     max_monthly_upload_bytes = Column(sa.BigInteger, nullable=False)  # Monthly volume limit
     max_translations_per_month = Column(Integer, nullable=True)  # NULL = unlimited
     max_api_calls_per_month = Column(Integer, nullable=True)  # NULL = unlimited
+    max_email_documents_per_month = Column(Integer, nullable=True)  # NULL = unlimited, for email-to-process feature
 
     # Per-file limits
     max_file_size_bytes = Column(sa.BigInteger, nullable=False)
@@ -88,6 +89,7 @@ class UserMonthlyUsage(Base):
     # Feature usage
     translations_used = Column(Integer, nullable=False, server_default='0')
     api_calls_made = Column(Integer, nullable=False, server_default='0')
+    email_documents_processed = Column(Integer, nullable=False, server_default='0')  # Email-to-process feature
 
     # Period tracking
     period_start_date = Column(Date, nullable=False)
@@ -143,6 +145,10 @@ class User(Base, TimestampMixin):
 
     # Email preferences (GDPR/CAN-SPAM compliance)
     email_marketing_enabled = Column(Boolean, default=True, nullable=False, server_default='true')
+
+    # Email-to-process feature
+    email_processing_address = Column(String(255), unique=True, nullable=True, index=True)  # e.g., "a7f3b2c1@doc.bonidoc.com"
+    email_processing_enabled = Column(Boolean, default=False, nullable=False, server_default='false')
 
     # Stripe integration
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
@@ -1458,4 +1464,5 @@ class KeywordTrainingData(Base):
 
 # Import auth models to register them with Base.metadata
 # This ensures SQLAlchemy knows about these tables and relationships
+# Email processing models (AllowedSender, EmailProcessingLog, etc.) are defined in auth_models.py
 from app.database import auth_models  # noqa: F401, E402

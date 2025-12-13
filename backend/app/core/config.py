@@ -134,6 +134,31 @@ class StripeSettings(BaseSettings):
         env_file = ".env"
 
 
+class EmailProcessingSettings(BaseSettings):
+    """Email-to-document processing configuration from environment variables"""
+
+    # IMAP settings for receiving emails (Zoho EU for info@bonidoc.com)
+    imap_host: str = Field(default="imappro.zoho.eu", description="IMAP server hostname (Zoho EU)")
+    imap_port: int = Field(default=993, description="IMAP port (993 for SSL)")
+    imap_user: str = Field(default="info@bonidoc.com", description="IMAP username")
+    imap_password: str = Field(..., description="IMAP password (from environment)")
+    imap_use_ssl: bool = Field(default=True, description="Use SSL for IMAP connection")
+
+    # Email processing settings
+    doc_domain: str = Field(default="doc.bonidoc.com", description="Document processing email domain")
+    temp_storage_path: str = Field(default="/tmp/email_attachments", description="Temporary file storage path")
+    polling_interval_seconds: int = Field(default=300, description="How often to poll for new emails (5 minutes)")
+
+    # Processing limits (defaults, overridden by tier settings)
+    max_attachment_size_mb: int = Field(default=20, description="Default max attachment size in MB")
+    max_attachments_per_email: int = Field(default=10, description="Max attachments per email")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class AppSettings(BaseSettings):
     """Application configuration from environment variables"""
 
@@ -163,6 +188,7 @@ class Settings(BaseSettings):
     translation: TranslationSettings = Field(default_factory=TranslationSettings)
     scanner: ScannerSettings = Field(default_factory=ScannerSettings)
     email: EmailSettings = Field(default_factory=EmailSettings)
+    email_processing: EmailProcessingSettings = Field(default_factory=EmailProcessingSettings)
     stripe: StripeSettings = Field(default_factory=StripeSettings)
 
     def __init__(self, **kwargs):

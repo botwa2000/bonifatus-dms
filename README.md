@@ -42,6 +42,200 @@ Bonifatus DMS is a **production-grade, AI-powered document management system** b
 - **📦 Collections** - Folder organization system
 - **🔔 Notifications** - Real-time activity alerts
 - **📈 Analytics** - Usage statistics and insights
+- **📧 Email-to-Document Processing** - Send documents via email for automatic processing
+
+---
+
+## 📧 Email-to-Document Processing Feature
+
+### **Overview**
+
+Users can send documents directly to their personal email address to have them automatically processed, categorized, and saved to their Google Drive - without logging into the application.
+
+### **How It Works**
+
+Each user receives a unique, randomly generated email address:
+- **Format:** `{random-token}@doc.bonidoc.com` (e.g., `a7f3b2c1@doc.bonidoc.com`)
+- **Purpose:** Only emails sent to this exact address will trigger document processing
+- **Security:** Random token makes it impossible to guess other users' addresses
+
+### **Email Infrastructure**
+
+**Primary Mailbox:** `info@bonidoc.com`
+- **Catch-all configuration:** Receives ALL emails sent to `@bonidoc.com` domain
+- **Business function:** Main contact email for customer support, inquiries, marketing
+- **Document processing:** Only processes emails sent to `@doc.bonidoc.com` subdomain
+
+**Document Processing Subdomain:** `@doc.bonidoc.com`
+- **Dedicated for automation:** Only these emails trigger document processing
+- **User-specific addresses:** Each user gets unique token (e.g., `a7f3b2c1@doc.bonidoc.com`)
+- **Separate from business:** Business emails to `info@bonidoc.com` remain untouched
+
+### **Processing Flow & Security Gates**
+
+#### **Phase 1: Email Reception & Domain Filtering**
+1. IMAP service polls `info@bonidoc.com` inbox every N minutes
+2. For each unread email:
+   - Extract recipient address from `To:` header
+   - **Filter check:** Is recipient `*@doc.bonidoc.com`?
+   - If NO → **Skip** (leave in inbox for manual business handling)
+   - If YES → Proceed to Phase 2
+
+#### **Phase 2: User Identification & Sender Verification**
+3. Extract token from recipient address (e.g., `a7f3b2c1` from `a7f3b2c1@doc.bonidoc.com`)
+4. **Security Gate #1:** Find user with matching `email_processing_address`
+   - If not found → Reject, delete email, log incident
+5. **Security Gate #2:** Check if sender email exists in user's whitelist (`allowed_senders`)
+   - If not whitelisted → Reject, notify user, delete email, log incident
+6. **Security Gate #3:** Check sender is marked as active
+   - If inactive → Reject, notify user, delete email
+
+#### **Phase 3: Tier & Quota Validation**
+7. **Security Gate #4:** Check user's tier plan
+   - Is `email_to_process_enabled` = true for this tier?
+   - If NO → Reject with upgrade suggestion
+8. **Security Gate #5:** Check monthly quota
+   - Current usage < `max_email_documents_per_month`?
+   - If exceeded → Reject with quota limit message
+
+#### **Phase 4: Attachment Validation**
+9. Extract all attachments from email
+10. **Security Gate #6:** Validate attachment count
+    - Max attachments per tier (configurable)
+11. **Security Gate #7:** Validate total size
+    - Total size < `max_attachment_size_mb` from tier limits
+
+#### **Phase 5: Malware Scanning**
+12. Save each attachment to temporary secure storage (outside web root)
+13. **Security Gate #8:** Run ClamAV antivirus scan on each file
+    - Same security level as manual uploads
+    - If malware detected → Reject entire email, notify user, delete all temp files
+
+#### **Phase 6: Document Processing**
+14. For each clean attachment:
+    - Upload to user's Google Drive (existing upload service)
+    - Create `Document` record in database
+    - Link to `EmailProcessingLog` entry
+    - Queue for AI categorization pipeline
+15. Increment `UserMonthlyUsage.email_documents_processed` counter
+16. Update `AllowedSender.use_count` and `last_email_at` timestamp
+
+#### **Phase 7: AI Processing**
+17. Process through existing AI categorization pipeline
+    - Text extraction (OCR if needed)
+    - Language detection
+    - Category suggestion
+    - Keyword extraction
+18. Store results in `processing_metadata` field
+
+#### **Phase 8: Notification & Cleanup**
+19. Send confirmation email to user:
+    - Subject line from original email
+    - Number of documents processed
+    - Category assignments
+    - Links to documents in dashboard
+20. Update `EmailProcessingLog` with completion status
+21. **Critical Security Step - Complete Cleanup:**
+    - Delete email from `info@bonidoc.com` inbox (IMAP DELETE + EXPUNGE)
+    - Delete ALL temporary files from temp server
+    - Clear any in-memory data
+    - **Only retain:** Documents in Google Drive, metadata in database, processing log
+
+#### **Phase 9: Error Handling**
+If any step fails:
+- Log detailed error in `EmailProcessingLog` (error_code, error_message, rejection_reason)
+- Send error notification email to user
+- **Always cleanup:** Delete email from inbox, delete temp files
+- No document created, no quota consumed
+
+### **Security Features**
+
+#### **Multi-Layer Verification**
+1. **Domain filtering:** Only `@doc.bonidoc.com` emails processed
+2. **Recipient verification:** Unique token must match user's address
+3. **Sender whitelist:** Only pre-approved senders accepted
+4. **Tier enforcement:** Feature must be enabled for user's plan
+5. **Quota limits:** Monthly document processing caps per tier
+
+#### **Malware Protection**
+- ClamAV scanning (same as manual uploads)
+- File type validation
+- Size limits per tier
+- Attachment count limits
+- Temporary storage isolation
+
+#### **Privacy & Data Protection**
+- No email body content stored (only metadata)
+- Attachments deleted immediately after processing
+- Email deleted from inbox after processing
+- Full audit trail in `EmailProcessingLog`
+- User controls whitelist completely
+- Feature can be disabled anytime
+
+#### **Deduplication**
+- Email `Message-ID` tracking prevents double-processing
+- IMAP UID tracking prevents re-processing after restart
+- Database constraints prevent duplicate document creation
+
+### **User Whitelist Management**
+
+Users must explicitly approve senders before documents are accepted:
+- **Add sender:** Email address, optional friendly name
+- **Activate/deactivate:** Temporarily disable sender without deletion
+- **Usage tracking:** View when sender last sent, how many emails processed
+- **No wildcards:** Each email address must be individually approved
+
+### **Tier-Based Limits**
+
+| Tier | Email Processing | Monthly Limit | Max Attachment Size |
+|------|-----------------|---------------|---------------------|
+| **Free** | Optional | 10 documents/month | 10 MB |
+| **Starter** | Included | 50 documents/month | 20 MB |
+| **Professional** | Included | 500 documents/month | 50 MB |
+
+### **Configuration (No Hardcoded Values)**
+
+All configuration stored in environment variables or database:
+
+**Environment Variables:**
+- `IMAP_HOST` - IMAP server hostname (imappro.zoho.eu for Zoho EU)
+- `IMAP_PORT` - IMAP port (993 for SSL)
+- `IMAP_USER` - IMAP username (info@bonidoc.com)
+- `IMAP_PASSWORD` - IMAP password (set via system env vars in production)
+- `IMAP_USE_SSL` - Use SSL connection (true)
+- `EMAIL_DOC_DOMAIN` - Document processing domain (doc.bonidoc.com)
+- `EMAIL_TEMP_STORAGE_PATH` - Temporary file storage location
+- `EMAIL_POLLING_INTERVAL_SECONDS` - How often to check for new emails
+- `CLAMAV_HOST` - ClamAV server hostname
+- `CLAMAV_PORT` - ClamAV server port
+
+**Database Configuration:**
+- Tier limits in `tier_plans` table
+- Email templates in `email_templates` table
+- System settings in `system_settings` table
+
+### **Email Templates**
+
+Three email templates for user notifications:
+1. **Confirmation Email** - Sent when processing starts
+2. **Completion Email** - Sent when documents successfully processed
+3. **Error Email** - Sent when processing fails (with error details)
+
+All templates support variables: `{user_name}`, `{document_count}`, `{category_name}`, `{error_message}`, etc.
+
+### **Monitoring & Audit**
+
+Every email is logged in `EmailProcessingLog` table:
+- Sender and recipient addresses
+- Subject line
+- Attachment count and total size
+- Processing status (received → processing → completed/rejected/failed)
+- Processing duration
+- Error details if failed
+- Notification sent timestamps
+- Full processing metadata
+
+Users can view complete history in their dashboard.
 
 ---
 

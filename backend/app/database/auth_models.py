@@ -141,6 +141,7 @@ class AllowedSender(Base):
     trust_level = Column(String(20), default='normal', nullable=False)  # high, normal, low
     notes = Column(Text, nullable=True)
     last_email_at = Column(DateTime(timezone=True), nullable=True)
+    use_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
@@ -157,16 +158,45 @@ class EmailProcessingLog(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='SET NULL'), nullable=True, index=True)
+
+    # Email details
     sender_email = Column(String(255), nullable=False)
     recipient_email = Column(String(255), nullable=False)
     subject = Column(String(500), nullable=True)
+
+    # Email message tracking for deduplication
+    email_message_id = Column(String(255), nullable=True, index=True)
+    email_uid = Column(String(100), nullable=True, index=True)
+
+    # Attachment details
     attachment_count = Column(Integer, default=0, nullable=False)
+    attachment_filenames = Column('attachment_filenames', Text, nullable=True)  # JSONB array
     total_size_bytes = Column(BigInteger, default=0, nullable=False)
+
+    # Processing status and timing
     status = Column(String(50), nullable=False, index=True)  # received, processing, completed, rejected, failed
+    processing_started_at = Column(DateTime(timezone=True), nullable=True)
+    processing_completed_at = Column(DateTime(timezone=True), nullable=True)
+    processing_time_ms = Column(Integer, nullable=True)
+
+    # Error tracking
+    error_code = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=True)
     rejection_reason = Column(String(500), nullable=True)
+
+    # Batch and documents
     batch_id = Column(UUID(as_uuid=True), ForeignKey('upload_batches.id', ondelete='SET NULL'), nullable=True)
     documents_created = Column(Integer, default=0, nullable=False)
-    processing_time_ms = Column(Integer, nullable=True)
+
+    # Notification tracking
+    confirmation_sent_at = Column(DateTime(timezone=True), nullable=True)
+    completion_notification_sent_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Processing metadata (AI results, etc.)
+    processing_metadata = Column('processing_metadata', Text, nullable=True)  # JSONB
+
+    # Timestamps
     received_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     processed_at = Column(DateTime(timezone=True), nullable=True)
 

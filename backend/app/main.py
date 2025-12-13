@@ -119,12 +119,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Temp files cleanup initialization failed: {e}")
 
+    # Start email polling task
+    try:
+        from app.tasks import start_email_poller
+        start_email_poller()
+        logger.info("Email polling task initialized")
+    except Exception as e:
+        logger.warning(f"Email polling initialization failed: {e}")
+
     logger.info("Application startup completed successfully")
-    
+
     yield
-    
+
     # Shutdown
     logger.info(f"Shutting down {settings.app.app_title}")
+
+    # Stop email polling task
+    try:
+        from app.tasks import stop_email_poller
+        stop_email_poller()
+        logger.info("Email polling task stopped")
+    except Exception as e:
+        logger.warning(f"Email polling shutdown error: {e}")
     
     try:
         from app.database.connection import close_database
@@ -309,6 +325,7 @@ routers = [
     ("app.api.billing_subscriptions", "Billing"),
     ("app.api.billing_cancellations", "BillingCancellations"),
     ("app.api.webhooks", "Webhooks"),
+    ("app.api.email_processing", "EmailProcessing"),
 ]
 
 for module_path, name in routers:

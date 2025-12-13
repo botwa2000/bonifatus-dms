@@ -47,3 +47,5 @@ postal==1.1.10
 # Task Queue
 celery[redis]==5.6.0
 redis==5.2.1
+# Background Task Scheduling
+APScheduler==3.10.4
