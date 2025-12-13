@@ -1,6 +1,6 @@
 """add email processing to user
 
-Revision ID: 842cdf669afe
+Revision ID: 042_add_email_processing_to_user
 Revises: 041_enhance_email_tracking
 Create Date: 2025-12-13 13:29:05.603330
 
@@ -10,13 +10,13 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '842cdf669afe'
+revision = '042_add_email_processing_to_user'
 down_revision = '041_enhance_email_tracking'
 branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
+def upgrade():
     # Add email processing columns to users table
     op.add_column('users', sa.Column('email_processing_address', sa.String(length=255), nullable=True))
     op.add_column('users', sa.Column('email_processing_enabled', sa.Boolean(), nullable=False, server_default='false'))
@@ -25,7 +25,7 @@ def upgrade() -> None:
     op.create_index('ix_users_email_processing_address', 'users', ['email_processing_address'], unique=True)
 
 
-def downgrade() -> None:
+def downgrade():
     # Drop index and columns
     op.drop_index('ix_users_email_processing_address', table_name='users')
     op.drop_column('users', 'email_processing_enabled')
