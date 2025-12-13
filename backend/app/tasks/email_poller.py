@@ -28,7 +28,7 @@ async def poll_emails_task():
 
     try:
         # Get database session
-        db = next(db_manager.get_db())
+        db = next(db_manager.get_db_session())
 
         try:
             # Create email processing service
