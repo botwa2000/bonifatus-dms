@@ -21,7 +21,9 @@ from app.core.config import settings
 from app.database.auth_models import AllowedSender, EmailProcessingLog, EmailSettings
 from app.database.models import User, Document, UserMonthlyUsage
 from app.services.email_service import EmailService
-from app.services.document_upload_service import DocumentUploadService
+from app.services.document_upload_service import document_upload_service
+from app.services.malware_scanner_service import malware_scanner_service
+from app.services.document_analysis_service import DocumentAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ class EmailProcessingService:
     def __init__(self, db: Session):
         self.db = db
         self.email_service = EmailService()
+        self.document_analysis_service = DocumentAnalysisService()
         self.imap_host = settings.email_processing.imap_host
         self.imap_port = settings.email_processing.imap_port
         self.imap_user = settings.email_processing.imap_user
@@ -470,6 +473,151 @@ class EmailProcessingService:
             self.db.rollback()
             logger.error(f"Failed to update allowed sender stats: {str(e)}")
 
+    async def process_attachments(
+        self,
+        temp_files: List[str],
+        filenames: List[str],
+        user: User,
+        sender_email: str,
+        subject: str,
+        email_id: bytes
+    ) -> Tuple[int, List[str], List[str], bool]:
+        """
+        Process email attachments: scan, analyze, and upload
+
+        Args:
+            temp_files: List of temporary file paths
+            filenames: List of original filenames
+            user: User object
+            sender_email: Sender email address
+            subject: Email subject
+            email_id: Email ID
+
+        Returns:
+            Tuple of (documents_created, uploaded_document_ids, processing_errors, malware_detected)
+        """
+        # SECURITY GATE #8: Malware scanning (ClamAV)
+        malware_detected = False
+        malware_details = []
+
+        for temp_file in temp_files:
+            try:
+                with open(temp_file, 'rb') as f:
+                    scan_result = await malware_scanner_service.scan_file(
+                        file_content=f,
+                        filename=os.path.basename(temp_file),
+                        mime_type=None
+                    )
+
+                    if not scan_result.is_safe:
+                        malware_detected = True
+                        malware_details.extend(scan_result.threats)
+                        logger.error(f"Malware detected in {temp_file}: {scan_result.threats}")
+
+                    # Log warnings even if file is safe
+                    if scan_result.warnings:
+                        logger.warning(f"Scan warnings for {temp_file}: {scan_result.warnings}")
+
+            except Exception as e:
+                logger.error(f"Error scanning file {temp_file}: {str(e)}")
+                # Fail-safe: reject on scanning error
+                malware_detected = True
+                malware_details.append(f"Scan error: {str(e)}")
+
+        if malware_detected:
+            return 0, [], malware_details, True
+
+        # Process documents (upload to Drive, AI categorization)
+        documents_created = 0
+        uploaded_document_ids = []
+        processing_errors = []
+
+        for idx, temp_file in enumerate(temp_files):
+            try:
+                # Read file content
+                with open(temp_file, 'rb') as f:
+                    file_content = f.read()
+
+                filename = filenames[idx]
+
+                # Detect MIME type
+                import magic
+                mime_type = magic.from_buffer(file_content, mime=True)
+
+                logger.info(f"Processing attachment {idx + 1}/{len(temp_files)}: {filename} ({mime_type})")
+
+                # Analyze document with AI
+                analysis_result = await self.document_analysis_service.analyze_document(
+                    file_content=file_content,
+                    file_name=filename,
+                    mime_type=mime_type,
+                    db=self.db,
+                    user_id=str(user.id)
+                )
+
+                logger.info(f"Document analyzed: language={analysis_result.get('detected_language')}, category={analysis_result.get('suggested_category_id')}")
+
+                # Get user's language preference
+                user_language = user.preferred_doc_languages[0] if user.preferred_doc_languages else analysis_result.get('detected_language', 'en')
+
+                # Prepare category IDs
+                suggested_category_id = analysis_result.get('suggested_category_id')
+                if suggested_category_id:
+                    category_ids = [suggested_category_id]
+                else:
+                    # Find "Other/Uncategorized" system category
+                    from app.database.models import Category
+                    uncategorized = self.db.query(Category).filter(
+                        Category.is_system == True,
+                        Category.reference_key == 'other'
+                    ).first()
+                    category_ids = [str(uncategorized.id)] if uncategorized else []
+
+                if not category_ids:
+                    raise ValueError("No category available for document")
+
+                # Extract keywords
+                keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
+
+                # Generate document title
+                title = subject if subject else filename
+
+                # Prepare temp_data for upload service
+                temp_data = {
+                    'file_content': file_content,
+                    'file_name': filename,
+                    'mime_type': mime_type,
+                    'analysis_result': analysis_result
+                }
+
+                # Upload document to Drive
+                upload_result = await document_upload_service.confirm_upload(
+                    temp_id=f"email_{email_id.decode()}_{idx}",
+                    temp_data=temp_data,
+                    title=title,
+                    category_ids=category_ids,
+                    confirmed_keywords=keywords,
+                    description=f"Received via email from {sender_email}",
+                    user_id=str(user.id),
+                    user_email=user.email,
+                    language_code=user_language,
+                    session=self.db
+                )
+
+                if upload_result['success']:
+                    documents_created += 1
+                    uploaded_document_ids.append(upload_result['document_id'])
+                    logger.info(f"Document uploaded successfully: {upload_result['document_id']} - {title}")
+                else:
+                    processing_errors.append(f"{filename}: Upload failed")
+                    logger.error(f"Document upload failed for {filename}")
+
+            except Exception as e:
+                logger.error(f"Error processing attachment {filename}: {str(e)}", exc_info=True)
+                processing_errors.append(f"{filename}: {str(e)}")
+
+        return documents_created, uploaded_document_ids, processing_errors, False
+
     async def send_rejection_notification(
         self,
         user_email: str,
@@ -769,17 +917,26 @@ class EmailProcessingService:
                     log.processing_started_at = datetime.utcnow()
                     self.db.commit()
 
-                    # SECURITY GATE #8: Malware scanning (ClamAV)
-                    # TODO: Integrate ClamAV scanning here
-                    # For now, assume files are clean
-                    malware_detected = False
+                    # Process attachments: scan, analyze, upload
+                    documents_created, uploaded_document_ids, processing_errors, malware_detected = asyncio.run(
+                        self.process_attachments(
+                            temp_files=temp_files,
+                            filenames=filenames,
+                            user=user,
+                            sender_email=sender_email,
+                            subject=subject,
+                            email_id=email_id
+                        )
+                    )
 
+                    # Handle malware detection
                     if malware_detected:
-                        logger.error(f"Malware detected in attachments from {sender_email}")
+                        rejection_reason = f"Malware/threats detected: {', '.join(processing_errors)}"
+                        logger.error(f"Rejecting email from {sender_email}: {rejection_reason}")
 
                         # Update log
                         log.status = 'rejected'
-                        log.rejection_reason = 'Malware detected in attachments'
+                        log.rejection_reason = rejection_reason
                         log.error_code = 'MALWARE_DETECTED'
                         log.processing_completed_at = datetime.utcnow()
                         self.db.commit()
@@ -790,13 +947,38 @@ class EmailProcessingService:
 
                         # Notify user
                         asyncio.run(self.send_rejection_notification(
-                            user.email, sender_email, subject, 'Malware detected in attachments'
+                            user.email, sender_email, subject, rejection_reason
                         ))
                         continue
 
-                    # Process documents (upload to Drive, AI categorization)
-                    # TODO: Integrate with document upload service
-                    documents_created = len(temp_files)
+                    # Handle processing failures
+                    if documents_created == 0:
+                        rejection_reason = f"Failed to process attachments: {'; '.join(processing_errors)}"
+                        logger.error(f"No documents created from email: {rejection_reason}")
+
+                        # Update log
+                        log.status = 'failed'
+                        log.rejection_reason = rejection_reason
+                        log.error_code = 'PROCESSING_FAILED'
+                        log.error_message = json.dumps(processing_errors)
+                        log.processing_completed_at = datetime.utcnow()
+                        self.db.commit()
+
+                        # Cleanup
+                        self.cleanup_temp_files(temp_files)
+                        self.delete_email_from_inbox(imap, email_id)
+
+                        # Notify user
+                        asyncio.run(self.send_rejection_notification(
+                            user.email, sender_email, subject, rejection_reason
+                        ))
+                        continue
+
+                    # Update log with document IDs
+                    log.processing_metadata = json.dumps({
+                        'uploaded_document_ids': uploaded_document_ids,
+                        'processing_errors': processing_errors
+                    })
 
                     # Update usage
                     self.increment_monthly_usage(str(user.id), documents_created)
