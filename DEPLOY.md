@@ -287,7 +287,77 @@ nginx -t && systemctl reload nginx
 
 ---
 
-### Issue 6: Database Migrations Not Applied
+### Issue 6: IP Whitelist - Access Blocked with 403 Forbidden
+
+**Symptoms:**
+```
+Failed to load documents/categories
+CORS errors with 403 Forbidden
+Nginx error: "access forbidden by rule, client: YOUR_IP"
+```
+
+**Root Cause:** Your IP address is not in the nginx whitelist for dev environment
+
+**Check nginx error logs:**
+```bash
+ssh root@91.99.212.17
+tail -50 /var/log/nginx/error.log | grep "forbidden by rule"
+```
+
+**Find your current IP:**
+```powershell
+# On Windows PC:
+ipconfig
+# Look for IPv4 Address and IPv6 Address
+
+# Or check public IP:
+curl https://api.ipify.org
+```
+
+**Add IP to whitelist:**
+```bash
+ssh root@91.99.212.17
+
+# Backup config first
+cp /etc/nginx/sites-enabled/dev.bonidoc.com /etc/nginx/sites-enabled/dev.bonidoc.com.backup
+
+# Add IPv4 (replace with your IP)
+sed -i '/allow 93.197.148.73;  # Home PC IPv4/a\    allow YOUR_IP_HERE;  # Current connection' /etc/nginx/sites-enabled/dev.bonidoc.com
+
+# Or edit manually
+nano /etc/nginx/sites-enabled/dev.bonidoc.com
+# Find the "allow" lines and add your IP in both server blocks
+
+# Test configuration
+nginx -t
+
+# Reload nginx
+systemctl reload nginx
+```
+
+**Current Whitelisted IPs:**
+- IPv4: `93.197.148.73` (home PC)
+- IPv6: `2003:fb:f0b::/32` (IPv6 range)
+
+**Whitelist Location:**
+`/etc/nginx/sites-enabled/dev.bonidoc.com` (both frontend and API server blocks)
+
+**For IPv6 subnet changes:**
+If your IPv6 subnet changes (common with dynamic IPv6):
+```bash
+# Check current whitelist
+grep "allow 2003" /etc/nginx/sites-enabled/dev.bonidoc.com
+
+# Update to new subnet (replace with your subnet)
+sed -i 's|2003:fb:f0e:fc6a::/64|2003:fb:f0b:YOUR_SUBNET::/64|g' /etc/nginx/sites-enabled/dev.bonidoc.com
+
+# Reload nginx
+nginx -t && systemctl reload nginx
+```
+
+---
+
+### Issue 7: Database Migrations Not Applied
 
 **Symptoms:**
 - New features not working
