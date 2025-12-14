@@ -729,27 +729,38 @@ class EmailProcessingService:
 
         try:
             # Connect to IMAP
+            logger.info(f"[EMAIL DEBUG] Connecting to IMAP server: {self.imap_server}")
             imap = self.connect_to_imap()
             if not imap:
+                logger.error("[EMAIL DEBUG] Failed to connect to IMAP")
                 return 0
 
+            logger.info("[EMAIL DEBUG] IMAP connection successful")
+
             # Select inbox
-            imap.select('INBOX')
+            logger.info("[EMAIL DEBUG] Selecting INBOX folder")
+            status, data = imap.select('INBOX')
+            logger.info(f"[EMAIL DEBUG] INBOX selected. Status: {status}, Messages: {data}")
 
             # Search for unread emails
+            logger.info("[EMAIL DEBUG] Searching for UNSEEN emails")
             status, messages = imap.search(None, 'UNSEEN')
             if status != 'OK':
-                logger.error("Failed to search for emails")
+                logger.error(f"[EMAIL DEBUG] Failed to search for emails. Status: {status}")
                 return 0
 
             email_ids = messages[0].split()
-            logger.info(f"Found {len(email_ids)} unread emails")
+            logger.info(f"[EMAIL DEBUG] Found {len(email_ids)} unread emails")
+            logger.info(f"[EMAIL DEBUG] Email IDs: {email_ids}")
 
             for email_id in email_ids:
                 try:
+                    logger.info(f"[EMAIL DEBUG] Processing email ID: {email_id}")
+
                     # Fetch email
                     status, msg_data = imap.fetch(email_id, '(RFC822)')
                     if status != 'OK':
+                        logger.error(f"[EMAIL DEBUG] Failed to fetch email {email_id}. Status: {status}")
                         continue
 
                     # Parse email
@@ -761,6 +772,8 @@ class EmailProcessingService:
                     sender_raw = email_message.get('From', '')
                     subject_raw = email_message.get('Subject', '')
                     message_id = email_message.get('Message-ID', '')
+
+                    logger.info(f"[EMAIL DEBUG] From: {sender_raw} | To: {recipient_raw} | Subject: {subject_raw}")
 
                     # Decode
                     recipient_email = self.extract_email_address(recipient_raw)
