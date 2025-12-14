@@ -729,7 +729,7 @@ class EmailProcessingService:
 
         try:
             # Connect to IMAP
-            logger.info(f"[EMAIL DEBUG] Connecting to IMAP server: {self.imap_server}")
+            logger.info(f"[EMAIL DEBUG] Connecting to IMAP server: {self.imap_host}:{self.imap_port}")
             imap = self.connect_to_imap()
             if not imap:
                 logger.error("[EMAIL DEBUG] Failed to connect to IMAP")
