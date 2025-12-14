@@ -47,6 +47,8 @@ class UserProfileResponse(BaseModel):
     last_login_at: Optional[datetime] = Field(None, description="Last login timestamp")
     created_at: datetime = Field(..., description="Account creation timestamp")
     updated_at: datetime = Field(..., description="Last profile update timestamp")
+    email_processing_enabled: Optional[bool] = Field(None, description="Email processing enabled")
+    email_processing_address: Optional[str] = Field(None, description="Email processing address")
     monthly_usage: Optional[dict] = Field(None, description="Monthly usage statistics and limits")
 
     class Config:

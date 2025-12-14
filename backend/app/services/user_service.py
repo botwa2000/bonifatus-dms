@@ -120,6 +120,8 @@ class UserService:
                 last_login_at=user.last_login_at,
                 created_at=user.created_at,
                 updated_at=user.updated_at,
+                email_processing_enabled=user.email_processing_enabled,
+                email_processing_address=user.email_processing_address,
                 monthly_usage=monthly_usage
             )
 
@@ -226,7 +228,9 @@ class UserService:
                 is_active=user.is_active,
                 last_login_at=user.last_login_at,
                 created_at=user.created_at,
-                updated_at=user.updated_at
+                updated_at=user.updated_at,
+                email_processing_enabled=user.email_processing_enabled,
+                email_processing_address=user.email_processing_address
             )
 
         except ValueError as e:
