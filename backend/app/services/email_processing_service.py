@@ -810,7 +810,7 @@ class EmailProcessingService:
                         # Send notification
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
 
                         # Delete email
                         self.delete_email_from_inbox(imap, email_id)
@@ -839,7 +839,7 @@ class EmailProcessingService:
 
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
 
                         self.delete_email_from_inbox(imap, email_id)
                         continue
@@ -863,7 +863,7 @@ class EmailProcessingService:
 
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
 
                         self.delete_email_from_inbox(imap, email_id)
                         continue
@@ -889,7 +889,7 @@ class EmailProcessingService:
 
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
 
                         self.delete_email_from_inbox(imap, email_id)
                         continue
@@ -950,7 +950,7 @@ class EmailProcessingService:
                         # Notify user
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
                         continue
 
                     # Handle processing failures
@@ -973,7 +973,7 @@ class EmailProcessingService:
                         # Notify user
                         await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
-                        ))
+                        )
                         continue
 
                     # Update log with document IDs
@@ -999,7 +999,7 @@ class EmailProcessingService:
                     # Send completion notification
                     await self.send_completion_notification(
                         user.email, sender_email, subject, documents_created
-                    ))
+                    )
 
                     # CRITICAL CLEANUP: Delete email and temp files
                     self.cleanup_temp_files(temp_files)
