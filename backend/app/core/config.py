@@ -48,8 +48,8 @@ class SecuritySettings(BaseSettings):
     
     security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
-    access_token_expire_minutes: int = Field(default=30, description="JWT access token expiration (30 min inactivity timeout)")
-    inactivity_timeout_minutes: int = Field(default=30, description="Inactivity timeout - logout after 30 min of no API calls")
+    access_token_expire_minutes: int = Field(default=480, description="JWT access token expiration (8 hours)")
+    inactivity_timeout_minutes: int = Field(default=480, description="Inactivity timeout - logout after 8 hours of no API calls")
     refresh_token_expire_days: int = Field(default=30, description="Refresh token expiration (30 days for persistent login)")
     default_user_tier: str = Field(default="free", description="Default user tier")
     admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")

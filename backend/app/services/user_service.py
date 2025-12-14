@@ -130,26 +130,73 @@ class UserService:
             session.close()
 
     async def update_user_profile(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         profile_update: UserProfileUpdate,
         ip_address: str = None
     ) -> Optional[UserProfileResponse]:
-        """Update user profile information"""
+        """Update user profile information, including email and password changes"""
         session = db_manager.session_local()
         try:
             user = session.get(User, user_id)
             if not user:
                 return None
 
+            # Check if this is a Google user trying to change email/password
+            if user.google_id:
+                if profile_update.new_email or profile_update.new_password:
+                    raise ValueError("Email and password changes are not allowed for Google-authenticated accounts")
+
             # Store old values for audit
             old_values = {
                 "full_name": user.full_name,
-                "profile_picture": user.profile_picture
+                "profile_picture": user.profile_picture,
+                "email": user.email
             }
 
-            # Update profile fields
-            update_data = profile_update.dict(exclude_unset=True)
+            # Handle password change if requested
+            if profile_update.current_password and profile_update.new_password:
+                from app.services.auth_service import auth_service
+                # Verify current password
+                if not auth_service.verify_password(profile_update.current_password, user.password_hash):
+                    raise ValueError("Current password is incorrect")
+
+                # Hash and update new password
+                user.password_hash = auth_service.get_password_hash(profile_update.new_password)
+                logger.info(f"Password changed for user: {user.email}")
+
+            # Handle email change if requested (non-Google users only)
+            old_email = user.email
+            if profile_update.new_email and profile_update.new_email != old_email:
+                # Check if new email already exists
+                existing_user = session.query(User).filter(User.email == profile_update.new_email).first()
+                if existing_user:
+                    raise ValueError("Email address already in use")
+
+                # Send verification code to new email
+                from app.services.email_auth_service import email_auth_service
+                code = await email_auth_service.create_verification_code(
+                    email=profile_update.new_email,
+                    purpose='email_change',
+                    user_id=user_id,
+                    session=session
+                )
+
+                await email_auth_service.send_verification_email(
+                    email=profile_update.new_email,
+                    code=code,
+                    user_name=user.full_name,
+                    purpose='email_change'
+                )
+
+                logger.info(f"Email change verification sent to {profile_update.new_email} for user {old_email}")
+
+                # Don't update email yet - wait for verification
+                # Store pending email in a temp field or return message to user
+                raise ValueError(f"Verification code sent to {profile_update.new_email}. Please verify to complete email change.")
+
+            # Update basic profile fields
+            update_data = profile_update.dict(exclude_unset=True, exclude={'new_email', 'current_password', 'new_password'})
             new_values = {}
 
             for field, value in update_data.items():
@@ -182,10 +229,64 @@ class UserService:
                 updated_at=user.updated_at
             )
 
+        except ValueError as e:
+            # Re-raise validation errors with original message
+            session.rollback()
+            raise e
         except Exception as e:
             logger.error(f"Failed to update user profile {user_id}: {e}")
             session.rollback()
             return None
+        finally:
+            session.close()
+
+    async def verify_and_change_email(
+        self,
+        user_id: str,
+        new_email: str,
+        verification_code: str,
+        ip_address: str = None
+    ) -> bool:
+        """Verify email change and update user email"""
+        session = db_manager.session_local()
+        try:
+            from app.services.email_auth_service import email_auth_service
+
+            # Verify code
+            is_valid = await email_auth_service.verify_code(
+                email=new_email,
+                code=verification_code,
+                purpose='email_change',
+                session=session
+            )
+
+            if not is_valid:
+                return False
+
+            user = session.get(User, user_id)
+            if not user:
+                return False
+
+            old_email = user.email
+
+            # Update user email
+            user.email = new_email
+            user.updated_at = datetime.utcnow()
+            session.commit()
+
+            # Log email change
+            await self._log_user_action(
+                user_id, "email_changed", "user", user_id,
+                {"email": old_email}, {"email": new_email}, ip_address, session
+            )
+
+            logger.info(f"Email changed from {old_email} to {new_email} for user {user_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to change email for user {user_id}: {e}")
+            session.rollback()
+            return False
         finally:
             session.close()
 

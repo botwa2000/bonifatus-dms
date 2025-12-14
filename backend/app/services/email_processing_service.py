@@ -64,6 +64,7 @@ class EmailProcessingService:
     def enable_email_processing_for_user(self, user_id: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Enable email processing for a user and assign unique email address
+        User must manually add allowed senders via Settings UI
 
         Args:
             user_id: User UUID

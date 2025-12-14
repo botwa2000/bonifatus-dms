@@ -13,18 +13,24 @@ class UserProfileUpdate(BaseModel):
     """Request model for updating user profile"""
     full_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User full name")
     profile_picture: Optional[str] = Field(None, description="Profile picture URL")
-    
+    new_email: Optional[EmailStr] = Field(None, description="New email address (requires verification)")
+    current_password: Optional[str] = Field(None, description="Current password (required for password change)")
+    new_password: Optional[str] = Field(None, min_length=8, description="New password")
+
     @validator('full_name')
     def validate_full_name(cls, v):
         if v is not None and v.strip() == "":
             raise ValueError('Full name cannot be empty')
         return v.strip() if v else v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "full_name": "John Doe",
-                "profile_picture": "https://lh3.googleusercontent.com/..."
+                "profile_picture": "https://lh3.googleusercontent.com/...",
+                "new_email": "newemail@example.com",
+                "current_password": "oldpassword123",
+                "new_password": "newpassword456"
             }
         }
 

@@ -567,8 +567,24 @@ export default function ProfilePage() {
                       {profile.google_id && (
                         <p className="text-xs text-neutral-500 mt-1">Email cannot be changed (linked to Google account)</p>
                       )}
+                      {!profile.google_id && (
+                        <p className="text-xs text-neutral-500 mt-1">Email can be changed in edit mode</p>
+                      )}
                     </>
                   } />
+                  {profile.email_processing_enabled && profile.email_processing_address && (
+                    <InfoRow label="Document Processing Email" value={
+                      <>
+                        <span className="font-mono text-sm bg-blue-50 dark:bg-blue-900 px-2 py-1 rounded">{profile.email_processing_address}</span>
+                        <p className="text-xs text-neutral-500 mt-2">
+                          Send documents to this email address to automatically process them.
+                        </p>
+                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-2 font-medium">
+                          ⚠️ Important: Add sender email addresses to your whitelist in Settings to receive emails
+                        </p>
+                      </>
+                    } />
+                  )}
                   {(() => {
                     // Check if user's tier supports email processing
                     const userTier = subscription ? availableTiers.find(t => t.id === subscription.tier_id) : null
