@@ -247,10 +247,14 @@ class UserService:
         verification_code: str,
         ip_address: str = None
     ) -> bool:
-        """Verify email change and update user email"""
+        """
+        Verify email change and update user email
+        Also updates the allowed_sender email pair for Pro users with email processing
+        """
         session = db_manager.session_local()
         try:
             from app.services.email_auth_service import email_auth_service
+            from app.database.auth_models import AllowedSender
 
             # Verify code
             is_valid = await email_auth_service.verify_code(
@@ -272,6 +276,34 @@ class UserService:
             # Update user email
             user.email = new_email
             user.updated_at = datetime.utcnow()
+
+            # Update allowed_sender email pair if email processing is enabled
+            if user.email_processing_enabled:
+                # Find the allowed sender entry for the old email
+                allowed_sender = session.query(AllowedSender).filter(
+                    AllowedSender.user_id == user_id,
+                    AllowedSender.sender_email == old_email
+                ).first()
+
+                if allowed_sender:
+                    # Update to new email
+                    allowed_sender.sender_email = new_email
+                    allowed_sender.sender_name = user.full_name
+                    logger.info(f"Updated allowed_sender email pair: {old_email} → {new_email}")
+                else:
+                    # If no allowed sender exists, create one (shouldn't happen for Pro users, but defensive)
+                    allowed_sender = AllowedSender(
+                        user_id=user_id,
+                        sender_email=new_email,
+                        sender_name=user.full_name,
+                        is_verified=True,
+                        is_active=True,
+                        trust_level='high',
+                        notes='Created during email change'
+                    )
+                    session.add(allowed_sender)
+                    logger.info(f"Created new allowed_sender for email change: {new_email}")
+
             session.commit()
 
             # Log email change

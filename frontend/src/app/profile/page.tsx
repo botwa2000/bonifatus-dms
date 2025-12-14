@@ -98,7 +98,6 @@ export default function ProfilePage() {
   const [availableTiers, setAvailableTiers] = useState<TierPlan[]>([])
   const [loadingSubscription, setLoadingSubscription] = useState(true)
   const [processingSubscription, setProcessingSubscription] = useState(false)
-  const [enablingEmailProcessing, setEnablingEmailProcessing] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
@@ -315,29 +314,6 @@ export default function ProfilePage() {
     await loadProfileData()
   }
 
-  const enableEmailProcessing = async () => {
-    setEnablingEmailProcessing(true)
-    setMessage(null)
-
-    try {
-      const response = await apiClient.post<{ enabled: boolean, email_address: string | null, message: string }>(
-        '/api/v1/email-processing/enable',
-        { enable: true },
-        true
-      )
-
-      if (response.enabled && response.email_address) {
-        setMessage({ type: 'success', text: response.message })
-        // Reload profile to get updated email processing address
-        await loadProfileData()
-      }
-    } catch (error) {
-      console.error('Failed to enable email processing:', error)
-      setMessage({ type: 'error', text: 'Failed to enable email processing' })
-    } finally {
-      setEnablingEmailProcessing(false)
-    }
-  }
 
   const handleUpdatePaymentMethod = async () => {
     setProcessingSubscription(true)
@@ -572,54 +548,24 @@ export default function ProfilePage() {
                       )}
                     </>
                   } />
-                  {profile.email_processing_enabled && profile.email_processing_address && (
-                    <InfoRow label="Document Processing Email" value={
-                      <>
-                        <span className="font-mono text-sm bg-blue-50 dark:bg-blue-900 px-2 py-1 rounded">{profile.email_processing_address}</span>
-                        <p className="text-xs text-neutral-500 mt-2">
-                          Send documents to this email address to automatically process them.
-                        </p>
-                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-2 font-medium">
-                          ⚠️ Important: Add sender email addresses to your whitelist in Settings to receive emails
-                        </p>
-                      </>
-                    } />
-                  )}
                   {(() => {
                     // Check if user's tier supports email processing
                     const userTier = subscription ? availableTiers.find(t => t.id === subscription.tier_id) : null
                     const tierSupportsEmailProcessing = userTier?.email_to_process_enabled
 
-                    if (profile.email_processing_enabled && profile.email_processing_address) {
-                      // Email processing is already enabled - show the address
+                    if (tierSupportsEmailProcessing && profile.email_processing_enabled && profile.email_processing_address) {
+                      // Pro/Premium user with email processing enabled - show processing email
                       return (
                         <InfoRow label="Document Processing Email" value={
                           <>
-                            <span className="font-mono text-sm">{profile.email_processing_address}</span>
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Send documents to this email address to automatically process them.
-                              Attachments will be extracted, analyzed, and added to your account.
+                            <span className="font-mono text-sm bg-blue-50 dark:bg-blue-900 px-2 py-1 rounded">
+                              {profile.email_processing_address}
+                            </span>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-2">
+                              Send documents from <span className="font-semibold">{profile.email}</span> to this address to automatically process them.
                             </p>
-                          </>
-                        } />
-                      )
-                    } else if (tierSupportsEmailProcessing && !profile.email_processing_enabled) {
-                      // Tier supports it but not enabled yet - show enable button
-                      return (
-                        <InfoRow label="Document Processing Email" value={
-                          <>
-                            <p className="text-sm text-neutral-600 mb-2">
-                              Your {userTier?.display_name} plan includes email-to-document processing.
-                            </p>
-                            <Button
-                              size="sm"
-                              onClick={enableEmailProcessing}
-                              disabled={enablingEmailProcessing}
-                            >
-                              {enablingEmailProcessing ? 'Enabling...' : 'Enable Email Processing'}
-                            </Button>
-                            <p className="text-xs text-neutral-500 mt-2">
-                              Get a unique email address to send documents for automatic processing.
+                            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                              Only emails from your registered account email are accepted.
                             </p>
                           </>
                         } />

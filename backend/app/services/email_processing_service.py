@@ -61,10 +61,10 @@ class EmailProcessingService:
         token = secrets.token_urlsafe(6)[:8].lower()
         return f"{token}@{self.doc_domain}"
 
-    def enable_email_processing_for_user(self, user_id: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def auto_enable_email_processing_for_pro_user(self, user_id: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
-        Enable email processing for a user and assign unique email address
-        User must manually add allowed senders via Settings UI
+        Automatically enable email processing for Pro users
+        Creates processing email + single allowed sender pair (user's registered email)
 
         Args:
             user_id: User UUID
@@ -79,9 +79,10 @@ class EmailProcessingService:
 
             # Check if already enabled
             if user.email_processing_enabled and user.email_processing_address:
+                logger.info(f"Email processing already enabled for user {user_id}")
                 return True, user.email_processing_address, None
 
-            # Generate unique email address
+            # Generate unique processing email address
             max_attempts = 10
             for _ in range(max_attempts):
                 email_address = self.generate_user_email_address(user_id)
@@ -105,21 +106,48 @@ class EmailProcessingService:
                 user_id=user_id,
                 email_address=email_address,
                 is_enabled=True,
-                daily_email_limit=50,  # Default, can be overridden by tier
+                daily_email_limit=50,
                 max_attachment_size_mb=20,
                 auto_categorize=True,
                 send_confirmation_email=True
             )
             self.db.add(email_settings)
+
+            # Create single allowed sender pair (user's registered email → processing email)
+            allowed_sender = AllowedSender(
+                user_id=user_id,
+                sender_email=user.email,
+                sender_name=user.full_name,
+                is_verified=True,
+                is_active=True,
+                trust_level='high',
+                notes='Auto-created email pair for Pro user'
+            )
+            self.db.add(allowed_sender)
+
             self.db.commit()
 
-            logger.info(f"Email processing enabled for user {user_id}: {email_address}")
+            logger.info(f"Email processing auto-enabled for Pro user {user_id}: {user.email} → {email_address}")
             return True, email_address, None
 
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Error enabling email processing for user {user_id}: {str(e)}")
+            logger.error(f"Error auto-enabling email processing for user {user_id}: {str(e)}")
             return False, None, str(e)
+
+    def enable_email_processing_for_user(self, user_id: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Enable email processing for a user (called automatically for Pro users)
+        Creates processing email + single allowed sender pair
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Tuple of (success, email_address, error_message)
+        """
+        # Delegate to auto_enable method (same implementation)
+        return self.auto_enable_email_processing_for_pro_user(user_id)
 
     def connect_to_imap(self) -> Optional[imaplib.IMAP4_SSL]:
         """

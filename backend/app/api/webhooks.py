@@ -367,6 +367,20 @@ async def handle_subscription_created(event, session: Session):
 
     logger.info(f"[WEBHOOK] ✓ Created subscription {db_subscription.id} for user {user.email}, tier {tier.name}, currency: {currency}, amount: {amount_cents}")
 
+    # Auto-enable email processing for Pro/Premium users
+    if tier.email_to_process_enabled:
+        try:
+            from app.services.email_processing_service import EmailProcessingService
+            email_processing_service = EmailProcessingService(session)
+            success, processing_email, error = email_processing_service.auto_enable_email_processing_for_pro_user(str(user.id))
+
+            if success:
+                logger.info(f"[WEBHOOK] ✓ Auto-enabled email processing for Pro user {user.email}: {processing_email}")
+            else:
+                logger.error(f"[WEBHOOK] Failed to auto-enable email processing for user {user.email}: {error}")
+        except Exception as e:
+            logger.error(f"[WEBHOOK] Exception while auto-enabling email processing: {e}")
+
     # Send subscription confirmation email
     try:
         # Use currency and amount from subscription (already extracted above)

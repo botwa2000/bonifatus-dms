@@ -59,28 +59,37 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check inactivity timeout (30 minutes of no API calls)
-    if user.last_activity_at:
-        inactive_seconds = (datetime.now(timezone.utc) - user.last_activity_at).total_seconds()
-        inactive_minutes = inactive_seconds / 60
-
-        if inactive_minutes > settings.security.inactivity_timeout_minutes:
-            logger.warning(f"User {user.email} inactive for {inactive_minutes:.1f} minutes - forcing logout")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Session expired due to inactivity ({settings.security.inactivity_timeout_minutes} minutes)",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-    # Update activity timestamp (track user activity)
-    # Use synchronous database session for activity update
+    # Update activity timestamp FIRST (before inactivity check)
+    # This prevents race condition where page refresh triggers inactivity logout
     from sqlalchemy.orm import Session
     db: Session = next(get_db())
+    current_time = datetime.now(timezone.utc)
+
     try:
         db_user = db.query(User).filter(User.id == user.id).first()
         if db_user:
-            db_user.last_activity_at = datetime.now(timezone.utc)
+            # Check inactivity timeout using the CURRENT last_activity_at (before updating)
+            if db_user.last_activity_at:
+                inactive_seconds = (current_time - db_user.last_activity_at).total_seconds()
+                inactive_minutes = inactive_seconds / 60
+
+                # Only enforce inactivity if it's been longer than the timeout
+                # Add 1 minute grace period to handle network delays and page loads
+                if inactive_minutes > (settings.security.inactivity_timeout_minutes + 1):
+                    db.close()
+                    logger.warning(f"User {user.email} inactive for {inactive_minutes:.1f} minutes - forcing logout")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail=f"Session expired due to inactivity ({settings.security.inactivity_timeout_minutes} minutes)",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+
+            # Update activity timestamp (this user is now active)
+            db_user.last_activity_at = current_time
             db.commit()
+    except HTTPException:
+        # Re-raise HTTP exceptions (like inactivity timeout)
+        raise
     except Exception as e:
         logger.error(f"Failed to update last_activity_at for user {user.email}: {e}")
         db.rollback()
