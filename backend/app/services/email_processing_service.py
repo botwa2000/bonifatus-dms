@@ -717,7 +717,7 @@ class EmailProcessingService:
         except Exception as e:
             logger.error(f"Failed to send completion notification: {str(e)}")
 
-    def poll_inbox(self) -> int:
+    async def poll_inbox(self) -> int:
         """
         Poll IMAP inbox for new emails sent to @doc.bonidoc.com
 
@@ -808,7 +808,7 @@ class EmailProcessingService:
                         )
 
                         # Send notification
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
 
@@ -837,7 +837,7 @@ class EmailProcessingService:
                             rejection_reason=rejection_reason
                         )
 
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
 
@@ -861,7 +861,7 @@ class EmailProcessingService:
                             rejection_reason=rejection_reason
                         )
 
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
 
@@ -887,7 +887,7 @@ class EmailProcessingService:
                             rejection_reason=rejection_reason
                         )
 
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
 
@@ -922,15 +922,13 @@ class EmailProcessingService:
                     self.db.commit()
 
                     # Process attachments: scan, analyze, upload
-                    documents_created, uploaded_document_ids, processing_errors, malware_detected = asyncio.run(
-                        self.process_attachments(
-                            temp_files=temp_files,
-                            filenames=filenames,
-                            user=user,
-                            sender_email=sender_email,
-                            subject=subject,
-                            email_id=email_id
-                        )
+                    documents_created, uploaded_document_ids, processing_errors, malware_detected = await self.process_attachments(
+                        temp_files=temp_files,
+                        filenames=filenames,
+                        user=user,
+                        sender_email=sender_email,
+                        subject=subject,
+                        email_id=email_id
                     )
 
                     # Handle malware detection
@@ -950,7 +948,7 @@ class EmailProcessingService:
                         self.delete_email_from_inbox(imap, email_id)
 
                         # Notify user
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
                         continue
@@ -973,7 +971,7 @@ class EmailProcessingService:
                         self.delete_email_from_inbox(imap, email_id)
 
                         # Notify user
-                        asyncio.run(self.send_rejection_notification(
+                        await self.send_rejection_notification(
                             user.email, sender_email, subject, rejection_reason
                         ))
                         continue
@@ -999,7 +997,7 @@ class EmailProcessingService:
                     self.db.commit()
 
                     # Send completion notification
-                    asyncio.run(self.send_completion_notification(
+                    await self.send_completion_notification(
                         user.email, sender_email, subject, documents_created
                     ))
 

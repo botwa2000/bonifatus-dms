@@ -35,7 +35,7 @@ async def poll_emails_task():
             email_service = EmailProcessingService(db)
 
             # Poll inbox
-            processed_count = email_service.poll_inbox()
+            processed_count = await email_service.poll_inbox()
 
             logger.info(f"Email polling completed. Processed {processed_count} emails.")
 

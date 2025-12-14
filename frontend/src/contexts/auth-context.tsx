@@ -29,18 +29,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // This prevents unnecessary API calls and 401 errors on public pages
 
   const loadUser = useCallback(async () => {
+    console.log('[AUTH DEBUG] loadUser called')
     setIsLoading(true)
 
     try {
+      console.log('[AUTH DEBUG] Calling authService.getCurrentUser()')
       const currentUser = await authService.getCurrentUser()
+      console.log('[AUTH DEBUG] getCurrentUser response:', currentUser ? `User: ${currentUser.email}` : 'null')
       setUser(currentUser)
       setIsAuthenticated(!!currentUser)
+      console.log('[AUTH DEBUG] Auth state updated - isAuthenticated:', !!currentUser)
     } catch (err) {
+      console.error('[AUTH DEBUG] Error in loadUser:', err)
       // Silently handle errors
       setUser(null)
       setIsAuthenticated(false)
+      console.log('[AUTH DEBUG] Auth state cleared due to error')
     } finally {
       setIsLoading(false)
+      console.log('[AUTH DEBUG] loadUser completed')
     }
   }, [])
 

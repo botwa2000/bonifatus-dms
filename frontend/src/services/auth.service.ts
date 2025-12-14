@@ -206,20 +206,30 @@ export class AuthService {
   }
 
   async getCurrentUser(): Promise<User | null> {
+    console.log('[AUTH SERVICE] getCurrentUser called')
     try {
       // httpOnly cookies are sent automatically with this request
+      console.log('[AUTH SERVICE] Calling /api/v1/auth/me')
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
       // User data no longer cached in sessionStorage (XSS risk)
       // Cookies are the single source of truth
 
+      console.log('[AUTH SERVICE] getCurrentUser success:', response?.email)
       return response
 
     } catch (error) {
         // Silently handle errors - 401 is expected during OAuth flow and on public pages
         const apiError = error as { status?: number; message?: string }
 
+        console.error('[AUTH SERVICE] getCurrentUser error:', {
+          status: apiError?.status,
+          message: apiError?.message,
+          fullError: error
+        })
+
         if (apiError?.status === 401) {
+          console.warn('[AUTH SERVICE] 401 error - clearing auth data')
           this.clearAllAuthData()
         }
 

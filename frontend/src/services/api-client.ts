@@ -122,15 +122,25 @@ export class ApiClient {
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
 
+          console.error('[API CLIENT] HTTP error:', {
+            status: response.status,
+            endpoint,
+            requireAuth,
+            error: error.message
+          })
+
           // Handle 401 errors with automatic token refresh (except for refresh endpoint itself)
           if (response.status === 401 && !endpoint.includes('/auth/refresh') && requireAuth) {
+            console.warn('[API CLIENT] 401 error - attempting token refresh')
             const refreshed = await this.refreshToken()
             if (refreshed) {
+              console.log('[API CLIENT] Token refresh successful - retrying request')
               // Token refreshed successfully, retry the request once
               lastError = error
               continue
             }
             // Refresh failed, redirect to login
+            console.error('[API CLIENT] Token refresh failed - redirecting to /login')
             if (typeof window !== 'undefined') {
               window.location.href = '/login'
             }
