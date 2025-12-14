@@ -16,6 +16,7 @@ interface UserProfile {
   email: string
   full_name: string
   tier: string
+  tier_id: number
   google_id: string
   profile_picture_url?: string
   created_at: string
@@ -82,6 +83,7 @@ export default function ProfilePage() {
   const [statistics, setStatistics] = useState<UserStatistics | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [fullName, setFullName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -172,6 +174,15 @@ export default function ProfilePage() {
   const handleUpdateProfile = async () => {
     if (!profile) return
 
+    // Validate email change
+    if (newEmail && newEmail !== profile.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(newEmail)) {
+        setMessage({ type: 'error', text: 'Please enter a valid email address' })
+        return
+      }
+    }
+
     // Validate password fields if attempting to change password
     if (newPassword || confirmPassword || currentPassword) {
       if (!currentPassword) {
@@ -198,6 +209,11 @@ export default function ProfilePage() {
     try {
       const updateData: Record<string, string> = { full_name: fullName }
 
+      // Add email change if provided
+      if (newEmail && newEmail !== profile.email) {
+        updateData.new_email = newEmail
+      }
+
       // Add password change if provided
       if (currentPassword && newPassword) {
         updateData.current_password = currentPassword
@@ -206,11 +222,21 @@ export default function ProfilePage() {
 
       await apiClient.put('/api/v1/users/profile', updateData, true)
 
-      setMessage({
-        type: 'success',
-        text: currentPassword && newPassword ? 'Profile and password updated successfully' : 'Profile updated successfully'
-      })
+      const hasEmailChange = newEmail && newEmail !== profile.email
+      const hasPasswordChange = currentPassword && newPassword
+
+      let successMessage = 'Profile updated successfully'
+      if (hasEmailChange && hasPasswordChange) {
+        successMessage = 'Profile, email, and password updated successfully'
+      } else if (hasEmailChange) {
+        successMessage = 'Profile and email updated successfully'
+      } else if (hasPasswordChange) {
+        successMessage = 'Profile and password updated successfully'
+      }
+
+      setMessage({ type: 'success', text: successMessage })
       setEditMode(false)
+      setNewEmail('')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
@@ -431,6 +457,20 @@ export default function ProfilePage() {
                     onChange={(e) => setFullName(e.target.value)}
                   />
 
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={newEmail || profile.email}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder={profile.email}
+                    disabled={!!profile.google_id}
+                  />
+                  {profile.google_id && (
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                      Email cannot be changed for Google accounts
+                    </p>
+                  )}
+
                   {!profile.google_id && (
                     <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
                       <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">Change Password (optional)</h4>
@@ -550,7 +590,9 @@ export default function ProfilePage() {
                   } />
                   {(() => {
                     // Check if user's tier supports email processing
-                    const userTier = subscription ? availableTiers.find(t => t.id === subscription.tier_id) : null
+                    // Use subscription tier if available, otherwise fall back to profile tier_id
+                    const tierIdToCheck = subscription?.tier_id ?? profile.tier_id
+                    const userTier = availableTiers.find(t => t.id === tierIdToCheck)
                     const tierSupportsEmailProcessing = userTier?.email_to_process_enabled
 
                     if (tierSupportsEmailProcessing && profile.email_processing_enabled && profile.email_processing_address) {
