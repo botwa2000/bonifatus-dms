@@ -70,9 +70,15 @@ async def get_current_user(
             # Store the old activity timestamp for checking
             last_activity = db_user.last_activity_at
 
+            # DEBUG: Log session activity details
+            logger.info(f"[SESSION DEBUG] User: {user.email} | Path: {request.url.path}")
+            logger.info(f"[SESSION DEBUG] Current time: {current_time}")
+            logger.info(f"[SESSION DEBUG] Last activity: {last_activity}")
+
             # Update activity timestamp IMMEDIATELY to mark this request as activity
             db_user.last_activity_at = current_time
             db.commit()
+            logger.info(f"[SESSION DEBUG] Activity timestamp updated to: {current_time}")
 
             # NOW check if user WAS inactive (before this request)
             # This prevents race condition where page refresh triggers logout
@@ -80,16 +86,23 @@ async def get_current_user(
                 inactive_seconds = (current_time - last_activity).total_seconds()
                 inactive_minutes = inactive_seconds / 60
 
+                logger.info(f"[SESSION DEBUG] Inactive duration: {inactive_minutes:.2f} minutes ({inactive_seconds:.1f} seconds)")
+                logger.info(f"[SESSION DEBUG] Timeout threshold: {settings.security.inactivity_timeout_minutes + 1} minutes")
+
                 # Only enforce inactivity if it's been longer than the timeout
                 # Add 1 minute grace period to handle network delays and page loads
                 if inactive_minutes > (settings.security.inactivity_timeout_minutes + 1):
                     db.close()
-                    logger.warning(f"User {user.email} was inactive for {inactive_minutes:.1f} minutes - forcing logout")
+                    logger.warning(f"[SESSION DEBUG] LOGOUT TRIGGERED - User {user.email} was inactive for {inactive_minutes:.1f} minutes - forcing logout")
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail=f"Session expired due to inactivity ({settings.security.inactivity_timeout_minutes} minutes)",
                         headers={"WWW-Authenticate": "Bearer"},
                     )
+                else:
+                    logger.info(f"[SESSION DEBUG] Session valid - continuing request")
+            else:
+                logger.info(f"[SESSION DEBUG] No last_activity timestamp - first request or new session")
     except HTTPException:
         # Re-raise HTTP exceptions (like inactivity timeout)
         raise

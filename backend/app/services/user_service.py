@@ -218,6 +218,9 @@ class UserService:
 
             logger.info(f"User profile updated: {user.email}")
 
+            # Get monthly usage information
+            monthly_usage = await tier_service.get_monthly_usage_info(user_id, session)
+
             return UserProfileResponse(
                 id=str(user.id),
                 email=user.email,
@@ -230,7 +233,8 @@ class UserService:
                 created_at=user.created_at,
                 updated_at=user.updated_at,
                 email_processing_enabled=user.email_processing_enabled,
-                email_processing_address=user.email_processing_address
+                email_processing_address=user.email_processing_address,
+                monthly_usage=monthly_usage
             )
 
         except ValueError as e:

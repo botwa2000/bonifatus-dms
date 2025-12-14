@@ -816,33 +816,8 @@ class EmailProcessingService:
                         self.delete_email_from_inbox(imap, email_id)
                         continue
 
-                    # SECURITY GATE #4 & #5: Check quota
-                    has_quota, quota_error = self.check_monthly_quota(str(user.id))
-                    if not has_quota:
-                        logger.warning(f"Quota exceeded for user {user.id}: {quota_error}")
-
-                        # Create log
-                        self.create_processing_log(
-                            user_id=str(user.id),
-                            sender_email=sender_email,
-                            recipient_email=recipient_email,
-                            subject=subject,
-                            message_id=message_id,
-                            uid=str(email_id),
-                            attachment_count=attachment_count,
-                            total_size_bytes=total_size,
-                            status='rejected',
-                            rejection_reason=quota_error
-                        )
-
-                        # Send notification
-                        asyncio.run(self.send_rejection_notification(
-                            user.email, sender_email, subject, quota_error
-                        ))
-
-                        # Delete email
-                        self.delete_email_from_inbox(imap, email_id)
-                        continue
+                    # SECURITY GATE #4 & #5: Quota check removed (Pro tier has unlimited email processing)
+                    # Future: Add quota check here for Free tier if needed
 
                     # SECURITY GATE #6: Check attachment count
                     if attachment_count == 0:

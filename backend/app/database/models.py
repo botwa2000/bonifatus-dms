@@ -88,7 +88,7 @@ class UserMonthlyUsage(Base):
     # Feature usage
     translations_used = Column(Integer, nullable=False, server_default='0')
     api_calls_made = Column(Integer, nullable=False, server_default='0')
-    email_documents_processed = Column(Integer, nullable=False, server_default='0')  # Email-to-process feature
+    # Note: email_documents_processed removed - unlimited feature for Pro tier
 
     # Period tracking
     period_start_date = Column(Date, nullable=False)
