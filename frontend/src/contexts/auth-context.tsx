@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)  // Start as true to prevent premature redirects
   const [error, setError] = useState<string | null>(null)
 
   // Passive provider: No auto-fetch on mount
