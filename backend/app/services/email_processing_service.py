@@ -608,8 +608,28 @@ class EmailProcessingService:
                 # Extract keywords
                 keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
 
-                # Generate document title
-                title = subject if subject else filename
+                # Generate document title from attachment filename (not email subject)
+                # Remove file extension for cleaner title
+                import os
+                title = os.path.splitext(filename)[0]
+
+                # Check for duplicates by file hash
+                import hashlib
+                file_hash = hashlib.sha256(file_content).hexdigest()
+
+                from app.database.models import Document
+                existing_doc = self.db.query(Document).filter(
+                    Document.user_id == user.id,
+                    Document.file_hash == file_hash,
+                    Document.is_deleted == False
+                ).first()
+
+                if existing_doc:
+                    logger.warning(f"[EMAIL DEBUG] Duplicate detected: {filename} already exists as document {existing_doc.id}")
+                    processing_errors.append(f"{filename}: Duplicate - already uploaded")
+                    continue  # Skip this attachment
+
+                logger.info(f"[EMAIL DEBUG] No duplicate found for {filename}, proceeding with upload")
 
                 # Prepare temp_data for upload service
                 temp_data = {
