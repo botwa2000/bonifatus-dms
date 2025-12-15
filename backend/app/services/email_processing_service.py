@@ -11,6 +11,7 @@ from email.utils import parseaddr
 import os
 import secrets
 import json
+import hashlib
 import asyncio
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
@@ -610,14 +611,11 @@ class EmailProcessingService:
 
                 # Generate document title from attachment filename (not email subject)
                 # Remove file extension for cleaner title
-                import os
                 title = os.path.splitext(filename)[0]
 
                 # Check for duplicates by file hash
-                import hashlib
                 file_hash = hashlib.sha256(file_content).hexdigest()
 
-                from app.database.models import Document
                 existing_doc = self.db.query(Document).filter(
                     Document.user_id == user.id,
                     Document.file_hash == file_hash,

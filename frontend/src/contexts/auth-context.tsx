@@ -28,16 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Pages that need authentication explicitly call loadUser()
   // This prevents unnecessary API calls and 401 errors on public pages
 
-  // Set initial loading to false after mount for public pages
-  useEffect(() => {
-    // On initial mount, if no auth check has been triggered, set loading to false
-    // This prevents public pages (like login) from being stuck in loading state
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [])
-
   const loadUser = useCallback(async () => {
     console.log('[AUTH DEBUG] loadUser called')
     setIsLoading(true)
