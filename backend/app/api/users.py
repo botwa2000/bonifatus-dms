@@ -733,3 +733,65 @@ async def get_monthly_usage(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to retrieve usage information"
         )
+
+
+@router.post(
+    "/verify-email-change",
+    responses={
+        200: {"description": "Email changed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired verification code"},
+        401: {"model": ErrorResponse, "description": "Authentication required"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Verify Email Change",
+    description="Verify new email address with 6-digit code and complete email change"
+)
+async def verify_email_change(
+    request: Request,
+    new_email: str,
+    verification_code: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Verify email change with 6-digit code
+
+    - **new_email**: New email address
+    - **verification_code**: 6-digit verification code sent to new email
+    """
+    try:
+        # Get client info
+        client_ip = request.client.host if request.client else None
+
+        # Verify and change email
+        success = await user_service.verify_and_change_email(
+            user_id=str(current_user.id),
+            new_email=new_email,
+            verification_code=verification_code,
+            ip_address=client_ip
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification code"
+            )
+
+        logger.info(f"Email changed successfully for user: {current_user.email} -> {new_email}")
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "message": "Email address updated successfully",
+                "new_email": new_email
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verify email change error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to verify email change"
+        )

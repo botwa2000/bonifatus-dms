@@ -175,20 +175,23 @@ class UserService:
                 if existing_user:
                     raise ValueError("Email address already in use")
 
-                # Send verification code to new email
+                # Send verification code to new email using existing methods
                 from app.services.email_auth_service import email_auth_service
-                code = await email_auth_service.create_verification_code(
+                from app.services.email_service import email_service
+
+                # Generate verification code
+                code_result = await email_auth_service.generate_verification_code(
+                    user_id=str(user_id),
                     email=profile_update.new_email,
                     purpose='email_change',
-                    user_id=user_id,
                     session=session
                 )
 
-                await email_auth_service.send_verification_email(
-                    email=profile_update.new_email,
-                    code=code,
+                # Send verification email using existing email service method
+                await email_service.send_verification_code_email(
+                    to_email=profile_update.new_email,
                     user_name=user.full_name,
-                    purpose='email_change'
+                    verification_code=code_result['code']
                 )
 
                 logger.info(f"Email change verification sent to {profile_update.new_email} for user {old_email}")

@@ -309,27 +309,47 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      // Validate currency is selected
-      if (!selectedCurrency) {
-        setMessage({ type: 'error', text: 'Please select a currency first' })
-        setProcessingSubscription(false)
-        return
+      // If user has an active subscription, use update endpoint
+      if (subscription) {
+        const response = await apiClient.put(
+          '/api/v1/billing/subscriptions/update',
+          {
+            tier_id: tierId,
+            billing_cycle: billingCycle
+          },
+          true
+        )
+
+        setMessage({ type: 'success', text: 'Subscription upgraded successfully! Changes will take effect immediately with prorated billing.' })
+
+        // Reload profile to show updated tier
+        await loadProfile()
+        await loadSubscription()
+      } else {
+        // No active subscription - create new checkout session
+        // Validate currency is selected
+        if (!selectedCurrency) {
+          setMessage({ type: 'error', text: 'Please select a currency first' })
+          setProcessingSubscription(false)
+          return
+        }
+
+        const response = await apiClient.post<{ checkout_url: string }>(
+          '/api/v1/billing/subscriptions/create-checkout',
+          {
+            tier_id: tierId,
+            billing_cycle: billingCycle,
+            currency: selectedCurrency.code
+          },
+          true
+        )
+
+        window.location.href = response.checkout_url
       }
-
-      const response = await apiClient.post<{ checkout_url: string }>(
-        '/api/v1/billing/subscriptions/create-checkout',
-        {
-          tier_id: tierId,
-          billing_cycle: billingCycle,
-          currency: selectedCurrency.code
-        },
-        true
-      )
-
-      window.location.href = response.checkout_url
     } catch (error) {
-      console.error('Failed to create checkout:', error)
-      setMessage({ type: 'error', text: 'Failed to start upgrade process' })
+      console.error('Failed to upgrade subscription:', error)
+      setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' })
+    } finally {
       setProcessingSubscription(false)
     }
   }

@@ -1461,6 +1461,79 @@ class KeywordTrainingData(Base):
     )
 
 
+# =============================================================================
+# Multi-User Delegate Access System
+# =============================================================================
+
+class UserDelegate(Base, TimestampMixin):
+    """Delegate access management - Pro users can grant access to other users"""
+    __tablename__ = "user_delegates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    delegate_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    delegate_email = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, server_default='viewer')  # viewer, editor, owner
+    status = Column(String(20), nullable=False, server_default='pending')  # pending, active, revoked
+
+    # Invitation management
+    invitation_token = Column(String(100), unique=True, nullable=True)
+    invitation_sent_at = Column(DateTime(timezone=True), nullable=True)
+    invitation_expires_at = Column(DateTime(timezone=True), nullable=True)
+    invitation_accepted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Access management
+    access_expires_at = Column(DateTime(timezone=True), nullable=True)  # Optional time-limited access
+    last_accessed_at = Column(DateTime(timezone=True), nullable=True)  # Track last activity
+
+    # Audit fields
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    owner = relationship("User", foreign_keys=[owner_user_id], backref="owned_delegates")
+    delegate = relationship("User", foreign_keys=[delegate_user_id], backref="delegated_access")
+    revoker = relationship("User", foreign_keys=[revoked_by])
+
+    __table_args__ = (
+        sa.CheckConstraint("role IN ('viewer', 'editor', 'owner')", name='check_role'),
+        sa.CheckConstraint("status IN ('pending', 'active', 'revoked')", name='check_status'),
+        sa.CheckConstraint('owner_user_id != delegate_user_id', name='check_different_users'),
+        sa.UniqueConstraint('owner_user_id', 'delegate_email', name='uq_owner_delegate_email'),
+        Index('idx_delegates_owner', 'owner_user_id'),
+        Index('idx_delegates_delegate_user', 'delegate_user_id'),
+        Index('idx_delegates_delegate_email', 'delegate_email'),
+        Index('idx_delegates_status', 'status'),
+        Index('idx_delegates_invitation_token', 'invitation_token'),
+        Index('idx_delegates_access_expires', 'access_expires_at', postgresql_where=sa.text('access_expires_at IS NOT NULL')),
+    )
+
+
+class DelegateAccessLog(Base):
+    """Audit trail for delegate document access"""
+    __tablename__ = "delegate_access_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    delegate_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    action = Column(String(20), nullable=False)  # view, download, search
+    accessed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
+    user_agent = Column(Text, nullable=True)
+
+    # Relationships
+    delegate = relationship("User", foreign_keys=[delegate_user_id])
+    owner = relationship("User", foreign_keys=[owner_user_id])
+
+    __table_args__ = (
+        sa.CheckConstraint("action IN ('view', 'download', 'search')", name='check_action'),
+        Index('idx_access_logs_delegate', 'delegate_user_id', 'accessed_at'),
+        Index('idx_access_logs_owner', 'owner_user_id', 'accessed_at'),
+        Index('idx_access_logs_document', 'document_id'),
+    )
+
+
 # Import auth models to register them with Base.metadata
 # This ensures SQLAlchemy knows about these tables and relationships
 # Email processing models (AllowedSender, EmailProcessingLog, etc.) are defined in auth_models.py
