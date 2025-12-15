@@ -22,7 +22,7 @@ export function GoogleLoginButton({
   tierId,
   billingCycle
 }: GoogleLoginButtonProps) {
-  const { initializeGoogleAuth, isLoading } = useAuth()
+  const { initializeGoogleAuth } = useAuth()
   const [isRedirecting, setIsRedirecting] = useState(false)
 
   const handleLogin = async () => {
@@ -48,7 +48,7 @@ export function GoogleLoginButton({
     secondary: 'bg-neutral-100 border border-neutral-200 text-neutral-600 hover:bg-neutral-200'
   }
 
-  const isButtonLoading = isLoading || isRedirecting
+  const isButtonLoading = isRedirecting
 
   return (
     <button
