@@ -322,6 +322,22 @@ async def update_user_tier(
                 sub.canceled_at = datetime.now(timezone.utc)
                 sub.ended_at = datetime.now(timezone.utc)
 
+        # Handle email processing feature based on tier
+        # Check if new tier has email-to-process feature enabled
+        if new_tier.email_to_process_enabled and not user.email_processing_enabled:
+            # Enable email processing for Pro users
+            from app.services.email_processing_service import EmailProcessingService
+            email_service = EmailProcessingService(session)
+            success, email_address, error = email_service.auto_enable_email_processing_for_pro_user(str(user.id))
+            if success:
+                logger.info(f"Email processing enabled for user {user.email}: {email_address}")
+            else:
+                logger.warning(f"Failed to enable email processing for user {user.email}: {error}")
+        elif not new_tier.email_to_process_enabled and user.email_processing_enabled:
+            # Disable email processing when downgrading from Pro
+            user.email_processing_enabled = False
+            logger.info(f"Email processing disabled for user {user.email}")
+
         session.commit()
 
         logger.info(f"Admin {current_user.email} updated user {user.email} tier: {old_tier_id} → {tier_update.tier_id}")
