@@ -6,7 +6,7 @@ Administrative endpoints for user management, tier configuration, and system mon
 
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, and_, or_, desc
@@ -272,6 +272,55 @@ async def update_user_tier(
                 document_count=0
             )
             session.add(quota)
+
+        # Update or create subscription for non-Free tiers
+        from app.database.models import Subscription
+
+        if tier_update.tier_id > 0:  # Not Free tier
+            # Check for existing subscription
+            existing_subscription = session.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user.id,
+                    Subscription.status.in_(['active', 'trialing'])
+                )
+            ).scalar_one_or_none()
+
+            if existing_subscription:
+                # Update existing subscription
+                existing_subscription.tier_id = tier_update.tier_id
+                existing_subscription.status = 'active'
+            else:
+                # Create admin-granted subscription
+                now = datetime.now(timezone.utc)
+                period_end = now + timedelta(days=365)  # 1 year from now
+
+                new_subscription = Subscription(
+                    user_id=user.id,
+                    tier_id=tier_update.tier_id,
+                    stripe_subscription_id=f"admin_granted_{user.id}",
+                    stripe_price_id=f"admin_price_{tier_update.tier_id}",
+                    billing_cycle='yearly',
+                    status='active',
+                    current_period_start=now,
+                    current_period_end=period_end,
+                    cancel_at_period_end=False,
+                    currency='USD',
+                    amount_cents=0  # Admin-granted, no charge
+                )
+                session.add(new_subscription)
+        else:
+            # Free tier - cancel any active subscriptions
+            active_subs = session.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user.id,
+                    Subscription.status.in_(['active', 'trialing'])
+                )
+            ).scalars().all()
+
+            for sub in active_subs:
+                sub.status = 'canceled'
+                sub.canceled_at = datetime.now(timezone.utc)
+                sub.ended_at = datetime.now(timezone.utc)
 
         session.commit()
 
