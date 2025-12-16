@@ -277,37 +277,58 @@ async def update_user_tier(
         from app.database.models import Subscription
 
         if tier_update.tier_id > 0:  # Not Free tier
-            # Check for existing subscription
+            # Check for existing admin-granted subscription (any status)
+            admin_sub_id = f"admin_granted_{user.id}"
             existing_subscription = session.execute(
                 select(Subscription).where(
                     Subscription.user_id == user.id,
-                    Subscription.status.in_(['active', 'trialing'])
+                    Subscription.stripe_subscription_id == admin_sub_id
                 )
             ).scalar_one_or_none()
 
             if existing_subscription:
-                # Update existing subscription
+                # Reactivate and update existing subscription
                 existing_subscription.tier_id = tier_update.tier_id
                 existing_subscription.status = 'active'
-            else:
-                # Create admin-granted subscription
+                existing_subscription.canceled_at = None
+                existing_subscription.ended_at = None
+                existing_subscription.cancel_at_period_end = False
+                # Extend period
                 now = datetime.now(timezone.utc)
-                period_end = now + timedelta(days=365)  # 1 year from now
+                existing_subscription.current_period_start = now
+                existing_subscription.current_period_end = now + timedelta(days=365)
+            else:
+                # Check for any active subscription (Stripe-managed)
+                active_stripe_sub = session.execute(
+                    select(Subscription).where(
+                        Subscription.user_id == user.id,
+                        Subscription.status.in_(['active', 'trialing']),
+                        Subscription.stripe_subscription_id != admin_sub_id
+                    )
+                ).scalar_one_or_none()
 
-                new_subscription = Subscription(
-                    user_id=user.id,
-                    tier_id=tier_update.tier_id,
-                    stripe_subscription_id=f"admin_granted_{user.id}",
-                    stripe_price_id=f"admin_price_{tier_update.tier_id}",
-                    billing_cycle='yearly',
-                    status='active',
-                    current_period_start=now,
-                    current_period_end=period_end,
-                    cancel_at_period_end=False,
-                    currency='USD',
-                    amount_cents=0  # Admin-granted, no charge
-                )
-                session.add(new_subscription)
+                if active_stripe_sub:
+                    # User has a real Stripe subscription, just update tier
+                    active_stripe_sub.tier_id = tier_update.tier_id
+                else:
+                    # Create new admin-granted subscription
+                    now = datetime.now(timezone.utc)
+                    period_end = now + timedelta(days=365)  # 1 year from now
+
+                    new_subscription = Subscription(
+                        user_id=user.id,
+                        tier_id=tier_update.tier_id,
+                        stripe_subscription_id=admin_sub_id,
+                        stripe_price_id=f"admin_price_{tier_update.tier_id}",
+                        billing_cycle='yearly',
+                        status='active',
+                        current_period_start=now,
+                        current_period_end=period_end,
+                        cancel_at_period_end=False,
+                        currency='USD',
+                        amount_cents=0  # Admin-granted, no charge
+                    )
+                    session.add(new_subscription)
         else:
             # Free tier - cancel any active subscriptions
             active_subs = session.execute(
