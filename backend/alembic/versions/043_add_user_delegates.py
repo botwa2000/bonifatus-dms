@@ -17,6 +17,9 @@ depends_on = None
 
 
 def upgrade():
+    # Ensure uuid-ossp extension is enabled
+    op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+
     # Create user_delegates table
     op.create_table('user_delegates',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
