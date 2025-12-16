@@ -323,8 +323,8 @@ export default function ProfilePage() {
         setMessage({ type: 'success', text: 'Subscription upgraded successfully! Changes will take effect immediately with prorated billing.' })
 
         // Reload profile to show updated tier
-        await loadProfile()
-        await loadSubscription()
+        await loadProfileData()
+        await loadSubscriptionData()
       } else {
         // No active subscription - create new checkout session
         // Validate currency is selected
