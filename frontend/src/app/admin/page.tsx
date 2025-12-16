@@ -128,7 +128,7 @@ interface EntityQualityConfig {
 }
 
 export default function AdminDashboard() {
-  const { user, isLoading, loadUser } = useAuth()
+  const { user, isLoading, hasAttemptedAuth, loadUser } = useAuth()
   const router = useRouter()
 
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -169,6 +169,11 @@ export default function AdminDashboard() {
 
   // Check admin access
   useEffect(() => {
+    // Don't check auth until we've attempted to load the user
+    if (!hasAttemptedAuth) {
+      return
+    }
+
     if (!isLoading && !user) {
       router.push('/login')
       return
@@ -182,7 +187,7 @@ export default function AdminDashboard() {
     if (user && user.is_admin) {
       loadData()
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, hasAttemptedAuth, router])
 
   const loadData = async () => {
     try {

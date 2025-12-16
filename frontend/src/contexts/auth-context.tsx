@@ -4,11 +4,13 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { authService } from '@/services/auth.service'
 import { User } from '@/types/auth.types'
+import { shouldLog } from '@/config/app.config'
 
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  hasAttemptedAuth: boolean
   error: string | null
   loadUser: () => Promise<void>
   initializeGoogleAuth: (tierId?: number, billingCycle?: 'monthly' | 'yearly') => Promise<void>
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)  // Start false for public pages
+  const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Passive provider: No auto-fetch on mount
@@ -30,25 +33,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // This prevents unnecessary API calls and 401 errors on public pages
 
   const loadUser = useCallback(async () => {
-    console.log('[AUTH DEBUG] loadUser called')
+    if (shouldLog('debug')) console.log('[AUTH DEBUG] loadUser called')
     setIsLoading(true)
 
     try {
-      console.log('[AUTH DEBUG] Calling authService.getCurrentUser()')
+      if (shouldLog('debug')) console.log('[AUTH DEBUG] Calling authService.getCurrentUser()')
       const currentUser = await authService.getCurrentUser()
-      console.log('[AUTH DEBUG] getCurrentUser response:', currentUser ? `User: ${currentUser.email}` : 'null')
+      if (shouldLog('debug')) console.log('[AUTH DEBUG] getCurrentUser response:', currentUser ? `User: ${currentUser.email}` : 'null')
       setUser(currentUser)
       setIsAuthenticated(!!currentUser)
-      console.log('[AUTH DEBUG] Auth state updated - isAuthenticated:', !!currentUser)
+      if (shouldLog('debug')) console.log('[AUTH DEBUG] Auth state updated - isAuthenticated:', !!currentUser)
     } catch (err) {
-      console.error('[AUTH DEBUG] Error in loadUser:', err)
+      if (shouldLog('error')) console.error('[AUTH DEBUG] Error in loadUser:', err)
       // Silently handle errors
       setUser(null)
       setIsAuthenticated(false)
-      console.log('[AUTH DEBUG] Auth state cleared due to error')
+      if (shouldLog('debug')) console.log('[AUTH DEBUG] Auth state cleared due to error')
     } finally {
       setIsLoading(false)
-      console.log('[AUTH DEBUG] loadUser completed')
+      setHasAttemptedAuth(true)
+      if (shouldLog('debug')) console.log('[AUTH DEBUG] loadUser completed')
     }
   }, [])
 
@@ -103,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isAuthenticated,
       isLoading,
+      hasAttemptedAuth,
       error,
       loadUser,
       initializeGoogleAuth,

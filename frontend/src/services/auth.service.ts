@@ -2,6 +2,7 @@
 
 import { apiClient } from './api-client'
 import { User, GoogleOAuthConfig, AuthError } from '@/types/auth.types'
+import { shouldLog } from '@/config/app.config'
 
 interface AuthServiceConfig {
   apiUrl: string
@@ -206,16 +207,16 @@ export class AuthService {
   }
 
   async getCurrentUser(): Promise<User | null> {
-    console.log('[AUTH SERVICE] getCurrentUser called')
+    if (shouldLog('debug')) console.log('[AUTH SERVICE] getCurrentUser called')
     try {
       // httpOnly cookies are sent automatically with this request
-      console.log('[AUTH SERVICE] Calling /api/v1/auth/me')
+      if (shouldLog('debug')) console.log('[AUTH SERVICE] Calling /api/v1/auth/me')
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
       // User data no longer cached in sessionStorage (XSS risk)
       // Cookies are the single source of truth
 
-      console.log('[AUTH SERVICE] getCurrentUser success:', response?.email)
+      if (shouldLog('debug')) console.log('[AUTH SERVICE] getCurrentUser success:', response?.email)
       return response
 
     } catch (error) {
