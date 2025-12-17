@@ -3,12 +3,14 @@
 Bonifatus DMS - Authentication Middleware
 JWT token validation from httpOnly cookies (Phase 1 security implementation)
 Activity tracking for inactivity timeout (30 minutes)
+Delegate access control for multi-user document sharing
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
-from fastapi import Depends, HTTPException, status, Request
+from typing import Optional, Tuple
+from uuid import UUID
+from fastapi import Depends, HTTPException, status, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import settings
@@ -181,25 +183,147 @@ async def optional_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> Optional[User]:
     """Get current user if token is provided, but don't require authentication"""
-    
+
     # Check httpOnly cookie first
     token = request.cookies.get("access_token")
-    
+
     # Fallback to Authorization header
     if not token and credentials:
         token = credentials.credentials
-    
+
     if not token:
         return None
 
     try:
         user = await auth_service.get_current_user(token)
-        
+
         if user and user.is_active:
             logger.info(f"Optional auth: User {user.email} authenticated for {request.url.path}")
             return user
-            
+
     except Exception as e:
         logger.warning(f"Optional auth failed for {request.url.path}: {e}")
-    
+
     return None
+
+
+class DelegateContext:
+    """Context for delegate access - contains effective user ID and permissions"""
+    def __init__(
+        self,
+        effective_user_id: UUID,
+        is_acting_as_delegate: bool = False,
+        delegate_role: Optional[str] = None,
+        owner_user: Optional[User] = None
+    ):
+        self.effective_user_id = effective_user_id
+        self.is_acting_as_delegate = is_acting_as_delegate
+        self.delegate_role = delegate_role
+        self.owner_user = owner_user
+
+    @property
+    def can_write(self) -> bool:
+        """Check if current context allows write operations"""
+        # Delegates with viewer role cannot write
+        if self.is_acting_as_delegate and self.delegate_role == 'viewer':
+            return False
+        # Owner or editor can write
+        return True
+
+    @property
+    def can_delete(self) -> bool:
+        """Check if current context allows delete operations"""
+        # Only owner or editor role can delete
+        if self.is_acting_as_delegate and self.delegate_role != 'owner':
+            return False
+        return True
+
+
+async def get_delegate_context(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    x_acting_as_user_id: Optional[str] = Header(None, alias="X-Acting-As-User-Id")
+) -> DelegateContext:
+    """
+    Get delegate access context for document operations
+
+    Checks if user is acting as a delegate and validates permissions.
+    Returns DelegateContext with effective user ID and access rights.
+
+    Header: X-Acting-As-User-Id (UUID of owner whose documents to access)
+    """
+
+    # If no acting-as header, user is accessing their own documents
+    if not x_acting_as_user_id:
+        return DelegateContext(
+            effective_user_id=current_user.id,
+            is_acting_as_delegate=False
+        )
+
+    # Parse and validate UUID
+    try:
+        owner_user_id = UUID(x_acting_as_user_id)
+    except ValueError:
+        logger.warning(f"Invalid X-Acting-As-User-Id header: {x_acting_as_user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid acting-as user ID format"
+        )
+
+    # User cannot act as themselves
+    if owner_user_id == current_user.id:
+        return DelegateContext(
+            effective_user_id=current_user.id,
+            is_acting_as_delegate=False
+        )
+
+    # Check if current user has delegate access to owner
+    from app.services.delegate_service import delegate_service
+
+    has_access, role = await delegate_service.check_access(
+        delegate_user_id=current_user.id,
+        owner_user_id=owner_user_id
+    )
+
+    if not has_access:
+        logger.warning(
+            f"User {current_user.email} attempted unauthorized delegate access to user {owner_user_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this user's documents"
+        )
+
+    # Get owner user info for context
+    from sqlalchemy.orm import Session
+    db: Session = next(get_db())
+    try:
+        owner_user = db.query(User).filter(User.id == owner_user_id).first()
+        if not owner_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Owner user not found"
+            )
+    finally:
+        db.close()
+
+    # Log delegate access
+    await delegate_service.log_access(
+        delegate_user_id=current_user.id,
+        owner_user_id=owner_user_id,
+        document_id=None,  # Will be set by specific endpoints
+        action=f"access_check_{request.url.path}",
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("User-Agent")
+    )
+
+    logger.info(
+        f"Delegate access: {current_user.email} acting as {owner_user.email} with role {role}"
+    )
+
+    return DelegateContext(
+        effective_user_id=owner_user_id,
+        is_acting_as_delegate=True,
+        delegate_role=role,
+        owner_user=owner_user
+    )

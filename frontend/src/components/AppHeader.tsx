@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/auth-context'
+import { useDelegate } from '@/contexts/delegate-context'
 import { shouldLog } from '@/config/app.config'
 
 interface AppHeaderProps {
@@ -17,16 +18,22 @@ interface AppHeaderProps {
 
 export default function AppHeader({ title, subtitle, showNav = true, action }: AppHeaderProps) {
   const { user, logout } = useAuth()
+  const { actingAsUser, grantedAccess, switchToAccount, isActingAsDelegate } = useDelegate()
   const router = useRouter()
   const pathname = usePathname()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const accountSwitcherRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false)
+      }
+      if (accountSwitcherRef.current && !accountSwitcherRef.current.contains(event.target as Node)) {
+        setShowAccountSwitcher(false)
       }
     }
 
@@ -116,6 +123,120 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
                   <span className="text-sm font-medium">Home</span>
                 </Link>
               </nav>
+            )}
+
+            {/* Account Switcher (if user has granted access) */}
+            {user && grantedAccess.length > 0 && (
+              <div className="relative" ref={accountSwitcherRef}>
+                <button
+                  onClick={() => setShowAccountSwitcher(!showAccountSwitcher)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-colors border ${
+                    isActingAsDelegate
+                      ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                      : 'border-neutral-300 text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                  title="Switch account"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  <span className="text-sm font-medium hidden sm:inline">
+                    {isActingAsDelegate ? actingAsUser?.owner_name : 'My Account'}
+                  </span>
+                  <svg
+                    className={`h-4 w-4 transition-transform ${showAccountSwitcher ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Account Switcher Dropdown */}
+                {showAccountSwitcher && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-neutral-200 py-1 z-50">
+                    <div className="px-4 py-2 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                      Switch Account
+                    </div>
+
+                    {/* My Account */}
+                    <button
+                      onClick={() => {
+                        switchToAccount(null)
+                        setShowAccountSwitcher(false)
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-3 ${
+                        !isActingAsDelegate
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-neutral-700 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium text-xs">
+                        {user.full_name?.charAt(0) || 'M'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">My Account</p>
+                        <p className="text-xs text-neutral-500 truncate">{user.email}</p>
+                      </div>
+                      {!isActingAsDelegate && (
+                        <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <div className="my-1 border-t border-neutral-200"></div>
+
+                    {/* Granted Access Accounts */}
+                    {grantedAccess.map((access) => (
+                      <button
+                        key={access.id}
+                        onClick={() => {
+                          switchToAccount(access.owner_user_id)
+                          setShowAccountSwitcher(false)
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-3 ${
+                          isActingAsDelegate && actingAsUser?.id === access.id
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'text-neutral-700 hover:bg-neutral-100'
+                        }`}
+                      >
+                        <div className="h-8 w-8 rounded-full bg-neutral-400 flex items-center justify-center text-white font-medium text-xs">
+                          {access.owner_name?.charAt(0) || 'D'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{access.owner_name}</p>
+                          <p className="text-xs text-neutral-500 truncate">
+                            {access.role} • {access.owner_email}
+                          </p>
+                        </div>
+                        {isActingAsDelegate && actingAsUser?.id === access.id && (
+                          <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+
+                    <div className="my-1 border-t border-neutral-200"></div>
+
+                    <button
+                      onClick={() => {
+                        setShowAccountSwitcher(false)
+                        router.push('/delegates')
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Manage Delegates</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* User Menu */}

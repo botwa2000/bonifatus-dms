@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/contexts/theme-context'
 import { AuthProvider } from '@/contexts/auth-context'
+import { DelegateProvider } from '@/contexts/delegate-context'
 import { CurrencyProvider } from '@/contexts/currency-context'
 import CookieConsent from '@/components/CookieConsent'
 
@@ -53,10 +54,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <AuthProvider>
-            <CurrencyProvider>
-              {children}
-              <CookieConsent language="en" />
-            </CurrencyProvider>
+            <DelegateProvider>
+              <CurrencyProvider>
+                {children}
+                <CookieConsent language="en" />
+              </CurrencyProvider>
+            </DelegateProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -215,6 +215,14 @@ export class ApiClient {
     // Cookies are sent automatically with credentials: 'include'
     // _requireAuth parameter kept for API compatibility but not used
 
+    // Add X-Acting-As-User-Id header if user is acting as delegate
+    if (typeof window !== 'undefined') {
+      const actingAsUserId = localStorage.getItem('actingAsUserId')
+      if (actingAsUserId) {
+        headers['X-Acting-As-User-Id'] = actingAsUserId
+      }
+    }
+
     return headers
   }
 

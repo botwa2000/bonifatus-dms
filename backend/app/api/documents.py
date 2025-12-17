@@ -20,7 +20,12 @@ from app.schemas.document_schemas import (
 from app.services.document_service import document_service
 from app.services.drive_service import drive_service
 from app.services.document_analysis_service import DocumentAnalysisService
-from app.middleware.auth_middleware import get_current_active_user, get_client_ip
+from app.middleware.auth_middleware import (
+    get_current_active_user,
+    get_client_ip,
+    get_delegate_context,
+    DelegateContext
+)
 from app.database.models import User
 
 logger = logging.getLogger(__name__)
@@ -46,6 +51,7 @@ class EntityUpdateRequest(BaseModel):
     responses={
         400: {"model": ErrorResponse, "description": "Invalid file or quota exceeded"},
         401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Delegates cannot upload documents"},
         413: {"model": ErrorResponse, "description": "File too large"},
         415: {"model": ErrorResponse, "description": "Unsupported file type"},
         500: {"model": ErrorResponse, "description": "Upload failed"}
@@ -57,14 +63,23 @@ async def upload_document(
     category_ids: str = Form(...),  # Comma-separated category IDs
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ) -> DocumentUploadResponse:
     """
     Upload document to Google Drive and process metadata
-    
+
     Validates file type, size, and user storage quota before upload
+    Note: Delegates with viewer role cannot upload documents
     """
     try:
+        # Block delegates from uploading
+        if delegate_ctx.is_acting_as_delegate:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Delegates cannot upload documents to another user's account"
+            )
+
         ip_address = get_client_ip(request)
 
         # Check if Google Drive is connected
@@ -139,6 +154,7 @@ async def upload_document(
     response_model=DocumentListResponse,
     responses={
         401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Delegate access denied"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
@@ -151,12 +167,13 @@ async def list_documents(
     page_size: Optional[int] = None,
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user)
+    delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ) -> DocumentListResponse:
     """
     List user documents with search and filtering
-    
+
     Supports full-text search, category filtering, and pagination
+    Delegates can list owner's documents using X-Acting-As-User-Id header
     """
     try:
         search_request = DocumentSearchRequest(
@@ -171,7 +188,7 @@ async def list_documents(
         )
 
         documents_result = await document_service.search_documents(
-            str(current_user.id), search_request
+            str(delegate_ctx.effective_user_id), search_request
         )
 
         if not documents_result:
@@ -180,7 +197,13 @@ async def list_documents(
                 detail="Failed to retrieve documents"
             )
 
-        logger.info(f"Documents listed for user: {current_user.email}")
+        if delegate_ctx.is_acting_as_delegate:
+            logger.info(
+                f"Documents listed as delegate for owner: {delegate_ctx.owner_user.email}"
+            )
+        else:
+            logger.info(f"Documents listed for user: {delegate_ctx.effective_user_id}")
+
         return documents_result
 
     except HTTPException:
@@ -198,21 +221,25 @@ async def list_documents(
     response_model=DocumentResponse,
     responses={
         401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Delegate access denied"},
         404: {"model": ErrorResponse, "description": "Document not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
 async def get_document(
     document_id: str,
-    current_user: User = Depends(get_current_active_user)
+    delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ) -> DocumentResponse:
     """
     Get document details by ID
-    
+
     Returns complete document metadata and processing status
+    Delegates can access owner's documents using X-Acting-As-User-Id header
     """
     try:
-        document = await document_service.get_document(document_id, str(current_user.id))
+        document = await document_service.get_document(
+            document_id, str(delegate_ctx.effective_user_id)
+        )
 
         if not document:
             raise HTTPException(
@@ -220,7 +247,13 @@ async def get_document(
                 detail="Document not found"
             )
 
-        logger.info(f"Document retrieved: {document_id} by user {current_user.email}")
+        if delegate_ctx.is_acting_as_delegate:
+            logger.info(
+                f"Document retrieved as delegate: {document_id} for owner {delegate_ctx.owner_user.email}"
+            )
+        else:
+            logger.info(f"Document retrieved: {document_id} by user {delegate_ctx.effective_user_id}")
+
         return document
 
     except HTTPException:
@@ -239,6 +272,7 @@ async def get_document(
     responses={
         400: {"model": ErrorResponse, "description": "Invalid update data"},
         401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Delegates cannot modify documents"},
         404: {"model": ErrorResponse, "description": "Document not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
@@ -247,14 +281,23 @@ async def update_document(
     document_id: str,
     request: Request,
     update_request: DocumentUpdateRequest,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ) -> DocumentResponse:
     """
     Update document metadata
-    
+
     Updates title, description, and category assignment
+    Note: Delegates with viewer role cannot modify documents
     """
     try:
+        # Block delegates from updating
+        if delegate_ctx.is_acting_as_delegate and not delegate_ctx.can_write:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Delegates with viewer role cannot modify documents"
+            )
+
         ip_address = get_client_ip(request)
 
         updated_document = await document_service.update_document(
@@ -363,6 +406,7 @@ async def update_document_entities(
     responses={
         200: {"description": "Document deleted successfully"},
         401: {"model": ErrorResponse, "description": "Authentication required"},
+        403: {"model": ErrorResponse, "description": "Delegates cannot delete documents"},
         404: {"model": ErrorResponse, "description": "Document not found"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
@@ -370,14 +414,23 @@ async def update_document_entities(
 async def delete_document(
     document_id: str,
     request: Request,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ):
     """
     Delete document from system and Google Drive
-    
+
     Permanently removes document and all associated data
+    Note: Delegates cannot delete documents
     """
     try:
+        # Block delegates from deleting
+        if delegate_ctx.is_acting_as_delegate and not delegate_ctx.can_delete:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Delegates cannot delete documents"
+            )
+
         ip_address = get_client_ip(request)
 
         success = await document_service.delete_document(
