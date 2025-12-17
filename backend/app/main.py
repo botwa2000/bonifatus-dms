@@ -326,6 +326,7 @@ routers = [
     ("app.api.billing_cancellations", "BillingCancellations"),
     ("app.api.webhooks", "Webhooks"),
     ("app.api.email_processing", "EmailProcessing"),
+    ("app.api.delegates", "Delegates"),
 ]
 
 for module_path, name in routers:

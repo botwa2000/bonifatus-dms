@@ -51,7 +51,7 @@ type SortField = 'title' | 'created_at' | 'file_size'
 type SortDirection = 'asc' | 'desc'
 
 export default function DocumentsPage() {
-  const { isAuthenticated, isLoading: authLoading, loadUser } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, hasAttemptedAuth, loadUser } = useAuth()
   const router = useRouter()
 
   const [documents, setDocuments] = useState<Document[]>([])
@@ -78,10 +78,15 @@ export default function DocumentsPage() {
   }, [loadUser])
 
   useEffect(() => {
+    // Don't check auth until we've attempted to load the user
+    if (!hasAttemptedAuth) {
+      return
+    }
+
     if (!authLoading && !isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, authLoading, router])
+  }, [isAuthenticated, authLoading, hasAttemptedAuth, router])
 
   useEffect(() => {
     if (isAuthenticated) {
