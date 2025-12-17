@@ -161,9 +161,7 @@ export default function AcceptInvitationPage() {
           </h1>
 
           {error && (
-            <Alert variant="destructive" className="mb-6" onClose={() => setError(null)}>
-              {error}
-            </Alert>
+            <Alert type="error" message={error} />
           )}
 
           <div className="mb-8">
