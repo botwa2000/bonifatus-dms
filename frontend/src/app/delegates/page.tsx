@@ -287,10 +287,8 @@ export default function DelegatesPage() {
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <Modal onClose={() => !isInviting && setShowInviteModal(false)}>
-          <ModalHeader onClose={() => !isInviting && setShowInviteModal(false)}>
-            Invite Delegate
-          </ModalHeader>
+        <Modal isOpen={showInviteModal} onClose={() => !isInviting && setShowInviteModal(false)}>
+          <ModalHeader title="Invite Delegate" onClose={() => !isInviting && setShowInviteModal(false)} />
           <ModalContent>
             <div className="space-y-4">
               <div>
@@ -350,10 +348,8 @@ export default function DelegatesPage() {
 
       {/* Revoke Confirmation Modal */}
       {revokingDelegate && (
-        <Modal onClose={() => !isRevoking && setRevokingDelegate(null)}>
-          <ModalHeader onClose={() => !isRevoking && setRevokingDelegate(null)}>
-            Revoke Delegate Access
-          </ModalHeader>
+        <Modal isOpen={!!revokingDelegate} onClose={() => !isRevoking && setRevokingDelegate(null)}>
+          <ModalHeader title="Revoke Delegate Access" onClose={() => !isRevoking && setRevokingDelegate(null)} />
           <ModalContent>
             <p className="text-gray-700 dark:text-gray-300">
               Are you sure you want to revoke access for{' '}
