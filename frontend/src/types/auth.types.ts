@@ -6,6 +6,7 @@ export interface User {
   full_name: string
   profile_picture?: string
   tier: string
+  tier_id: number
   created_at: string
   updated_at: string
   last_login?: string
