@@ -186,22 +186,16 @@ export default function DelegatesPage() {
           </div>
 
           {!isProUser && (
-            <Alert variant="info" className="mb-4">
-              Upgrade to Professional tier to invite delegates and share your document library.
-            </Alert>
+            <Alert type="info" message="Upgrade to Professional tier to invite delegates and share your document library." />
           )}
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-4" onClose={() => setError(null)}>
-            {error}
-          </Alert>
+          <Alert type="error" message={error} />
         )}
 
         {success && (
-          <Alert variant="success" className="mb-4" onClose={() => setSuccess(null)}>
-            {success}
-          </Alert>
+          <Alert type="success" message={success} />
         )}
 
         {/* Delegates List */}
