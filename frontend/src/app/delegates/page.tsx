@@ -94,8 +94,9 @@ export default function DelegatesPage() {
 
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000)
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to send invitation'
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to send invitation'
       setError(errorMessage)
     } finally {
       setIsInviting(false)
@@ -119,8 +120,9 @@ export default function DelegatesPage() {
 
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000)
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to revoke access'
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to revoke access'
       setError(errorMessage)
       setRevokingDelegate(null)
     } finally {
