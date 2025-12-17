@@ -181,7 +181,7 @@ export default function AcceptInvitationPage() {
                 <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                View and search the owner's documents
+                View and search the owner&apos;s documents
               </li>
               <li className="flex items-start">
                 <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
