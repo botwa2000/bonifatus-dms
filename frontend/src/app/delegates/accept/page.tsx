@@ -1,14 +1,14 @@
 // frontend/src/app/delegates/accept/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { delegateService } from '@/services/delegate.service'
 import { Button, Alert, SpinnerFullPage } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const { isAuthenticated, isLoading: authLoading, hasAttemptedAuth, loadUser } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -215,5 +215,13 @@ export default function AcceptInvitationPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={<SpinnerFullPage />}>
+      <AcceptInvitationContent />
+    </Suspense>
   )
 }
