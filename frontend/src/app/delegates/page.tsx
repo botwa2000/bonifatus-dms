@@ -368,7 +368,7 @@ export default function DelegatesPage() {
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              variant="danger"
               onClick={handleRevokeAccess}
               disabled={isRevoking}
             >
