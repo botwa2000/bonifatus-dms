@@ -137,7 +137,7 @@ export default function DelegatesPage() {
       case 'pending':
         return 'warning'
       case 'revoked':
-        return 'destructive'
+        return 'error'
       default:
         return 'default'
     }
