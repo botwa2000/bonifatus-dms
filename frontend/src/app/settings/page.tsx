@@ -5,9 +5,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
-import { Card, CardHeader, CardContent, Button, Select, Alert } from '@/components/ui'
+import { Card, CardHeader, CardContent, Button, Select, Alert, Input, Badge, Modal, ModalHeader, ModalContent, ModalFooter } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import { shouldLog } from '@/config/app.config'
+import { delegateService, type Delegate } from '@/services/delegate.service'
+import type { BadgeVariant } from '@/components/ui'
 
 interface UserPreferences {
   language: string
@@ -41,7 +43,7 @@ interface DriveStatus {
 }
 
 export default function SettingsPage() {
-  const { isAuthenticated, isLoading, loadUser } = useAuth()
+  const { user, isAuthenticated, isLoading, loadUser } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
@@ -51,6 +53,14 @@ export default function SettingsPage() {
   const [driveLoading, setDriveLoading] = useState(false)
   const [resettingCategories, setResettingCategories] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  // Delegates state
+  const [delegates, setDelegates] = useState<Delegate[]>([])
+  const [delegatesLoading, setDelegatesLoading] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [isInviting, setIsInviting] = useState(false)
+  const [revokingDelegate, setRevokingDelegate] = useState<Delegate | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -99,10 +109,84 @@ export default function SettingsPage() {
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
       setDriveStatus(driveData)
+
+      // Load delegates
+      await loadDelegates()
     } catch {
       // Error already logged by API client, just show user message
       if (shouldLog('debug')) console.log('[SETTINGS DEBUG] ❌ Failed to load settings')
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
+    }
+  }
+
+  const loadDelegates = async () => {
+    try {
+      setDelegatesLoading(true)
+      const response = await delegateService.listDelegates()
+      setDelegates(response.delegates)
+    } catch (error) {
+      console.error('Failed to load delegates:', error)
+    } finally {
+      setDelegatesLoading(false)
+    }
+  }
+
+  const handleInviteDelegate = async () => {
+    if (!inviteEmail.trim()) {
+      setMessage({ type: 'error', text: 'Please enter an email address' })
+      return
+    }
+
+    setIsInviting(true)
+    setMessage(null)
+
+    try {
+      await delegateService.inviteDelegate({
+        email: inviteEmail.trim(),
+        role: 'viewer'
+      })
+
+      setMessage({ type: 'success', text: `Invitation sent to ${inviteEmail}` })
+      setInviteEmail('')
+      setShowInviteModal(false)
+      await loadDelegates()
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: error.message || 'Failed to send invitation. Please try again.'
+      })
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  const handleRevokeAccess = async (delegate: Delegate) => {
+    if (!confirm(`Revoke access for ${delegate.delegate_email}? They will no longer be able to view your documents.`)) {
+      return
+    }
+
+    try {
+      await delegateService.revokeDelegate(delegate.id)
+      setMessage({ type: 'success', text: 'Delegate access revoked' })
+      await loadDelegates()
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: error.message || 'Failed to revoke access. Please try again.'
+      })
+    }
+  }
+
+  const getStatusBadge = (status: string): { variant: BadgeVariant, label: string } => {
+    switch (status) {
+      case 'active':
+        return { variant: 'success', label: 'Active' }
+      case 'pending':
+        return { variant: 'warning', label: 'Pending' }
+      case 'revoked':
+        return { variant: 'danger', label: 'Revoked' }
+      default:
+        return { variant: 'neutral', label: status }
     }
   }
 
@@ -542,6 +626,160 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Team Access Section - Pro Tier Only */}
+          {user && user.tier_name === 'Professional' && (
+            <Card>
+              <CardHeader title="Team Access" />
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">Delegate Access</p>
+                      <p className="text-xs text-neutral-500">
+                        Share read-only access to your documents with team members or assistants
+                      </p>
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={() => setShowInviteModal(true)}
+                    >
+                      Invite Delegate
+                    </Button>
+                  </div>
+
+                  {delegatesLoading ? (
+                    <div className="text-center py-8">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
+                      <p className="mt-4 text-sm text-neutral-600">Loading delegates...</p>
+                    </div>
+                  ) : delegates.length > 0 ? (
+                    <div className="mt-6">
+                      <div className="overflow-hidden border border-neutral-200 rounded-lg">
+                        <table className="min-w-full divide-y divide-neutral-200">
+                          <thead className="bg-neutral-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Email
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Invited
+                              </th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-neutral-200">
+                            {delegates.map((delegate) => {
+                              const badge = getStatusBadge(delegate.status)
+                              return (
+                                <tr key={delegate.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
+                                    {delegate.delegate_email}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                    {new Date(delegate.invitation_sent_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                    {delegate.status === 'active' || delegate.status === 'pending' ? (
+                                      <Button
+                                        variant="danger"
+                                        onClick={() => handleRevokeAccess(delegate)}
+                                      >
+                                        Revoke
+                                      </Button>
+                                    ) : (
+                                      <span className="text-neutral-400">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border-2 border-dashed border-neutral-200 rounded-lg">
+                      <svg
+                        className="mx-auto h-12 w-12 text-neutral-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                      </svg>
+                      <p className="mt-2 text-sm text-neutral-600">No delegates yet</p>
+                      <p className="text-xs text-neutral-500">Invite team members to share access to your documents</p>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-neutral-500">
+                    Delegates have read-only access to all your documents. They can view and download but cannot upload, edit, or delete.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Invite Delegate Modal */}
+          {showInviteModal && (
+            <Modal onClose={() => setShowInviteModal(false)}>
+              <ModalHeader
+                title="Invite Delegate"
+                onClose={() => setShowInviteModal(false)}
+              />
+              <ModalContent>
+                <p className="text-sm text-neutral-600 mb-4">
+                  Send an invitation to grant read-only access to your documents. The recipient will receive an email with an acceptance link.
+                </p>
+                <Input
+                  label="Email Address"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="colleague@example.com"
+                  disabled={isInviting}
+                />
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs text-blue-800 font-medium">Delegate Permissions:</p>
+                  <ul className="mt-2 text-xs text-blue-700 space-y-1">
+                    <li>✓ View and search all your documents</li>
+                    <li>✓ Download documents for review</li>
+                    <li>✗ Cannot upload, edit, or delete documents</li>
+                  </ul>
+                </div>
+              </ModalContent>
+              <ModalFooter>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowInviteModal(false)}
+                  disabled={isInviting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleInviteDelegate}
+                  disabled={isInviting}
+                >
+                  {isInviting ? 'Sending...' : 'Send Invitation'}
+                </Button>
+              </ModalFooter>
+            </Modal>
+          )}
 
           <div className="flex justify-end space-x-3">
             <Button variant="secondary" onClick={() => router.push('/dashboard')}>
