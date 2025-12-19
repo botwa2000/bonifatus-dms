@@ -126,13 +126,17 @@ class EmailProcessingService:
             )
             self.db.add(allowed_sender)
 
-            self.db.commit()
+            # DO NOT commit here - let the caller manage the transaction
+            # The session is typically passed from update_user_tier which will commit
+            # self.db.commit()  # Commented out to prevent double-commit issues
 
             logger.info(f"Email processing auto-enabled for Pro user {user_id}: {user.email} → {email_address}")
             return True, email_address, None
 
         except Exception as e:
-            self.db.rollback()
+            # DO NOT rollback here - let the caller handle transaction cleanup
+            # Rolling back here would undo the tier update that the caller made
+            # self.db.rollback()  # Commented out
             logger.error(f"Error auto-enabling email processing for user {user_id}: {str(e)}")
             return False, None, str(e)
 
