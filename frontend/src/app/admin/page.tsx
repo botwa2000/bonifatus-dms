@@ -157,6 +157,7 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState('')
   const [userSortField, setUserSortField] = useState<'email' | 'full_name' | 'tier_name' | 'created_at'>('created_at')
   const [userSortDirection, setUserSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
 
   // Tier editing with unit selector
   const [storageUnit, setStorageUnit] = useState<'bytes' | 'MB' | 'GB'>('GB')
@@ -320,12 +321,59 @@ export default function AdminDashboard() {
   }
 
   const updateUserTier = async (userId: string, newTierId: number) => {
+    // Get current user for optimistic update and rollback
+    const user = users.find(u => u.id === userId)
+    if (!user) return
+
+    const oldTierId = user.tier_id
+    const newTierName = tiers.find(t => t.id === newTierId)?.display_name || 'Unknown'
+
     try {
-      await apiClient.patch(`/api/v1/admin/users/${userId}/tier`, { tier_id: newTierId })
+      setUpdatingUserId(userId)
+
+      // Optimistic update - immediately update UI
+      setUsers(prevUsers =>
+        prevUsers.map(u =>
+          u.id === userId
+            ? { ...u, tier_id: newTierId, tier_name: newTierName }
+            : u
+        )
+      )
+
+      // Make API call
+      const response = await apiClient.patch(`/api/v1/admin/users/${userId}/tier`, { tier_id: newTierId })
+
+      // Reload data to ensure consistency with backend
       await loadData()
+
+      // Show success message
+      alert(`✓ Successfully updated ${user.email} to ${newTierName} tier`)
+
     } catch (error) {
       console.error('Failed to update user tier:', error)
-      alert('Failed to update user tier')
+
+      // Rollback optimistic update on error
+      setUsers(prevUsers =>
+        prevUsers.map(u =>
+          u.id === userId
+            ? { ...u, tier_id: oldTierId }
+            : u
+        )
+      )
+
+      // Show detailed error message
+      const errorMessage = (error as { response?: { data?: { detail?: string } }; message?: string })
+        ?.response?.data?.detail || (error as Error)?.message || 'Failed to update user tier'
+      alert(`✗ Error: ${errorMessage}`)
+
+      // Try to reload data to sync with backend state
+      try {
+        await loadData()
+      } catch (reloadError) {
+        console.error('Failed to reload data after error:', reloadError)
+      }
+    } finally {
+      setUpdatingUserId(null)
     }
   }
 
@@ -614,12 +662,19 @@ export default function AdminDashboard() {
                           <select
                             value={user.tier_id}
                             onChange={(e) => updateUserTier(user.id, parseInt(e.target.value))}
-                            className="px-2 py-1 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
+                            disabled={updatingUserId === user.id}
+                            className={`px-2 py-1 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm ${
+                              updatingUserId === user.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                            }`}
+                            title={updatingUserId === user.id ? 'Updating...' : 'Change user tier'}
                           >
                             {tiers.map((tier) => (
                               <option key={tier.id} value={tier.id}>{tier.display_name}</option>
                             ))}
                           </select>
+                          {updatingUserId === user.id && (
+                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">Updating...</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.document_count}</td>
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
