@@ -121,7 +121,7 @@ export default function SettingsPage() {
   const loadDelegates = async () => {
     try {
       setDelegatesLoading(true)
-      const response = await delegateService.listDelegates()
+      const response = await delegateService.listMyDelegates()
       setDelegates(response.delegates)
     } catch (error) {
       console.error('Failed to load delegates:', error)
