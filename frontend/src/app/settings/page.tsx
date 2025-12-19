@@ -185,9 +185,9 @@ export default function SettingsPage() {
       case 'pending':
         return { variant: 'warning', label: 'Pending' }
       case 'revoked':
-        return { variant: 'danger', label: 'Revoked' }
+        return { variant: 'error', label: 'Revoked' }
       default:
-        return { variant: 'neutral', label: status }
+        return { variant: 'default', label: status }
     }
   }
 
