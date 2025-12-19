@@ -629,7 +629,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Team Access Section - Pro Tier Only */}
-          {user && user.tier_name === 'Professional' && (
+          {user && user.tier === 'Professional' && (
             <Card>
               <CardHeader title="Team Access" />
               <CardContent>
