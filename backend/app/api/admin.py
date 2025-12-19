@@ -234,8 +234,11 @@ async def update_user_tier(
 
     Admin only endpoint to change user tier (upgrade/downgrade).
     """
+    logger.info(f"[DEBUG] update_user_tier: REQUEST RECEIVED - user_id={user_id}, tier_id={tier_update.tier_id}, admin={current_user.email}")
+
     session = db_manager.session_local()
     try:
+        logger.info(f"[DEBUG] update_user_tier: Fetching user from database - user_id={user_id}")
         # Get user
         user = session.get(User, user_id)
         if not user:
@@ -359,22 +362,28 @@ async def update_user_tier(
             user.email_processing_enabled = False
             logger.info(f"Email processing disabled for user {user.email}")
 
+        logger.info(f"[DEBUG] update_user_tier: Committing transaction to database")
         session.commit()
+        logger.info(f"[DEBUG] update_user_tier: Transaction committed successfully")
 
         logger.info(f"Admin {current_user.email} updated user {user.email} tier: {old_tier_id} → {tier_update.tier_id}")
 
-        return {
+        response_data = {
             "message": "User tier updated successfully",
             "user_id": user_id,
             "old_tier_id": old_tier_id,
             "new_tier_id": tier_update.tier_id,
             "new_tier_name": new_tier.display_name
         }
+        logger.info(f"[DEBUG] update_user_tier: Returning success response - {response_data}")
+        return response_data
 
-    except HTTPException:
+    except HTTPException as http_exc:
+        logger.error(f"[DEBUG] update_user_tier: HTTP Exception - status={http_exc.status_code}, detail={http_exc.detail}")
         raise
     except Exception as e:
         session.rollback()
+        logger.error(f"[DEBUG] update_user_tier: Unexpected exception - {type(e).__name__}: {e}")
         logger.error(f"Error updating user tier: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

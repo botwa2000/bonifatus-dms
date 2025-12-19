@@ -323,15 +323,40 @@ export default function AdminDashboard() {
   const updateUserTier = async (userId: string, newTierId: number) => {
     // Get current user for optimistic update and rollback
     const user = users.find(u => u.id === userId)
-    if (!user) return
+    if (!user) {
+      console.error('[DEBUG] updateUserTier: user not found:', userId)
+      return
+    }
 
     const oldTierId = user.tier_id
     const newTierName = tiers.find(t => t.id === newTierId)?.display_name || 'Unknown'
 
+    console.log('[DEBUG] updateUserTier: Starting tier update', {
+      userId,
+      userEmail: user.email,
+      oldTierId,
+      newTierId,
+      newTierName,
+      timestamp: new Date().toISOString()
+    })
+
     try {
       setUpdatingUserId(userId)
+      console.log('[DEBUG] updateUserTier: Set loading state for user:', userId)
 
-      // Optimistic update - immediately update UI
+      // Make API call FIRST (removed optimistic update)
+      console.log('[DEBUG] updateUserTier: Making API call to /api/v1/admin/users/' + userId + '/tier')
+      console.log('[DEBUG] updateUserTier: Request body:', { tier_id: newTierId })
+
+      const response = await apiClient.patch(
+        `/api/v1/admin/users/${userId}/tier`,
+        { tier_id: newTierId },
+        true  // requireAuth=true for admin endpoints
+      )
+
+      console.log('[DEBUG] updateUserTier: API call successful, response:', response)
+
+      // Update UI after successful API call
       setUsers(prevUsers =>
         prevUsers.map(u =>
           u.id === userId
@@ -339,41 +364,43 @@ export default function AdminDashboard() {
             : u
         )
       )
-
-      // Make API call
-      const response = await apiClient.patch(`/api/v1/admin/users/${userId}/tier`, { tier_id: newTierId })
+      console.log('[DEBUG] updateUserTier: Updated local state')
 
       // Reload data to ensure consistency with backend
+      console.log('[DEBUG] updateUserTier: Reloading data from server')
       await loadData()
+      console.log('[DEBUG] updateUserTier: Data reloaded')
 
       // Show success message
       alert(`✓ Successfully updated ${user.email} to ${newTierName} tier`)
+      console.log('[DEBUG] updateUserTier: Update complete')
 
     } catch (error) {
-      console.error('Failed to update user tier:', error)
-
-      // Rollback optimistic update on error
-      setUsers(prevUsers =>
-        prevUsers.map(u =>
-          u.id === userId
-            ? { ...u, tier_id: oldTierId }
-            : u
-        )
-      )
+      console.error('[DEBUG] updateUserTier: ERROR occurred:', error)
+      console.error('[DEBUG] updateUserTier: Error details:', {
+        name: (error as Error)?.name,
+        message: (error as Error)?.message,
+        status: (error as { status?: number })?.status,
+        response: (error as { response?: unknown })?.response
+      })
 
       // Show detailed error message
       const errorMessage = (error as { response?: { data?: { detail?: string } }; message?: string })
         ?.response?.data?.detail || (error as Error)?.message || 'Failed to update user tier'
       alert(`✗ Error: ${errorMessage}`)
+      console.error('[DEBUG] updateUserTier: Showed error alert:', errorMessage)
 
-      // Try to reload data to sync with backend state
+      // Reload data to sync with backend state
       try {
+        console.log('[DEBUG] updateUserTier: Reloading data after error')
         await loadData()
+        console.log('[DEBUG] updateUserTier: Data reloaded after error')
       } catch (reloadError) {
-        console.error('Failed to reload data after error:', reloadError)
+        console.error('[DEBUG] updateUserTier: Failed to reload data after error:', reloadError)
       }
     } finally {
       setUpdatingUserId(null)
+      console.log('[DEBUG] updateUserTier: Cleared loading state')
     }
   }
 
