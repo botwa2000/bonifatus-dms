@@ -238,133 +238,193 @@ async def update_user_tier(
 
     session = db_manager.session_local()
     try:
-        logger.info(f"[DEBUG] update_user_tier: Fetching user from database - user_id={user_id}")
+        logger.info(f"[DEBUG] update_user_tier: Step 1 - Fetching user from database - user_id={user_id}")
         # Get user
         user = session.get(User, user_id)
         if not user:
+            logger.error(f"[DEBUG] update_user_tier: User not found - user_id={user_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
+        logger.info(f"[DEBUG] update_user_tier: User found - email={user.email}, current_tier_id={user.tier_id}")
 
+        logger.info(f"[DEBUG] update_user_tier: Step 2 - Verifying new tier exists - tier_id={tier_update.tier_id}")
         # Verify new tier exists
         new_tier = session.get(TierPlan, tier_update.tier_id)
         if not new_tier:
+            logger.error(f"[DEBUG] update_user_tier: Invalid tier ID - tier_id={tier_update.tier_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid tier ID: {tier_update.tier_id}"
             )
+        logger.info(f"[DEBUG] update_user_tier: New tier found - name={new_tier.display_name}, email_enabled={new_tier.email_to_process_enabled}")
 
+        logger.info(f"[DEBUG] update_user_tier: Step 3 - Updating user tier_id")
         old_tier_id = user.tier_id
         user.tier_id = tier_update.tier_id
+        logger.info(f"[DEBUG] update_user_tier: User tier_id updated in memory - old={old_tier_id}, new={tier_update.tier_id}")
 
+        logger.info(f"[DEBUG] update_user_tier: Step 4 - Updating storage quota")
         # Update or create storage quota
-        quota = session.execute(
-            select(UserStorageQuota).where(UserStorageQuota.user_id == user.id)
-        ).scalar_one_or_none()
-
-        if quota:
-            quota.tier_id = tier_update.tier_id
-            quota.total_quota_bytes = new_tier.max_monthly_upload_bytes
-        else:
-            quota = UserStorageQuota(
-                user_id=user.id,
-                tier_id=tier_update.tier_id,
-                total_quota_bytes=new_tier.max_monthly_upload_bytes,
-                used_bytes=0,
-                document_count=0
-            )
-            session.add(quota)
-
-        # Update or create subscription for non-Free tiers
-        from app.database.models import Subscription
-
-        if tier_update.tier_id > 0:  # Not Free tier
-            # Check for existing admin-granted subscription (any status)
-            admin_sub_id = f"admin_granted_{user.id}"
-            existing_subscription = session.execute(
-                select(Subscription).where(
-                    Subscription.user_id == user.id,
-                    Subscription.stripe_subscription_id == admin_sub_id
-                )
+        try:
+            quota = session.execute(
+                select(UserStorageQuota).where(UserStorageQuota.user_id == user.id)
             ).scalar_one_or_none()
 
-            if existing_subscription:
-                # Reactivate and update existing subscription
-                existing_subscription.tier_id = tier_update.tier_id
-                existing_subscription.status = 'active'
-                existing_subscription.canceled_at = None
-                existing_subscription.ended_at = None
-                existing_subscription.cancel_at_period_end = False
-                # Extend period
-                now = datetime.now(timezone.utc)
-                existing_subscription.current_period_start = now
-                existing_subscription.current_period_end = now + timedelta(days=365)
+            if quota:
+                logger.info(f"[DEBUG] update_user_tier: Existing quota found - updating")
+                quota.tier_id = tier_update.tier_id
+                quota.total_quota_bytes = new_tier.max_monthly_upload_bytes
             else:
-                # Check for any active subscription (Stripe-managed)
-                active_stripe_sub = session.execute(
+                logger.info(f"[DEBUG] update_user_tier: No quota found - creating new")
+                quota = UserStorageQuota(
+                    user_id=user.id,
+                    tier_id=tier_update.tier_id,
+                    total_quota_bytes=new_tier.max_monthly_upload_bytes,
+                    used_bytes=0,
+                    document_count=0
+                )
+                session.add(quota)
+            logger.info(f"[DEBUG] update_user_tier: Storage quota updated successfully")
+        except Exception as quota_error:
+            logger.error(f"[DEBUG] update_user_tier: ERROR in storage quota update - {type(quota_error).__name__}: {quota_error}")
+            raise
+
+        logger.info(f"[DEBUG] update_user_tier: Step 5 - Importing Subscription model")
+        # Update or create subscription for non-Free tiers
+        try:
+            from app.database.models import Subscription
+            logger.info(f"[DEBUG] update_user_tier: Subscription model imported successfully")
+        except Exception as import_error:
+            logger.error(f"[DEBUG] update_user_tier: ERROR importing Subscription model - {type(import_error).__name__}: {import_error}")
+            raise
+
+        if tier_update.tier_id > 0:  # Not Free tier
+            logger.info(f"[DEBUG] update_user_tier: Step 6 - Handling Pro tier subscription")
+            try:
+                # Check for existing admin-granted subscription (any status)
+                admin_sub_id = f"admin_granted_{user.id}"
+                logger.info(f"[DEBUG] update_user_tier: Looking for existing admin subscription - admin_sub_id={admin_sub_id}")
+
+                existing_subscription = session.execute(
                     select(Subscription).where(
                         Subscription.user_id == user.id,
-                        Subscription.status.in_(['active', 'trialing']),
-                        Subscription.stripe_subscription_id != admin_sub_id
+                        Subscription.stripe_subscription_id == admin_sub_id
                     )
                 ).scalar_one_or_none()
 
-                if active_stripe_sub:
-                    # User has a real Stripe subscription, just update tier
-                    active_stripe_sub.tier_id = tier_update.tier_id
-                else:
-                    # Create new admin-granted subscription
+                if existing_subscription:
+                    logger.info(f"[DEBUG] update_user_tier: Found existing admin subscription - reactivating")
+                    # Reactivate and update existing subscription
+                    existing_subscription.tier_id = tier_update.tier_id
+                    existing_subscription.status = 'active'
+                    existing_subscription.canceled_at = None
+                    existing_subscription.ended_at = None
+                    existing_subscription.cancel_at_period_end = False
+                    # Extend period
                     now = datetime.now(timezone.utc)
-                    period_end = now + timedelta(days=365)  # 1 year from now
+                    existing_subscription.current_period_start = now
+                    existing_subscription.current_period_end = now + timedelta(days=365)
+                    logger.info(f"[DEBUG] update_user_tier: Admin subscription reactivated")
+                else:
+                    logger.info(f"[DEBUG] update_user_tier: No admin subscription - checking for Stripe subscription")
+                    # Check for any active subscription (Stripe-managed)
+                    active_stripe_sub = session.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == user.id,
+                            Subscription.status.in_(['active', 'trialing']),
+                            Subscription.stripe_subscription_id != admin_sub_id
+                        )
+                    ).scalar_one_or_none()
 
-                    new_subscription = Subscription(
-                        user_id=user.id,
-                        tier_id=tier_update.tier_id,
-                        stripe_subscription_id=admin_sub_id,
-                        stripe_price_id=f"admin_price_{tier_update.tier_id}",
-                        billing_cycle='yearly',
-                        status='active',
-                        current_period_start=now,
-                        current_period_end=period_end,
-                        cancel_at_period_end=False,
-                        currency='USD',
-                        amount_cents=0  # Admin-granted, no charge
-                    )
-                    session.add(new_subscription)
+                    if active_stripe_sub:
+                        logger.info(f"[DEBUG] update_user_tier: Found active Stripe subscription - updating tier only")
+                        # User has a real Stripe subscription, just update tier
+                        active_stripe_sub.tier_id = tier_update.tier_id
+                    else:
+                        logger.info(f"[DEBUG] update_user_tier: No subscriptions found - creating new admin subscription")
+                        # Create new admin-granted subscription
+                        now = datetime.now(timezone.utc)
+                        period_end = now + timedelta(days=365)  # 1 year from now
+
+                        new_subscription = Subscription(
+                            user_id=user.id,
+                            tier_id=tier_update.tier_id,
+                            stripe_subscription_id=admin_sub_id,
+                            stripe_price_id=f"admin_price_{tier_update.tier_id}",
+                            billing_cycle='yearly',
+                            status='active',
+                            current_period_start=now,
+                            current_period_end=period_end,
+                            cancel_at_period_end=False,
+                            currency='USD',
+                            amount_cents=0  # Admin-granted, no charge
+                        )
+                        session.add(new_subscription)
+                        logger.info(f"[DEBUG] update_user_tier: New admin subscription created")
+            except Exception as sub_error:
+                logger.error(f"[DEBUG] update_user_tier: ERROR in subscription handling - {type(sub_error).__name__}: {sub_error}")
+                import traceback
+                logger.error(f"[DEBUG] update_user_tier: Traceback:\n{traceback.format_exc()}")
+                raise
         else:
-            # Free tier - cancel any active subscriptions
-            active_subs = session.execute(
-                select(Subscription).where(
-                    Subscription.user_id == user.id,
-                    Subscription.status.in_(['active', 'trialing'])
-                )
-            ).scalars().all()
+            logger.info(f"[DEBUG] update_user_tier: Step 6 - Handling Free tier - canceling subscriptions")
+            try:
+                # Free tier - cancel any active subscriptions
+                active_subs = session.execute(
+                    select(Subscription).where(
+                        Subscription.user_id == user.id,
+                        Subscription.status.in_(['active', 'trialing'])
+                    )
+                ).scalars().all()
 
-            for sub in active_subs:
-                sub.status = 'canceled'
-                sub.canceled_at = datetime.now(timezone.utc)
-                sub.ended_at = datetime.now(timezone.utc)
+                logger.info(f"[DEBUG] update_user_tier: Found {len(active_subs)} active subscriptions to cancel")
+                for sub in active_subs:
+                    sub.status = 'canceled'
+                    sub.canceled_at = datetime.now(timezone.utc)
+                    sub.ended_at = datetime.now(timezone.utc)
+                logger.info(f"[DEBUG] update_user_tier: All subscriptions canceled")
+            except Exception as cancel_error:
+                logger.error(f"[DEBUG] update_user_tier: ERROR canceling subscriptions - {type(cancel_error).__name__}: {cancel_error}")
+                raise
 
+        logger.info(f"[DEBUG] update_user_tier: Step 7 - Handling email processing feature")
         # Handle email processing feature based on tier
         # Check if new tier has email-to-process feature enabled
-        if new_tier.email_to_process_enabled and not user.email_processing_enabled:
-            # Enable email processing for Pro users
-            from app.services.email_processing_service import EmailProcessingService
-            email_service = EmailProcessingService(session)
-            success, email_address, error = email_service.auto_enable_email_processing_for_pro_user(str(user.id))
-            if success:
-                logger.info(f"Email processing enabled for user {user.email}: {email_address}")
+        try:
+            if new_tier.email_to_process_enabled and not user.email_processing_enabled:
+                logger.info(f"[DEBUG] update_user_tier: Enabling email processing for Pro user")
+                # Enable email processing for Pro users
+                from app.services.email_processing_service import EmailProcessingService
+                email_service = EmailProcessingService(session)
+                success, email_address, error = email_service.auto_enable_email_processing_for_pro_user(str(user.id))
+                if success:
+                    logger.info(f"[DEBUG] update_user_tier: Email processing enabled successfully - {email_address}")
+                else:
+                    logger.warning(f"[DEBUG] update_user_tier: Failed to enable email processing - {error}")
+            elif not new_tier.email_to_process_enabled and user.email_processing_enabled:
+                logger.info(f"[DEBUG] update_user_tier: Disabling email processing for downgrade")
+                # Disable email processing when downgrading from Pro
+                user.email_processing_enabled = False
+                logger.info(f"[DEBUG] update_user_tier: Email processing disabled")
             else:
-                logger.warning(f"Failed to enable email processing for user {user.email}: {error}")
-        elif not new_tier.email_to_process_enabled and user.email_processing_enabled:
-            # Disable email processing when downgrading from Pro
-            user.email_processing_enabled = False
-            logger.info(f"Email processing disabled for user {user.email}")
+                logger.info(f"[DEBUG] update_user_tier: No email processing changes needed")
+        except Exception as email_error:
+            logger.error(f"[DEBUG] update_user_tier: ERROR in email processing - {type(email_error).__name__}: {email_error}")
+            import traceback
+            logger.error(f"[DEBUG] update_user_tier: Traceback:\n{traceback.format_exc()}")
+            raise
 
-        logger.info(f"[DEBUG] update_user_tier: Committing transaction to database")
-        session.commit()
-        logger.info(f"[DEBUG] update_user_tier: Transaction committed successfully")
+        logger.info(f"[DEBUG] update_user_tier: Step 8 - Committing transaction to database")
+        try:
+            session.commit()
+            logger.info(f"[DEBUG] update_user_tier: Transaction committed successfully")
+        except Exception as commit_error:
+            logger.error(f"[DEBUG] update_user_tier: ERROR during commit - {type(commit_error).__name__}: {commit_error}")
+            import traceback
+            logger.error(f"[DEBUG] update_user_tier: Traceback:\n{traceback.format_exc()}")
+            raise
 
         logger.info(f"Admin {current_user.email} updated user {user.email} tier: {old_tier_id} → {tier_update.tier_id}")
 
@@ -383,13 +443,15 @@ async def update_user_tier(
         raise
     except Exception as e:
         session.rollback()
-        logger.error(f"[DEBUG] update_user_tier: Unexpected exception - {type(e).__name__}: {e}")
-        logger.error(f"Error updating user tier: {e}")
+        logger.error(f"[DEBUG] update_user_tier: Unexpected exception in outer handler - {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"[DEBUG] update_user_tier: Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update user tier"
+            detail=f"Failed to update user tier: {type(e).__name__}: {str(e)}"
         )
     finally:
+        logger.info(f"[DEBUG] update_user_tier: Closing database session")
         session.close()
 
 
