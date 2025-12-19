@@ -686,7 +686,7 @@ export default function SettingsPage() {
                                     <Badge variant={badge.variant}>{badge.label}</Badge>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
-                                    {new Date(delegate.invitation_sent_at).toLocaleDateString()}
+                                    {delegate.invitation_sent_at ? new Date(delegate.invitation_sent_at).toLocaleDateString() : '—'}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                     {delegate.status === 'active' || delegate.status === 'pending' ? (
