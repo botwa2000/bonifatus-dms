@@ -102,29 +102,50 @@ class EmailProcessingService:
             user.email_processing_address = email_address
             user.email_processing_enabled = True
 
-            # Create email settings
-            email_settings = EmailSettings(
-                user_id=user_id,
-                email_address=email_address,
-                is_enabled=True,
-                daily_email_limit=50,
-                max_attachment_size_mb=20,
-                auto_categorize=True,
-                send_confirmation_email=True
-            )
-            self.db.add(email_settings)
+            # Create email settings (check if already exists)
+            existing_settings = self.db.query(EmailSettings).filter(
+                EmailSettings.user_id == user_id
+            ).first()
+
+            if not existing_settings:
+                email_settings = EmailSettings(
+                    user_id=user_id,
+                    email_address=email_address,
+                    is_enabled=True,
+                    daily_email_limit=50,
+                    max_attachment_size_mb=20,
+                    auto_categorize=True,
+                    send_confirmation_email=True
+                )
+                self.db.add(email_settings)
+                logger.info(f"Created new email settings for user {user_id}")
+            else:
+                # Update existing settings
+                existing_settings.email_address = email_address
+                existing_settings.is_enabled = True
+                logger.info(f"Updated existing email settings for user {user_id}")
 
             # Create single allowed sender pair (user's registered email → processing email)
-            allowed_sender = AllowedSender(
-                user_id=user_id,
-                sender_email=user.email,
-                sender_name=user.full_name,
-                is_verified=True,
-                is_active=True,
-                trust_level='high',
-                notes='Auto-created email pair for Pro user'
-            )
-            self.db.add(allowed_sender)
+            # Check if allowed sender already exists to avoid unique constraint violation
+            existing_sender = self.db.query(AllowedSender).filter(
+                AllowedSender.user_id == user_id,
+                AllowedSender.sender_email == user.email
+            ).first()
+
+            if not existing_sender:
+                allowed_sender = AllowedSender(
+                    user_id=user_id,
+                    sender_email=user.email,
+                    sender_name=user.full_name,
+                    is_verified=True,
+                    is_active=True,
+                    trust_level='high',
+                    notes='Auto-created email pair for Pro user'
+                )
+                self.db.add(allowed_sender)
+                logger.info(f"Created new allowed sender for user {user_id}: {user.email}")
+            else:
+                logger.info(f"Allowed sender already exists for user {user_id}: {user.email}")
 
             # DO NOT commit here - let the caller manage the transaction
             # The session is typically passed from update_user_tier which will commit
