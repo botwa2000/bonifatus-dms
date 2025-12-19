@@ -52,12 +52,12 @@ class DelegateService:
         """
         session = db_manager.session_local()
         try:
-            # Verify owner exists and is Pro tier
+            # Verify owner exists and is Pro tier or Admin
             owner = session.query(User).filter(User.id == owner_user_id).first()
             if not owner:
                 return None, "Owner user not found"
 
-            if owner.tier_id != self.PRO_TIER_ID:
+            if owner.tier_id < self.PRO_TIER_ID and not owner.is_admin:
                 return None, "Only Professional tier users can invite delegates"
 
             # Validate role
