@@ -166,7 +166,7 @@ export default function SettingsPage() {
     }
 
     try {
-      await delegateService.revokeDelegate(delegate.id)
+      await delegateService.revokeAccess(delegate.id)
       setMessage({ type: 'success', text: 'Delegate access revoked' })
       await loadDelegates()
     } catch (error) {
