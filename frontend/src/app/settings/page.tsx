@@ -737,7 +737,7 @@ export default function SettingsPage() {
 
           {/* Invite Delegate Modal */}
           {showInviteModal && (
-            <Modal onClose={() => setShowInviteModal(false)}>
+            <Modal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)}>
               <ModalHeader
                 title="Invite Delegate"
                 onClose={() => setShowInviteModal(false)}
