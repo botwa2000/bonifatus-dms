@@ -43,7 +43,7 @@ interface DriveStatus {
 }
 
 export default function SettingsPage() {
-  const { user, isAuthenticated, isLoading, loadUser } = useAuth()
+  const { user, isLoading, loadUser } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
@@ -60,7 +60,6 @@ export default function SettingsPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
-  const [revokingDelegate, setRevokingDelegate] = useState<Delegate | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -150,10 +149,11 @@ export default function SettingsPage() {
       setInviteEmail('')
       setShowInviteModal(false)
       await loadDelegates()
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation. Please try again.'
       setMessage({
         type: 'error',
-        text: error.message || 'Failed to send invitation. Please try again.'
+        text: errorMessage
       })
     } finally {
       setIsInviting(false)
@@ -169,10 +169,11 @@ export default function SettingsPage() {
       await delegateService.revokeDelegate(delegate.id)
       setMessage({ type: 'success', text: 'Delegate access revoked' })
       await loadDelegates()
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to revoke access. Please try again.'
       setMessage({
         type: 'error',
-        text: error.message || 'Failed to revoke access. Please try again.'
+        text: errorMessage
       })
     }
   }
