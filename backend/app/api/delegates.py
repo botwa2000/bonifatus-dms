@@ -359,7 +359,7 @@ async def respond_to_invitation(
 
     from app.database.connection import db_manager
     from app.database.models import UserDelegate, User as UserModel
-    from datetime import datetime
+    from datetime import datetime, timezone
     from uuid import UUID
 
     if action not in ['accept', 'decline']:
@@ -395,8 +395,8 @@ async def respond_to_invitation(
                 detail=f"This invitation is {invitation.status} and cannot be accepted or declined"
             )
 
-        # Check expiration
-        if invitation.invitation_expires_at < datetime.utcnow():
+        # Check expiration (use timezone-aware datetime)
+        if invitation.invitation_expires_at < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This invitation has expired"
@@ -408,7 +408,7 @@ async def respond_to_invitation(
         if action == 'accept':
             # Accept the invitation
             invitation.status = 'active'
-            invitation.invitation_accepted_at = datetime.utcnow()
+            invitation.invitation_accepted_at = datetime.now(timezone.utc)
             invitation.delegate_user_id = current_user.id
             session.commit()
 
@@ -424,7 +424,7 @@ async def respond_to_invitation(
         else:  # decline
             # Decline the invitation (set to revoked)
             invitation.status = 'revoked'
-            invitation.revoked_at = datetime.utcnow()
+            invitation.revoked_at = datetime.now(timezone.utc)
             invitation.revoked_by = current_user.id
             session.commit()
 

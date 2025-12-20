@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
+import { delegateService } from '@/services/delegate.service'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
 
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [documentsLoading, setDocumentsLoading] = useState(true)
   const [isProcessingTier, setIsProcessingTier] = useState(false)
   const [tierProcessed, setTierProcessed] = useState(false)
+  const [pendingInvitationsCount, setPendingInvitationsCount] = useState(0)
 
   // Load user data on mount (passive auth context requires explicit call)
   useEffect(() => {
@@ -140,6 +142,22 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  // Check for pending invitations
+  useEffect(() => {
+    const checkPendingInvitations = async () => {
+      try {
+        const response = await delegateService.getPendingInvitations()
+        setPendingInvitationsCount(response.total)
+      } catch (error) {
+        // Silently handle - no notification if check fails
+      }
+    }
+
+    if (user) {
+      checkPendingInvitations()
+    }
+  }, [user])
+
 
   // Show loading state while user data loads or processing tier selection
   if (isLoading || !user || isProcessingTier) {
@@ -160,6 +178,34 @@ export default function DashboardPage() {
       <AppHeader title="Dashboard" subtitle="Overview of your documents" />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Pending Invitations Banner */}
+        {pendingInvitationsCount > 0 && (
+          <div className="mb-6 bg-blue-50 border-2 border-blue-500 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    You have {pendingInvitationsCount} pending invitation{pendingInvitationsCount > 1 ? 's' : ''} to shared documents
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Someone wants to share their document library with you
+                  </p>
+                </div>
+              </div>
+              <Link href="/settings">
+                <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">
+                  View Invitations
+                </button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-neutral-900 mb-2">
