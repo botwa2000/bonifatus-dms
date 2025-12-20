@@ -1,28 +1,156 @@
 # Quick Deployment Guide
 
-**Last Updated:** 2025-12-07
-**Credentials:** See `HETZNER_SETUP_ACTUAL.md` for server access details
+**Last Updated:** 2025-12-20
+**Server Access:** See `HETZNER_SETUP_ACTUAL.md` for credentials and detailed server setup
+
+> **Important:** This document references configurations from `HETZNER_SETUP_ACTUAL.md`.
+> Always check both files for complete deployment context.
 
 ---
 
 ## Quick Reference
 
-| Environment | Directory | URL | API URL | Ports |
-|------------|-----------|-----|---------|-------|
-| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | 3001/8081/5001 |
-| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | 3000/8080/5000 |
+| Environment | Directory | URL | API URL | Ports | Config Source |
+|------------|-----------|-----|---------|-------|---------------|
+| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | 3001/8081/5001 | `.env` file |
+| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | 3000/8080/5000 | Environment variables |
 
 **Server IP:** 91.99.212.17 (see HETZNER_SETUP_ACTUAL.md)
 
+**Key Differences:**
+- **Dev:** Uses `.env` file, requires nginx reload after deployment, ClamAV disabled
+- **Prod:** Uses system environment variables, ClamAV enabled
+
 ---
 
-## Standard Deployment Workflow
+## ONE-COMMAND DEPLOYMENT SEQUENCES
+
+### Deploy to DEV (Single Approval)
+
+Use this consolidated command for dev deployment. It handles stashing, pulling, building, deploying, and health checks in one sequence.
+
+```bash
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
+  echo '=== [1/8] Checking git status ===' && \
+  git status && \
+  echo '=== [2/8] Stashing local changes ===' && \
+  git stash && \
+  echo '=== [3/8] Pulling latest code ===' && \
+  git pull origin main && \
+  echo '=== [4/8] Restoring dev configuration ===' && \
+  git stash pop && \
+  echo '=== [5/8] Building containers ===' && \
+  docker compose build && \
+  echo '=== [6/8] Starting containers ===' && \
+  docker compose up -d && \
+  sleep 10 && \
+  echo '=== [7/8] Reloading nginx (CRITICAL for dev) ===' && \
+  nginx -t && systemctl reload nginx && \
+  echo '=== [8/8] Health checks ===' && \
+  echo 'Container status:' && \
+  docker compose ps && \
+  echo '' && \
+  echo 'Backend health:' && \
+  curl -s https://api-dev.bonidoc.com/health && \
+  echo '' && \
+  echo 'Backend logs (last 20 lines):' && \
+  docker logs bonifatus-backend-dev --tail 20 && \
+  echo '' && \
+  echo '✅ DEV DEPLOYMENT COMPLETE'"
+```
+
+**Expected Output:**
+- All 8 steps complete without errors
+- Containers show "Up (healthy)"
+- Backend health returns: `{"status":"healthy","environment":"development"}`
+- No errors in backend logs
+
+**If Errors Occur:**
+The sequence will stop at the failing step. Check the error message and:
+1. Fix the issue (code error, merge conflict, etc.)
+2. Re-run the deployment sequence
+3. Or continue manually from the failed step
+
+---
+
+### Deploy to PROD (Single Approval)
+
+Use this consolidated command for production deployment. **Only run after successful dev testing!**
+
+```bash
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms && \
+  echo '=== [1/7] Checking git status ===' && \
+  git status && \
+  echo '=== [2/7] Pulling latest code ===' && \
+  git pull origin main && \
+  echo '=== [3/7] Building containers ===' && \
+  docker compose build && \
+  echo '=== [4/7] Starting containers ===' && \
+  docker compose up -d && \
+  sleep 15 && \
+  echo '=== [5/7] Running database migrations ===' && \
+  docker exec bonifatus-backend alembic upgrade head && \
+  echo '=== [6/7] Health checks ===' && \
+  echo 'Container status:' && \
+  docker compose ps && \
+  echo '' && \
+  echo 'Backend health:' && \
+  curl -s https://api.bonidoc.com/health && \
+  echo '' && \
+  echo 'ClamAV status:' && \
+  docker exec bonifatus-backend curl -s localhost:8080/health | grep -i clamav && \
+  echo '' && \
+  echo 'Backend logs (last 20 lines):' && \
+  docker logs bonifatus-backend --tail 20 && \
+  echo '' && \
+  echo '=== [7/7] Verifying frontend ===' && \
+  curl -sI https://bonidoc.com | head -5 && \
+  echo '' && \
+  echo '✅ PROD DEPLOYMENT COMPLETE - VERIFY IN BROWSER!'"
+```
+
+**Expected Output:**
+- All 7 steps complete without errors
+- Containers show "Up (healthy)"
+- Backend health returns: `{"status":"healthy","environment":"production"}`
+- ClamAV shows as enabled/running
+- Frontend returns HTTP 200
+- No errors in backend logs
+
+**If Errors Occur:**
+The sequence will stop at the failing step. For production:
+1. **DO NOT** fix directly in prod - fix in dev first
+2. Test the fix in dev environment
+3. Re-deploy to prod with tested fix
+4. If critical, use rollback procedure (see below)
+
+---
+
+### Deploy to BOTH (Dev → Test → Prod)
+
+For complete deployment cycle with testing pause:
+
+```bash
+# Step 1: Deploy to dev
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && git stash && git pull origin main && git stash pop && docker compose build && docker compose up -d && sleep 10 && nginx -t && systemctl reload nginx && docker compose ps && curl -s https://api-dev.bonidoc.com/health"
+
+# Step 2: TEST ON DEV - Open https://dev.bonidoc.com and verify all features work
+
+# Step 3: Deploy to prod (only if dev testing passed)
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main && docker compose build && docker compose up -d && sleep 15 && docker exec bonifatus-backend alembic upgrade head && docker compose ps && curl -s https://api.bonidoc.com/health"
+```
+
+---
+
+## Standard Deployment Workflow (Step-by-Step)
+
+Use this when you need more control or if the one-command sequence fails.
 
 ### Step 1: Local - Commit and Push
 
 ```bash
 # Commit your changes
-git add .
+git add -A
 git commit -m "Your commit message
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
@@ -36,28 +164,26 @@ git push origin main
 ### Step 2: Deploy to Dev (ALWAYS TEST FIRST!)
 
 ```bash
-# SSH to server (credentials in HETZNER_SETUP_ACTUAL.md)
+# SSH to server
 ssh root@91.99.212.17
 
 # Navigate to dev directory
 cd /opt/bonifatus-dms-dev
 
-# ⚠️ IMPORTANT: Handle local changes (dev-specific API URL)
-# Check if there are local changes
+# Check git status
 git status
 
-# If docker-compose.yml has local changes, stash them
+# Stash local changes (dev-specific API URL)
 git stash
 
 # Pull latest code
 git pull origin main
 
-# Restore dev-specific configuration (API URL fix)
+# Restore dev configuration
 git stash pop
 
-# If conflict, keep dev API URL:
-# Edit docker-compose.yml and ensure:
-#   NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com
+# Handle conflicts if needed:
+# Edit docker-compose.yml and ensure: NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com
 # Then: git add docker-compose.yml && git stash drop
 
 # Rebuild containers
@@ -66,34 +192,26 @@ docker compose build
 # Restart containers
 docker compose up -d
 
-# ⚠️⚠️⚠️ CRITICAL: ALWAYS RELOAD NGINX AFTER CONTAINER RESTART ⚠️⚠️⚠️
-# Why: Docker restarts can cause nginx routing to break, preventing dev access
-# This MUST be run every time containers are restarted or rebuilt
+# ⚠️ CRITICAL: ALWAYS RELOAD NGINX AFTER DEV DEPLOYMENT
 nginx -t && systemctl reload nginx
-echo "✓ Nginx reloaded - dev site should be accessible"
-
-# Run migrations if needed
-docker exec bonifatus-backend-dev alembic upgrade head
+echo "✓ Nginx reloaded"
 
 # Check status
 docker compose ps
-docker compose logs --tail=50 backend
-docker compose logs --tail=50 frontend
+
+# Verify health
+curl https://api-dev.bonidoc.com/health
+
+# Check logs for errors
+docker logs bonifatus-backend-dev --tail 50
 ```
 
 **Expected output:**
 ```
 bonifatus-backend-dev      Up (healthy)    8081->8080
 bonifatus-frontend-dev     Up              3001->3000
+bonifatus-redis-dev        Up (healthy)    6380->6379
 bonifatus-translator-dev   Up              5001->5000
-```
-
-**Verify deployment:**
-```bash
-# Backend health
-curl https://api-dev.bonidoc.com/health
-
-# Should show: {"status":"healthy","environment":"development"}
 ```
 
 ### Step 3: Test on Dev
@@ -103,10 +221,10 @@ curl https://api-dev.bonidoc.com/health
 3. Check browser console for errors
 4. Verify database changes
 
-### Step 4: Deploy to Production (Only After Dev Testing Passes!)
+### Step 4: Deploy to Production (Only After Dev Testing!)
 
 ```bash
-# Still logged in as root@91.99.212.17
+# Still on server as root@91.99.212.17
 
 # Navigate to production directory
 cd /opt/bonifatus-dms
@@ -120,353 +238,209 @@ docker compose build
 # Restart containers
 docker compose up -d
 
-# Run migrations if needed
+# Run migrations
 docker exec bonifatus-backend alembic upgrade head
 
 # Check status
 docker compose ps
-docker compose logs --tail=50 backend
-docker compose logs --tail=50 frontend
+
+# Verify health
+curl https://api.bonidoc.com/health
+
+# Check ClamAV (prod only)
+docker logs bonifatus-backend --tail 50 | grep -i clamav
+
+# Check for errors
+docker logs bonifatus-backend --tail 50 | grep -i error
 ```
 
 **Expected output:**
 ```
 bonifatus-backend      Up (healthy)    8080->8080
 bonifatus-frontend     Up              3000->3000
+bonifatus-redis        Up (healthy)    6379->6379
 bonifatus-translator   Up              5000->5000
 ```
 
-**Verify production deployment:**
-```bash
-# Backend health
-curl https://api.bonidoc.com/health
+### Step 5: Verify Production
 
-# Should show: {"status":"healthy","environment":"production"}
-
-# Exit server
-exit
-```
-
-### Step 5: Verify Production in Browser
-
-1. Open browser to https://bonidoc.com
+1. Open https://bonidoc.com
 2. Test critical functionality
-3. Monitor for errors
+3. Monitor logs: `docker logs bonifatus-backend -f`
 
 ---
 
-## Common Issues and Fixes
+## Error Handling During Deployment
 
-### Issue 1: CORS Errors - Frontend Calling Wrong API
+### If Build Fails
 
-**Symptoms:**
-```
-Access to fetch at 'https://api.bonidoc.com' from origin 'https://dev.bonidoc.com'
-has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header
-```
-
-**Root Cause:** Dev frontend was built with production API URL instead of dev API URL
-
-**Fix:**
 ```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms-dev
+# Check which service failed
+docker compose ps
 
-# 1. Verify docker-compose.yml has correct API URL
-grep "NEXT_PUBLIC_API_URL" docker-compose.yml
-# Should show: NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com
+# Check build logs
+docker compose logs frontend
+docker compose logs backend
 
-# 2. If wrong, fix it
-sed -i 's|NEXT_PUBLIC_API_URL: https://api.bonidoc.com|NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com|g' docker-compose.yml
+# Common fixes:
+# 1. Frontend memory issue:
+docker compose build frontend --no-cache
 
-# 3. Rebuild frontend with correct API URL
-docker compose build frontend
+# 2. Backend dependencies:
+docker compose build backend --no-cache
 
-# 4. Restart frontend
-docker compose up -d frontend
-
-# 5. Verify (should show api-dev.bonidoc.com in build logs)
-docker compose logs frontend | grep "NEXT_PUBLIC_API_URL"
+# 3. Clear all and rebuild:
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
-**Prevention:** Never edit dev `docker-compose.yml` manually. Always verify `NEXT_PUBLIC_API_URL` matches environment.
+### If Container Won't Start
 
----
-
-### Issue 2: Container Name Conflicts
-
-**Symptoms:**
-```
-Error: The container name "/bonifatus-backend" is already in use
-```
-
-**Root Cause:** Dev docker-compose.yml missing `-dev` suffix on container names
-
-**Fix:**
 ```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms-dev
+# Check logs for the failing container
+docker logs bonifatus-backend-dev --tail 100
 
-# Verify container names have -dev suffix
-grep "container_name:" docker-compose.yml
+# Common issues:
+# - Port already in use: Check docker compose ps, stop conflicting container
+# - Memory limit: Check docker stats, increase memory in docker-compose.yml
+# - Missing env vars: Check .env file (dev) or environment variables (prod)
 
-# Should show:
-# container_name: bonifatus-backend-dev
-# container_name: bonifatus-frontend-dev
-# container_name: bonifatus-translator-dev
+# Restart specific container
+docker compose restart backend
 
-# If missing, the file was corrupted. Restore from git:
-git checkout docker-compose.yml
-
-# Or manually add -dev suffix to all container names
+# Or restart all
+docker compose down && docker compose up -d
 ```
 
----
+### If Health Check Fails
 
-### Issue 3: Frontend Build Failing (Out of Memory)
-
-**Symptoms:**
-```
-FATAL ERROR: Ineffective mark-compacts near heap limit
-```
-
-**Fix:**
 ```bash
-# Increase Node memory during build (on server)
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms-dev
+# Check what the health endpoint returns
+curl -v https://api-dev.bonidoc.com/health
 
-# Edit Dockerfile to increase Node memory
-# Or build with more resources:
-docker compose build frontend --memory=2g
-docker compose up -d frontend
+# Common issues:
+# - 502/504: Backend not responding - check logs
+# - 403: IP whitelist - add your IP to nginx config
+# - CORS: Wrong API URL in frontend build
+# - 500: Backend error - check logs for stack trace
+
+# Quick fixes:
+# 1. Check backend is actually running:
+docker ps | grep backend
+
+# 2. Check backend logs:
+docker logs bonifatus-backend-dev --tail 100
+
+# 3. Restart backend:
+docker compose restart backend
 ```
 
----
+### If Nginx Returns 403 (IP Whitelist)
 
-### Issue 4: Backend Out of Memory (libpostal)
-
-**Symptoms:**
-```
-net::ERR_FAILED 524
-CORS policy errors (even though API URL is correct)
-```
-
-**Root Cause:** Backend ran out of memory (libpostal language models need 5GB)
-
-**Verify:**
 ```bash
-# Check backend memory usage
-docker stats bonifatus-backend-dev --no-stream
-
-# Should show < 90% of memory limit
-```
-
-**Fix:**
-```bash
-# Memory limit is in docker-compose.yml
-# Current: 5G (increased from 3G for libpostal)
-# If needed, increase to 6G and rebuild
-```
-
----
-
-### Issue 5: Nginx Not Reloaded (Dev Access Lost)
-
-**Symptoms:** Can't access dev.bonidoc.com after deployment
-
-**Root Cause:** Forgot to reload nginx after container restart
-
-**Fix:**
-```bash
-ssh root@91.99.212.17
-nginx -t && systemctl reload nginx
-```
-
-**Prevention:** Always run `nginx -t && systemctl reload nginx` after dev deployment
-
----
-
-### Issue 6: IP Whitelist - Access Blocked with 403 Forbidden
-
-**Symptoms:**
-```
-Failed to load documents/categories
-CORS errors with 403 Forbidden
-Nginx error: "access forbidden by rule, client: YOUR_IP"
-```
-
-**Root Cause:** Your IP address is not in the nginx whitelist for dev environment
-
-**Check nginx error logs:**
-```bash
-ssh root@91.99.212.17
-tail -50 /var/log/nginx/error.log | grep "forbidden by rule"
-```
-
-**Find your current IP:**
-```powershell
-# On Windows PC:
-ipconfig
-# Look for IPv4 Address and IPv6 Address
-
-# Or check public IP:
-curl https://api.ipify.org
-```
-
-**Add IP to whitelist:**
-```bash
-ssh root@91.99.212.17
-
-# Backup config first
-cp /etc/nginx/sites-enabled/dev.bonidoc.com /etc/nginx/sites-enabled/dev.bonidoc.com.backup
-
-# Add IPv4 (replace with your IP)
-sed -i '/allow 93.197.148.73;  # Home PC IPv4/a\    allow YOUR_IP_HERE;  # Current connection' /etc/nginx/sites-enabled/dev.bonidoc.com
-
-# Or edit manually
+# Add your IP to dev whitelist
 nano /etc/nginx/sites-enabled/dev.bonidoc.com
-# Find the "allow" lines and add your IP in both server blocks
+# Add: allow YOUR_IP_HERE;
 
-# Test configuration
-nginx -t
-
-# Reload nginx
-systemctl reload nginx
-```
-
-**Current Whitelisted IPs:**
-- IPv4: `93.197.148.73` (home PC)
-- IPv6: `2003:fb:f0b::/32` (IPv6 range)
-
-**Whitelist Location:**
-`/etc/nginx/sites-enabled/dev.bonidoc.com` (both frontend and API server blocks)
-
-**For IPv6 subnet changes:**
-If your IPv6 subnet changes (common with dynamic IPv6):
-```bash
-# Check current whitelist
-grep "allow 2003" /etc/nginx/sites-enabled/dev.bonidoc.com
-
-# Update to new subnet (replace with your subnet)
-sed -i 's|2003:fb:f0e:fc6a::/64|2003:fb:f0b:YOUR_SUBNET::/64|g' /etc/nginx/sites-enabled/dev.bonidoc.com
-
-# Reload nginx
+# Test and reload
 nginx -t && systemctl reload nginx
 ```
 
 ---
 
-### Issue 7: Database Migrations Not Applied
-
-**Symptoms:**
-- New features not working
-- Database errors in logs
-
-**Fix:**
-```bash
-# Dev
-ssh root@91.99.212.17
-docker exec bonifatus-backend-dev alembic current
-docker exec bonifatus-backend-dev alembic upgrade head
-
-# Prod
-docker exec bonifatus-backend alembic current
-docker exec bonifatus-backend alembic upgrade head
-```
-
----
-
-## Critical Configuration Differences
-
-### Docker Compose - Frontend Build Args
-
-**⚠️ CRITICAL:** Dev and Prod MUST have different API URLs
-
-**Dev (`/opt/bonifatus-dms-dev/docker-compose.yml`):**
-```yaml
-frontend:
-  build:
-    context: ./frontend
-    args:
-      NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com  # ⚠️ DEV API
-  container_name: bonifatus-frontend-dev                # ⚠️ -dev suffix
-  ports:
-    - "3001:3000"                                        # ⚠️ Port 3001
-```
-
-**Prod (`/opt/bonifatus-dms/docker-compose.yml`):**
-```yaml
-frontend:
-  build:
-    context: ./frontend
-    args:
-      NEXT_PUBLIC_API_URL: https://api.bonidoc.com      # ⚠️ PROD API
-  container_name: bonifatus-frontend                     # ⚠️ No suffix
-  ports:
-    - "3000:3000"                                        # ⚠️ Port 3000
-```
+## Configuration Differences: Dev vs Prod
 
 ### Environment Variables
 
-**Files that differ between dev and prod:**
-- `.env` - Contains environment-specific secrets
-- `docker-compose.yml` - Contains environment-specific ports/names/URLs
-
-**⚠️ NEVER copy these files between dev and prod!**
-
-See `DEV_TO_PROD_MIGRATION.md` for full list of variables that must differ.
-
----
-
-## Quick Diagnostic Commands
-
+**DEV:** Uses `.env` file in `/opt/bonifatus-dms-dev/backend/.env`
 ```bash
-# Check which API frontend is calling
-ssh root@91.99.212.17
-curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
-# Should show: api-dev.bonidoc.com
-
-# Check container status
-docker compose ps
-
-# Check backend logs for errors
-docker compose logs --tail=100 backend | grep -i error
-
-# Check frontend build logs
-docker compose logs frontend | grep "NEXT_PUBLIC_API_URL"
-
-# Check database migration status
-docker exec bonifatus-backend-dev alembic current
-
-# Check backend memory usage
-docker stats bonifatus-backend-dev --no-stream
-
-# Test backend health
-curl https://api-dev.bonidoc.com/health
-
-# Test frontend health
-curl -I https://dev.bonidoc.com
+# View dev env vars
+cat /opt/bonifatus-dms-dev/backend/.env | grep -v PASSWORD
 ```
 
+**PROD:** Uses system environment variables
+```bash
+# Set via systemd service or docker-compose environment section
+# Never stored in files for security
+```
+
+### Docker Compose Differences
+
+**Key differences to maintain:**
+
+| Setting | Dev | Prod |
+|---------|-----|------|
+| Container names | `*-dev` suffix | No suffix |
+| API URL | `api-dev.bonidoc.com` | `api.bonidoc.com` |
+| Ports | 3001/8081/5001 | 3000/8080/5000 |
+| ClamAV | Disabled | Enabled |
+| Memory limits | 5GB backend | 6GB backend |
+
+### Nginx Reload Requirement
+
+**DEV ONLY:** Must reload nginx after deployment
+```bash
+nginx -t && systemctl reload nginx
+```
+
+**Reason:** Docker container restart can break nginx routing on dev
+
+**PROD:** Not required (separate nginx config, different network setup)
+
 ---
 
-## When to Use --no-cache
+## Health Check Commands
 
-**Default (with cache):** `docker compose build`
-- Use for: Regular code changes (99% of deployments)
-- Time: 2-3 minutes
-- Your code changes WILL be deployed
+### Backend Health
+```bash
+# Dev
+curl https://api-dev.bonidoc.com/health
+# Should return: {"status":"healthy","environment":"development"}
 
-**No cache:** `docker compose build --no-cache`
-- Use for:
-  - Monthly maintenance
-  - Dockerfile base image changes
-  - System package updates
-  - Persistent build issues
-- Time: 15-20 minutes
+# Prod
+curl https://api.bonidoc.com/health
+# Should return: {"status":"healthy","environment":"production"}
+```
 
-**⚠️ Don't overthink it:** Use default `docker compose build` unless you changed the Dockerfile itself.
+### Frontend Health
+```bash
+# Dev
+curl -I https://dev.bonidoc.com
+# Should return: HTTP/2 200
+
+# Prod
+curl -I https://bonidoc.com
+# Should return: HTTP/2 200
+```
+
+### Database Health
+```bash
+# Dev
+docker exec bonifatus-backend-dev alembic current
+# Shows current migration version
+
+# Prod
+docker exec bonifatus-backend alembic current
+```
+
+### ClamAV Health (Prod Only)
+```bash
+# Check if ClamAV is running
+docker exec bonifatus-backend curl localhost:8080/health | grep -i clamav
+# Should show: clamav_status: "running"
+```
+
+### Full System Health
+```bash
+# Dev
+docker compose -f /opt/bonifatus-dms-dev/docker-compose.yml ps
+docker stats --no-stream
+
+# Prod
+docker compose -f /opt/bonifatus-dms/docker-compose.yml ps
+docker stats --no-stream
+```
 
 ---
 
@@ -481,7 +455,7 @@ cd /opt/bonifatus-dms
 # Find last working commit
 git log --oneline -10
 
-# Rollback to previous commit
+# Rollback code
 git reset --hard <commit-hash>
 
 # Rebuild and restart
@@ -490,50 +464,144 @@ docker compose up -d
 
 # Verify
 curl https://api.bonidoc.com/health
+docker compose ps
+
+# If database migrations need rollback:
+docker exec bonifatus-backend alembic downgrade -1
 ```
+
+**For dev rollback:** Same process in `/opt/bonifatus-dms-dev` + remember to reload nginx
+
+---
+
+## Common Issues and Fixes
+
+### Issue 1: CORS Errors - Frontend Calling Wrong API
+
+**Symptoms:**
+```
+Access to fetch at 'https://api.bonidoc.com' from origin 'https://dev.bonidoc.com'
+has been blocked by CORS policy
+```
+
+**Fix:**
+```bash
+cd /opt/bonifatus-dms-dev
+
+# Verify API URL
+grep "NEXT_PUBLIC_API_URL" docker-compose.yml
+# Should show: https://api-dev.bonidoc.com
+
+# If wrong, fix and rebuild frontend
+docker compose build frontend
+docker compose up -d frontend
+nginx -t && systemctl reload nginx
+```
+
+### Issue 2: Dev Site Inaccessible After Deployment
+
+**Fix:**
+```bash
+# Always reload nginx after dev deployment
+nginx -t && systemctl reload nginx
+```
+
+### Issue 3: Container Name Conflicts
+
+**Fix:**
+```bash
+# Verify dev containers have -dev suffix
+cd /opt/bonifatus-dms-dev
+grep "container_name:" docker-compose.yml
+
+# Should show: bonifatus-backend-dev, etc.
+```
+
+### Issue 4: Memory Issues (libpostal)
+
+**Symptoms:**
+```
+Backend logs: "Killed"
+HTTP 502/524 errors
+```
+
+**Fix:**
+```bash
+# Check memory usage
+docker stats bonifatus-backend-dev --no-stream
+
+# Increase in docker-compose.yml if needed:
+# mem_limit: 6g
+```
+
+---
+
+## Quick Diagnostic Commands
+
+```bash
+# Container status
+docker compose ps
+
+# Backend logs
+docker logs bonifatus-backend-dev --tail 100 | grep -i error
+
+# Frontend build verification
+docker logs bonifatus-frontend-dev | grep NEXT_PUBLIC_API_URL
+
+# Database migration status
+docker exec bonifatus-backend-dev alembic current
+
+# Memory usage
+docker stats --no-stream
+
+# Nginx config test
+nginx -t
+
+# Check which API frontend is calling
+curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
+```
+
+---
+
+## Deployment Checklist
+
+**Before Any Deployment:**
+- [ ] Code committed and pushed to main
+- [ ] No hardcoded values or secrets in code
+- [ ] Dependencies added to requirements.txt/package.json
+- [ ] Environment variables configured (dev: .env, prod: env vars)
+
+**Dev Deployment:**
+- [ ] Run consolidated dev deployment command
+- [ ] Verify health check passes
+- [ ] Test on https://dev.bonidoc.com
+- [ ] Check browser console for errors
+- [ ] Verify new features work correctly
+
+**Prod Deployment (only after dev testing):**
+- [ ] Dev testing completed and passed
+- [ ] Run consolidated prod deployment command
+- [ ] Verify health check passes
+- [ ] Check ClamAV status (should be enabled)
+- [ ] Test on https://bonidoc.com
+- [ ] Monitor logs for 5-10 minutes
+- [ ] Verify critical user flows work
 
 ---
 
 ## Notes
 
-- **Always deploy to dev first, then prod**
-- **Always reload nginx after dev deployment**
-- **Always verify API URL in docker-compose.yml**
-- **Never copy .env or docker-compose.yml between environments**
-- **Check HETZNER_SETUP_ACTUAL.md for server credentials**
-- **See deployment_guide.md for detailed explanations**
+- **Always deploy to dev first, test, then prod**
+- **Use one-command sequences for consistent deployments**
+- **Deployment sequence will stop on errors - fix and retry**
+- **Dev requires nginx reload, prod does not**
+- **Dev uses .env file, prod uses environment variables**
+- **ClamAV is disabled on dev, enabled on prod**
+- **Check HETZNER_SETUP_ACTUAL.md for server access and detailed setup**
 
 ---
 
-## Quick Checklist
-
-**Before Deployment:**
-- [ ] Code committed and pushed to main
-- [ ] No hardcoded values in code
-- [ ] New dependencies added to requirements.txt / package.json
-
-**Dev Deployment:**
-- [ ] SSH to 91.99.212.17 (see HETZNER_SETUP_ACTUAL.md)
-- [ ] cd /opt/bonifatus-dms-dev
-- [ ] git pull origin main
-- [ ] docker compose build
-- [ ] docker compose up -d
-- [ ] nginx -t && systemctl reload nginx
-- [ ] docker compose ps (verify healthy)
-- [ ] Test on dev.bonidoc.com
-
-**Prod Deployment (only after dev testing):**
-- [ ] cd /opt/bonifatus-dms
-- [ ] git pull origin main
-- [ ] docker compose build
-- [ ] docker compose up -d
-- [ ] docker compose ps (verify healthy)
-- [ ] Test on bonidoc.com
-- [ ] Monitor logs for errors
-
----
-
-**For detailed explanations, see:**
-- Server setup: `HETZNER_SETUP_ACTUAL.md`
-- Full deployment guide: `deployment_guide.md`
-- Dev/Prod differences: `DEV_TO_PROD_MIGRATION.md`
+**For More Information:**
+- Server setup details: `HETZNER_SETUP_ACTUAL.md`
+- Dev/Prod configuration differences: `DEV_TO_PROD_MIGRATION.md`
+- Full deployment explanations: `deployment_guide.md` (if exists)

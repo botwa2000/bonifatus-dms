@@ -68,6 +68,14 @@ class DelegateService:
             if owner.email.lower() == delegate_email.lower():
                 return None, "Cannot invite yourself as a delegate"
 
+            # IMPORTANT: Verify invitee has a BoniDoc account
+            invitee_user = session.query(User).filter(
+                User.email == delegate_email.lower()
+            ).first()
+
+            if not invitee_user:
+                return None, "This email is not registered with BoniDoc. Please ask them to create a free account first at https://bonidoc.com"
+
             # Check if invitation already exists (case-insensitive email comparison)
             existing = session.query(UserDelegate).filter(
                 UserDelegate.owner_user_id == owner_user_id,
@@ -92,7 +100,7 @@ class DelegateService:
                     existing.access_expires_at = access_expires_at
                     existing.revoked_at = None
                     existing.revoked_by = None
-                    existing.delegate_user_id = None
+                    existing.delegate_user_id = invitee_user.id  # Keep user ID
                     existing.invitation_accepted_at = None
 
                     session.commit()
@@ -105,9 +113,10 @@ class DelegateService:
             token = self._generate_invitation_token()
             expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
-            # Create new delegate invitation
+            # Create new delegate invitation (with delegate_user_id since user exists)
             delegate = UserDelegate(
                 owner_user_id=owner_user_id,
+                delegate_user_id=invitee_user.id,  # Store user ID from validation
                 delegate_email=delegate_email.lower(),
                 role=role,
                 status='pending',

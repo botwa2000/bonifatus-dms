@@ -212,6 +212,51 @@ async def list_granted_access(
     )
 
 
+@router.get(
+    "/pending-invitations",
+    response_model=DelegateListResponse,
+    responses={
+        401: {"description": "Authentication required"}
+    }
+)
+async def get_pending_invitations(
+    current_user: User = Depends(get_current_active_user)
+) -> DelegateListResponse:
+    """
+    Get all pending invitations for the current user
+
+    Returns invitations that are:
+    - Sent to the current user's email
+    - Status is 'pending' (not yet accepted/declined)
+    - Not expired
+
+    Used by the "Shared with Me" section in Settings.
+    """
+    logger.info(f"[DELEGATES API] User {current_user.email} fetching pending invitations")
+
+    from app.database.connection import db_manager
+    from app.database.models import UserDelegate
+    from datetime import datetime
+
+    session = db_manager.session_local()
+    try:
+        # Get all pending invitations for this user's email
+        pending = session.query(UserDelegate).filter(
+            UserDelegate.delegate_email == current_user.email.lower(),
+            UserDelegate.status == 'pending',
+            UserDelegate.invitation_expires_at > datetime.utcnow()
+        ).order_by(UserDelegate.invitation_sent_at.desc()).all()
+
+        logger.info(f"[DELEGATES API] Found {len(pending)} pending invitations for {current_user.email}")
+
+        return DelegateListResponse(
+            delegates=[DelegateResponse.from_orm(d) for d in pending],
+            total=len(pending)
+        )
+    finally:
+        session.close()
+
+
 @router.post(
     "/accept/{token}",
     response_model=AcceptInvitationResponse,
@@ -253,6 +298,114 @@ async def accept_invitation(
 
     logger.info(f"[DELEGATES API] Invitation accepted successfully by {current_user.email}")
     return response
+
+
+@router.post(
+    "/respond/{invitation_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Invalid invitation or action"},
+        404: {"description": "Invitation not found"}
+    }
+)
+async def respond_to_invitation(
+    invitation_id: str,
+    action: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Accept or decline a delegate invitation from Settings page
+
+    - **invitation_id**: The ID of the invitation
+    - **action**: "accept" or "decline"
+
+    This endpoint requires authentication and validates that the invitation
+    was sent to the current user's email.
+    """
+    logger.info(f"[DELEGATES API] User {current_user.email} responding to invitation {invitation_id}: {action}")
+
+    from app.database.connection import db_manager
+    from app.database.models import UserDelegate, User as UserModel
+    from datetime import datetime
+    from uuid import UUID
+
+    if action not in ['accept', 'decline']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Action must be 'accept' or 'decline'"
+        )
+
+    session = db_manager.session_local()
+    try:
+        # Get the invitation
+        invitation = session.query(UserDelegate).filter(
+            UserDelegate.id == UUID(invitation_id)
+        ).first()
+
+        if not invitation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invitation not found"
+            )
+
+        # Validate the invitation is for the current user
+        if invitation.delegate_email.lower() != current_user.email.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This invitation was not sent to your email address"
+            )
+
+        # Check invitation status
+        if invitation.status != 'pending':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"This invitation is {invitation.status} and cannot be accepted or declined"
+            )
+
+        # Check expiration
+        if invitation.invitation_expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This invitation has expired"
+            )
+
+        # Get owner details for response
+        owner = session.query(UserModel).filter(UserModel.id == invitation.owner_user_id).first()
+
+        if action == 'accept':
+            # Accept the invitation
+            invitation.status = 'active'
+            invitation.invitation_accepted_at = datetime.utcnow()
+            invitation.delegate_user_id = current_user.id
+            session.commit()
+
+            logger.info(f"[DELEGATES API] Invitation {invitation_id} accepted by {current_user.email}")
+
+            return {
+                "success": True,
+                "message": f"You now have {invitation.role} access to {owner.full_name}'s documents",
+                "owner_name": owner.full_name,
+                "owner_email": owner.email,
+                "role": invitation.role
+            }
+        else:  # decline
+            # Decline the invitation (set to revoked)
+            invitation.status = 'revoked'
+            invitation.revoked_at = datetime.utcnow()
+            invitation.revoked_by = current_user.id
+            session.commit()
+
+            logger.info(f"[DELEGATES API] Invitation {invitation_id} declined by {current_user.email}")
+
+            return {
+                "success": True,
+                "message": "Invitation declined",
+                "owner_name": owner.full_name,
+                "owner_email": owner.email
+            }
+
+    finally:
+        session.close()
 
 
 @router.delete(
