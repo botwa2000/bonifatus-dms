@@ -384,7 +384,7 @@ class DocumentService:
             session.close()
 
     async def get_document(self, document_id: str, user_id: str) -> Optional[DocumentResponse]:
-        """Get document by ID with user access validation"""
+        """Get document by ID with user access validation (supports delegate access)"""
         session = db_manager.session_local()
         try:
             # Get user's preferred language
@@ -410,9 +410,42 @@ class DocumentService:
             )
             result = session.execute(stmt).first()
 
+            # If document not found as owner, check if user has delegate access
             if not result:
-                logger.warning(f"[GET_DOCUMENT DEBUG] Document {document_id} not found for user {user_id}")
-                return None
+                # Try to get document without user_id filter
+                stmt_no_filter = (
+                    select(Document, Category, CategoryTranslation)
+                    .outerjoin(DocumentCategory, and_(
+                        DocumentCategory.document_id == Document.id,
+                        DocumentCategory.is_primary == True
+                    ))
+                    .outerjoin(Category, Category.id == DocumentCategory.category_id)
+                    .outerjoin(CategoryTranslation, and_(
+                        CategoryTranslation.category_id == Category.id,
+                        CategoryTranslation.language_code == user_language
+                    ))
+                    .where(Document.id == document_id)
+                )
+                result = session.execute(stmt_no_filter).first()
+
+                if not result:
+                    logger.warning(f"[GET_DOCUMENT DEBUG] Document {document_id} does not exist")
+                    return None
+
+                # Check delegate access
+                document_temp, _, _ = result
+                from app.services.delegate_service import delegate_service
+                from uuid import UUID
+                has_access, role = await delegate_service.check_access(
+                    delegate_user_id=UUID(user_id),
+                    owner_user_id=UUID(str(document_temp.user_id))
+                )
+
+                if not has_access:
+                    logger.warning(f"[GET_DOCUMENT DEBUG] User {user_id} has no access to document {document_id} owned by {document_temp.user_id}")
+                    return None
+
+                logger.info(f"[GET_DOCUMENT DEBUG] User {user_id} accessing shared document {document_id} as delegate (role: {role})")
 
             document, category, category_translation = result
 
@@ -1001,6 +1034,16 @@ class DocumentService:
             elif sort_by == "file_size":
                 all_documents.sort(
                     key=lambda x: x.file_size if x.file_size else 0,
+                    reverse=(sort_order == "desc")
+                )
+            elif sort_by == "category_name":
+                all_documents.sort(
+                    key=lambda x: x.category_name.lower() if x.category_name else "zzz",
+                    reverse=(sort_order == "desc")
+                )
+            elif sort_by == "mime_type":
+                all_documents.sort(
+                    key=lambda x: x.mime_type.lower() if x.mime_type else "zzz",
                     reverse=(sort_order == "desc")
                 )
 

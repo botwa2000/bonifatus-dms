@@ -2,15 +2,47 @@
 'use client'
 
 import Script from 'next/script'
+import { useEffect, useState } from 'react'
 import { GA_MEASUREMENT_ID } from '@/lib/analytics'
 
+declare global {
+  interface Window {
+    CookieConsentApi?: {
+      acceptedCategory: (category: string) => boolean
+    }
+  }
+}
+
 export default function GoogleAnalytics() {
+  const [consentGiven, setConsentGiven] = useState(false)
   const isProduction = process.env.NODE_ENV === 'production'
   const enableInDev = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS_DEV === 'true'
   const analyticsEnabled = isProduction || enableInDev
 
-  // Only load if analytics enabled and valid measurement ID
-  if (!GA_MEASUREMENT_ID || !analyticsEnabled) {
+  useEffect(() => {
+    // Check if user has already consented to analytics
+    const checkConsent = () => {
+      if (typeof window !== 'undefined' && window.CookieConsentApi) {
+        const hasConsent = window.CookieConsentApi.acceptedCategory('analytics')
+        setConsentGiven(hasConsent)
+      }
+    }
+
+    // Check immediately
+    checkConsent()
+
+    // Listen for consent changes
+    window.addEventListener('cc:onConsent', checkConsent)
+    window.addEventListener('cc:onChange', checkConsent)
+
+    return () => {
+      window.removeEventListener('cc:onConsent', checkConsent)
+      window.removeEventListener('cc:onChange', checkConsent)
+    }
+  }, [])
+
+  // Only load if analytics enabled, valid measurement ID, AND user consented
+  if (!GA_MEASUREMENT_ID || !analyticsEnabled || !consentGiven) {
     return null
   }
 
@@ -33,7 +65,7 @@ export default function GoogleAnalytics() {
               page_path: window.location.pathname,
               cookie_flags: 'SameSite=None;Secure',
               anonymize_ip: true,
-              allow_google_signals: true,
+              allow_google_signals: false,
               allow_ad_personalization_signals: false,
             });
           `,

@@ -55,7 +55,7 @@ interface DocumentsResponse {
 }
 
 type ViewMode = 'list' | 'grid'
-type SortField = 'title' | 'created_at' | 'file_size'
+type SortField = 'title' | 'created_at' | 'file_size' | 'category_name' | 'mime_type'
 type SortDirection = 'asc' | 'desc'
 
 export default function DocumentsPage() {
@@ -268,6 +268,41 @@ export default function DocumentsPage() {
       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
+    )
+  }
+
+  const getDocumentType = (mimeType: string, fileName: string) => {
+    // Extract file extension from mime type or filename
+    let type = 'FILE'
+
+    if (mimeType.includes('pdf')) {
+      type = 'PDF'
+    } else if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) {
+      type = 'JPG'
+    } else if (mimeType.includes('image/png')) {
+      type = 'PNG'
+    } else if (mimeType.includes('image/gif')) {
+      type = 'GIF'
+    } else if (mimeType.includes('image/')) {
+      type = 'IMAGE'
+    } else if (mimeType.includes('word') || mimeType.includes('msword')) {
+      type = 'DOC'
+    } else if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) {
+      type = 'XLS'
+    } else if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
+      type = 'PPT'
+    } else if (mimeType.includes('text/plain')) {
+      type = 'TXT'
+    } else {
+      // Fallback to file extension
+      const ext = fileName.split('.').pop()?.toUpperCase()
+      if (ext) type = ext
+    }
+
+    return (
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+        {type}
+      </span>
     )
   }
 
@@ -520,7 +555,7 @@ export default function DocumentsPage() {
                         </span>
                       ) : null}
                     </div>
-                    {getStatusBadge(doc.processing_status)}
+                    {getDocumentType(doc.mime_type, doc.file_name)}
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
@@ -597,7 +632,17 @@ export default function DocumentsPage() {
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                      Category
+                      <button
+                        onClick={() => handleSort('category_name')}
+                        className="flex items-center space-x-1 hover:text-neutral-900"
+                      >
+                        <span>Category</span>
+                        {sortField === 'category_name' && (
+                          <svg className={`h-4 w-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        )}
+                      </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
@@ -613,7 +658,17 @@ export default function DocumentsPage() {
                       </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
-                      Status
+                      <button
+                        onClick={() => handleSort('mime_type')}
+                        className="flex items-center space-x-1 hover:text-neutral-900"
+                      >
+                        <span>Type</span>
+                        {sortField === 'mime_type' && (
+                          <svg className={`h-4 w-4 ${sortDirection === 'desc' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        )}
+                      </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
@@ -699,7 +754,7 @@ export default function DocumentsPage() {
                         {formatFileSize(doc.file_size)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(doc.processing_status)}
+                        {getDocumentType(doc.mime_type, doc.file_name)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                         {formatDate(doc.created_at)}
