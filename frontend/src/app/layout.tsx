@@ -8,6 +8,7 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { DelegateProvider } from '@/contexts/delegate-context'
 import { CurrencyProvider } from '@/contexts/currency-context'
 import CookieConsent from '@/components/CookieConsent'
+import { GoogleAnalytics, PostHogProvider, PlausibleAnalytics } from '@/components/analytics'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -50,18 +51,22 @@ export default function RootLayout({
           }}
         />
         <script src="https://accounts.google.com/gsi/client" async defer></script>
+        <GoogleAnalytics />
+        <PlausibleAnalytics />
       </head>
       <body className={inter.className}>
-        <ThemeProvider>
-          <AuthProvider>
-            <DelegateProvider>
-              <CurrencyProvider>
-                {children}
-                <CookieConsent language="en" />
-              </CurrencyProvider>
-            </DelegateProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <DelegateProvider>
+                <CurrencyProvider>
+                  {children}
+                  <CookieConsent language="en" />
+                </CurrencyProvider>
+              </DelegateProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   )

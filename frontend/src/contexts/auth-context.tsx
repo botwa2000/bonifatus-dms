@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { authService } from '@/services/auth.service'
 import { User } from '@/types/auth.types'
 import { shouldLog } from '@/config/app.config'
+import { identifyUser, trackLogout, resetUser } from '@/lib/analytics'
 
 interface AuthContextType {
   user: User | null
@@ -43,6 +44,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser)
       setIsAuthenticated(!!currentUser)
       if (shouldLog('debug')) console.log('[AUTH DEBUG] Auth state updated - isAuthenticated:', !!currentUser)
+
+      // Identify user for analytics
+      if (currentUser) {
+        identifyUser(currentUser.id, {
+          email: currentUser.email,
+          full_name: currentUser.full_name,
+          tier: currentUser.tier,
+          created_at: currentUser.created_at,
+        })
+      }
     } catch (err) {
       if (shouldLog('error')) console.error('[AUTH DEBUG] Error in loadUser:', err)
       // Silently handle errors
@@ -70,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      // Track logout event
+      trackLogout()
+      resetUser()
+
       await authService.logout()
       setUser(null)
       setIsAuthenticated(false)

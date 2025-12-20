@@ -891,6 +891,143 @@ class DocumentService:
         finally:
             session.close()
 
+    async def search_documents_multi_source(
+        self,
+        current_user: User,
+        search_request: DocumentSearchRequest,
+        include_own: bool = True,
+        shared_owner_ids: List[str] = []
+    ) -> Optional[DocumentListResponse]:
+        """
+        Search documents from multiple sources (own + shared from delegates)
+
+        Args:
+            current_user: The current authenticated user
+            search_request: Search filters and pagination
+            include_own: Whether to include user's own documents
+            shared_owner_ids: List of owner user IDs to fetch shared documents from
+
+        Returns:
+            Unified document list with owner metadata and permissions
+        """
+        from app.services.delegate_service import delegate_service
+
+        all_documents = []
+        total_from_sources = 0
+
+        try:
+            # Fetch own documents if requested
+            if include_own:
+                logger.info(f"[MULTI-SOURCE] Fetching own documents for user {current_user.id}")
+                own_docs = await self.search_documents(str(current_user.id), search_request)
+
+                if own_docs and own_docs.documents:
+                    for doc in own_docs.documents:
+                        # Add owner metadata for own documents
+                        doc.owner_type = "own"
+                        doc.owner_user_id = str(current_user.id)
+                        doc.owner_name = current_user.full_name
+                        doc.can_edit = True
+                        doc.can_delete = True
+
+                    all_documents.extend(own_docs.documents)
+                    total_from_sources += own_docs.total_count
+                    logger.info(f"[MULTI-SOURCE] Found {len(own_docs.documents)} own documents")
+
+            # Fetch shared documents from each owner
+            for owner_id in shared_owner_ids:
+                try:
+                    owner_uuid = UUID(owner_id)
+
+                    # Validate delegate has active access to this owner
+                    has_access, role = await delegate_service.check_access(
+                        delegate_user_id=current_user.id,
+                        owner_user_id=owner_uuid
+                    )
+
+                    if not has_access:
+                        logger.warning(f"[MULTI-SOURCE] User {current_user.id} does not have access to owner {owner_id}")
+                        continue
+
+                    logger.info(f"[MULTI-SOURCE] Fetching shared documents from owner {owner_id} (role: {role})")
+
+                    # Fetch owner's documents
+                    shared_docs = await self.search_documents(owner_id, search_request)
+
+                    if shared_docs and shared_docs.documents:
+                        # Get owner details for metadata
+                        session = db_manager.session_local()
+                        try:
+                            owner_user = session.query(User).filter(User.id == owner_uuid).first()
+                            owner_name = owner_user.full_name if owner_user else "Unknown Owner"
+                        finally:
+                            session.close()
+
+                        # Add owner metadata for shared documents
+                        for doc in shared_docs.documents:
+                            doc.owner_type = "shared"
+                            doc.owner_user_id = owner_id
+                            doc.owner_name = owner_name
+                            # Delegates with 'viewer' role cannot edit or delete
+                            doc.can_edit = False if role == 'viewer' else True
+                            doc.can_delete = False
+
+                        all_documents.extend(shared_docs.documents)
+                        total_from_sources += shared_docs.total_count
+                        logger.info(f"[MULTI-SOURCE] Found {len(shared_docs.documents)} shared documents from owner {owner_id}")
+
+                except ValueError:
+                    logger.error(f"[MULTI-SOURCE] Invalid owner ID format: {owner_id}")
+                    continue
+                except Exception as e:
+                    logger.error(f"[MULTI-SOURCE] Error fetching documents from owner {owner_id}: {e}")
+                    continue
+
+            # Sort combined results
+            # By default, sort by created_at desc
+            sort_by = search_request.sort_by or "created_at"
+            sort_order = search_request.sort_order or "desc"
+
+            if sort_by == "created_at":
+                all_documents.sort(
+                    key=lambda x: x.created_at if x.created_at else datetime.min,
+                    reverse=(sort_order == "desc")
+                )
+            elif sort_by == "title":
+                all_documents.sort(
+                    key=lambda x: x.title.lower() if x.title else "",
+                    reverse=(sort_order == "desc")
+                )
+            elif sort_by == "file_size":
+                all_documents.sort(
+                    key=lambda x: x.file_size if x.file_size else 0,
+                    reverse=(sort_order == "desc")
+                )
+
+            # Apply pagination to combined results
+            page = search_request.page or 1
+            page_size = search_request.page_size or 20
+
+            total_count = len(all_documents)
+            offset = (page - 1) * page_size
+            paginated_documents = all_documents[offset:offset + page_size]
+
+            total_pages = (total_count + page_size - 1) // page_size
+
+            logger.info(f"[MULTI-SOURCE] Returning {len(paginated_documents)} documents (page {page}/{total_pages}, total: {total_count})")
+
+            return DocumentListResponse(
+                documents=paginated_documents,
+                total_count=total_count,
+                page=page,
+                page_size=page_size,
+                total_pages=total_pages
+            )
+
+        except Exception as e:
+            logger.error(f"[MULTI-SOURCE] Error searching multi-source documents: {e}")
+            return None
+
     async def get_user_storage_usage(self, user_id: str) -> int:
         """Get total storage usage for user in bytes"""
         session = db_manager.session_local()

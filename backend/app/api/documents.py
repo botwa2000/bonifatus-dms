@@ -167,15 +167,51 @@ async def list_documents(
     page_size: Optional[int] = None,
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = None,
+    include_own: bool = True,
+    include_shared: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
     delegate_ctx: DelegateContext = Depends(get_delegate_context)
 ) -> DocumentListResponse:
     """
     List user documents with search and filtering
 
     Supports full-text search, category filtering, and pagination
-    Delegates can list owner's documents using X-Acting-As-User-Id header
+
+    Multi-source filtering (new):
+    - include_own: Include user's own documents (default: true)
+    - include_shared: Comma-separated owner user IDs to include shared documents from
+
+    Legacy support:
+    - X-Acting-As-User-Id header for single-owner delegate access
     """
     try:
+        # Handle legacy single-owner delegate access via header
+        if delegate_ctx.is_acting_as_delegate and not include_shared:
+            search_request = DocumentSearchRequest(
+                query=query,
+                category_id=category_id,
+                language=language,
+                processing_status=processing_status,
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
+
+            documents_result = await document_service.search_documents(
+                str(delegate_ctx.effective_user_id), search_request
+            )
+
+            if not documents_result:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to retrieve documents"
+                )
+
+            logger.info(f"Documents listed as delegate for owner: {delegate_ctx.owner_user.email}")
+            return documents_result
+
+        # New multi-source document fetching
         search_request = DocumentSearchRequest(
             query=query,
             category_id=category_id,
@@ -187,8 +223,20 @@ async def list_documents(
             sort_order=sort_order
         )
 
-        documents_result = await document_service.search_documents(
-            str(delegate_ctx.effective_user_id), search_request
+        # Parse shared owner IDs
+        shared_owner_ids = []
+        if include_shared:
+            shared_owner_ids = [
+                owner_id.strip()
+                for owner_id in include_shared.split(',')
+                if owner_id.strip()
+            ]
+
+        documents_result = await document_service.search_documents_multi_source(
+            current_user=current_user,
+            search_request=search_request,
+            include_own=include_own,
+            shared_owner_ids=shared_owner_ids
         )
 
         if not documents_result:
@@ -197,12 +245,10 @@ async def list_documents(
                 detail="Failed to retrieve documents"
             )
 
-        if delegate_ctx.is_acting_as_delegate:
-            logger.info(
-                f"Documents listed as delegate for owner: {delegate_ctx.owner_user.email}"
-            )
-        else:
-            logger.info(f"Documents listed for user: {delegate_ctx.effective_user_id}")
+        logger.info(
+            f"Documents listed for user {current_user.email}: "
+            f"own={include_own}, shared_sources={len(shared_owner_ids)}"
+        )
 
         return documents_result
 

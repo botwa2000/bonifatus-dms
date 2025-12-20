@@ -64,6 +64,12 @@ class DocumentResponse(BaseModel):
     web_view_link: Optional[str] = Field(None, description="Google Drive view link")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
+    # Owner metadata for multi-user delegate access
+    owner_type: Optional[str] = Field(None, description="Document ownership type: 'own' or 'shared'")
+    owner_user_id: Optional[str] = Field(None, description="Owner user ID (for shared documents)")
+    owner_name: Optional[str] = Field(None, description="Owner display name (for shared documents)")
+    can_edit: Optional[bool] = Field(None, description="Permission to edit this document")
+    can_delete: Optional[bool] = Field(None, description="Permission to delete this document")
 
 
 class DocumentUpdateRequest(BaseModel):
