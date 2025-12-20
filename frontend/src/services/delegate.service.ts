@@ -42,6 +42,22 @@ export interface DelegateListResponse {
   total: number
 }
 
+export interface PendingInvitation {
+  id: string
+  owner_user_id: string
+  owner_email: string
+  owner_name: string
+  role: string
+  status: string
+  invitation_sent_at: string | null
+  invitation_expires_at: string | null
+}
+
+export interface PendingInvitationListResponse {
+  invitations: PendingInvitation[]
+  total: number
+}
+
 export interface GrantedAccessListResponse {
   granted_access: GrantedAccess[]
   total: number
@@ -94,6 +110,27 @@ class DelegateService {
   async revokeAccess(delegateId: string): Promise<{ success: boolean; message: string }> {
     return apiClient.delete<{ success: boolean; message: string }>(
       `/api/v1/delegates/${delegateId}`,
+      true
+    )
+  }
+
+  /**
+   * Get all pending invitations for the current user
+   */
+  async getPendingInvitations(): Promise<PendingInvitationListResponse> {
+    return apiClient.get<PendingInvitationListResponse>('/api/v1/delegates/pending-invitations', true)
+  }
+
+  /**
+   * Accept or decline a delegate invitation
+   */
+  async respondToInvitation(
+    invitationId: string,
+    action: 'accept' | 'decline'
+  ): Promise<{ success: boolean; message: string; owner_name: string; owner_email: string; role?: string }> {
+    return apiClient.post(
+      `/api/v1/delegates/respond/${invitationId}`,
+      { action },
       true
     )
   }

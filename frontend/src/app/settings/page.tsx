@@ -8,7 +8,7 @@ import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Select, Alert, Input, Badge, Modal, ModalHeader, ModalContent, ModalFooter } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import { shouldLog } from '@/config/app.config'
-import { delegateService, type Delegate } from '@/services/delegate.service'
+import { delegateService, type Delegate, type GrantedAccess, type PendingInvitation } from '@/services/delegate.service'
 import type { BadgeVariant } from '@/components/ui'
 
 interface UserPreferences {
@@ -54,12 +54,18 @@ export default function SettingsPage() {
   const [resettingCategories, setResettingCategories] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-  // Delegates state
+  // Delegates state (for owners - Pro tier only)
   const [delegates, setDelegates] = useState<Delegate[]>([])
   const [delegatesLoading, setDelegatesLoading] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [isInviting, setIsInviting] = useState(false)
+
+  // Shared with Me state (for all users)
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([])
+  const [grantedAccess, setGrantedAccess] = useState<GrantedAccess[]>([])
+  const [sharedLoading, setSharedLoading] = useState(false)
+  const [respondingToInvite, setRespondingToInvite] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -109,8 +115,13 @@ export default function SettingsPage() {
       setSystemSettings(sysData.settings)
       setDriveStatus(driveData)
 
-      // Load delegates
-      await loadDelegates()
+      // Load delegates (only if Pro tier)
+      if (user && (user.tier_id === 2 || user.is_admin)) {
+        await loadDelegates()
+      }
+
+      // Load shared with me (for all users)
+      await loadSharedWithMe()
     } catch {
       // Error already logged by API client, just show user message
       if (shouldLog('debug')) console.log('[SETTINGS DEBUG] ❌ Failed to load settings')
@@ -127,6 +138,22 @@ export default function SettingsPage() {
       console.error('Failed to load delegates:', error)
     } finally {
       setDelegatesLoading(false)
+    }
+  }
+
+  const loadSharedWithMe = async () => {
+    try {
+      setSharedLoading(true)
+      const [pendingResponse, grantedResponse] = await Promise.all([
+        delegateService.getPendingInvitations(),
+        delegateService.listGrantedAccess()
+      ])
+      setPendingInvitations(pendingResponse.invitations)
+      setGrantedAccess(grantedResponse.granted_access)
+    } catch (error) {
+      console.error('Failed to load shared access:', error)
+    } finally {
+      setSharedLoading(false)
     }
   }
 
@@ -175,6 +202,30 @@ export default function SettingsPage() {
         type: 'error',
         text: errorMessage
       })
+    }
+  }
+
+  const handleRespondToInvitation = async (invitation: PendingInvitation, action: 'accept' | 'decline') => {
+    setRespondingToInvite(invitation.id)
+    setMessage(null)
+
+    try {
+      const response = await delegateService.respondToInvitation(invitation.id, action)
+      setMessage({
+        type: 'success',
+        text: response.message
+      })
+
+      // Reload shared access data
+      await loadSharedWithMe()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${action} invitation. Please try again.`
+      setMessage({
+        type: 'error',
+        text: errorMessage
+      })
+    } finally {
+      setRespondingToInvite(null)
     }
   }
 
@@ -623,6 +674,146 @@ export default function SettingsPage() {
                   <p className="text-xs text-neutral-500">
                     Connect your Google Drive to automatically sync and backup your documents with version control and easy sharing.
                   </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Shared with Me Section - All Users */}
+          <Card>
+            <CardHeader title="Shared with Me" />
+            <CardContent>
+              {sharedLoading ? (
+                <div className="text-center py-8">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
+                  <p className="mt-4 text-sm text-neutral-600">Loading shared access...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Pending Invitations */}
+                  {pendingInvitations.length > 0 && (
+                    <div>
+                      <div className="flex items-center space-x-2 mb-4">
+                        <h3 className="text-sm font-medium text-neutral-900">Pending Invitations</h3>
+                        <Badge variant="warning">{pendingInvitations.length}</Badge>
+                      </div>
+                      <div className="space-y-3">
+                        {pendingInvitations.map((invitation) => (
+                          <div
+                            key={invitation.id}
+                            className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-neutral-900">
+                                  {invitation.owner_name}
+                                </p>
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  {invitation.owner_email} • Role: {invitation.role}
+                                </p>
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  Invited {invitation.invitation_sent_at ? new Date(invitation.invitation_sent_at).toLocaleDateString() : '—'}
+                                  {invitation.invitation_expires_at && ` • Expires ${new Date(invitation.invitation_expires_at).toLocaleDateString()}`}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Button
+                                  variant="primary"
+                                  onClick={() => handleRespondToInvitation(invitation, 'accept')}
+                                  disabled={respondingToInvite === invitation.id}
+                                >
+                                  {respondingToInvite === invitation.id ? 'Processing...' : 'Accept'}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => handleRespondToInvitation(invitation, 'decline')}
+                                  disabled={respondingToInvite === invitation.id}
+                                >
+                                  Decline
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Shared Access */}
+                  {grantedAccess.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-neutral-900 mb-4">Active Shared Access</h3>
+                      <div className="overflow-hidden border border-neutral-200 rounded-lg">
+                        <table className="min-w-full divide-y divide-neutral-200">
+                          <thead className="bg-neutral-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Owner
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Role
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                                Last Accessed
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-neutral-200">
+                            {grantedAccess.map((access) => {
+                              const badge = getStatusBadge(access.status)
+                              return (
+                                <tr key={access.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div>
+                                      <p className="text-sm font-medium text-neutral-900">{access.owner_name}</p>
+                                      <p className="text-xs text-neutral-500">{access.owner_email}</p>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
+                                    {access.role}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                    {access.last_accessed_at
+                                      ? new Date(access.last_accessed_at).toLocaleDateString()
+                                      : 'Never'}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {pendingInvitations.length === 0 && grantedAccess.length === 0 && (
+                    <div className="text-center py-8 border-2 border-dashed border-neutral-200 rounded-lg">
+                      <svg
+                        className="mx-auto h-12 w-12 text-neutral-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                        />
+                      </svg>
+                      <p className="mt-2 text-sm text-neutral-600">No shared access yet</p>
+                      <p className="text-xs text-neutral-500">
+                        When someone shares their documents with you, they will appear here
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

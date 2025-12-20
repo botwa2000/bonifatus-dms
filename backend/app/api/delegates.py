@@ -212,16 +212,32 @@ async def list_granted_access(
     )
 
 
+class PendingInvitationResponse(BaseModel):
+    """Extended response for pending invitations with owner details"""
+    id: str
+    owner_user_id: str
+    owner_email: str
+    owner_name: str
+    role: str
+    status: str
+    invitation_sent_at: Optional[str] = None
+    invitation_expires_at: Optional[str] = None
+
+class PendingInvitationListResponse(BaseModel):
+    """Response for list of pending invitations"""
+    invitations: List[PendingInvitationResponse]
+    total: int
+
 @router.get(
     "/pending-invitations",
-    response_model=DelegateListResponse,
+    response_model=PendingInvitationListResponse,
     responses={
         401: {"description": "Authentication required"}
     }
 )
 async def get_pending_invitations(
     current_user: User = Depends(get_current_active_user)
-) -> DelegateListResponse:
+) -> PendingInvitationListResponse:
     """
     Get all pending invitations for the current user
 
@@ -235,7 +251,7 @@ async def get_pending_invitations(
     logger.info(f"[DELEGATES API] User {current_user.email} fetching pending invitations")
 
     from app.database.connection import db_manager
-    from app.database.models import UserDelegate
+    from app.database.models import UserDelegate, User as UserModel
     from datetime import datetime
 
     session = db_manager.session_local()
@@ -249,9 +265,25 @@ async def get_pending_invitations(
 
         logger.info(f"[DELEGATES API] Found {len(pending)} pending invitations for {current_user.email}")
 
-        return DelegateListResponse(
-            delegates=[DelegateResponse.from_orm(d) for d in pending],
-            total=len(pending)
+        # Build response with owner details
+        result = []
+        for invitation in pending:
+            owner = session.query(UserModel).filter(UserModel.id == invitation.owner_user_id).first()
+            if owner:
+                result.append(PendingInvitationResponse(
+                    id=str(invitation.id),
+                    owner_user_id=str(invitation.owner_user_id),
+                    owner_email=owner.email,
+                    owner_name=owner.full_name,
+                    role=invitation.role,
+                    status=invitation.status,
+                    invitation_sent_at=invitation.invitation_sent_at.isoformat() if invitation.invitation_sent_at else None,
+                    invitation_expires_at=invitation.invitation_expires_at.isoformat() if invitation.invitation_expires_at else None
+                ))
+
+        return PendingInvitationListResponse(
+            invitations=result,
+            total=len(result)
         )
     finally:
         session.close()
