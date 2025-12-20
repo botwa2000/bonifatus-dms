@@ -4,6 +4,8 @@
  * Supports multiple analytics providers: Google Analytics 4, PostHog, Plausible
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Google Analytics 4
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || ''
 
@@ -26,6 +28,7 @@ declare global {
   interface Window {
     gtag?: (...args: any[]) => void
     dataLayer?: any[]
+    posthog?: any
   }
 }
 
@@ -71,8 +74,8 @@ export const trackSignup = (method: 'google' | 'email') => {
   })
 
   // PostHog
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('user_signup', { method })
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('user_signup', { method })
   }
 }
 
@@ -83,8 +86,8 @@ export const trackLogin = (method: 'google' | 'email') => {
     label: method,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('user_login', { method })
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('user_login', { method })
   }
 }
 
@@ -94,8 +97,8 @@ export const trackLogout = () => {
     category: 'authentication',
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('user_logout')
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('user_logout')
   }
 }
 
@@ -108,8 +111,8 @@ export const trackDocumentUpload = (fileType: string, fileSize: number) => {
     value: Math.round(fileSize / 1024), // KB
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('document_upload', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('document_upload', {
       file_type: fileType,
       file_size_kb: Math.round(fileSize / 1024),
     })
@@ -123,8 +126,8 @@ export const trackDocumentView = (documentId: string) => {
     label: documentId,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('document_view', { document_id: documentId })
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('document_view', { document_id: documentId })
   }
 }
 
@@ -135,8 +138,8 @@ export const trackDocumentDownload = (documentId: string, fileType: string) => {
     label: fileType,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('document_download', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('document_download', {
       document_id: documentId,
       file_type: fileType,
     })
@@ -150,8 +153,8 @@ export const trackDocumentDelete = (documentId: string) => {
     label: documentId,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('document_delete', { document_id: documentId })
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('document_delete', { document_id: documentId })
   }
 }
 
@@ -163,8 +166,8 @@ export const trackDocumentSearch = (query: string, resultsCount: number) => {
     value: resultsCount,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('document_search', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('document_search', {
       query,
       results_count: resultsCount,
     })
@@ -179,8 +182,8 @@ export const trackSubscriptionStart = (tier: string, billingCycle: string) => {
     label: `${tier}_${billingCycle}`,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('subscription_start', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('subscription_start', {
       tier,
       billing_cycle: billingCycle,
     })
@@ -202,8 +205,8 @@ export const trackSubscriptionComplete = (tier: string, billingCycle: string, am
     }],
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('subscription_complete', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('subscription_complete', {
       tier,
       billing_cycle: billingCycle,
       amount,
@@ -219,8 +222,8 @@ export const trackSubscriptionCancel = (tier: string, reason?: string) => {
     label: tier,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('subscription_cancel', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('subscription_cancel', {
       tier,
       reason,
     })
@@ -235,8 +238,8 @@ export const trackDelegateInvite = (role: string) => {
     label: role,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('delegate_invite', { role })
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('delegate_invite', { role })
   }
 }
 
@@ -247,8 +250,8 @@ export const trackDelegateAccept = (ownerName: string, role: string) => {
     label: role,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('delegate_accept', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('delegate_accept', {
       owner_name: ownerName,
       role,
     })
@@ -262,8 +265,8 @@ export const trackDelegateViewDocuments = (ownerName: string, documentCount: num
     value: documentCount,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('delegate_view_documents', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('delegate_view_documents', {
       owner_name: ownerName,
       document_count: documentCount,
     })
@@ -271,15 +274,15 @@ export const trackDelegateViewDocuments = (ownerName: string, documentCount: num
 }
 
 // Feature Usage Events
-export const trackFeatureUse = (featureName: string, metadata?: Record<string, any>) => {
+export const trackFeatureUse = (featureName: string, metadata?: Record<string, unknown>) => {
   event({
     action: 'feature_use',
     category: 'engagement',
     label: featureName,
   })
 
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('feature_use', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('feature_use', {
       feature_name: featureName,
       ...metadata,
     })
@@ -287,15 +290,15 @@ export const trackFeatureUse = (featureName: string, metadata?: Record<string, a
 }
 
 // Identify user (for PostHog)
-export const identifyUser = (userId: string, properties?: Record<string, any>) => {
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.identify(userId, properties)
+export const identifyUser = (userId: string, properties?: Record<string, unknown>) => {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.identify(userId, properties)
   }
 }
 
 // Reset user (on logout)
 export const resetUser = () => {
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.reset()
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.reset()
   }
 }
