@@ -843,12 +843,14 @@ class DocumentService:
                 try:
                     category_uuid = uuid.UUID(search_request.category_id)
                     logger.info(f"[CATEGORY FILTER] Applying category filter for category_id: {category_uuid}")
-                    category_filter = exists().where(
-                        and_(
-                            DocumentCategory.document_id == Document.id,
-                            DocumentCategory.category_id == category_uuid
+                    category_filter = exists(
+                        select(1).select_from(DocumentCategory).where(
+                            and_(
+                                DocumentCategory.document_id == Document.id,
+                                DocumentCategory.category_id == category_uuid
+                            )
                         )
-                    )
+                    ).correlate(Document)
                     base_query = base_query.where(category_filter)
                     logger.info(f"[CATEGORY FILTER] Category filter applied successfully")
                 except ValueError:
