@@ -97,6 +97,10 @@ export default function DelegatesPage() {
       setTimeout(() => setSuccess(null), 5000)
     } catch (err: unknown) {
       const error = err as {
+        status?: number
+        error?: {
+          detail?: { code?: string; message?: string } | string
+        }
         response?: {
           status?: number
           data?: { detail?: { code?: string; message?: string } | string }
@@ -105,8 +109,9 @@ export default function DelegatesPage() {
       }
 
       // Check if this is a USER_NOT_REGISTERED error (409 Conflict)
-      if (error?.response?.status === 409) {
-        const detail = error.response.data?.detail
+      const status = error?.status || error?.response?.status
+      if (status === 409) {
+        const detail = error?.error?.detail || error?.response?.data?.detail
         if (typeof detail === 'object' && detail?.code === 'USER_NOT_REGISTERED') {
           // Show confirmation dialog
           const confirmed = window.confirm(
@@ -123,7 +128,9 @@ export default function DelegatesPage() {
       }
 
       // Handle other errors
-      const errorMessage = typeof error?.response?.data?.detail === 'string'
+      const errorMessage = typeof error?.error?.detail === 'string'
+        ? error.error.detail
+        : typeof error?.response?.data?.detail === 'string'
         ? error.response.data.detail
         : error?.message || 'Failed to send invitation'
       setError(errorMessage)
