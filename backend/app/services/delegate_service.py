@@ -68,10 +68,10 @@ class DelegateService:
             if owner.email.lower() == delegate_email.lower():
                 return None, "Cannot invite yourself as a delegate"
 
-            # Check if invitation already exists
+            # Check if invitation already exists (case-insensitive email comparison)
             existing = session.query(UserDelegate).filter(
                 UserDelegate.owner_user_id == owner_user_id,
-                UserDelegate.delegate_email == delegate_email
+                UserDelegate.delegate_email == delegate_email.lower()
             ).first()
 
             if existing:
