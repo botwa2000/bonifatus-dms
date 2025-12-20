@@ -7,7 +7,7 @@ REST API for multi-user document access management
 import logging
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.responses import JSONResponse
 
 from app.schemas.delegate_schemas import (
