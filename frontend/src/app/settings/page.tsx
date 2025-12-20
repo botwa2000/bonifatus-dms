@@ -1004,7 +1004,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   variant="primary"
-                  onClick={handleInviteDelegate}
+                  onClick={() => handleInviteDelegate()}
                   disabled={isInviting}
                 >
                   {isInviting ? 'Sending...' : 'Send Invitation'}
