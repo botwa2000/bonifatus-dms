@@ -5,8 +5,9 @@ REST API for multi-user document access management
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.responses import JSONResponse
 
