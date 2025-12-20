@@ -79,13 +79,33 @@ class DelegateService:
                     return None, "This user already has active access"
                 elif existing.status == 'pending':
                     return None, "An invitation has already been sent to this email"
-                # If revoked, we'll create a new invitation below
+                elif existing.status == 'revoked':
+                    # Re-invite revoked user: update existing record to pending
+                    token = self._generate_invitation_token()
+                    expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
-            # Generate invitation token
+                    existing.status = 'pending'
+                    existing.role = role
+                    existing.invitation_token = token
+                    existing.invitation_sent_at = datetime.utcnow()
+                    existing.invitation_expires_at = expires_at
+                    existing.access_expires_at = access_expires_at
+                    existing.revoked_at = None
+                    existing.revoked_by = None
+                    existing.delegate_user_id = None
+                    existing.invitation_accepted_at = None
+
+                    session.commit()
+                    session.refresh(existing)
+
+                    logger.info(f"[DELEGATE] Re-invited revoked delegate: owner={owner_user_id}, delegate_email={delegate_email}")
+                    return existing, None
+
+            # Generate invitation token for new invitation
             token = self._generate_invitation_token()
             expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
-            # Create delegate invitation
+            # Create new delegate invitation
             delegate = UserDelegate(
                 owner_user_id=owner_user_id,
                 delegate_email=delegate_email.lower(),
