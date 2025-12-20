@@ -842,6 +842,7 @@ class DocumentService:
                 from sqlalchemy.sql import exists
                 try:
                     category_uuid = uuid.UUID(search_request.category_id)
+                    logger.info(f"[CATEGORY FILTER] Applying category filter for category_id: {category_uuid}")
                     category_filter = exists().where(
                         and_(
                             DocumentCategory.document_id == Document.id,
@@ -849,8 +850,9 @@ class DocumentService:
                         )
                     )
                     base_query = base_query.where(category_filter)
+                    logger.info(f"[CATEGORY FILTER] Category filter applied successfully")
                 except ValueError:
-                    logger.warning(f"Invalid category_id format: {search_request.category_id}")
+                    logger.warning(f"[CATEGORY FILTER] Invalid category_id format: {search_request.category_id}")
 
             if search_request.language:
                 base_query = base_query.where(Document.primary_language == search_request.language)
@@ -866,6 +868,9 @@ class DocumentService:
 
             count_stmt = select(func.count()).select_from(base_query.subquery())
             total_count = session.execute(count_stmt).scalar()
+
+            if search_request.category_id:
+                logger.info(f"[CATEGORY FILTER] Found {total_count} documents matching category filter")
 
             sort_column = getattr(Document, sort_by, Document.created_at)
             if sort_order == "desc":
