@@ -157,7 +157,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleInviteDelegate = async () => {
+  const handleInviteDelegate = async (allowUnregistered = false) => {
     if (!inviteEmail.trim()) {
       setMessage({ type: 'error', text: 'Please enter an email address' })
       return
@@ -169,15 +169,47 @@ export default function SettingsPage() {
     try {
       await delegateService.inviteDelegate({
         email: inviteEmail.trim(),
-        role: 'viewer'
+        role: 'viewer',
+        allow_unregistered: allowUnregistered
       })
 
       setMessage({ type: 'success', text: `Invitation sent to ${inviteEmail}` })
       setInviteEmail('')
       setShowInviteModal(false)
       await loadDelegates()
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation. Please try again.'
+    } catch (err: unknown) {
+      const error = err as {
+        response?: {
+          status?: number
+          data?: { detail?: { code?: string; message?: string } | string }
+        }
+        message?: string
+      }
+
+      // Check if this is a USER_NOT_REGISTERED error (409 Conflict)
+      if (error?.response?.status === 409) {
+        const detail = error.response.data?.detail
+        if (typeof detail === 'object' && detail?.code === 'USER_NOT_REGISTERED') {
+          // Show confirmation dialog
+          const confirmed = window.confirm(
+            detail.message ||
+            `The email ${inviteEmail.trim()} is not registered with BoniDoc. Would you like to send an invitation anyway? They will need to create an account first.`
+          )
+
+          if (confirmed) {
+            // Retry with allow_unregistered flag
+            await handleInviteDelegate(true)
+            return
+          }
+        }
+      }
+
+      // Handle other errors
+      const errorMessage = typeof error?.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : error instanceof Error
+        ? error.message
+        : 'Failed to send invitation. Please try again.'
       setMessage({
         type: 'error',
         text: errorMessage
@@ -243,18 +275,24 @@ export default function SettingsPage() {
   }
 
   const handleSave = async () => {
-    if (!preferences) return
+    if (!preferences || !systemSettings) return
+
+    // Always include all available languages for document recognition
+    const preferencesWithAllLanguages = {
+      ...preferences,
+      preferred_doc_languages: systemSettings.available_languages
+    }
 
     if (shouldLog('debug')) {
       console.log('[SETTINGS DEBUG] === Save Button Clicked ===')
       console.log('[SETTINGS DEBUG] Saving preferences to backend...')
       console.log('[SETTINGS DEBUG] Components being saved:')
-      console.log('[SETTINGS DEBUG]   - Language:', preferences.language)
-      console.log('[SETTINGS DEBUG]   - Preferred Doc Languages:', preferences.preferred_doc_languages)
-      console.log('[SETTINGS DEBUG]   - Timezone:', preferences.timezone)
-      console.log('[SETTINGS DEBUG]   - Theme:', preferences.theme)
-      console.log('[SETTINGS DEBUG]   - Notifications Enabled:', preferences.notifications_enabled)
-      console.log('[SETTINGS DEBUG]   - Auto Categorization:', preferences.auto_categorization)
+      console.log('[SETTINGS DEBUG]   - Language:', preferencesWithAllLanguages.language)
+      console.log('[SETTINGS DEBUG]   - Preferred Doc Languages (all):', preferencesWithAllLanguages.preferred_doc_languages)
+      console.log('[SETTINGS DEBUG]   - Timezone:', preferencesWithAllLanguages.timezone)
+      console.log('[SETTINGS DEBUG]   - Theme:', preferencesWithAllLanguages.theme)
+      console.log('[SETTINGS DEBUG]   - Notifications Enabled:', preferencesWithAllLanguages.notifications_enabled)
+      console.log('[SETTINGS DEBUG]   - Auto Categorization:', preferencesWithAllLanguages.auto_categorization)
       console.log('[SETTINGS DEBUG] Endpoint: PUT /api/v1/users/preferences')
     }
 
@@ -264,7 +302,7 @@ export default function SettingsPage() {
     const oldLanguage = preferences.language
 
     try {
-      await apiClient.put('/api/v1/users/preferences', preferences, true)
+      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
 
       if (shouldLog('debug')) {
         console.log('[SETTINGS DEBUG] ✅ Preferences saved successfully to database')
@@ -532,33 +570,35 @@ export default function SettingsPage() {
 
               <div className="mt-6">
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Document Languages
+                  Document Language Recognition
                 </label>
-                <p className="text-xs text-neutral-500 mb-3">
-                  Select which languages you work with. Categories will be auto-translated to these languages.
-                </p>
-                <div className="space-y-2">
-                  {systemSettings.available_languages.map(langCode => {
-                    const currentLangs = preferences.preferred_doc_languages || [preferences.language]
-                    const isSelected = currentLangs.includes(langCode)
-
-                    return (
-                      <label
-                        key={langCode}
-                        className="flex items-center space-x-3 p-3 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleDocLanguage(langCode)}
-                          className="h-4 w-4 text-admin-primary border-neutral-300 rounded focus:ring-admin-primary"
-                        />
-                        <span className="text-sm text-neutral-900">
-                          {getLanguageName(langCode)}
-                        </span>
-                      </label>
-                    )
-                  })}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <svg className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-2">
+                        Your documents are automatically recognized in all supported languages
+                      </p>
+                      <p className="text-xs text-blue-700 mb-3">
+                        The system will detect and process documents in any of the following languages:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {systemSettings.available_languages.map(langCode => (
+                          <span
+                            key={langCode}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-900 border border-blue-300"
+                          >
+                            {getLanguageName(langCode)}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-blue-600 mt-3 italic">
+                        More languages coming soon!
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

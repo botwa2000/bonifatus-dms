@@ -42,7 +42,8 @@ class DelegateService:
         owner_user_id: UUID,
         delegate_email: str,
         role: str = "viewer",
-        access_expires_at: Optional[datetime] = None
+        access_expires_at: Optional[datetime] = None,
+        allow_unregistered: bool = False
     ) -> Tuple[Optional[UserDelegate], Optional[str]]:
         """
         Invite a delegate to access owner's documents
@@ -55,26 +56,42 @@ class DelegateService:
             # Verify owner exists and is Pro tier or Admin
             owner = session.query(User).filter(User.id == owner_user_id).first()
             if not owner:
-                return None, "Owner user not found"
+                error_msg = "Owner user not found"
+                logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner_user_id={owner_user_id})")
+                return None, error_msg
 
             if owner.tier_id < self.PRO_TIER_ID and not owner.is_admin:
-                return None, "Only Professional tier users can invite delegates"
+                error_msg = "Only Professional tier users can invite delegates"
+                logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner={owner.email}, tier_id={owner.tier_id})")
+                return None, error_msg
 
             # Validate role
             if role not in ['viewer', 'editor', 'owner']:
-                return None, f"Invalid role: {role}"
+                error_msg = f"Invalid role: {role}"
+                logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner={owner.email})")
+                return None, error_msg
 
             # Check if owner is trying to invite themselves
             if owner.email.lower() == delegate_email.lower():
-                return None, "Cannot invite yourself as a delegate"
+                error_msg = "Cannot invite yourself as a delegate"
+                logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner={owner.email})")
+                return None, error_msg
 
-            # IMPORTANT: Verify invitee has a BoniDoc account
+            # Check if invitee has a BoniDoc account
             invitee_user = session.query(User).filter(
                 User.email == delegate_email.lower()
             ).first()
 
             if not invitee_user:
-                return None, "This email is not registered with BoniDoc. Please ask them to create a free account first at https://bonidoc.com"
+                if not allow_unregistered:
+                    # Return special error code that frontend can handle with confirmation dialog
+                    error_msg = "USER_NOT_REGISTERED"
+                    logger.info(f"[DELEGATE] User not registered, requiring confirmation (owner={owner.email}, delegate_email={delegate_email})")
+                    return None, error_msg
+                else:
+                    # User confirmed - allow invitation to non-registered user
+                    logger.info(f"[DELEGATE] Creating invitation for non-registered user (owner={owner.email}, delegate_email={delegate_email})")
+                    invitee_user = None  # Will create invitation with NULL delegate_user_id
 
             # Check if invitation already exists (case-insensitive email comparison)
             existing = session.query(UserDelegate).filter(
@@ -84,9 +101,13 @@ class DelegateService:
 
             if existing:
                 if existing.status == 'active':
-                    return None, "This user already has active access"
+                    error_msg = "This user already has active access"
+                    logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner={owner.email}, delegate={delegate_email})")
+                    return None, error_msg
                 elif existing.status == 'pending':
-                    return None, "An invitation has already been sent to this email"
+                    error_msg = "An invitation has already been sent to this email"
+                    logger.warning(f"[DELEGATE] Invite failed: {error_msg} (owner={owner.email}, delegate={delegate_email})")
+                    return None, error_msg
                 elif existing.status == 'revoked':
                     # Re-invite revoked user: update existing record to pending
                     token = self._generate_invitation_token()
@@ -100,7 +121,7 @@ class DelegateService:
                     existing.access_expires_at = access_expires_at
                     existing.revoked_at = None
                     existing.revoked_by = None
-                    existing.delegate_user_id = invitee_user.id  # Keep user ID
+                    existing.delegate_user_id = invitee_user.id if invitee_user else None
                     existing.invitation_accepted_at = None
 
                     session.commit()
@@ -113,10 +134,11 @@ class DelegateService:
             token = self._generate_invitation_token()
             expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
-            # Create new delegate invitation (with delegate_user_id since user exists)
+            # Create new delegate invitation
+            # delegate_user_id will be NULL if user is not registered yet
             delegate = UserDelegate(
                 owner_user_id=owner_user_id,
-                delegate_user_id=invitee_user.id,  # Store user ID from validation
+                delegate_user_id=invitee_user.id if invitee_user else None,
                 delegate_email=delegate_email.lower(),
                 role=role,
                 status='pending',

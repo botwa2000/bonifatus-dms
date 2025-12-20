@@ -67,7 +67,7 @@ export default function DelegatesPage() {
     }
   }
 
-  const handleInviteDelegate = async () => {
+  const handleInviteDelegate = async (allowUnregistered = false) => {
     if (!inviteEmail.trim()) {
       setError('Please enter an email address')
       return
@@ -79,7 +79,8 @@ export default function DelegatesPage() {
 
       const request: DelegateInviteRequest = {
         email: inviteEmail.trim(),
-        role: inviteRole
+        role: inviteRole,
+        allow_unregistered: allowUnregistered
       }
 
       await delegateService.inviteDelegate(request)
@@ -95,8 +96,36 @@ export default function DelegatesPage() {
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(null), 5000)
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } }; message?: string }
-      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to send invitation'
+      const error = err as {
+        response?: {
+          status?: number
+          data?: { detail?: { code?: string; message?: string } | string }
+        }
+        message?: string
+      }
+
+      // Check if this is a USER_NOT_REGISTERED error (409 Conflict)
+      if (error?.response?.status === 409) {
+        const detail = error.response.data?.detail
+        if (typeof detail === 'object' && detail?.code === 'USER_NOT_REGISTERED') {
+          // Show confirmation dialog
+          const confirmed = window.confirm(
+            detail.message ||
+            `The email ${inviteEmail.trim()} is not registered with BoniDoc. Would you like to send an invitation anyway? They will need to create an account first.`
+          )
+
+          if (confirmed) {
+            // Retry with allow_unregistered flag
+            await handleInviteDelegate(true)
+            return
+          }
+        }
+      }
+
+      // Handle other errors
+      const errorMessage = typeof error?.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : error?.message || 'Failed to send invitation'
       setError(errorMessage)
     } finally {
       setIsInviting(false)

@@ -195,6 +195,21 @@ class EmailAuthService:
             session.commit()
             session.refresh(user)
 
+            # Check for pending delegate invitations and auto-activate them
+            from app.database.models import UserDelegate
+            pending_invitations = session.query(UserDelegate).filter(
+                UserDelegate.delegate_email == email.lower(),
+                UserDelegate.status == 'pending',
+                UserDelegate.delegate_user_id == None
+            ).all()
+
+            if pending_invitations:
+                logger.info(f"[REGISTRATION] Found {len(pending_invitations)} pending delegate invitations for {email}")
+                for invitation in pending_invitations:
+                    invitation.delegate_user_id = user.id
+                    logger.info(f"[REGISTRATION] Auto-linked delegate invitation {invitation.id} to new user {user.id}")
+                session.commit()
+
             # Generate verification code
             code_result = await self.generate_verification_code(
                 user_id=str(user.id),

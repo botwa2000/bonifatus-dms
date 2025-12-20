@@ -62,11 +62,21 @@ async def invite_delegate(
         owner_user_id=current_user.id,
         delegate_email=invite_request.email,
         role=invite_request.role,
-        access_expires_at=invite_request.access_expires_at
+        access_expires_at=invite_request.access_expires_at,
+        allow_unregistered=invite_request.allow_unregistered
     )
 
     if error:
-        if "Professional tier" in error:
+        if error == "USER_NOT_REGISTERED":
+            # Return 409 Conflict to signal frontend to show confirmation dialog
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "USER_NOT_REGISTERED",
+                    "message": f"The email {invite_request.email} is not registered with BoniDoc. Would you like to send an invitation anyway? They will need to create an account first."
+                }
+            )
+        elif "Professional tier" in error:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=error
@@ -86,72 +96,142 @@ async def invite_delegate(
 
     # Send invitation email
     try:
-        accept_url = f"{settings.app.app_frontend_url}/delegates/accept?token={delegate.invitation_token}"
+        # Different email content based on whether user is registered
+        if delegate.delegate_user_id is None:
+            # User is NOT registered - send account creation email
+            signup_url = f"{settings.app.app_frontend_url}/signup?invitation_token={delegate.invitation_token}&email={invite_request.email}"
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background-color: #4F46E5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-                <h1 style="margin: 0; font-size: 24px;">Delegate Access Invitation</h1>
-            </div>
-
-            <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
-                <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
-
-                <p style="font-size: 16px; margin-bottom: 20px;">
-                    <strong>{current_user.full_name}</strong> ({current_user.email}) has invited you to access their document library on BoniDoc as a <strong>{invite_request.role}</strong>.
-                </p>
-
-                <div style="background-color: #F3F4F6; padding: 20px; border-radius: 6px; margin: 25px 0;">
-                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #1F2937;">As a delegate, you will be able to:</p>
-                    <ul style="margin: 10px 0; padding-left: 20px;">
-                        <li style="margin: 5px 0;">View and search documents</li>
-                        <li style="margin: 5px 0;">Download documents for review</li>
-                        <li style="margin: 5px 0;">Access document metadata and categories</li>
-                    </ul>
-                    <p style="margin: 10px 0 0 0; font-weight: bold; color: #1F2937;">You will NOT be able to:</p>
-                    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-                        <li style="margin: 5px 0;">Upload, edit, or delete documents</li>
-                    </ul>
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #4F46E5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">You're Invited to BoniDoc!</h1>
                 </div>
 
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{accept_url}"
-                       style="display: inline-block; background-color: #4F46E5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                        Accept Invitation
-                    </a>
+                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
+                    <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
+
+                    <p style="font-size: 16px; margin-bottom: 20px;">
+                        <strong>{current_user.full_name}</strong> ({current_user.email}) wants to share their document library with you on BoniDoc.
+                    </p>
+
+                    <div style="background-color: #FEF3C7; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #F59E0B;">
+                        <p style="margin: 0; font-weight: bold; color: #92400E;">Action Required</p>
+                        <p style="margin: 10px 0 0 0; color: #92400E;">
+                            To accept this invitation, you need to create a free BoniDoc account first.
+                        </p>
+                    </div>
+
+                    <div style="background-color: #F3F4F6; padding: 20px; border-radius: 6px; margin: 25px 0;">
+                        <p style="margin: 0 0 10px 0; font-weight: bold; color: #1F2937;">Once you create your account, you'll be able to:</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li style="margin: 5px 0;">View and search {current_user.full_name}'s documents</li>
+                            <li style="margin: 5px 0;">Download documents for review</li>
+                            <li style="margin: 5px 0;">Access document metadata and categories</li>
+                        </ul>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{signup_url}"
+                           style="display: inline-block; background-color: #4F46E5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                            Create Free Account & Accept
+                        </a>
+                    </div>
+
+                    <p style="font-size: 14px; color: #6B7280; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        If you cannot click the button above, copy and paste this link into your browser:<br>
+                        <a href="{signup_url}" style="color: #4F46E5; word-break: break-all;">{signup_url}</a>
+                    </p>
+
+                    <p style="font-size: 14px; color: #6B7280; margin-top: 20px;">
+                        This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
+                    </p>
                 </div>
 
-                <p style="font-size: 14px; color: #6B7280; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                    If you cannot click the button above, copy and paste this link into your browser:<br>
-                    <a href="{accept_url}" style="color: #4F46E5; word-break: break-all;">{accept_url}</a>
-                </p>
+                <div style="text-align: center; margin-top: 20px; padding: 20px; font-size: 12px; color: #9CA3AF;">
+                    <p style="margin: 0;">BoniDoc Document Management System</p>
+                    <p style="margin: 5px 0 0 0;">Professional Document Management</p>
+                </div>
+            </body>
+            </html>
+            """
 
-                <p style="font-size: 14px; color: #6B7280; margin-top: 20px;">
-                    This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
-                </p>
-            </div>
+            subject = f"{current_user.full_name} invited you to collaborate on BoniDoc"
+        else:
+            # User IS registered - send standard acceptance email
+            accept_url = f"{settings.app.app_frontend_url}/delegates/accept?token={delegate.invitation_token}"
 
-            <div style="text-align: center; margin-top: 20px; padding: 20px; font-size: 12px; color: #9CA3AF;">
-                <p style="margin: 0;">BoniDoc Document Management System</p>
-                <p style="margin: 5px 0 0 0;">Professional Document Management</p>
-            </div>
-        </body>
-        </html>
-        """
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #4F46E5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">Delegate Access Invitation</h1>
+                </div>
+
+                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
+                    <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
+
+                    <p style="font-size: 16px; margin-bottom: 20px;">
+                        <strong>{current_user.full_name}</strong> ({current_user.email}) has invited you to access their document library on BoniDoc as a <strong>{invite_request.role}</strong>.
+                    </p>
+
+                    <div style="background-color: #F3F4F6; padding: 20px; border-radius: 6px; margin: 25px 0;">
+                        <p style="margin: 0 0 10px 0; font-weight: bold; color: #1F2937;">As a delegate, you will be able to:</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li style="margin: 5px 0;">View and search documents</li>
+                            <li style="margin: 5px 0;">Download documents for review</li>
+                            <li style="margin: 5px 0;">Access document metadata and categories</li>
+                        </ul>
+                        <p style="margin: 10px 0 0 0; font-weight: bold; color: #1F2937;">You will NOT be able to:</p>
+                        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                            <li style="margin: 5px 0;">Upload, edit, or delete documents</li>
+                        </ul>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{accept_url}"
+                           style="display: inline-block; background-color: #4F46E5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                            Accept Invitation
+                        </a>
+                    </div>
+
+                    <p style="font-size: 14px; color: #6B7280; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        If you cannot click the button above, copy and paste this link into your browser:<br>
+                        <a href="{accept_url}" style="color: #4F46E5; word-break: break-all;">{accept_url}</a>
+                    </p>
+
+                    <p style="font-size: 14px; color: #6B7280; margin-top: 20px;">
+                        This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
+                    </p>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px; padding: 20px; font-size: 12px; color: #9CA3AF;">
+                    <p style="margin: 0;">BoniDoc Document Management System</p>
+                    <p style="margin: 5px 0 0 0;">Professional Document Management</p>
+                </div>
+            </body>
+            </html>
+            """
+
+            subject = f"Delegate Access Invitation from {current_user.full_name}"
 
         await email_service.send_email(
             to_email=invite_request.email,
             to_name=invite_request.email,
-            subject=f"Delegate Access Invitation from {current_user.full_name}",
+            subject=subject,
             html_content=html_content
         )
-        logger.info(f"[DELEGATES API] Invitation email sent to {invite_request.email}")
+        logger.info(f"[DELEGATES API] Invitation email sent to {invite_request.email} (registered={delegate.delegate_user_id is not None})")
     except Exception as e:
         logger.error(f"[DELEGATES API] Failed to send invitation email: {e}")
         # Don't fail the request if email fails, just log it

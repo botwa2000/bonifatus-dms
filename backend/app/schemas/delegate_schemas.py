@@ -15,6 +15,7 @@ class DelegateInviteRequest(BaseModel):
     email: EmailStr = Field(..., description="Email address of the delegate to invite")
     role: str = Field(default="viewer", description="Access role (viewer, editor, owner)")
     access_expires_at: Optional[datetime] = Field(None, description="Optional access expiry date")
+    allow_unregistered: bool = Field(default=False, description="Allow inviting users who don't have a BoniDoc account yet")
 
     @validator('role')
     def validate_role(cls, v):
@@ -28,7 +29,8 @@ class DelegateInviteRequest(BaseModel):
             "example": {
                 "email": "assistant@example.com",
                 "role": "viewer",
-                "access_expires_at": None
+                "access_expires_at": None,
+                "allow_unregistered": False
             }
         }
 

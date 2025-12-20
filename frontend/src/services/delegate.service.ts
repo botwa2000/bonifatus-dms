@@ -6,6 +6,7 @@ export interface DelegateInviteRequest {
   email: string
   role: 'viewer' | 'editor' | 'owner'
   access_expires_at?: string
+  allow_unregistered?: boolean
 }
 
 export interface Delegate {
