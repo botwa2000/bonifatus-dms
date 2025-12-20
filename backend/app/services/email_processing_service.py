@@ -652,7 +652,7 @@ class EmailProcessingService:
                     processing_errors.append(f"{filename}: Duplicate - already uploaded")
                     continue  # Skip this attachment
 
-                logger.info(f"[EMAIL DEBUG] No duplicate found for {filename}, proceeding with upload")
+                logger.debug(f"[EMAIL] No duplicate found for {filename}, proceeding with upload")
 
                 # Prepare temp_data for upload service
                 temp_data = {
@@ -772,7 +772,7 @@ class EmailProcessingService:
 
         try:
             # Connect to IMAP
-            logger.info(f"[EMAIL DEBUG] Connecting to IMAP server: {self.imap_host}:{self.imap_port}")
+            logger.debug(f"[EMAIL] Connecting to IMAP server: {self.imap_host}:{self.imap_port}")
             imap = self.connect_to_imap()
             if not imap:
                 logger.error("[EMAIL DEBUG] Failed to connect to IMAP")
@@ -783,7 +783,7 @@ class EmailProcessingService:
             # Select inbox
             logger.info("[EMAIL DEBUG] Selecting INBOX folder")
             status, data = imap.select('INBOX')
-            logger.info(f"[EMAIL DEBUG] INBOX selected. Status: {status}, Messages: {data}")
+            logger.debug(f"[EMAIL] INBOX selected. Status: {status}, Messages: {data}")
 
             # Search for unread emails
             logger.info("[EMAIL DEBUG] Searching for UNSEEN emails")
@@ -793,12 +793,12 @@ class EmailProcessingService:
                 return 0
 
             email_ids = messages[0].split()
-            logger.info(f"[EMAIL DEBUG] Found {len(email_ids)} unread emails")
-            logger.info(f"[EMAIL DEBUG] Email IDs: {email_ids}")
+            logger.debug(f"[EMAIL] Found {len(email_ids)} unread emails")
+            logger.debug(f"[EMAIL] Email IDs: {email_ids}")
 
             for email_id in email_ids:
                 try:
-                    logger.info(f"[EMAIL DEBUG] Processing email ID: {email_id}")
+                    logger.debug(f"[EMAIL] Processing email ID: {email_id}")
 
                     # Fetch email
                     status, msg_data = imap.fetch(email_id, '(RFC822)')
@@ -816,7 +816,7 @@ class EmailProcessingService:
                     subject_raw = email_message.get('Subject', '')
                     message_id = email_message.get('Message-ID', '')
 
-                    logger.info(f"[EMAIL DEBUG] From: {sender_raw} | To: {recipient_raw} | Subject: {subject_raw}")
+                    logger.debug(f"[EMAIL] From: {sender_raw} | To: {recipient_raw} | Subject: {subject_raw}")
 
                     # Decode
                     recipient_email = self.extract_email_address(recipient_raw)
@@ -826,21 +826,21 @@ class EmailProcessingService:
                     logger.info(f"Processing email: {sender_email} -> {recipient_email}")
 
                     # CRITICAL FILTER: Only process @doc.bonidoc.com emails
-                    logger.info(f"[EMAIL DEBUG] Checking if {recipient_email} is doc email")
+                    logger.debug(f"[EMAIL] Checking if {recipient_email} is doc email")
                     if not self.is_doc_email(recipient_email):
                         logger.warning(f"[EMAIL DEBUG] REJECTED - Not a doc email: {recipient_email}")
                         continue
-                    logger.info(f"[EMAIL DEBUG] ✓ Passed doc email check")
+                    logger.debug(f"[EMAIL] ✓ Passed doc email check")
 
                     # Extract attachments
-                    logger.info(f"[EMAIL DEBUG] Extracting attachments")
+                    logger.debug(f"[EMAIL] Extracting attachments")
                     attachments = self.extract_attachments(email_message)
                     attachment_count = len(attachments)
                     total_size = sum(att['size'] for att in attachments)
-                    logger.info(f"[EMAIL DEBUG] Found {attachment_count} attachments, total size: {total_size} bytes")
+                    logger.debug(f"[EMAIL] Found {attachment_count} attachments, total size: {total_size} bytes")
 
                     # SECURITY GATE #1: Find user by email address
-                    logger.info(f"[EMAIL DEBUG] Looking up user by email address: {recipient_email}")
+                    logger.debug(f"[EMAIL] Looking up user by email address: {recipient_email}")
                     user = self.find_user_by_email_address(recipient_email)
                     if not user:
                         logger.error(f"[EMAIL DEBUG] REJECTED - No user found for address: {recipient_email}")
@@ -848,10 +848,10 @@ class EmailProcessingService:
                         # Delete email and continue
                         self.delete_email_from_inbox(imap, email_id)
                         continue
-                    logger.info(f"[EMAIL DEBUG] ✓ User found: {user.email} (ID: {user.id})")
+                    logger.debug(f"[EMAIL] ✓ User found: {user.email} (ID: {user.id})")
 
                     # SECURITY GATE #2 & #3: Check sender is allowed and active
-                    logger.info(f"[EMAIL DEBUG] Checking if sender {sender_email} is allowed for user {user.id}")
+                    logger.debug(f"[EMAIL] Checking if sender {sender_email} is allowed for user {user.id}")
                     is_allowed, allowed_sender = self.is_sender_allowed(str(user.id), sender_email)
                     if not is_allowed:
                         rejection_reason = f"Sender {sender_email} not in whitelist"
@@ -881,13 +881,13 @@ class EmailProcessingService:
                         # Delete email
                         self.delete_email_from_inbox(imap, email_id)
                         continue
-                    logger.info(f"[EMAIL DEBUG] ✓ Sender is whitelisted: {sender_email}")
+                    logger.debug(f"[EMAIL] ✓ Sender is whitelisted: {sender_email}")
 
                     # SECURITY GATE #4 & #5: Quota check removed (Pro tier has unlimited email processing)
                     # Future: Add quota check here for Free tier if needed
 
                     # SECURITY GATE #6: Check attachment count
-                    logger.info(f"[EMAIL DEBUG] Checking attachment count: {attachment_count}")
+                    logger.debug(f"[EMAIL] Checking attachment count: {attachment_count}")
                     if attachment_count == 0:
                         logger.error(f"[EMAIL DEBUG] REJECTED - No attachments in email from {sender_email}")
                         rejection_reason = "No attachments found in email"
@@ -912,7 +912,7 @@ class EmailProcessingService:
                         logger.error(f"[EMAIL DEBUG] Deleting email {email_id}")
                         self.delete_email_from_inbox(imap, email_id)
                         continue
-                    logger.info(f"[EMAIL DEBUG] ✓ Has {attachment_count} attachments")
+                    logger.debug(f"[EMAIL] ✓ Has {attachment_count} attachments")
 
                     if attachment_count > settings.email_processing.max_attachments_per_email:
                         rejection_reason = f"Too many attachments ({attachment_count} > {settings.email_processing.max_attachments_per_email})"
@@ -939,7 +939,7 @@ class EmailProcessingService:
                         continue
 
                     # SECURITY GATE #7: Check total size
-                    logger.info(f"[EMAIL DEBUG] Checking total size: {total_size} bytes ({total_size / 1024 / 1024:.2f}MB)")
+                    logger.debug(f"[EMAIL] Checking total size: {total_size} bytes ({total_size / 1024 / 1024:.2f}MB)")
                     max_size_bytes = settings.email_processing.max_attachment_size_mb * 1024 * 1024
                     if total_size > max_size_bytes:
                         rejection_reason = f"Attachments too large ({total_size / 1024 / 1024:.1f}MB > {settings.email_processing.max_attachment_size_mb}MB)"
@@ -965,15 +965,15 @@ class EmailProcessingService:
                         logger.error(f"[EMAIL DEBUG] Deleting email {email_id}")
                         self.delete_email_from_inbox(imap, email_id)
                         continue
-                    logger.info(f"[EMAIL DEBUG] ✓ Size check passed")
+                    logger.debug(f"[EMAIL] ✓ Size check passed")
 
                     # PASSED ALL SECURITY GATES - PROCESSING EMAIL
-                    logger.info(f"[EMAIL DEBUG] ========================================")
-                    logger.info(f"[EMAIL DEBUG] ✓✓✓ EMAIL PASSED ALL CHECKS - PROCESSING ✓✓✓")
-                    logger.info(f"[EMAIL DEBUG] ========================================")
+                    logger.debug(f"[EMAIL] ========================================")
+                    logger.debug(f"[EMAIL] ✓✓✓ EMAIL PASSED ALL CHECKS - PROCESSING ✓✓✓")
+                    logger.debug(f"[EMAIL] ========================================")
 
                     # Create processing log
-                    logger.info(f"[EMAIL DEBUG] Creating processing log")
+                    logger.debug(f"[EMAIL] Creating processing log")
                     log = self.create_processing_log(
                         user_id=str(user.id),
                         sender_email=sender_email,
@@ -987,20 +987,20 @@ class EmailProcessingService:
                     )
 
                     # Save attachments to temp storage
-                    logger.info(f"[EMAIL DEBUG] Saving {len(attachments)} attachments to temp storage")
+                    logger.debug(f"[EMAIL] Saving {len(attachments)} attachments to temp storage")
                     temp_files = []
                     filenames = []
                     for attachment in attachments:
-                        logger.info(f"[EMAIL DEBUG] Saving attachment: {attachment['filename']}")
+                        logger.debug(f"[EMAIL] Saving attachment: {attachment['filename']}")
                         filepath = self.save_attachment_to_temp(attachment)
                         if filepath:
                             temp_files.append(filepath)
                             filenames.append(attachment['filename'])
-                            logger.info(f"[EMAIL DEBUG] ✓ Saved to {filepath}")
+                            logger.debug(f"[EMAIL] ✓ Saved to {filepath}")
                         else:
                             logger.error(f"[EMAIL DEBUG] Failed to save attachment: {attachment['filename']}")
 
-                    logger.info(f"[EMAIL DEBUG] Saved {len(temp_files)} files successfully")
+                    logger.debug(f"[EMAIL] Saved {len(temp_files)} files successfully")
 
                     # Update log with filenames
                     log.attachment_filenames = json.dumps(filenames)
@@ -1008,7 +1008,7 @@ class EmailProcessingService:
                     self.db.commit()
 
                     # Process attachments: scan, analyze, upload
-                    logger.info(f"[EMAIL DEBUG] Starting attachment processing (scan, analyze, upload)")
+                    logger.debug(f"[EMAIL] Starting attachment processing (scan, analyze, upload)")
                     documents_created, uploaded_document_ids, processing_errors, malware_detected = await self.process_attachments(
                         temp_files=temp_files,
                         filenames=filenames,
@@ -1018,11 +1018,11 @@ class EmailProcessingService:
                         email_id=email_id
                     )
 
-                    logger.info(f"[EMAIL DEBUG] Processing complete. Results:")
-                    logger.info(f"[EMAIL DEBUG]   - Documents created: {documents_created}")
-                    logger.info(f"[EMAIL DEBUG]   - Document IDs: {uploaded_document_ids}")
-                    logger.info(f"[EMAIL DEBUG]   - Malware detected: {malware_detected}")
-                    logger.info(f"[EMAIL DEBUG]   - Processing errors: {processing_errors}")
+                    logger.debug(f"[EMAIL] Processing complete. Results:")
+                    logger.debug(f"[EMAIL]   - Documents created: {documents_created}")
+                    logger.debug(f"[EMAIL]   - Document IDs: {uploaded_document_ids}")
+                    logger.debug(f"[EMAIL]   - Malware detected: {malware_detected}")
+                    logger.debug(f"[EMAIL]   - Processing errors: {processing_errors}")
 
                     # Handle malware detection
                     if malware_detected:
@@ -1070,9 +1070,9 @@ class EmailProcessingService:
                         continue
 
                     # SUCCESS! Email passed all checks and documents created
-                    logger.info(f"[EMAIL DEBUG] ========================================")
-                    logger.info(f"[EMAIL DEBUG] ✓✓✓ SUCCESS - {documents_created} DOCUMENTS CREATED ✓✓✓")
-                    logger.info(f"[EMAIL DEBUG] ========================================")
+                    logger.debug(f"[EMAIL] ========================================")
+                    logger.debug(f"[EMAIL] ✓✓✓ SUCCESS - {documents_created} DOCUMENTS CREATED ✓✓✓")
+                    logger.debug(f"[EMAIL] ========================================")
 
                     # Update log with document IDs
                     log.processing_metadata = json.dumps({
@@ -1081,12 +1081,12 @@ class EmailProcessingService:
                     })
 
                     # Update usage
-                    logger.info(f"[EMAIL DEBUG] Updating monthly usage for user {user.id}")
+                    logger.debug(f"[EMAIL] Updating monthly usage for user {user.id}")
                     self.increment_monthly_usage(str(user.id), documents_created)
 
                     # Update allowed sender stats
                     if allowed_sender:
-                        logger.info(f"[EMAIL DEBUG] Updating sender stats for {sender_email}")
+                        logger.debug(f"[EMAIL] Updating sender stats for {sender_email}")
                         self.update_allowed_sender_stats(allowed_sender)
 
                     # Update log
@@ -1095,22 +1095,22 @@ class EmailProcessingService:
                     log.processing_completed_at = datetime.utcnow()
                     log.processing_time_ms = int((log.processing_completed_at - log.processing_started_at).total_seconds() * 1000)
                     self.db.commit()
-                    logger.info(f"[EMAIL DEBUG] Processing log updated to 'completed'")
+                    logger.debug(f"[EMAIL] Processing log updated to 'completed'")
 
                     # Send completion notification
-                    logger.info(f"[EMAIL DEBUG] Sending completion notification to {user.email}")
+                    logger.debug(f"[EMAIL] Sending completion notification to {user.email}")
                     await self.send_completion_notification(
                         user.email, sender_email, subject, documents_created
                     )
 
                     # CRITICAL CLEANUP: Delete email and temp files
-                    logger.info(f"[EMAIL DEBUG] Cleaning up temp files and deleting email {email_id}")
+                    logger.debug(f"[EMAIL] Cleaning up temp files and deleting email {email_id}")
                     self.cleanup_temp_files(temp_files)
                     self.delete_email_from_inbox(imap, email_id)
-                    logger.info(f"[EMAIL DEBUG] ✓ Cleanup complete")
+                    logger.debug(f"[EMAIL] ✓ Cleanup complete")
 
                     processed_count += 1
-                    logger.info(f"[EMAIL DEBUG] Email processing complete! Total processed in this batch: {processed_count}")
+                    logger.debug(f"[EMAIL] Email processing complete! Total processed in this batch: {processed_count}")
                     logger.info(f"Successfully processed email from {sender_email}: {documents_created} documents created")
 
                 except Exception as e:

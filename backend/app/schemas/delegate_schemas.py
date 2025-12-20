@@ -35,9 +35,9 @@ class DelegateInviteRequest(BaseModel):
 
 class DelegateResponse(BaseModel):
     """Response model for delegate information"""
-    id: str = Field(..., description="Delegate ID")
-    owner_user_id: str = Field(..., description="Owner user ID")
-    delegate_user_id: Optional[str] = Field(None, description="Delegate user ID (null if not accepted)")
+    id: UUID = Field(..., description="Delegate ID")
+    owner_user_id: UUID = Field(..., description="Owner user ID")
+    delegate_user_id: Optional[UUID] = Field(None, description="Delegate user ID (null if not accepted)")
     delegate_email: str = Field(..., description="Delegate email address")
     role: str = Field(..., description="Access role")
     status: str = Field(..., description="Invitation status (pending, active, revoked)")
@@ -52,6 +52,9 @@ class DelegateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            UUID: str  # Serialize UUIDs as strings in JSON response
+        }
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -88,8 +91,8 @@ class DelegateListResponse(BaseModel):
 
 class GrantedAccessResponse(BaseModel):
     """Response model for owners who granted access to the current user"""
-    id: str = Field(..., description="Delegate ID")
-    owner_user_id: str = Field(..., description="Owner user ID")
+    id: UUID = Field(..., description="Delegate ID")
+    owner_user_id: UUID = Field(..., description="Owner user ID")
     owner_email: str = Field(..., description="Owner email address")
     owner_name: str = Field(..., description="Owner full name")
     role: str = Field(..., description="Access role granted")
@@ -100,6 +103,9 @@ class GrantedAccessResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            UUID: str  # Serialize UUIDs as strings in JSON response
+        }
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -151,11 +157,11 @@ class AcceptInvitationResponse(BaseModel):
 
 class DelegateAccessLogResponse(BaseModel):
     """Response model for delegate access log entry"""
-    id: str = Field(..., description="Log entry ID")
-    delegate_user_id: str = Field(..., description="Delegate user ID")
+    id: UUID = Field(..., description="Log entry ID")
+    delegate_user_id: UUID = Field(..., description="Delegate user ID")
     delegate_email: str = Field(..., description="Delegate email")
     delegate_name: str = Field(..., description="Delegate full name")
-    document_id: str = Field(..., description="Document ID")
+    document_id: UUID = Field(..., description="Document ID")
     document_title: str = Field(..., description="Document title")
     action: str = Field(..., description="Action performed (view, download, search)")
     accessed_at: datetime = Field(..., description="When the action was performed")
@@ -163,6 +169,9 @@ class DelegateAccessLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            UUID: str  # Serialize UUIDs as strings in JSON response
+        }
         json_schema_extra = {
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",

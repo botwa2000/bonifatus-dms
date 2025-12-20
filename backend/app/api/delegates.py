@@ -85,8 +85,7 @@ async def invite_delegate(
 
     # Send invitation email
     try:
-        frontend_url = settings.frontend_url or "https://bonidoc.com"
-        accept_url = f"{frontend_url}/delegates/accept?token={delegate.invitation_token}"
+        accept_url = f"{settings.app.app_frontend_url}/delegates/accept?token={delegate.invitation_token}"
 
         html_content = f"""
         <!DOCTYPE html>
