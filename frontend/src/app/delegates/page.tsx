@@ -366,7 +366,7 @@ export default function DelegatesPage() {
             </Button>
             <Button
               variant="primary"
-              onClick={handleInviteDelegate}
+              onClick={() => handleInviteDelegate()}
               disabled={isInviting || !inviteEmail.trim()}
             >
               {isInviting ? 'Sending...' : 'Send Invitation'}
