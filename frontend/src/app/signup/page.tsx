@@ -12,6 +12,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
+import { logger } from '@/lib/logger'
 
 function SignupContent() {
   const router = useRouter()
@@ -62,7 +63,7 @@ function SignupContent() {
         setPasswordStrength(data)
       }
     } catch (error) {
-      console.error('Password strength check failed:', error)
+      logger.error('Password strength check failed:', error)
     }
   }
 
@@ -113,7 +114,7 @@ function SignupContent() {
         setError(data.message || 'Registration failed. Please try again.')
       }
     } catch (error) {
-      console.error('Registration error:', error)
+      logger.error('Registration error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -155,7 +156,7 @@ function SignupContent() {
           <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">You&apos;ve selected</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">You've selected</p>
                 <p className="text-lg font-semibold text-neutral-900 dark:text-white">
                   {tierName} Plan
                   {billingCycle === 'yearly' && <span className="text-sm text-admin-primary ml-2">(Save 20%)</span>}

@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import * as CookieConsent from 'vanilla-cookieconsent';
+import { logger } from '@/lib/logger'
 import 'vanilla-cookieconsent/dist/cookieconsent.css';
 
 interface CookieConsentProps {
@@ -20,7 +21,7 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
         const response = await fetch(`${apiUrl}/api/v1/settings/cookie-consent?language=${language}`);
 
         if (!response.ok) {
-          console.error('Failed to fetch cookie consent config');
+          logger.error('Failed to fetch cookie consent config');
           return;
         }
 
@@ -167,7 +168,7 @@ export default function CookieConsentBanner({ language = 'en' }: CookieConsentPr
 
         setIsLoaded(true);
       } catch (error) {
-        console.error('Error initializing cookie consent:', error);
+        logger.error('Error initializing cookie consent:', error);
       }
     };
 

@@ -15,6 +15,7 @@ import { CategoryStatsCard } from '@/components/categories/CategoryStatsCard'
 import { CategoryForm } from '@/components/categories/CategoryForm'
 import { CategoryCard } from '@/components/categories/CategoryCard'
 import AppHeader from '@/components/AppHeader'
+import { logger } from '@/lib/logger'
 
 type ViewMode = 'list' | 'grid'
 type SortField = 'name' | 'documents' | 'updated' | 'created'
@@ -85,7 +86,7 @@ export default function CategoriesPage() {
       setCategories(data.categories)
     } catch (err) {
       setError('Failed to load categories. Please try again.')
-      console.error('Load categories error:', err)
+      logger.error('Load categories error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -97,7 +98,7 @@ export default function CategoriesPage() {
       setShowCreateModal(false)
       await loadCategories()
     } catch (err) {
-      console.error('Create category error:', err)
+      logger.error('Create category error:', err)
       const error = err as { response?: { data?: { detail?: string } }; message?: string }
       const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to create category'
       setError(errorMessage)
@@ -111,7 +112,7 @@ export default function CategoriesPage() {
       setEditingCategory(null)
       await loadCategories()
     } catch (err) {
-      console.error('Update category error:', err)
+      logger.error('Update category error:', err)
       const error = err as { response?: { data?: { detail?: string } }; message?: string }
       const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update category'
       setError(errorMessage)
@@ -125,7 +126,7 @@ export default function CategoriesPage() {
       setDeletingCategory(null)
       await loadCategories()
     } catch (err) {
-      console.error('Delete category error:', err)
+      logger.error('Delete category error:', err)
       const error = err as { response?: { data?: { detail?: string } }; message?: string }
       const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to delete category'
       setError(errorMessage)

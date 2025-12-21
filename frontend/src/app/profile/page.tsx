@@ -10,6 +10,7 @@ import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Input, Select, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge, UsageMetric } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import CancellationModal from '@/components/CancellationModal'
+import { logger } from '@/lib/logger'
 
 interface UserProfile {
   id: string
@@ -166,7 +167,7 @@ export default function ProfilePage() {
       setStatistics(statsData)
       setFullName(profileData.full_name)
     } catch (error) {
-      console.error('Failed to load profile:', error)
+      logger.error('Failed to load profile:', error)
       setMessage({ type: 'error', text: 'Failed to load profile data' })
     }
   }
@@ -242,7 +243,7 @@ export default function ProfilePage() {
       setConfirmPassword('')
       await loadProfileData()
     } catch (error: unknown) {
-      console.error('Failed to update profile:', error)
+      logger.error('Failed to update profile:', error)
       const errorMessage = error && typeof error === 'object' && 'response' in error
         ? ((error as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to update profile')
         : 'Failed to update profile'
@@ -278,7 +279,7 @@ export default function ProfilePage() {
         window.location.href = '/'
       }, 2000)
     } catch (error) {
-      console.error('Failed to delete account:', error)
+      logger.error('Failed to delete account:', error)
       setMessage({ type: 'error', text: 'Failed to deactivate account' })
       setDeleting(false)
     }
@@ -298,7 +299,7 @@ export default function ProfilePage() {
         setBillingCycle(subData.billing_cycle as 'monthly' | 'yearly')
       }
     } catch (error) {
-      console.error('Failed to load subscription:', error)
+      logger.error('Failed to load subscription:', error)
     } finally {
       setLoadingSubscription(false)
     }
@@ -347,7 +348,7 @@ export default function ProfilePage() {
         window.location.href = response.checkout_url
       }
     } catch (error) {
-      console.error('Failed to upgrade subscription:', error)
+      logger.error('Failed to upgrade subscription:', error)
       setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' })
     } finally {
       setProcessingSubscription(false)
@@ -375,7 +376,7 @@ export default function ProfilePage() {
       // Redirect to Stripe Customer Portal
       window.location.href = response.url
     } catch (error) {
-      console.error('Failed to open payment portal:', error)
+      logger.error('Failed to open payment portal:', error)
       setMessage({ type: 'error', text: 'Failed to open payment management portal' })
       setProcessingSubscription(false)
     }
@@ -844,7 +845,7 @@ export default function ProfilePage() {
                                   setShowBillingChangeModal(true)
                                 }
                               } catch (error) {
-                                console.error('Failed to preview billing cycle change:', error)
+                                logger.error('Failed to preview billing cycle change:', error)
                                 setMessage({
                                   type: 'error',
                                   text: 'Failed to load billing cycle change preview. Please try again.'
@@ -1198,7 +1199,7 @@ export default function ProfilePage() {
                   await loadSubscriptionData()
                 }
               } catch (error) {
-                console.error('Failed to schedule billing cycle change:', error)
+                logger.error('Failed to schedule billing cycle change:', error)
                 setMessage({
                   type: 'error',
                   text: 'Failed to schedule billing cycle change. Please try again.'

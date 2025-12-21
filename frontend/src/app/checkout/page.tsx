@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { apiClient } from '@/services/api-client'
 import { useCurrency } from '@/contexts/currency-context'
+import { logger } from '@/lib/logger'
 
 function CheckoutContent() {
   const searchParams = useSearchParams()
@@ -57,7 +58,7 @@ function CheckoutContent() {
           throw new Error('No checkout URL received')
         }
       } catch (err) {
-        console.error('Checkout error:', err)
+        logger.error('Checkout error:', err)
         const errorMessage = (err as {response?: {data?: {detail?: string}}})?.response?.data?.detail || 'Failed to initialize checkout'
         setError(errorMessage)
 

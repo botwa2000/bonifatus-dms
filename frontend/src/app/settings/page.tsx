@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { Card, CardHeader, CardContent, Button, Select, Alert, Input, Badge, Modal, ModalHeader, ModalContent, ModalFooter } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
-import { shouldLog } from '@/config/app.config'
+import { logger } from '@/lib/logger'
 import { delegateService, type Delegate, type GrantedAccess, type PendingInvitation } from '@/services/delegate.service'
 import type { BadgeVariant } from '@/components/ui'
 
@@ -86,7 +86,7 @@ export default function SettingsPage() {
   }, [])
 
   const loadSettings = async () => {
-    if (shouldLog('debug')) console.log('[SETTINGS DEBUG] === Loading Settings Page ===')
+    logger.debug('[SETTINGS DEBUG] === Loading Settings Page ===')
 
     try {
       const [prefsData, sysData, driveData] = await Promise.all([
@@ -95,21 +95,19 @@ export default function SettingsPage() {
         apiClient.get<DriveStatus>('/api/v1/users/drive/status', true)
       ])
 
-      if (shouldLog('debug')) {
-        console.log('[SETTINGS DEBUG] === User Preferences Loaded from DB ===')
-        console.log('[SETTINGS DEBUG] Language:', prefsData.language)
-        console.log('[SETTINGS DEBUG] Preferred Doc Languages:', prefsData.preferred_doc_languages)
-        console.log('[SETTINGS DEBUG] Timezone:', prefsData.timezone)
-        console.log('[SETTINGS DEBUG] Theme:', prefsData.theme || '(not set, using default)')
-        console.log('[SETTINGS DEBUG] Notifications Enabled:', prefsData.notifications_enabled)
-        console.log('[SETTINGS DEBUG] Auto Categorization:', prefsData.auto_categorization)
+      logger.debug('[SETTINGS DEBUG] === User Preferences Loaded from DB ===')
+      logger.debug('[SETTINGS DEBUG] Language:', prefsData.language)
+      logger.debug('[SETTINGS DEBUG] Preferred Doc Languages:', prefsData.preferred_doc_languages)
+      logger.debug('[SETTINGS DEBUG] Timezone:', prefsData.timezone)
+      logger.debug('[SETTINGS DEBUG] Theme:', prefsData.theme || '(not set, using default)')
+      logger.debug('[SETTINGS DEBUG] Notifications Enabled:', prefsData.notifications_enabled)
+      logger.debug('[SETTINGS DEBUG] Auto Categorization:', prefsData.auto_categorization)
 
-        console.log('[SETTINGS DEBUG] === System Settings ===')
-        console.log('[SETTINGS DEBUG] Available Languages:', sysData.settings.available_languages)
-        console.log('[SETTINGS DEBUG] Available Themes:', sysData.settings.available_themes)
-        console.log('[SETTINGS DEBUG] Default Theme:', sysData.settings.default_theme)
-        console.log('[SETTINGS DEBUG] Default Language:', sysData.settings.default_language)
-      }
+      logger.debug('[SETTINGS DEBUG] === System Settings ===')
+      logger.debug('[SETTINGS DEBUG] Available Languages:', sysData.settings.available_languages)
+      logger.debug('[SETTINGS DEBUG] Available Themes:', sysData.settings.available_themes)
+      logger.debug('[SETTINGS DEBUG] Default Theme:', sysData.settings.default_theme)
+      logger.debug('[SETTINGS DEBUG] Default Language:', sysData.settings.default_language)
 
       setPreferences(prefsData)
       setSystemSettings(sysData.settings)
@@ -124,7 +122,7 @@ export default function SettingsPage() {
       await loadSharedWithMe()
     } catch {
       // Error already logged by API client, just show user message
-      if (shouldLog('debug')) console.log('[SETTINGS DEBUG] ❌ Failed to load settings')
+      logger.debug('[SETTINGS DEBUG] ❌ Failed to load settings')
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
     }
   }
@@ -135,7 +133,7 @@ export default function SettingsPage() {
       const response = await delegateService.listMyDelegates()
       setDelegates(response.delegates)
     } catch (error) {
-      console.error('Failed to load delegates:', error)
+      logger.error('Failed to load delegates:', error)
     } finally {
       setDelegatesLoading(false)
     }
@@ -151,7 +149,7 @@ export default function SettingsPage() {
       setPendingInvitations(pendingResponse.invitations)
       setGrantedAccess(grantedResponse.granted_access)
     } catch (error) {
-      console.error('Failed to load shared access:', error)
+      logger.error('Failed to load shared access:', error)
     } finally {
       setSharedLoading(false)
     }
@@ -178,6 +176,10 @@ export default function SettingsPage() {
       setShowInviteModal(false)
       await loadDelegates()
     } catch (err: unknown) {
+      logger.debug('[DELEGATE] Caught error:', err)
+      logger.debug('[DELEGATE] Error type:', typeof err)
+      logger.debug('[DELEGATE] Error keys:', err ? Object.keys(err as object) : 'null')
+
       const error = err as {
         status?: number
         error?: {
@@ -192,8 +194,14 @@ export default function SettingsPage() {
 
       // Check if this is a USER_NOT_REGISTERED error (409 Conflict)
       const status = error?.status || error?.response?.status
+      logger.debug('[DELEGATE] Extracted status:', status)
       if (status === 409) {
-        const detail = error?.error?.detail || error?.response?.data?.detail
+        // Try multiple paths to get the detail object
+        let detail = error?.response?.data?.detail || error?.error?.detail || error?.response?.data
+
+        logger.debug('[DELEGATE DEBUG] 409 error detail:', detail)
+        logger.debug('[DELEGATE DEBUG] Full error:', error)
+
         if (typeof detail === 'object' && detail?.code === 'USER_NOT_REGISTERED') {
           // Show confirmation dialog
           const confirmed = window.confirm(
@@ -204,6 +212,10 @@ export default function SettingsPage() {
           if (confirmed) {
             // Retry with allow_unregistered flag
             await handleInviteDelegate(true)
+            return
+          } else {
+            // User cancelled, clear the error message
+            setMessage(null)
             return
           }
         }
@@ -290,18 +302,16 @@ export default function SettingsPage() {
       preferred_doc_languages: systemSettings.available_languages
     }
 
-    if (shouldLog('debug')) {
-      console.log('[SETTINGS DEBUG] === Save Button Clicked ===')
-      console.log('[SETTINGS DEBUG] Saving preferences to backend...')
-      console.log('[SETTINGS DEBUG] Components being saved:')
-      console.log('[SETTINGS DEBUG]   - Language:', preferencesWithAllLanguages.language)
-      console.log('[SETTINGS DEBUG]   - Preferred Doc Languages (all):', preferencesWithAllLanguages.preferred_doc_languages)
-      console.log('[SETTINGS DEBUG]   - Timezone:', preferencesWithAllLanguages.timezone)
-      console.log('[SETTINGS DEBUG]   - Theme:', preferencesWithAllLanguages.theme)
-      console.log('[SETTINGS DEBUG]   - Notifications Enabled:', preferencesWithAllLanguages.notifications_enabled)
-      console.log('[SETTINGS DEBUG]   - Auto Categorization:', preferencesWithAllLanguages.auto_categorization)
-      console.log('[SETTINGS DEBUG] Endpoint: PUT /api/v1/users/preferences')
-    }
+    logger.debug('[SETTINGS DEBUG] === Save Button Clicked ===')
+    logger.debug('[SETTINGS DEBUG] Saving preferences to backend...')
+    logger.debug('[SETTINGS DEBUG] Components being saved:')
+    logger.debug('[SETTINGS DEBUG]   - Language:', preferencesWithAllLanguages.language)
+    logger.debug('[SETTINGS DEBUG]   - Preferred Doc Languages (all):', preferencesWithAllLanguages.preferred_doc_languages)
+    logger.debug('[SETTINGS DEBUG]   - Timezone:', preferencesWithAllLanguages.timezone)
+    logger.debug('[SETTINGS DEBUG]   - Theme:', preferencesWithAllLanguages.theme)
+    logger.debug('[SETTINGS DEBUG]   - Notifications Enabled:', preferencesWithAllLanguages.notifications_enabled)
+    logger.debug('[SETTINGS DEBUG]   - Auto Categorization:', preferencesWithAllLanguages.auto_categorization)
+    logger.debug('[SETTINGS DEBUG] Endpoint: PUT /api/v1/users/preferences')
 
     setSaving(true)
     setMessage(null)
@@ -311,15 +321,13 @@ export default function SettingsPage() {
     try {
       await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
 
-      if (shouldLog('debug')) {
-        console.log('[SETTINGS DEBUG] ✅ Preferences saved successfully to database')
-        console.log('[SETTINGS DEBUG] Theme was saved as:', preferences.theme)
-      }
+      logger.debug('[SETTINGS DEBUG] ✅ Preferences saved successfully to database')
+      logger.debug('[SETTINGS DEBUG] Theme was saved as:', preferences.theme)
 
       setMessage({ type: 'success', text: 'Settings saved successfully' })
 
       if (preferences.language !== oldLanguage) {
-        if (shouldLog('debug')) console.log('[SETTINGS DEBUG] Language changed, reloading page...')
+        logger.debug('[SETTINGS DEBUG] Language changed, reloading page...')
         setMessage({ type: 'success', text: 'Settings saved. Reloading to apply language changes...' })
         setTimeout(() => {
           window.location.href = '/dashboard'
@@ -327,10 +335,8 @@ export default function SettingsPage() {
       }
     } catch (error) {
       // Error already logged by API client
-      if (shouldLog('debug')) {
-        console.log('[SETTINGS DEBUG] ❌ Failed to save preferences')
-        console.error('[SETTINGS DEBUG] Error:', error)
-      }
+      logger.debug('[SETTINGS DEBUG] ❌ Failed to save preferences')
+      logger.error('[SETTINGS DEBUG] Error:', error)
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
     } finally {
       setSaving(false)
@@ -338,11 +344,9 @@ export default function SettingsPage() {
   }
 
   const handleThemeChange = (newTheme: string) => {
-    if (shouldLog('debug')) {
-      console.log('[SETTINGS DEBUG] === Theme Changed in UI ===')
-      console.log('[SETTINGS DEBUG] New theme selected:', newTheme)
-      console.log('[SETTINGS DEBUG] Note: Theme will be saved to DB when "Save Changes" is clicked')
-    }
+    logger.debug('[SETTINGS DEBUG] === Theme Changed in UI ===')
+    logger.debug('[SETTINGS DEBUG] New theme selected:', newTheme)
+    logger.debug('[SETTINGS DEBUG] Note: Theme will be saved to DB when "Save Changes" is clicked')
 
     setPreferences({ ...preferences!, theme: newTheme })
     if (mounted && typeof window !== 'undefined') {
@@ -351,10 +355,8 @@ export default function SettingsPage() {
       root.classList.remove('light', 'dark')
       root.classList.add(newTheme)
 
-      if (shouldLog('debug')) {
-        console.log('[SETTINGS DEBUG] Applied theme to DOM immediately for preview')
-        console.log('[SETTINGS DEBUG] Saved theme to localStorage for persistence')
-      }
+      logger.debug('[SETTINGS DEBUG] Applied theme to DOM immediately for preview')
+      logger.debug('[SETTINGS DEBUG] Saved theme to localStorage for persistence')
     }
   }
 
@@ -389,7 +391,7 @@ export default function SettingsPage() {
       // Redirect directly to Google (no backend redirect)
       window.location.href = oauthUrl
     } catch (error) {
-      console.error('Drive OAuth initialization failed:', error)
+      logger.error('Drive OAuth initialization failed:', error)
       setMessage({ type: 'error', text: 'Failed to initiate Drive connection' })
       setDriveLoading(false)
     }
@@ -426,18 +428,18 @@ export default function SettingsPage() {
     setMessage(null)
 
     try {
-      console.log('[CATEGORY RESET] Resetting categories to defaults...')
+      logger.debug('[CATEGORY RESET] Resetting categories to defaults...')
       const response = await apiClient.post<{ message: string, created: string[], skipped: string[] }>(
         '/api/v1/categories/restore-defaults',
         {},
         true
       )
-      console.log('[CATEGORY RESET] ✅ Reset successful:', response)
-      console.log(`[CATEGORY RESET] Created categories: ${response.created.join(', ')}`)
-      console.log(`[CATEGORY RESET] Message: ${response.message}`)
+      logger.debug('[CATEGORY RESET] ✅ Reset successful:', response)
+      logger.debug(`[CATEGORY RESET] Created categories: ${response.created.join(', ')}`)
+      logger.debug(`[CATEGORY RESET] Message: ${response.message}`)
       setMessage({ type: 'success', text: response.message })
     } catch (error) {
-      console.error('[CATEGORY RESET] ❌ Reset failed:', error)
+      logger.error('[CATEGORY RESET] ❌ Reset failed:', error)
       setMessage({ type: 'error', text: 'Failed to reset categories. Please try again.' })
     } finally {
       setResettingCategories(false)

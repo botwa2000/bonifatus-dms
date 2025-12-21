@@ -36,7 +36,7 @@ export const pageview = (url: string) => {
   if (!analyticsEnabled || !GA_MEASUREMENT_ID) return
 
   if (!isProduction) {
-    console.log('[Analytics DEV] Pageview:', url)
+    logger.debug('[Analytics DEV] Pageview:', url)
   }
 
   window.gtag?.('config', GA_MEASUREMENT_ID, {
@@ -53,7 +53,7 @@ export const event = ({ action, category, label, value }: {
   if (!analyticsEnabled || !GA_MEASUREMENT_ID) return
 
   if (!isProduction) {
-    console.log('[Analytics DEV] Event:', { action, category, label, value })
+    logger.debug('[Analytics DEV] Event:', { action, category, label, value })
   }
 
   window.gtag?.('event', action, {

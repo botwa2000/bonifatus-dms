@@ -14,6 +14,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { apiClient } from '@/services/api-client'
+import { logger } from '@/lib/logger'
 
 interface EmailTemplate {
   id: string
@@ -97,7 +98,7 @@ export default function EmailTemplatesAdmin() {
       const data = await apiClient.get<{ templates: EmailTemplate[] }>('/api/v1/admin/email-templates')
       setTemplates(data.templates || [])
     } catch (error) {
-      console.error('Error loading templates:', error)
+      logger.error('Error loading templates:', error)
       setMessage({ type: 'error', text: 'Error loading email templates' })
     } finally {
       setLoading(false)
@@ -132,7 +133,7 @@ export default function EmailTemplatesAdmin() {
       setSelectedTemplate(null)
       await loadTemplates()
     } catch (error: unknown) {
-      console.error('Error saving template:', error)
+      logger.error('Error saving template:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error saving template'
       setMessage({ type: 'error', text: errorMessage })
     } finally {

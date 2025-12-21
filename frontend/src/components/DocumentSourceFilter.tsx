@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { delegateService, GrantedAccess } from '@/services/delegate.service'
+import { logger } from '@/lib/logger'
 
 interface DocumentSourceFilterProps {
   onFilterChange: (includeOwn: boolean, sharedOwnerIds: string[]) => void
@@ -24,7 +25,7 @@ export default function DocumentSourceFilter({ onFilterChange }: DocumentSourceF
       const response = await delegateService.listGrantedAccess()
       setGrantedAccess(response.granted_access)
     } catch (error) {
-      console.error('Failed to load granted access:', error)
+      logger.error('Failed to load granted access:', error)
     } finally {
       setLoading(false)
     }

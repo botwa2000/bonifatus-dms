@@ -9,6 +9,7 @@ import { apiClient } from '@/services/api-client'
 import AppHeader from '@/components/AppHeader'
 import { Badge, Button, Alert } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
+import { logger } from '@/lib/logger'
 
 interface Category {
   id: string
@@ -100,23 +101,23 @@ export default function DocumentDetailPage() {
         true
       )
 
-      console.log('[DOCUMENT DETAIL] Loaded document:', data)
-      console.log('[DOCUMENT DETAIL] category_id:', data.category_id)
-      console.log('[DOCUMENT DETAIL] category_name:', data.category_name)
+      logger.debug('[DOCUMENT DETAIL] Loaded document:', data)
+      logger.debug('[DOCUMENT DETAIL] category_id:', data.category_id)
+      logger.debug('[DOCUMENT DETAIL] category_name:', data.category_name)
 
       // DEBUG: Log entities received from API
       if (data.entities) {
-        console.log('[DOCUMENT DETAIL] ✓ Entities received from API:', data.entities.length, 'total')
+        logger.debug('[DOCUMENT DETAIL] ✓ Entities received from API:', data.entities.length, 'total')
         const entityByType: Record<string, Entity[]> = {}
         data.entities.forEach((e: Entity) => {
           if (!entityByType[e.type]) entityByType[e.type] = []
           entityByType[e.type].push(e)
         })
         Object.entries(entityByType).forEach(([type, entities]) => {
-          console.log(`  - ${type}: ${entities.length} entities`, entities.map((e: Entity) => `${e.value} (${e.confidence})`))
+          logger.debug(`  - ${type}: ${entities.length} entities`, entities.map((e: Entity) => `${e.value} (${e.confidence})`))
         })
       } else {
-        console.log('[DOCUMENT DETAIL] ❌ No entities received from API')
+        logger.debug('[DOCUMENT DETAIL] ❌ No entities received from API')
       }
 
       setDocument(data)
@@ -140,7 +141,7 @@ export default function DocumentDetailPage() {
       setEditedEntities(data.entities || [])
     } catch (err) {
       setError('Failed to load document')
-      console.error('Load document error:', err)
+      logger.error('Load document error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -151,7 +152,7 @@ export default function DocumentDetailPage() {
       const data = await apiClient.get<{ categories: Category[] }>('/api/v1/categories', true)
       setCategories(data.categories)
     } catch (err) {
-      console.error('Failed to load categories:', err)
+      logger.error('Failed to load categories:', err)
     }
   }
 
@@ -189,7 +190,7 @@ export default function DocumentDetailPage() {
       await loadDocument()
     } catch (err) {
       setError('Failed to update categories')
-      console.error(err)
+      logger.error(err)
     } finally {
       setIsSaving(false)
     }
@@ -213,7 +214,7 @@ export default function DocumentDetailPage() {
       await loadDocument()
     } catch (err) {
       setError('Failed to update keywords')
-      console.error(err)
+      logger.error(err)
     } finally {
       setIsSaving(false)
     }
@@ -248,7 +249,7 @@ export default function DocumentDetailPage() {
       await loadDocument()
     } catch (err) {
       setError('Failed to update entities')
-      console.error(err)
+      logger.error(err)
     } finally {
       setIsSaving(false)
     }
@@ -284,7 +285,7 @@ export default function DocumentDetailPage() {
       router.push('/documents')
     } catch (err) {
       setError('Failed to delete document')
-      console.error(err)
+      logger.error(err)
       setDeletingDocument(false)
     }
   }
@@ -776,10 +777,10 @@ export default function DocumentDetailPage() {
                     }, {} as Record<string, Entity[]>) || {}
 
                     // DEBUG: Log what's being rendered
-                    console.log('[DOCUMENT DETAIL] 🎨 Rendering entities to UI:')
-                    console.log('  - entityGroups:', Object.keys(entityGroups))
+                    logger.debug('[DOCUMENT DETAIL] 🎨 Rendering entities to UI:')
+                    logger.debug('  - entityGroups:', Object.keys(entityGroups))
                     Object.entries(entityGroups).forEach(([type, entities]) => {
-                      console.log(`  - Rendering ${type}: ${entities.length} entities`, entities.map(e => e.value))
+                      logger.debug(`  - Rendering ${type}: ${entities.length} entities`, entities.map(e => e.value))
                     })
 
                     // Entity type display configuration

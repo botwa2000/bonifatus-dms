@@ -11,6 +11,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
+import { logger } from '@/lib/logger'
 
 export default function LoginPageContent() {
   const router = useRouter()
@@ -69,7 +70,7 @@ export default function LoginPageContent() {
         setError(data.message || 'Login failed. Please try again.')
       }
     } catch (error) {
-      console.error('Login error:', error)
+      logger.error('Login error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -95,7 +96,7 @@ export default function LoginPageContent() {
             </Link>
 
             <div className="text-sm text-neutral-600 dark:text-neutral-400">
-              Don&apos;t have an account?{' '}
+              Don't have an account?{' '}
               <Link href="/signup" className="text-admin-primary hover:text-admin-primary-dark font-medium">
                 Sign up
               </Link>

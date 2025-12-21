@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { delegateService, type GrantedAccess } from '@/services/delegate.service'
 import { useAuth } from './auth-context'
+import { logger } from '@/lib/logger'
 
 interface DelegateContextType {
   actingAsUserId: string | null
@@ -35,7 +36,7 @@ export function DelegateProvider({ children }: { children: React.ReactNode }) {
       const response = await delegateService.listGrantedAccess()
       setGrantedAccess(response.granted_access)
     } catch (error) {
-      console.error('Failed to load granted access:', error)
+      logger.error('Failed to load granted access:', error)
       setGrantedAccess([])
     } finally {
       setIsLoadingAccess(false)

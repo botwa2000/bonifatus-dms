@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui'
 import { categoryService } from '@/services/category.service'
 import type { CategoryKeyword, KeywordOverlap } from '@/services/category.service'
+import { logger } from '@/lib/logger'
 
 interface KeywordsManagerProps {
   categoryId: string
@@ -29,14 +30,14 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
   const loadKeywords = async () => {
     try {
       setLoading(true)
-      console.log('[KeywordsManager DEBUG] Loading keywords:', {
+      logger.debug('[KeywordsManager DEBUG] Loading keywords:', {
         categoryId,
         languageCode,
         languageCodeType: typeof languageCode,
         isUndefined: languageCode === undefined
       })
       const data = await categoryService.getKeywords(categoryId, languageCode)
-      console.log('[KeywordsManager DEBUG] Received keywords:', {
+      logger.debug('[KeywordsManager DEBUG] Received keywords:', {
         count: data.keywords.length,
         languages: [...new Set(data.keywords.map(k => k.language_code))],
         sample: data.keywords.slice(0, 3).map(k => ({ keyword: k.keyword, lang: k.language_code }))
@@ -44,7 +45,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
       setKeywords(data.keywords)
       setError(null)
     } catch (err) {
-      console.error('[KeywordsManager DEBUG] Failed to load keywords:', err)
+      logger.error('[KeywordsManager DEBUG] Failed to load keywords:', err)
       setError('Failed to load keywords')
     } finally {
       setLoading(false)
@@ -58,7 +59,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
         o.categories.some(c => c.category_id === categoryId)
       ))
     } catch (err) {
-      console.error('Failed to load overlaps:', err)
+      logger.error('Failed to load overlaps:', err)
     }
   }
 

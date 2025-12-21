@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
-
+import { logger } from '@/lib/logger'
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -24,14 +24,25 @@ export default function ForgotPasswordPage() {
     setError('')
     setLoading(true)
 
+    const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/email/forgot-password`
+    logger.debug('[FORGOT PASSWORD] Submitting to:', apiUrl)
+      logger.debug('[FORGOT PASSWORD] Email:', email)
+    }
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/email/forgot-password`, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
 
+      logger.debug('[FORGOT PASSWORD] Response status:', response.status)
+      }
+
       const data = await response.json()
+
+      logger.debug('[FORGOT PASSWORD] Response data:', data)
+      }
 
       if (response.ok) {
         setSuccess(true)
@@ -39,7 +50,7 @@ export default function ForgotPasswordPage() {
         setError(data.message || 'Failed to send reset link. Please try again.')
       }
     } catch (error) {
-      console.error('Forgot password error:', error)
+      logger.error('Forgot password error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -164,7 +175,7 @@ export default function ForgotPasswordPage() {
               {/* Info Box */}
               <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  <strong className="text-neutral-900 dark:text-white">Didn&apos;t receive the email?</strong><br />
+                  <strong className="text-neutral-900 dark:text-white">Didn't receive the email?</strong><br />
                   Check your spam folder. The link expires in 1 hour.
                 </p>
               </div>

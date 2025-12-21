@@ -1,6 +1,7 @@
 // frontend/src/services/api-client.ts
 
 import { ApiResponse, ApiError, RequestConfig } from '@/types/auth.types'
+import { logger } from '@/lib/logger'
 
 interface ApiClientConfig {
   baseURL: string
@@ -122,7 +123,7 @@ export class ApiClient {
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)
 
-          console.error('[API CLIENT] HTTP error:', {
+          logger.error('[API CLIENT] HTTP error:', {
             status: response.status,
             endpoint,
             requireAuth,
@@ -131,16 +132,16 @@ export class ApiClient {
 
           // Handle 401 errors with automatic token refresh (except for refresh endpoint itself)
           if (response.status === 401 && !endpoint.includes('/auth/refresh') && requireAuth) {
-            console.warn('[API CLIENT] 401 error - attempting token refresh')
+            logger.warn('[API CLIENT] 401 error - attempting token refresh')
             const refreshed = await this.refreshToken()
             if (refreshed) {
-              console.log('[API CLIENT] Token refresh successful - retrying request')
+              logger.debug('[API CLIENT] Token refresh successful - retrying request')
               // Token refreshed successfully, retry the request once
               lastError = error
               continue
             }
             // Refresh failed, redirect to login
-            console.error('[API CLIENT] Token refresh failed - redirecting to /login')
+            logger.error('[API CLIENT] Token refresh failed - redirecting to /login')
             if (typeof window !== 'undefined') {
               window.location.href = '/login'
             }
@@ -332,14 +333,14 @@ export class ApiClient {
         })
 
         if (response.ok) {
-          console.log('[API Client] Token refreshed successfully')
+          logger.debug('[API Client] Token refreshed successfully')
           return true
         }
 
-        console.warn('[API Client] Token refresh failed:', response.status)
+        logger.warn('[API Client] Token refresh failed:', response.status)
         return false
       } catch (error) {
-        console.error('[API Client] Token refresh error:', error)
+        logger.error('[API Client] Token refresh error:', error)
         return false
       } finally {
         this.isRefreshing = false

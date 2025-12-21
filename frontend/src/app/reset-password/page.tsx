@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
+import { logger } from '@/lib/logger'
 
 function ResetPasswordContent() {
   const router = useRouter()
@@ -60,7 +61,7 @@ function ResetPasswordContent() {
         setPasswordStrength(data)
       }
     } catch (error) {
-      console.error('Password strength check failed:', error)
+      logger.error('Password strength check failed:', error)
     }
   }
 
@@ -104,7 +105,7 @@ function ResetPasswordContent() {
         setError(data.message || 'Failed to reset password. The link may have expired.')
       }
     } catch (error) {
-      console.error('Reset password error:', error)
+      logger.error('Reset password error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)

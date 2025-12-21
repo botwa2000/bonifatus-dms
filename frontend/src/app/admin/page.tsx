@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { apiClient } from '@/services/api-client'
 import currencyList from 'currency-list'
+import { logger } from '@/lib/logger'
 
 interface SystemStats {
   total_users: number
@@ -224,7 +225,7 @@ export default function AdminDashboard() {
       setEntityQualityConfigs(entityQualityData.configs)
 
     } catch (error) {
-      console.error('Failed to load admin data:', error)
+      logger.error('Failed to load admin data:', error)
     } finally {
       setLoadingData(false)
     }
@@ -235,7 +236,7 @@ export default function AdminDashboard() {
       const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
     } catch (error) {
-      console.error('Failed to check ClamAV health:', error)
+      logger.error('Failed to check ClamAV health:', error)
     }
   }
 
@@ -253,7 +254,7 @@ export default function AdminDashboard() {
       // Refresh health status
       await checkClamavHealth()
     } catch (error) {
-      console.error('Failed to restart ClamAV:', error)
+      logger.error('Failed to restart ClamAV:', error)
       alert('Failed to restart ClamAV service')
     } finally {
       setRestartingClamav(false)
@@ -266,7 +267,7 @@ export default function AdminDashboard() {
       await loadData()
       setEditingTier(null)
     } catch (error) {
-      console.error('Failed to update tier:', error)
+      logger.error('Failed to update tier:', error)
       alert('Failed to update tier configuration')
     }
   }
@@ -280,7 +281,7 @@ export default function AdminDashboard() {
       setEditingCurrency(null)
       alert(`Currency ${currencyCode} updated successfully!`)
     } catch (error) {
-      console.error('Failed to update currency:', error)
+      logger.error('Failed to update currency:', error)
       alert('Failed to update currency exchange rate')
     }
   }
@@ -298,7 +299,7 @@ export default function AdminDashboard() {
       await loadData()
       alert(`Currency ${currencyData.code} created successfully!`)
     } catch (error) {
-      console.error('Failed to create currency:', error)
+      logger.error('Failed to create currency:', error)
       const errorMessage = (error as {response?: {data?: {detail?: string}}})?.response?.data?.detail || 'Failed to create currency'
       alert(errorMessage)
     }
@@ -314,7 +315,7 @@ export default function AdminDashboard() {
       await loadData()
       alert(`Currency ${currencyCode} deleted successfully!`)
     } catch (error) {
-      console.error('Failed to delete currency:', error)
+      logger.error('Failed to delete currency:', error)
       const errorMessage = (error as {response?: {data?: {detail?: string}}})?.response?.data?.detail || 'Failed to delete currency'
       alert(errorMessage)
     }
@@ -324,14 +325,14 @@ export default function AdminDashboard() {
     // Get current user for optimistic update and rollback
     const user = users.find(u => u.id === userId)
     if (!user) {
-      console.error('[DEBUG] updateUserTier: user not found:', userId)
+      logger.error('[DEBUG] updateUserTier: user not found:', userId)
       return
     }
 
     const oldTierId = user.tier_id
     const newTierName = tiers.find(t => t.id === newTierId)?.display_name || 'Unknown'
 
-    console.log('[DEBUG] updateUserTier: Starting tier update', {
+    logger.debug('[DEBUG] updateUserTier: Starting tier update', {
       userId,
       userEmail: user.email,
       oldTierId,
@@ -342,11 +343,11 @@ export default function AdminDashboard() {
 
     try {
       setUpdatingUserId(userId)
-      console.log('[DEBUG] updateUserTier: Set loading state for user:', userId)
+      logger.debug('[DEBUG] updateUserTier: Set loading state for user:', userId)
 
       // Make API call FIRST (removed optimistic update)
-      console.log('[DEBUG] updateUserTier: Making API call to /api/v1/admin/users/' + userId + '/tier')
-      console.log('[DEBUG] updateUserTier: Request body:', { tier_id: newTierId })
+      logger.debug('[DEBUG] updateUserTier: Making API call to /api/v1/admin/users/' + userId + '/tier')
+      logger.debug('[DEBUG] updateUserTier: Request body:', { tier_id: newTierId })
 
       const response = await apiClient.patch(
         `/api/v1/admin/users/${userId}/tier`,
@@ -354,7 +355,7 @@ export default function AdminDashboard() {
         true  // requireAuth=true for admin endpoints
       )
 
-      console.log('[DEBUG] updateUserTier: API call successful, response:', response)
+      logger.debug('[DEBUG] updateUserTier: API call successful, response:', response)
 
       // Update UI after successful API call
       setUsers(prevUsers =>
@@ -364,20 +365,20 @@ export default function AdminDashboard() {
             : u
         )
       )
-      console.log('[DEBUG] updateUserTier: Updated local state')
+      logger.debug('[DEBUG] updateUserTier: Updated local state')
 
       // Reload data to ensure consistency with backend
-      console.log('[DEBUG] updateUserTier: Reloading data from server')
+      logger.debug('[DEBUG] updateUserTier: Reloading data from server')
       await loadData()
-      console.log('[DEBUG] updateUserTier: Data reloaded')
+      logger.debug('[DEBUG] updateUserTier: Data reloaded')
 
       // Show success message
       alert(`✓ Successfully updated ${user.email} to ${newTierName} tier`)
-      console.log('[DEBUG] updateUserTier: Update complete')
+      logger.debug('[DEBUG] updateUserTier: Update complete')
 
     } catch (error) {
-      console.error('[DEBUG] updateUserTier: ERROR occurred:', error)
-      console.error('[DEBUG] updateUserTier: Error details:', {
+      logger.error('[DEBUG] updateUserTier: ERROR occurred:', error)
+      logger.error('[DEBUG] updateUserTier: Error details:', {
         name: (error as Error)?.name,
         message: (error as Error)?.message,
         status: (error as { status?: number })?.status,
@@ -388,19 +389,19 @@ export default function AdminDashboard() {
       const errorMessage = (error as { response?: { data?: { detail?: string } }; message?: string })
         ?.response?.data?.detail || (error as Error)?.message || 'Failed to update user tier'
       alert(`✗ Error: ${errorMessage}`)
-      console.error('[DEBUG] updateUserTier: Showed error alert:', errorMessage)
+      logger.error('[DEBUG] updateUserTier: Showed error alert:', errorMessage)
 
       // Reload data to sync with backend state
       try {
-        console.log('[DEBUG] updateUserTier: Reloading data after error')
+        logger.debug('[DEBUG] updateUserTier: Reloading data after error')
         await loadData()
-        console.log('[DEBUG] updateUserTier: Data reloaded after error')
+        logger.debug('[DEBUG] updateUserTier: Data reloaded after error')
       } catch (reloadError) {
-        console.error('[DEBUG] updateUserTier: Failed to reload data after error:', reloadError)
+        logger.error('[DEBUG] updateUserTier: Failed to reload data after error:', reloadError)
       }
     } finally {
       setUpdatingUserId(null)
-      console.log('[DEBUG] updateUserTier: Cleared loading state')
+      logger.debug('[DEBUG] updateUserTier: Cleared loading state')
     }
   }
 
@@ -413,7 +414,7 @@ export default function AdminDashboard() {
       setEditingConfig(null)
       alert(`Config ${configKey} updated successfully!`)
     } catch (error) {
-      console.error('Failed to update entity quality config:', error)
+      logger.error('Failed to update entity quality config:', error)
       alert('Failed to update configuration')
     }
   }

@@ -9,7 +9,8 @@ import { Card, CardHeader, CardContent, Button, Alert, Badge, Input, Checkbox, S
 import { categoryService, type Category } from '@/services/category.service'
 import { DocumentAnalysisProgress } from '@/components/DocumentAnalysisProgress'
 import AppHeader from '@/components/AppHeader'
-import { shouldLog, ENTITY_TYPES } from '@/config/app.config'
+import { ENTITY_TYPES  } from '@/config/app.config'
+import { logger } from '@/lib/logger'
 
 interface ErrorResponse {
   detail?: string
@@ -99,15 +100,14 @@ export default function BatchUploadPage() {
       const data = await categoryService.listCategories()
       setCategories(data.categories)
 
-      if (shouldLog('debug')) {
-        console.log('[UPLOAD DEBUG] === Available Categories Loaded ===')
-        console.log('[UPLOAD DEBUG] Total categories:', data.categories.length)
+      logger.debug('[UPLOAD DEBUG] === Available Categories Loaded ===')
+        logger.debug('[UPLOAD DEBUG] Total categories:', data.categories.length)
         data.categories.forEach((cat: Category) => {
-          console.log(`[UPLOAD DEBUG]   - ID: ${cat.id}, Name: "${cat.name}"`)
+          logger.debug(`[UPLOAD DEBUG]   - ID: ${cat.id}, Name: "${cat.name}"`)
         })
       }
     } catch (error) {
-      console.error('Failed to load categories:', error)
+      logger.error('Failed to load categories:', error)
     }
   }
 
@@ -121,7 +121,7 @@ export default function BatchUploadPage() {
         setMaxFilenameLength(data.value)
       }
     } catch (error) {
-      console.error('Failed to load config:', error)
+      logger.error('Failed to load config:', error)
     }
   }
 
@@ -191,11 +191,11 @@ export default function BatchUploadPage() {
           })
         }
 
-        console.log(`[Batch ${batchId}] Status: ${status.status}, Progress: ${status.processed_files}/${status.total_files}`)
+        logger.debug(`[Batch ${batchId}] Status: ${status.status}, Progress: ${status.processed_files}/${status.total_files}`)
 
         // Check if batch is complete
         if (status.status === 'completed') {
-          console.log(`[Batch ${batchId}] Processing completed`)
+          logger.debug(`[Batch ${batchId}] Processing completed`)
           return {
             total_files: status.total_files,
             successful: status.successful_files,
@@ -212,13 +212,13 @@ export default function BatchUploadPage() {
         await new Promise(resolve => setTimeout(resolve, pollInterval))
 
       } catch (error) {
-        console.error(`[Batch ${batchId}] Polling error:`, error)
+        logger.error(`[Batch ${batchId}] Polling error:`, error)
 
         // For network errors, continue polling (don't throw immediately)
         // The upload might have completed successfully despite the polling error
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('ERR_FAILED')) {
-          console.log(`[Batch ${batchId}] Network error during polling, will retry...`)
+          logger.debug(`[Batch ${batchId}] Network error during polling, will retry...`)
           await new Promise(resolve => setTimeout(resolve, pollInterval))
           continue
         }
@@ -332,7 +332,7 @@ export default function BatchUploadPage() {
       const failedFiles = result.results.filter((r: FileAnalysisResult): r is FileAnalysisFailure => !r.success)
       if (failedFiles.length > 0) {
         const errorMessages = failedFiles.map((f: FileAnalysisFailure) => `${f.original_filename}: ${f.error}`).join('; ')
-        console.error('Some files failed analysis:', errorMessages)
+        logger.error('Some files failed analysis:', errorMessages)
         setMessage({
           type: 'error',
           text: `${failedFiles.length} file(s) failed analysis: ${errorMessages}`
@@ -340,9 +340,8 @@ export default function BatchUploadPage() {
       }
 
       // Build upload states only for successful analyses
-      if (shouldLog('debug')) {
-        console.log('[UPLOAD DEBUG] ==== Analysis Results ====')
-        console.log(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
+      logger.debug('[UPLOAD DEBUG] ==== Analysis Results ====')
+        logger.debug(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
       }
 
       const states: FileUploadState[] = result.results
@@ -351,30 +350,29 @@ export default function BatchUploadPage() {
           // Find category name for debugging
           const suggestedCategory = categories.find(c => c.id === r.analysis.suggested_category_id)
 
-          if (shouldLog('debug')) {
-            console.log(`[UPLOAD DEBUG] === File Analysis Complete ===`)
-            console.log(`[UPLOAD DEBUG] File: ${r.original_filename}`)
-            console.log(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
-            console.log(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
-            console.log(`[UPLOAD DEBUG]   - Entities: ${r.analysis.entities?.length || 0}`)
+          logger.debug(`[UPLOAD DEBUG] === File Analysis Complete ===`)
+            logger.debug(`[UPLOAD DEBUG] File: ${r.original_filename}`)
+            logger.debug(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
+            logger.debug(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
+            logger.debug(`[UPLOAD DEBUG]   - Entities: ${r.analysis.entities?.length || 0}`)
             if (r.analysis.entities && r.analysis.entities.length > 0) {
-              console.log(`[UPLOAD DEBUG]   - Entity details:`, r.analysis.entities)
+              logger.debug(`[UPLOAD DEBUG]   - Entity details:`, r.analysis.entities)
             }
-            console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
-            console.log(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
-            console.log(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
+            logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+            logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
+            logger.debug(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
 
             // CRITICAL DEBUG: Show if category ID mismatch
             if (r.analysis.suggested_category_id && !suggestedCategory) {
-              console.error(`[CHECKBOX DEBUG] ❌❌❌ CATEGORY ID MISMATCH!`)
-              console.error(`[CHECKBOX DEBUG] Backend suggested category ID: ${r.analysis.suggested_category_id}`)
-              console.error(`[CHECKBOX DEBUG] This ID is NOT in the available categories list!`)
-              console.error(`[CHECKBOX DEBUG] Available category IDs:`, categories.map(c => c.id))
-              console.error(`[CHECKBOX DEBUG] Available "Other" categories:`, categories.filter(c => c.name?.toLowerCase().includes('other') || c.name?.toLowerCase().includes('sonstige')))
-              console.error(`[CHECKBOX DEBUG] Result: Checkbox will NOT be checked because ID doesn't exist in list`)
+              logger.error(`[CHECKBOX DEBUG] ❌❌❌ CATEGORY ID MISMATCH!`)
+              logger.error(`[CHECKBOX DEBUG] Backend suggested category ID: ${r.analysis.suggested_category_id}`)
+              logger.error(`[CHECKBOX DEBUG] This ID is NOT in the available categories list!`)
+              logger.error(`[CHECKBOX DEBUG] Available category IDs:`, categories.map(c => c.id))
+              logger.error(`[CHECKBOX DEBUG] Available "Other" categories:`, categories.filter(c => c.name?.toLowerCase().includes('other') || c.name?.toLowerCase().includes('sonstige')))
+              logger.error(`[CHECKBOX DEBUG] Result: Checkbox will NOT be checked because ID doesn't exist in list`)
             } else if (suggestedCategory) {
-              console.log(`[CHECKBOX DEBUG] ✅ Category found: ${suggestedCategory.name} (${suggestedCategory.id})`)
-              console.log(`[CHECKBOX DEBUG] Checkbox WILL be checked`)
+              logger.debug(`[CHECKBOX DEBUG] ✅ Category found: ${suggestedCategory.name} (${suggestedCategory.id})`)
+              logger.debug(`[CHECKBOX DEBUG] Checkbox WILL be checked`)
             }
           }
 
@@ -422,7 +420,7 @@ export default function BatchUploadPage() {
       }
 
     } catch (error) {
-      console.error('Batch analysis error:', error)
+      logger.error('Batch analysis error:', error)
       let errorMessage: string | React.ReactNode = 'Analysis failed. Please try again.'
 
       if (error instanceof Error) {
@@ -631,7 +629,7 @@ export default function BatchUploadPage() {
       }
 
     } catch (error) {
-      console.error('Batch upload error:', error)
+      logger.error('Batch upload error:', error)
       setMessage({
         type: 'error',
         text: 'Upload failed. Please try again.'
@@ -877,19 +875,19 @@ export default function BatchUploadPage() {
                                 const isPrimary = state.primary_category === category.id
 
                                 // Debug logging
-                                if (catIdx === 0 && shouldLog('debug')) {
-                                  console.log(`[CATEGORY DEBUG] File: ${state.original_filename}`)
-                                  console.log(`[CATEGORY DEBUG] Selected categories:`, state.selected_categories)
-                                  console.log(`[CATEGORY DEBUG] Primary category:`, state.primary_category)
+                                if (catIdx === 0) {
+                                  logger.debug(`[CATEGORY DEBUG] File: ${state.original_filename}`)
+                                  logger.debug(`[CATEGORY DEBUG] Selected categories:`, state.selected_categories)
+                                  logger.debug(`[CATEGORY DEBUG] Primary category:`, state.primary_category)
                                 }
 
                                 // Enhanced debug for checkbox state
-                                if (shouldLog('debug') && (category.name.toLowerCase().includes('other') || category.name.toLowerCase().includes('sonstige') || isSelected)) {
-                                  console.log(`[CHECKBOX DEBUG] Category: ${category.name} (${category.id})`)
-                                  console.log(`[CHECKBOX DEBUG]   - Is in selected_categories array: ${isSelected}`)
-                                  console.log(`[CHECKBOX DEBUG]   - Selected categories array:`, state.selected_categories)
-                                  console.log(`[CHECKBOX DEBUG]   - Does ${category.id} === any in array: ${state.selected_categories.some(id => id === category.id)}`)
-                                  console.log(`[CHECKBOX DEBUG]   - Checkbox will be: ${isSelected ? 'CHECKED ✅' : 'UNCHECKED ❌'}`)
+                                if (category.name.toLowerCase().includes('other') || category.name.toLowerCase().includes('sonstige') || isSelected) {
+                                  logger.debug(`[CHECKBOX DEBUG] Category: ${category.name} (${category.id})`)
+                                  logger.debug(`[CHECKBOX DEBUG]   - Is in selected_categories array: ${isSelected}`)
+                                  logger.debug(`[CHECKBOX DEBUG]   - Selected categories array:`, state.selected_categories)
+                                  logger.debug(`[CHECKBOX DEBUG]   - Does ${category.id} === any in array: ${state.selected_categories.some(id => id === category.id)}`)
+                                  logger.debug(`[CHECKBOX DEBUG]   - Checkbox will be: ${isSelected ? 'CHECKED ✅' : 'UNCHECKED ❌'}`)
                                 }
 
                                 return (

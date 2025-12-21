@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { apiClient } from '@/services/api-client'
+import { logger } from '@/lib/logger'
 
 interface Currency {
   code: string
@@ -47,7 +48,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
           setSelectedCurrencyState(defaultCurrency)
         }
       } catch (error) {
-        console.error('Failed to load currencies:', error)
+        logger.error('Failed to load currencies:', error)
         // Fallback to EUR
         setSelectedCurrencyState({
           code: 'EUR',

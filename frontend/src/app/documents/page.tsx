@@ -11,8 +11,7 @@ import type { BadgeVariant } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import DocumentSourceFilter from '@/components/DocumentSourceFilter'
 import { useEffect, useState, useCallback } from 'react'
-import { shouldLog } from '@/config/app.config'
-
+import { logger } from '@/lib/logger'
 interface Category {
   id: string
   name: string
@@ -122,7 +121,7 @@ export default function DocumentsPage() {
       const data = await apiClient.get<{ categories: Category[] }>('/api/v1/categories', true)
       setCategories(data.categories)
     } catch (err) {
-      console.error('Failed to load categories:', err)
+      logger.error('Failed to load categories:', err)
     }
   }
 
@@ -155,7 +154,7 @@ export default function DocumentsPage() {
       setTotalPages(data.total_pages)
     } catch (err) {
       setError('Failed to load documents')
-      console.error('Load documents error:', err)
+      logger.error('Load documents error:', err)
     } finally {
       setIsLoading(false)
       setIsInitialLoad(false)
@@ -195,30 +194,29 @@ export default function DocumentsPage() {
   }
 
   const handleDelete = async (documentId: string) => {
-    if (shouldLog('debug')) {
-      console.log('[DELETE DEBUG] === Frontend Delete Started ===')
-      console.log('[DELETE DEBUG] Document ID:', documentId)
-      console.log('[DELETE DEBUG] Document ID type:', typeof documentId)
+    logger.debug('[DELETE DEBUG] === Frontend Delete Started ===')
+      logger.debug('[DELETE DEBUG] Document ID:', documentId)
+      logger.debug('[DELETE DEBUG] Document ID type:', typeof documentId)
     }
 
     try {
-      if (shouldLog('debug')) console.log('[DELETE DEBUG] Calling API delete endpoint:', `/api/v1/documents/${documentId}`)
+      logger.debug('[DELETE DEBUG] Calling API delete endpoint:', `/api/v1/documents/${documentId}`)
 
       // Optimistic update: remove document from UI immediately
       setDocuments(prev => prev.filter(doc => doc.id !== documentId))
       setDeletingDocument(null)
 
       const response = await apiClient.delete(`/api/v1/documents/${documentId}`, true)
-      if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅ Delete API response:', response)
+      logger.debug('[DELETE DEBUG] ✅ Delete API response:', response)
 
       // Reload to get accurate count and sync with server
-      if (shouldLog('debug')) console.log('[DELETE DEBUG] Reloading documents list...')
+      logger.debug('[DELETE DEBUG] Reloading documents list...')
       await loadDocuments()
-      if (shouldLog('debug')) console.log('[DELETE DEBUG] ✅✅✅ Delete completed successfully')
+      logger.debug('[DELETE DEBUG] ✅✅✅ Delete completed successfully')
     } catch (err) {
-      if (shouldLog('debug')) {
-        console.error('[DELETE DEBUG] ❌ Delete failed:', err)
-        console.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
+      
+        logger.error('[DELETE DEBUG] ❌ Delete failed:', err)
+        logger.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
       }
 
       // Close modal on error to prevent double-delete attempts
@@ -228,7 +226,7 @@ export default function DocumentsPage() {
       await loadDocuments()
 
       setError('Failed to delete document. It may have already been deleted.')
-      console.error('Delete error:', err)
+      logger.error('Delete error:', err)
     }
   }
 
@@ -375,7 +373,7 @@ export default function DocumentsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 <div>
-                  <span className="font-medium">Viewing {actingAsUser.owner_name}&apos;s documents</span>
+                  <span className="font-medium">Viewing {actingAsUser.owner_name}'s documents</span>
                   <span className="text-indigo-200 ml-2">({actingAsUser.role} access)</span>
                 </div>
               </div>

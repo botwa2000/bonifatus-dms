@@ -130,7 +130,7 @@ function AcceptInvitationContent() {
 
             <p className="text-gray-600 dark:text-gray-400 mb-2">
               You now have <strong className="text-gray-900 dark:text-white">{invitationDetails.role}</strong> access to{' '}
-              <strong className="text-gray-900 dark:text-white">{invitationDetails.owner_name}&apos;s</strong> documents.
+              <strong className="text-gray-900 dark:text-white">{invitationDetails.owner_name}'s</strong> documents.
             </p>
 
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
@@ -166,7 +166,7 @@ function AcceptInvitationContent() {
 
           <div className="mb-8">
             <p className="text-gray-600 dark:text-gray-400 text-center">
-              You&apos;ve been invited to access another user&apos;s document library as a delegate.
+              You've been invited to access another user's document library as a delegate.
             </p>
           </div>
 
@@ -179,7 +179,7 @@ function AcceptInvitationContent() {
                 <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                View and search the owner&apos;s documents
+                View and search the owner's documents
               </li>
               <li className="flex items-start">
                 <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

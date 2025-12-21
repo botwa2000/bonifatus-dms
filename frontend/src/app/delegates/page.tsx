@@ -12,6 +12,7 @@ import {
 import { Button, Modal, ModalHeader, ModalContent, ModalFooter, Alert, Badge, SpinnerFullPage } from '@/components/ui'
 import AppHeader from '@/components/AppHeader'
 import type { BadgeVariant } from '@/components/ui'
+import { logger } from '@/lib/logger'
 
 export default function DelegatesPage() {
   const { user, isAuthenticated, isLoading: authLoading, hasAttemptedAuth, loadUser } = useAuth()
@@ -61,7 +62,7 @@ export default function DelegatesPage() {
       setDelegates(response.delegates)
     } catch (err) {
       setError('Failed to load delegates. Please try again.')
-      console.error('Load delegates error:', err)
+      logger.error('Load delegates error:', err)
     } finally {
       setIsLoading(false)
     }

@@ -2,8 +2,7 @@
 
 import { apiClient } from './api-client'
 import { User, GoogleOAuthConfig, AuthError } from '@/types/auth.types'
-import { shouldLog } from '@/config/app.config'
-
+import { logger } from '@/lib/logger'
 interface AuthServiceConfig {
   apiUrl: string
   tokenRefreshThreshold: number
@@ -49,7 +48,7 @@ export class AuthService {
       sessionStorage.removeItem(testKey)
       return true
     } catch (e) {
-      console.error('SessionStorage not available:', e)
+      logger.error('SessionStorage not available:', e)
       return false
     }
   }
@@ -75,7 +74,7 @@ export class AuthService {
 
       return this.oauthConfigCache
     } catch (error) {
-      console.error('Failed to fetch OAuth config:', error)
+      logger.error('Failed to fetch OAuth config:', error)
       throw new Error('Unable to initialize authentication')
     }
   }
@@ -112,7 +111,7 @@ export class AuthService {
         sessionStorage.setItem('selected_billing_cycle', billingCycle)
       }
     } catch (error) {
-      console.error('Failed to store OAuth state:', error)
+      logger.error('Failed to store OAuth state:', error)
       throw new Error('Failed to store OAuth state: ' + (error as Error).message)
     }
   }
@@ -177,7 +176,7 @@ export class AuthService {
       window.location.href = authUrl
 
     } catch (error) {
-      console.error('OAuth initialization failed:', error)
+      logger.error('OAuth initialization failed:', error)
       throw new Error('Authentication service unavailable: ' + (error as Error).message)
     }
   }
@@ -207,30 +206,30 @@ export class AuthService {
   }
 
   async getCurrentUser(): Promise<User | null> {
-    if (shouldLog('debug')) console.log('[AUTH SERVICE] getCurrentUser called')
+    logger.debug('[AUTH SERVICE] getCurrentUser called')
     try {
       // httpOnly cookies are sent automatically with this request
-      if (shouldLog('debug')) console.log('[AUTH SERVICE] Calling /api/v1/auth/me')
+      logger.debug('[AUTH SERVICE] Calling /api/v1/auth/me')
       const response = await apiClient.get<User>('/api/v1/auth/me', true)
 
       // User data no longer cached in sessionStorage (XSS risk)
       // Cookies are the single source of truth
 
-      if (shouldLog('debug')) console.log('[AUTH SERVICE] getCurrentUser success:', response?.email)
+      logger.debug('[AUTH SERVICE] getCurrentUser success:', response?.email)
       return response
 
     } catch (error) {
         // Silently handle errors - 401 is expected during OAuth flow and on public pages
         const apiError = error as { status?: number; message?: string }
 
-        console.error('[AUTH SERVICE] getCurrentUser error:', {
+        logger.error('[AUTH SERVICE] getCurrentUser error:', {
           status: apiError?.status,
           message: apiError?.message,
           fullError: error
         })
 
         if (apiError?.status === 401) {
-          console.warn('[AUTH SERVICE] 401 error - clearing auth data')
+          logger.warn('[AUTH SERVICE] 401 error - clearing auth data')
           this.clearAllAuthData()
         }
 
@@ -267,7 +266,7 @@ export class AuthService {
       return await this.tokenRefreshPromise
 
     } catch (error) {
-      console.error('Token refresh failed:', error)
+      logger.error('Token refresh failed:', error)
       this.clearAllAuthData()
       return false
     } finally {
@@ -296,7 +295,7 @@ export class AuthService {
     try {
       await apiClient.delete('/api/v1/auth/logout', true)
     } catch (error) {
-      console.error('Logout request failed:', error)
+      logger.error('Logout request failed:', error)
     } finally {
       this.clearTokenRefresh()
       this.clearAllAuthData()
@@ -346,7 +345,7 @@ export class AuthService {
         features: ['premium_storage', 'ai_categorization', 'priority_support']
       }
     } catch (error) {
-      console.error('Failed to get trial info:', error)
+      logger.error('Failed to get trial info:', error)
       return null
     }
   }

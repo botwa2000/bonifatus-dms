@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Modal, ModalHeader, ModalContent, ModalFooter, Button, Select, Alert, Badge } from '@/components/ui'
 import { apiClient } from '@/services/api-client'
+import { logger } from '@/lib/logger'
 
 interface CancellationReason {
   value: string
@@ -74,7 +75,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       )
       setReasons(data.reasons)
     } catch (error) {
-      console.error('Failed to load cancellation reasons:', error)
+      logger.error('Failed to load cancellation reasons:', error)
       // Fallback reasons if API fails
       setReasons([
         { value: 'too_expensive', label: 'Too expensive' },
@@ -103,7 +104,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       setStep('success')
       onSuccess()
     } catch (error: unknown) {
-      console.error('Cancellation failed:', error)
+      logger.error('Cancellation failed:', error)
       const errorDetail = error && typeof error === 'object' && 'detail' in error ? (error as { detail: string }).detail : null
       setError(errorDetail || 'Failed to cancel subscription. Please try again.')
     } finally {
@@ -148,7 +149,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </h4>
             <p className="text-sm text-yellow-800">
               By canceling your <span className="font-medium">{subscription.tier_name}</span> subscription,
-              you&apos;ll lose access to premium features and be limited to basic functionality.
+              you'll lose access to premium features and be limited to basic functionality.
               Your investment in professional document management will be paused.
             </p>
           </div>
@@ -168,7 +169,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
               <p className="font-medium text-blue-900">14-Day Money-Back Guarantee</p>
               <p className="text-sm mt-1 text-blue-700">
                 You subscribed {subscriptionAgeDays} day{subscriptionAgeDays !== 1 ? 's' : ''} ago.
-                You&apos;re eligible for a full refund if you cancel immediately.
+                You're eligible for a full refund if you cancel immediately.
               </p>
             </div>
           )}
@@ -197,7 +198,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       <ModalContent>
         <div className="space-y-6">
           <p className="text-neutral-600">
-            We&apos;d love to know why you&apos;re canceling. Your feedback helps us improve.
+            We'd love to know why you're canceling. Your feedback helps us improve.
           </p>
 
           {/* Cancellation type selection */}
@@ -310,7 +311,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             <p className="text-sm mt-1 text-yellow-700">
               {cancelType === 'immediate'
                 ? 'Your subscription will be canceled immediately and you will receive a full refund.'
-                : `Your subscription will end on ${new Date(subscription.current_period_end).toLocaleDateString()}. You&apos;ll have access until then.`
+                : `Your subscription will end on ${new Date(subscription.current_period_end).toLocaleDateString()}. You'll have access until then.`
               }
             </p>
           </div>
@@ -391,7 +392,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </p>
             {!result?.downgraded_to_free && (
               <p className="text-sm text-blue-800 mt-2">
-                After this date, you&apos;ll be automatically downgraded to the Free tier.
+                After this date, you'll be automatically downgraded to the Free tier.
               </p>
             )}
           </div>

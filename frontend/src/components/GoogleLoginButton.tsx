@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
+import { logger } from '@/lib/logger'
 
 interface GoogleLoginButtonProps {
   variant?: 'primary' | 'secondary'
@@ -32,7 +33,7 @@ export function GoogleLoginButton({
       // It will be encoded into OAuth state parameter for backend to access
       await initializeGoogleAuth(tierId, billingCycle)
     } catch (error) {
-      console.error('Google login failed:', error)
+      logger.error('Google login failed:', error)
       setIsRedirecting(false)
     }
   }

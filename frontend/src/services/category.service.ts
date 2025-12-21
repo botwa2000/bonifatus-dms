@@ -1,5 +1,6 @@
 // frontend/src/services/category.service.ts
 import { apiClient } from './api-client'
+import { logger } from '@/lib/logger'
 
 export interface Category {
   id: string
@@ -157,7 +158,7 @@ class CategoryService {
     languageCode?: string
   ): Promise<KeywordListResponse> {
     // Only include language_code param if specified, otherwise backend returns ALL languages
-    console.log('[CategoryService DEBUG] getKeywords called:', {
+    logger.debug('[CategoryService DEBUG] getKeywords called:', {
       categoryId,
       languageCode,
       languageCodeType: typeof languageCode,
@@ -165,14 +166,14 @@ class CategoryService {
       isNull: languageCode === null
     })
     const params = languageCode ? { params: { language_code: languageCode } } : undefined
-    console.log('[CategoryService DEBUG] Request params:', params)
+    logger.debug('[CategoryService DEBUG] Request params:', params)
 
     const result = await apiClient.get<KeywordListResponse>(
       `/api/v1/categories/${categoryId}/keywords`,
       true,
       params
     )
-    console.log('[CategoryService DEBUG] Response:', {
+    logger.debug('[CategoryService DEBUG] Response:', {
       keywordCount: result.keywords?.length,
       languages: result.keywords ? [...new Set(result.keywords.map(k => k.language_code))] : []
     })

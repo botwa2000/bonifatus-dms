@@ -13,6 +13,7 @@ import { apiClient } from '@/services/api-client'
 import { delegateService } from '@/services/delegate.service'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
+import { logger } from '@/lib/logger'
 
 interface Document {
   id: string
@@ -68,7 +69,7 @@ export default function DashboardPage() {
 
         if (subscription && subscription.id) {
           // User already has a subscription - don't process tier selection
-          console.log('User already has active subscription, skipping tier selection')
+          logger.debug('User already has active subscription, skipping tier selection')
           setTierProcessed(true)
           return
         }
@@ -76,7 +77,7 @@ export default function DashboardPage() {
         // If 404, user has no subscription - continue with tier selection
         const apiError = error as { response?: { status?: number } }
         if (apiError?.response?.status !== 404) {
-          console.error('Failed to check subscription status:', error)
+          logger.error('Failed to check subscription status:', error)
         }
       }
 
@@ -108,7 +109,7 @@ export default function DashboardPage() {
         window.location.href = checkoutResponse.checkout_url
 
       } catch (error) {
-        console.error('Failed to process tier selection:', error)
+        logger.error('Failed to process tier selection:', error)
         setTierProcessed(true)
         setIsProcessingTier(false)
         // Continue to dashboard even if checkout fails

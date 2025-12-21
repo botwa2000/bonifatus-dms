@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
+import { logger } from '@/lib/logger'
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -120,7 +121,7 @@ function VerifyEmailContent() {
         setError(data.message || 'Invalid verification code. Please try again.')
       }
     } catch (error) {
-      console.error('Verification error:', error)
+      logger.error('Verification error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -154,7 +155,7 @@ function VerifyEmailContent() {
         setError('Failed to resend code. Please try again.')
       }
     } catch (error) {
-      console.error('Resend error:', error)
+      logger.error('Resend error:', error)
       setError('An error occurred. Please try again.')
     } finally {
       setResendLoading(false)
@@ -255,7 +256,7 @@ function VerifyEmailContent() {
               disabled={resendLoading}
               className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-admin-primary disabled:opacity-50"
             >
-              {resendLoading ? 'Sending...' : 'Didn&apos;t receive the code? Resend'}
+              {resendLoading ? 'Sending...' : "Didn't receive the code? Resend"}
             </button>
           </div>
 

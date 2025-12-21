@@ -7,8 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/contexts/auth-context'
 import { useDelegate } from '@/contexts/delegate-context'
-import { shouldLog } from '@/config/app.config'
-
+import { logger } from '@/lib/logger'
 interface AppHeaderProps {
   title?: string
   subtitle?: string
@@ -109,11 +108,10 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
                   className="flex items-center space-x-2 px-3 py-2 rounded-md transition-colors text-neutral-700 hover:bg-neutral-100 border-l border-neutral-200 ml-2"
                   title="Go to Homepage"
                   onClick={() => {
-                    if (shouldLog('debug')) {
-                      console.log('[HOME DEBUG] === Home Link Clicked ===')
-                      console.log('[HOME DEBUG] Current pathname:', pathname)
-                      console.log('[HOME DEBUG] Navigating to: /')
-                      console.log('[HOME DEBUG] Using Next.js Link component (same tab)')
+                    logger.debug('[HOME DEBUG] === Home Link Clicked ===')
+                      logger.debug('[HOME DEBUG] Current pathname:', pathname)
+                      logger.debug('[HOME DEBUG] Navigating to: /')
+                      logger.debug('[HOME DEBUG] Using Next.js Link component (same tab)')
                     }
                   }}
                 >
