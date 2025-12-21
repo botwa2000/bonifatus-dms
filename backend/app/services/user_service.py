@@ -585,17 +585,31 @@ class UserService:
                     logger.error(f"Failed to cancel Stripe subscription: {stripe_error}")
                     # Continue with account deletion even if Stripe cancellation fails
 
-            # Log deletion before deleting (will be deleted with audit logs)
-            await self._log_user_action(
-                user_id, "account_deletion_hard", "user", user_id,
-                {"is_active": user.is_active}, {"deleted": True},
-                ip_address, session,
-                extra_data={
-                    "reason": deactivation_request.reason,
-                    "feedback": deactivation_request.feedback,
-                    "had_active_subscription": active_subscription is not None
-                }
-            )
+            # Save anonymous deletion feedback for product improvement
+            if deactivation_request.reason or deactivation_request.feedback:
+                import hashlib
+                from app.database.models import AccountDeletionFeedback, Document
+
+                # Create anonymous ID from email hash
+                anonymous_id = hashlib.sha256(user_email.encode()).hexdigest()
+
+                # Calculate user metrics
+                days_since_registration = (datetime.utcnow() - user.created_at).days if user.created_at else None
+                total_documents = session.query(Document).filter(Document.user_id == user_id).count()
+
+                # Save feedback (persists after user deletion)
+                feedback_record = AccountDeletionFeedback(
+                    anonymous_id=anonymous_id,
+                    tier_at_deletion=user.tier.name if user.tier else 'unknown',
+                    days_since_registration=days_since_registration,
+                    total_documents_uploaded=total_documents,
+                    had_active_subscription=active_subscription is not None,
+                    reason_category=deactivation_request.reason,
+                    feedback_text=deactivation_request.feedback
+                )
+                session.add(feedback_record)
+                session.flush()  # Save before user deletion
+                logger.info(f"Saved anonymous deletion feedback for {user_email}")
 
             # 1. Delete user settings (not cascade)
             session.query(UserSetting).filter(UserSetting.user_id == user_id).delete()
@@ -605,7 +619,12 @@ class UserService:
             session.query(Category).filter(Category.user_id == user_id).delete()
             logger.info(f"Deleted custom categories for {user_email}")
 
-            # 3. Delete audit logs for this user (not cascade)
+            # 3. Delete allowed senders for email processing (not cascade)
+            from app.database.auth_models import AllowedSender
+            session.query(AllowedSender).filter(AllowedSender.user_id == user_id).delete()
+            logger.info(f"Deleted allowed senders for {user_email}")
+
+            # 4. Delete audit logs for this user (not cascade)
             session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
             logger.info(f"Deleted audit logs for {user_email}")
 
@@ -623,7 +642,7 @@ class UserService:
                 # Don't fail deletion if email fails, but log it
                 logger.error(f"Failed to send account deletion email to {user_email}: {email_error}")
 
-            # 4. Delete user record (cascades to documents, sessions, etc.)
+            # 5. Delete user record (cascades to documents, sessions, etc.)
             session.delete(user)
             session.commit()
 

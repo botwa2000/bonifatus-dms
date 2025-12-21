@@ -1031,7 +1031,7 @@ export default function ProfilePage() {
               <div>
                 <h3 className="font-medium text-neutral-900 mb-2">Delete Account</h3>
                 <p className="text-sm text-neutral-600 mb-4">
-                  Once you delete your account, there is no going back. Your documents will remain in Google Drive, but all metadata and categorization will be permanently deleted after 30 days.
+                  Once you delete your account, there is no going back. Your documents will remain in Google Drive, but all metadata and categorization will be permanently deleted immediately.
                 </p>
                 <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
                   Delete Account
@@ -1047,7 +1047,7 @@ export default function ProfilePage() {
         <ModalContent>
           <Alert
             type="error"
-            message="Warning: This action cannot be undone. Your account will be deactivated immediately, and all data will be permanently deleted after 30 days."
+            message="Warning: This action cannot be undone. Your account and all associated data will be permanently deleted immediately."
           />
 
           <Alert
