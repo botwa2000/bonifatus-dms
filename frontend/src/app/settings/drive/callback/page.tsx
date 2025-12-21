@@ -23,7 +23,6 @@ function DriveCallbackContent() {
       const error = searchParams.get('error')
 
       logger.debug('[Drive Callback] Starting OAuth callback', { hasCode: !!code, hasState: !!state, error })
-      }
 
       // Handle OAuth error from Google
       if (error) {
@@ -63,7 +62,6 @@ function DriveCallbackContent() {
             logger.debug('[Drive Callback DEBUG] ✅ Refresh response:', refreshResponse)
             logger.debug('[Drive Callback DEBUG] Auth tokens refreshed successfully')
             logger.debug('[Drive Callback] Auth tokens refreshed successfully')
-            }
           } catch (refreshError) {
             logger.error('[Drive Callback DEBUG] ❌ Token refresh failed:', refreshError)
             logger.error('[Drive Callback] Token refresh failed:', refreshError)
