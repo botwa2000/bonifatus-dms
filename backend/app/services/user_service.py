@@ -7,7 +7,7 @@ Business logic for user profile operations and settings management
 import logging
 import json
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, text, or_
 
@@ -594,7 +594,7 @@ class UserService:
                 anonymous_id = hashlib.sha256(user_email.encode()).hexdigest()
 
                 # Calculate user metrics
-                days_since_registration = (datetime.utcnow() - user.created_at).days if user.created_at else None
+                days_since_registration = (datetime.now(timezone.utc) - user.created_at).days if user.created_at else None
                 total_documents = session.query(Document).filter(Document.user_id == user_id).count()
 
                 # Save feedback (persists after user deletion)
