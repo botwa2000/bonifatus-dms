@@ -545,7 +545,10 @@ class UserService:
         """
         session = db_manager.session_local()
         try:
-            from app.database.models import UserSetting, Category, AuditLog
+            from app.database.models import (
+                UserSetting, Category, AuditLog, UserCorpusStats,
+                KeywordTrainingData, UserDelegate
+            )
 
             user = session.get(User, user_id)
             if not user:
@@ -634,6 +637,17 @@ class UserService:
             session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete()
             session.query(RegisteredDevice).filter(RegisteredDevice.user_id == user_id).delete()
             logger.info(f"Deleted all auth-related records for {user_email}")
+
+            # 3a. Delete ML/stats tables (explicit to avoid FK issues)
+            session.query(UserCorpusStats).filter(UserCorpusStats.user_id == user_id).delete()
+            session.query(KeywordTrainingData).filter(KeywordTrainingData.user_id == user_id).delete()
+            logger.info(f"Deleted ML/stats records for {user_email}")
+
+            # 3b. Delete delegate relationships (both as owner and delegate)
+            session.query(UserDelegate).filter(
+                (UserDelegate.owner_user_id == user_id) | (UserDelegate.delegate_user_id == user_id)
+            ).delete(synchronize_session=False)
+            logger.info(f"Deleted delegate relationships for {user_email}")
 
             # 4. Delete audit logs for this user (not cascade)
             session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
