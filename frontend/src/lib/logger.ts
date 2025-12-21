@@ -2,12 +2,12 @@
 /**
  * Centralized logging utility
  * Automatically handles dev vs production logging
- * - Debug/info logs only appear in development
+ * - Debug/info logs only appear in development (controlled by NEXT_PUBLIC_DEBUG_LOGS)
  * - Warnings and errors always appear
- * - Production builds automatically remove debug/info calls via dead code elimination
+ * - Production builds with debug disabled remove debug/info calls via dead code elimination
  */
 
-const isDev = process.env.NODE_ENV === 'development'
+const isDev = process.env.NEXT_PUBLIC_DEBUG_LOGS === 'true'
 
 export const logger = {
   /**
