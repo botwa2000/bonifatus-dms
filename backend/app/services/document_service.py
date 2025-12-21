@@ -18,6 +18,7 @@ from app.database.models import Document, Category, DocumentCategory, CategoryTr
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
 from app.services.tier_service import tier_service
+from app.core.config import settings
 from app.schemas.document_schemas import (
     DocumentUploadResponse, DocumentResponse, DocumentUpdateRequest,
     DocumentListResponse, DocumentSearchRequest, DocumentStorageInfo,
@@ -990,9 +991,15 @@ class DocumentService:
                         continue
 
                     logger.info(f"[MULTI-SOURCE] Fetching shared documents from owner {owner_id} (role: {role})")
+                    if settings.is_development and search_request.category_id:
+                        logger.info(f"[MULTI-SOURCE] Category filter active: {search_request.category_id}")
 
                     # Fetch owner's documents
                     shared_docs = await self.search_documents(owner_id, search_request)
+
+                    if settings.is_development and search_request.category_id:
+                        doc_count = len(shared_docs.documents) if shared_docs else 0
+                        logger.info(f"[MULTI-SOURCE] Found {doc_count} shared documents from owner {owner_id} matching category filter")
 
                     if shared_docs and shared_docs.documents:
                         # Get owner details for metadata
