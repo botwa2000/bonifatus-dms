@@ -620,11 +620,15 @@ class UserService:
             logger.info(f"Deleted custom categories for {user_email}")
 
             # 3. Delete allowed senders for email processing (not cascade)
-            from app.database.auth_models import AllowedSender
+            from app.database.auth_models import AllowedSender, EmailProcessingLog
             session.query(AllowedSender).filter(AllowedSender.user_id == user_id).delete()
             logger.info(f"Deleted allowed senders for {user_email}")
 
-            # 4. Delete audit logs for this user (not cascade)
+            # 4. Delete email processing logs (not cascade)
+            session.query(EmailProcessingLog).filter(EmailProcessingLog.user_id == user_id).delete()
+            logger.info(f"Deleted email processing logs for {user_email}")
+
+            # 5. Delete audit logs for this user (not cascade)
             session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
             logger.info(f"Deleted audit logs for {user_email}")
 
@@ -642,7 +646,7 @@ class UserService:
                 # Don't fail deletion if email fails, but log it
                 logger.error(f"Failed to send account deletion email to {user_email}: {email_error}")
 
-            # 5. Delete user record (cascades to documents, sessions, etc.)
+            # 6. Delete user record (cascades to documents, sessions, etc.)
             session.delete(user)
             session.commit()
 
