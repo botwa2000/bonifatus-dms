@@ -189,6 +189,7 @@ class UserService:
 
                 # Send verification email using existing email service method
                 await email_service.send_verification_code_email(
+                    session=session,
                     to_email=profile_update.new_email,
                     user_name=user.full_name,
                     verification_code=code_result['code']
@@ -658,6 +659,7 @@ class UserService:
                 from app.services.email_service import email_service
                 deletion_date = datetime.utcnow().strftime("%B %d, %Y at %H:%M UTC")
                 await email_service.send_account_deleted_notification(
+                    session=session,
                     to_email=user_email,
                     user_name=user_name,
                     deletion_date=deletion_date

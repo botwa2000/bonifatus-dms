@@ -558,6 +558,7 @@ async def drive_oauth_callback(
                 from app.services.email_service import email_service
                 dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
                 await email_service.send_drive_connected_notification(
+                    session=session,
                     to_email=user.email,
                     user_name=user.full_name,
                     dashboard_url=dashboard_url,

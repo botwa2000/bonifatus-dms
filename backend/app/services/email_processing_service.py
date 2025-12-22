@@ -692,34 +692,28 @@ class EmailProcessingService:
 
     async def send_rejection_notification(
         self,
-        user_email: str,
+        user: User,
         sender_email: str,
         subject: str,
         rejection_reason: str
     ):
         """
-        Send rejection notification to user
+        Send rejection notification to user using database template
 
         Args:
-            user_email: User's email address
+            user: User object
             sender_email: Sender who was rejected
             subject: Original email subject
             rejection_reason: Why it was rejected
         """
         try:
-            html_content = f"""
-            <h2>Document Processing Failed</h2>
-            <p>An email from <strong>{sender_email}</strong> was rejected and not processed.</p>
-            <p><strong>Subject:</strong> {subject}</p>
-            <p><strong>Reason:</strong> {rejection_reason}</p>
-            <p>If you want to accept documents from this sender, please add them to your allowed senders list in your account settings.</p>
-            """
-
-            await self.email_service.send_email(
-                to_email=user_email,
-                to_name=None,
-                subject=f"Document Processing Failed - {sender_email}",
-                html_content=html_content
+            await self.email_service.send_email_rejection_notification(
+                session=self.db,
+                to_email=user.email,
+                to_name=user.full_name or user.email,
+                sender_email=sender_email,
+                subject=subject,
+                rejection_reason=rejection_reason
             )
 
         except Exception as e:
@@ -727,34 +721,28 @@ class EmailProcessingService:
 
     async def send_completion_notification(
         self,
-        user_email: str,
+        user: User,
         sender_email: str,
         subject: str,
         documents_created: int
     ):
         """
-        Send completion notification to user
+        Send completion notification to user using database template
 
         Args:
-            user_email: User's email address
+            user: User object
             sender_email: Sender email
             subject: Original email subject
             documents_created: Number of documents created
         """
         try:
-            html_content = f"""
-            <h2>Documents Processed Successfully</h2>
-            <p>Your email from <strong>{sender_email}</strong> has been processed.</p>
-            <p><strong>Subject:</strong> {subject}</p>
-            <p><strong>Documents Created:</strong> {documents_created}</p>
-            <p>Your documents are now available in your dashboard.</p>
-            """
-
-            await self.email_service.send_email(
-                to_email=user_email,
-                to_name=None,
-                subject=f"Documents Processed - {documents_created} file(s)",
-                html_content=html_content
+            await self.email_service.send_email_completion_notification(
+                session=self.db,
+                to_email=user.email,
+                to_name=user.full_name or user.email,
+                sender_email=sender_email,
+                subject=subject,
+                documents_created=documents_created
             )
 
         except Exception as e:
@@ -874,7 +862,7 @@ class EmailProcessingService:
 
                         # Send notification
                         await self.send_rejection_notification(
-                            user.email, sender_email, subject, rejection_reason
+                            user, sender_email, subject, rejection_reason
                         )
 
                         logger.error(f"[EMAIL DEBUG] Deleting email {email_id}")
@@ -1100,7 +1088,7 @@ class EmailProcessingService:
                     # Send completion notification
                     logger.debug(f"[EMAIL] Sending completion notification to {user.email}")
                     await self.send_completion_notification(
-                        user.email, sender_email, subject, documents_created
+                        user, sender_email, subject, documents_created
                     )
 
                     # CRITICAL CLEANUP: Delete email and temp files

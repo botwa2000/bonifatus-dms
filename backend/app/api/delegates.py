@@ -95,143 +95,42 @@ async def invite_delegate(
     logger.info(f"[DELEGATES API] Delegate invitation created: {delegate.id}")
 
     # Send invitation email
+    # Send invitation email using database template
     try:
-        # Different email content based on whether user is registered
-        if delegate.delegate_user_id is None:
-            # User is NOT registered - send account creation email
-            signup_url = f"{settings.app.app_frontend_url}/signup?invitation_token={delegate.invitation_token}&email={invite_request.email}"
+        # Get database session for email template
+        from app.database.connection import db_manager
+        email_session = db_manager.session_local()
 
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background-color: #4F46E5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-                    <h1 style="margin: 0; font-size: 24px;">You're Invited to BoniDoc!</h1>
-                </div>
+        try:
+            if delegate.delegate_user_id is None:
+                # User is NOT registered - send account creation email
+                signup_url = f"{settings.app.app_frontend_url}/signup?invitation_token={delegate.invitation_token}&email={invite_request.email}"
 
-                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
-                    <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
+                await email_service.send_delegate_invitation_unregistered(
+                    session=email_session,
+                    to_email=invite_request.email,
+                    owner_name=current_user.full_name or current_user.email,
+                    owner_email=current_user.email,
+                    signup_url=signup_url
+                )
+                logger.info(f"[DELEGATES API] Unregistered user invitation sent to {invite_request.email}")
+            else:
+                # User IS registered - send standard acceptance email
+                accept_url = f"{settings.app.app_frontend_url}/delegates/accept?token={delegate.invitation_token}"
 
-                    <p style="font-size: 16px; margin-bottom: 20px;">
-                        <strong>{current_user.full_name}</strong> ({current_user.email}) wants to share their document library with you on BoniDoc.
-                    </p>
+                await email_service.send_delegate_invitation_registered(
+                    session=email_session,
+                    to_email=invite_request.email,
+                    to_name=invite_request.email,
+                    owner_name=current_user.full_name or current_user.email,
+                    owner_email=current_user.email,
+                    role=invite_request.role,
+                    accept_url=accept_url
+                )
+                logger.info(f"[DELEGATES API] Registered user invitation sent to {invite_request.email}")
+        finally:
+            email_session.close()
 
-                    <div style="background-color: #FEF3C7; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #F59E0B;">
-                        <p style="margin: 0; font-weight: bold; color: #92400E;">Action Required</p>
-                        <p style="margin: 10px 0 0 0; color: #92400E;">
-                            To accept this invitation, you need to create a free BoniDoc account first.
-                        </p>
-                    </div>
-
-                    <div style="background-color: #F3F4F6; padding: 20px; border-radius: 6px; margin: 25px 0;">
-                        <p style="margin: 0 0 10px 0; font-weight: bold; color: #1F2937;">Once you create your account, you'll be able to:</p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li style="margin: 5px 0;">View and search {current_user.full_name}'s documents</li>
-                            <li style="margin: 5px 0;">Download documents for review</li>
-                            <li style="margin: 5px 0;">Access document metadata and categories</li>
-                        </ul>
-                    </div>
-
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{signup_url}"
-                           style="display: inline-block; background-color: #4F46E5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                            Create Free Account & Accept
-                        </a>
-                    </div>
-
-                    <p style="font-size: 14px; color: #6B7280; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        If you cannot click the button above, copy and paste this link into your browser:<br>
-                        <a href="{signup_url}" style="color: #4F46E5; word-break: break-all;">{signup_url}</a>
-                    </p>
-
-                    <p style="font-size: 14px; color: #6B7280; margin-top: 20px;">
-                        This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
-                    </p>
-                </div>
-
-                <div style="text-align: center; margin-top: 20px; padding: 20px; font-size: 12px; color: #9CA3AF;">
-                    <p style="margin: 0;">BoniDoc Document Management System</p>
-                    <p style="margin: 5px 0 0 0;">Professional Document Management</p>
-                </div>
-            </body>
-            </html>
-            """
-
-            subject = f"{current_user.full_name} invited you to collaborate on BoniDoc"
-        else:
-            # User IS registered - send standard acceptance email
-            accept_url = f"{settings.app.app_frontend_url}/delegates/accept?token={delegate.invitation_token}"
-
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background-color: #4F46E5; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-                    <h1 style="margin: 0; font-size: 24px;">Delegate Access Invitation</h1>
-                </div>
-
-                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
-                    <p style="font-size: 16px; margin-bottom: 20px;">Hello,</p>
-
-                    <p style="font-size: 16px; margin-bottom: 20px;">
-                        <strong>{current_user.full_name}</strong> ({current_user.email}) has invited you to access their document library on BoniDoc as a <strong>{invite_request.role}</strong>.
-                    </p>
-
-                    <div style="background-color: #F3F4F6; padding: 20px; border-radius: 6px; margin: 25px 0;">
-                        <p style="margin: 0 0 10px 0; font-weight: bold; color: #1F2937;">As a delegate, you will be able to:</p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li style="margin: 5px 0;">View and search documents</li>
-                            <li style="margin: 5px 0;">Download documents for review</li>
-                            <li style="margin: 5px 0;">Access document metadata and categories</li>
-                        </ul>
-                        <p style="margin: 10px 0 0 0; font-weight: bold; color: #1F2937;">You will NOT be able to:</p>
-                        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-                            <li style="margin: 5px 0;">Upload, edit, or delete documents</li>
-                        </ul>
-                    </div>
-
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{accept_url}"
-                           style="display: inline-block; background-color: #4F46E5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                            Accept Invitation
-                        </a>
-                    </div>
-
-                    <p style="font-size: 14px; color: #6B7280; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        If you cannot click the button above, copy and paste this link into your browser:<br>
-                        <a href="{accept_url}" style="color: #4F46E5; word-break: break-all;">{accept_url}</a>
-                    </p>
-
-                    <p style="font-size: 14px; color: #6B7280; margin-top: 20px;">
-                        This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
-                    </p>
-                </div>
-
-                <div style="text-align: center; margin-top: 20px; padding: 20px; font-size: 12px; color: #9CA3AF;">
-                    <p style="margin: 0;">BoniDoc Document Management System</p>
-                    <p style="margin: 5px 0 0 0;">Professional Document Management</p>
-                </div>
-            </body>
-            </html>
-            """
-
-            subject = f"Delegate Access Invitation from {current_user.full_name}"
-
-        await email_service.send_email(
-            to_email=invite_request.email,
-            to_name=invite_request.email,
-            subject=subject,
-            html_content=html_content
-        )
-        logger.info(f"[DELEGATES API] Invitation email sent to {invite_request.email} (registered={delegate.delegate_user_id is not None})")
     except Exception as e:
         logger.error(f"[DELEGATES API] Failed to send invitation email: {e}")
         # Don't fail the request if email fails, just log it

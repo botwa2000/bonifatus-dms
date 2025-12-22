@@ -763,6 +763,7 @@ async def register_email(request_data: RegisterRequest, db = Depends(get_db)):
 
                         if code_record:
                             await email_service.send_verification_code_email(
+                                session=db,
                                 to_email=result['email'],
                                 user_name=request_data.full_name or result['email'],
                                 verification_code=code_record.code
@@ -806,6 +807,7 @@ async def register_email(request_data: RegisterRequest, db = Depends(get_db)):
             if code_record:
                 # Send verification email
                 await email_service.send_verification_code_email(
+                    session=db,
                     to_email=request_data.email,
                     user_name=request_data.full_name or request_data.email,
                     verification_code=code_record.code
@@ -1035,6 +1037,7 @@ async def verify_email(
             dashboard_url = f"https://{'dev.' if settings.is_development else ''}bonidoc.com/dashboard"
             asyncio.create_task(
                 email_service.send_user_created_notification(
+                    session=db,
                     to_email=user.email,
                     user_name=user.full_name or user.email,
                     dashboard_url=dashboard_url,
@@ -1067,6 +1070,7 @@ async def verify_email(
             for admin in admin_users:
                 asyncio.create_task(
                     email_service.send_admin_new_user_notification(
+                        session=db,
                         admin_email=admin.email,
                         admin_name=admin.full_name or admin.email,
                         new_user_name=user.full_name or user.email,
@@ -1146,6 +1150,7 @@ async def resend_verification_code(request_data: ResendCodeRequest, db = Depends
 
         if code_record:
             await email_service.send_verification_code_email(
+                session=db,
                 to_email=request_data.email,
                 user_name=user.full_name or user.email,
                 verification_code=code_record.code
@@ -1196,10 +1201,11 @@ async def forgot_password(request_data: ForgotPasswordRequest, db = Depends(get_
             ).scalar_one_or_none()
 
             if user:
-                # Build reset URL
-                reset_url = f"https://{'dev.' if settings.environment == 'development' else ''}bonidoc.com/reset-password?token={result['token']}"
+                # Build reset URL using configured frontend URL
+                reset_url = f"{settings.app.app_frontend_url}/reset-password?token={result['token']}"
 
                 await email_service.send_password_reset_email(
+                    session=db,
                     to_email=request_data.email,
                     user_name=user.full_name or user.email,
                     reset_token=result['token'],

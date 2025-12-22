@@ -461,6 +461,7 @@ class AuthService:
                             from app.services.email_service import email_service
                             dashboard_url = settings.app.app_frontend_url  # Homepage/dashboard, not login page
                             await email_service.send_user_created_notification(
+                                session=db,
                                 to_email=user.email,
                                 user_name=user.full_name,
                                 dashboard_url=dashboard_url,

@@ -192,6 +192,7 @@ class EmailService:
 
     async def send_welcome_email(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         dashboard_url: str
@@ -200,6 +201,7 @@ class EmailService:
         Send welcome email to new user
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             dashboard_url: Dashboard/homepage URL
@@ -207,30 +209,39 @@ class EmailService:
         Returns:
             True if email sent successfully
         """
-        subject = "Welcome to BoniDoc!"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Welcome to BoniDoc, {user_name}!</h2>
-            <p>Your account has been created successfully.</p>
-            <p>Get started with organizing your documents:</p>
-            <p><a href="{dashboard_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a></p>
-            <p>If you have any questions, feel free to reply to this email.</p>
-            <p>Best regards,<br>The BoniDoc Team</p>
-        </body>
-        </html>
-        """
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'app_name': 'BoniDoc',
+            'login_url': dashboard_url,
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='welcome_email',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'welcome_email' not found")
+            raise Exception("Email template 'welcome_email' not found in database")
 
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_noreply
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
         )
 
     async def send_password_reset_email(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         reset_token: str,
@@ -240,6 +251,7 @@ class EmailService:
         Send password reset email
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             reset_token: Password reset token
@@ -248,32 +260,40 @@ class EmailService:
         Returns:
             True if email sent successfully
         """
-        subject = "Reset Your BoniDoc Password"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Password Reset Request</h2>
-            <p>Hello {user_name},</p>
-            <p>We received a request to reset your BoniDoc password.</p>
-            <p>Click the button below to reset your password:</p>
-            <p><a href="{reset_url}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request a password reset, please ignore this email.</p>
-            <p>Best regards,<br>The BoniDoc Team</p>
-        </body>
-        </html>
-        """
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'app_name': 'BoniDoc',
+            'reset_url': reset_url,
+            'reset_link_expiration_hours': '1',
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='password_reset',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'password_reset' not found")
+            raise Exception("Email template 'password_reset' not found in database")
 
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_noreply
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
         )
 
     async def send_verification_code_email(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         verification_code: str
@@ -282,6 +302,7 @@ class EmailService:
         Send 2FA verification code email
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             verification_code: 6-digit verification code
@@ -289,31 +310,40 @@ class EmailService:
         Returns:
             True if email sent successfully
         """
-        subject = "Your BoniDoc Verification Code"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Verification Code</h2>
-            <p>Hello {user_name},</p>
-            <p>Your verification code is:</p>
-            <h1 style="color: #4CAF50; font-size: 36px; letter-spacing: 5px;">{verification_code}</h1>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you didn't request this code, please secure your account immediately.</p>
-            <p>Best regards,<br>The BoniDoc Team</p>
-        </body>
-        </html>
-        """
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'app_name': 'BoniDoc',
+            'verification_code': verification_code,
+            'code_expiration_minutes': '10',
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='verification_code',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'verification_code' not found")
+            raise Exception("Email template 'verification_code' not found in database")
 
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_noreply
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
         )
 
     async def send_user_created_notification(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         dashboard_url: str,
@@ -323,6 +353,7 @@ class EmailService:
         Send notification when new user account is created
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             dashboard_url: Dashboard/homepage URL
@@ -336,48 +367,43 @@ class EmailService:
             logger.info(f"Skipping user creation email to {to_email} - marketing emails disabled")
             return False
 
-        subject = "Welcome to BoniDoc - Your Account is Ready!"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Welcome to BoniDoc, {user_name}!</h2>
-            <p>Your account has been successfully created. We're excited to have you on board!</p>
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'app_name': 'BoniDoc',
+            'dashboard_url': dashboard_url,
+            'feature_1': 'Automatically categorize your documents with intelligent OCR',
+            'feature_2': 'Store documents securely in your Google Drive',
+            'feature_3': 'Search and organize documents across multiple languages',
+            'feature_4': 'Access your documents from anywhere',
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
 
-            <h3>What you can do with BoniDoc:</h3>
-            <ul>
-                <li>Automatically categorize your documents with intelligent OCR</li>
-                <li>Store documents securely in your Google Drive</li>
-                <li>Search and organize documents across multiple languages</li>
-                <li>Access your documents from anywhere</li>
-            </ul>
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='user_created_notification',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
 
-            <p>Get started now:</p>
-            <p><a href="{dashboard_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a></p>
-
-            <p>If you have any questions or need help, feel free to reach out to our support team.</p>
-
-            <p>Best regards,<br>The BoniDoc Team</p>
-
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">
-                You received this email because you created a BoniDoc account.
-                You can manage your email preferences in your account settings.
-            </p>
-        </body>
-        </html>
-        """
+        if not email_data:
+            logger.error(f"Database template 'user_created_notification' not found")
+            raise Exception("Email template 'user_created_notification' not found in database")
 
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_info,
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
             reply_to=settings.email.email_from_info
         )
 
     async def send_drive_connected_notification(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         dashboard_url: str,
@@ -387,6 +413,7 @@ class EmailService:
         Send notification when Google Drive is successfully connected
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             dashboard_url: Dashboard URL
@@ -400,48 +427,40 @@ class EmailService:
             logger.info(f"Skipping Drive connection email to {to_email} - marketing emails disabled")
             return False
 
-        subject = "Google Drive Successfully Connected!"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Great news, {user_name}!</h2>
-            <p>Your Google Drive has been successfully connected to BoniDoc.</p>
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'app_name': 'BoniDoc',
+            'storage_provider': 'Google Drive',
+            'dashboard_url': dashboard_url,
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
 
-            <h3>What happens next:</h3>
-            <ul>
-                <li>Your documents will be securely stored in your Google Drive</li>
-                <li>BoniDoc will automatically categorize and organize them for you</li>
-                <li>You maintain full control and ownership of your files</li>
-                <li>Access your documents anytime from the dashboard</li>
-            </ul>
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='drive_connected',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
 
-            <p>Ready to upload your first document?</p>
-            <p><a href="{dashboard_url}" style="background-color: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a></p>
-
-            <p>If you have any questions about Google Drive integration, check out our help center or contact support.</p>
-
-            <p>Best regards,<br>The BoniDoc Team</p>
-
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">
-                You received this email because you connected Google Drive to your BoniDoc account.
-                You can manage your email preferences in your account settings.
-            </p>
-        </body>
-        </html>
-        """
+        if not email_data:
+            logger.error(f"Database template 'drive_connected' not found")
+            raise Exception("Email template 'drive_connected' not found in database")
 
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_info,
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
             reply_to=settings.email.email_from_info
         )
 
     async def send_account_deleted_notification(
         self,
+        session: Session,
         to_email: str,
         user_name: str,
         deletion_date: str
@@ -453,6 +472,7 @@ class EmailService:
         User must be informed about their data deletion.
 
         Args:
+            session: Database session
             to_email: User email
             user_name: User name
             deletion_date: Date when account was deleted
@@ -460,54 +480,32 @@ class EmailService:
         Returns:
             True if email sent successfully
         """
-        subject = "Your BoniDoc Account Has Been Deleted"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>Account Deletion Confirmation</h2>
-            <p>Hello {user_name},</p>
-            <p>This email confirms that your BoniDoc account has been successfully deleted on {deletion_date}.</p>
+        # Try to load template from database first
+        template_variables = {
+            'user_name': user_name,
+            'deletion_date': deletion_date,
+            'support_email': settings.email.email_from_info
+        }
 
-            <h3>What has been done:</h3>
-            <ul>
-                <li>Your account has been deactivated and scheduled for permanent deletion</li>
-                <li>Your personal information will be removed from our systems</li>
-                <li>Your documents remain in your Google Drive (we only removed our access)</li>
-                <li>All active sessions have been terminated</li>
-            </ul>
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='account_deletion',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
 
-            <h3>Data Retention:</h3>
-            <p>Per our data retention policy and legal requirements:</p>
-            <ul>
-                <li>Most personal data will be deleted within 30 days</li>
-                <li>Some anonymized usage statistics may be retained for analytics</li>
-                <li>Transaction records may be kept for accounting/legal purposes (7 years)</li>
-            </ul>
+        if not email_data:
+            logger.error(f"Database template 'account_deletion' not found")
+            raise Exception("Email template 'account_deletion' not found in database")
 
-            <p><strong>Important:</strong> Your documents stored in Google Drive are still yours and remain untouched.
-            We have only removed BoniDoc's access to your Drive.</p>
-
-            <p>If you deleted your account by mistake or would like to return, you're always welcome to create a new account.</p>
-
-            <p>We're sorry to see you go. If you have any feedback about your experience, we'd love to hear it.</p>
-
-            <p>Best regards,<br>The BoniDoc Team</p>
-
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">
-                This is a mandatory notification per GDPR regulations. You received this email because your
-                BoniDoc account was deleted. For questions, contact: {settings.email.email_from_info}
-            </p>
-        </body>
-        </html>
-        """
-
+        logger.info(f"Using database template for account deletion email to {to_email}")
         return await self.send_email(
-            to_email=to_email,
-            to_name=user_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_info,
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
             reply_to=settings.email.email_from_info
         )
 
@@ -814,6 +812,7 @@ class EmailService:
 
     async def send_admin_new_user_notification(
         self,
+        session: Session,
         admin_email: str,
         admin_name: str,
         new_user_name: str,
@@ -826,6 +825,7 @@ class EmailService:
         Send notification to admin when new user registers
 
         Args:
+            session: Database session
             admin_email: Admin email address
             admin_name: Admin name
             new_user_name: New user's full name
@@ -837,51 +837,277 @@ class EmailService:
         Returns:
             True if email sent successfully
         """
-        subject = f"New User Registration: {new_user_name}"
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2>New User Registration</h2>
-            <p>Hello {admin_name},</p>
-            <p>A new user has completed registration on BoniDoc.</p>
+        # Load template from database
+        template_variables = {
+            'admin_name': admin_name,
+            'new_user_name': new_user_name,
+            'new_user_email': new_user_email,
+            'new_user_id': str(new_user_id),
+            'tier_name': tier_name,
+            'registration_date': registration_date,
+            'admin_dashboard_url': f"{settings.app.app_frontend_url}/admin",
+            'app_name': 'BoniDoc'
+        }
 
-            <h3>User Details:</h3>
-            <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 8px; font-weight: bold;">Name:</td>
-                    <td style="padding: 8px;">{new_user_name}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 8px; font-weight: bold;">User ID:</td>
-                    <td style="padding: 8px;">{new_user_id}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 8px; font-weight: bold;">Email:</td>
-                    <td style="padding: 8px;">{new_user_email}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 8px; font-weight: bold;">Package:</td>
-                    <td style="padding: 8px;"><strong>{tier_name}</strong></td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; font-weight: bold;">Registration Date:</td>
-                    <td style="padding: 8px;">{registration_date}</td>
-                </tr>
-            </table>
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='admin_new_user_notification',
+            variables=template_variables,
+            recipient_email=admin_email,
+            recipient_name=admin_name
+        )
 
-            <p style="margin-top: 20px;">This is an automated notification from the BoniDoc system.</p>
-
-            <p>Best regards,<br>BoniDoc Admin System</p>
-        </body>
-        </html>
-        """
+        if not email_data:
+            logger.error(f"Database template 'admin_new_user_notification' not found")
+            raise Exception("Email template 'admin_new_user_notification' not found in database")
 
         return await self.send_email(
-            to_email=admin_email,
-            to_name=admin_name,
-            subject=subject,
-            html_content=html_content,
-            from_email=settings.email.email_from_noreply
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
+        )
+    async def send_delegate_invitation_registered(
+        self,
+        session: Session,
+        to_email: str,
+        to_name: str,
+        owner_name: str,
+        owner_email: str,
+        role: str,
+        accept_url: str
+    ) -> bool:
+        """
+        Send delegate invitation to registered user
+
+        Args:
+            session: Database session
+            to_email: Delegate email
+            to_name: Delegate name
+            owner_name: Document owner name
+            owner_email: Document owner email
+            role: Access role (viewer/editor/owner)
+            accept_url: URL to accept invitation
+
+        Returns:
+            True if email sent successfully
+        """
+        # Define permissions based on role
+        permissions = {
+            'viewer': ['View documents', 'Download documents', 'Access shared documents'],
+            'editor': ['View documents', 'Download documents', 'Edit document metadata'],
+            'owner': ['Full access to documents', 'Manage categories', 'Full control']
+        }
+
+        restrictions = {
+            'viewer': ['Cannot upload new documents', 'Cannot modify existing documents'],
+            'editor': ['Cannot upload new documents', 'Limited administrative access'],
+            'owner': ['No restrictions', 'Full access granted']
+        }
+
+        role_perms = permissions.get(role, permissions['viewer'])
+        role_restrictions = restrictions.get(role, restrictions['viewer'])
+
+        template_variables = {
+            'delegate_name': to_name,
+            'owner_name': owner_name,
+            'owner_email': owner_email,
+            'role': role.capitalize(),
+            'accept_url': accept_url,
+            'app_name': 'BoniDoc',
+            'permission_1': role_perms[0] if len(role_perms) > 0 else '',
+            'permission_2': role_perms[1] if len(role_perms) > 1 else '',
+            'permission_3': role_perms[2] if len(role_perms) > 2 else '',
+            'restriction_1': role_restrictions[0],
+            'restriction_2': role_restrictions[1],
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='delegate_invitation_registered',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=to_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'delegate_invitation_registered' not found")
+            raise Exception("Email template 'delegate_invitation_registered' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
+        )
+
+    async def send_delegate_invitation_unregistered(
+        self,
+        session: Session,
+        to_email: str,
+        owner_name: str,
+        owner_email: str,
+        signup_url: str
+    ) -> bool:
+        """
+        Send delegate invitation to unregistered user (requires signup)
+
+        Args:
+            session: Database session
+            to_email: Delegate email
+            owner_name: Document owner name
+            owner_email: Document owner email
+            signup_url: URL to sign up and accept invitation
+
+        Returns:
+            True if email sent successfully
+        """
+        template_variables = {
+            'delegate_email': to_email,
+            'owner_name': owner_name,
+            'owner_email': owner_email,
+            'signup_url': signup_url,
+            'app_name': 'BoniDoc',
+            'feature_1': 'Access and view shared documents',
+            'feature_2': 'Collaborate with document owners',
+            'feature_3': 'Organize and manage shared content',
+            'button_color': '#e67e22',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='delegate_invitation_unregistered',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=to_email
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'delegate_invitation_unregistered' not found")
+            raise Exception("Email template 'delegate_invitation_unregistered' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
+        )
+
+    async def send_email_rejection_notification(
+        self,
+        session: Session,
+        to_email: str,
+        to_name: str,
+        sender_email: str,
+        subject: str,
+        rejection_reason: str
+    ) -> bool:
+        """
+        Send notification when email processing fails
+
+        Args:
+            session: Database session
+            to_email: User email
+            to_name: User name
+            sender_email: Email sender address
+            subject: Original email subject
+            rejection_reason: Why processing failed
+
+        Returns:
+            True if email sent successfully
+        """
+        template_variables = {
+            'user_name': to_name,
+            'sender_email': sender_email,
+            'subject': subject,
+            'rejection_reason': rejection_reason,
+            'settings_url': f"{settings.app.app_frontend_url}/settings",
+            'support_url': f"{settings.app.app_frontend_url}/support",
+            'app_name': 'BoniDoc'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='email_rejection_notification',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=to_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'email_rejection_notification' not found")
+            raise Exception("Email template 'email_rejection_notification' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
+        )
+
+    async def send_email_completion_notification(
+        self,
+        session: Session,
+        to_email: str,
+        to_name: str,
+        sender_email: str,
+        subject: str,
+        documents_created: int
+    ) -> bool:
+        """
+        Send notification when email processing succeeds
+
+        Args:
+            session: Database session
+            to_email: User email
+            to_name: User name
+            sender_email: Email sender address
+            subject: Original email subject
+            documents_created: Number of documents created
+
+        Returns:
+            True if email sent successfully
+        """
+        template_variables = {
+            'user_name': to_name,
+            'sender_email': sender_email,
+            'subject': subject,
+            'documents_created': str(documents_created),
+            'dashboard_url': f"{settings.app.app_frontend_url}/documents",
+            'app_name': 'BoniDoc',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='email_completion_notification',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=to_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'email_completion_notification' not found")
+            raise Exception("Email template 'email_completion_notification' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_noreply),
+            reply_to=settings.email.email_from_noreply
         )
 
 
