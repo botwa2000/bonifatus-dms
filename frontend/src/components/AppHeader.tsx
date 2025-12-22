@@ -109,10 +109,9 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
                   title="Go to Homepage"
                   onClick={() => {
                     logger.debug('[HOME DEBUG] === Home Link Clicked ===')
-                      logger.debug('[HOME DEBUG] Current pathname:', pathname)
-                      logger.debug('[HOME DEBUG] Navigating to: /')
-                      logger.debug('[HOME DEBUG] Using Next.js Link component (same tab)')
-                    }
+                    logger.debug('[HOME DEBUG] Current pathname:', pathname)
+                    logger.debug('[HOME DEBUG] Navigating to: /')
+                    logger.debug('[HOME DEBUG] Using Next.js Link component (same tab)')
                   }}
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

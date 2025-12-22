@@ -26,8 +26,7 @@ export default function ForgotPasswordPage() {
 
     const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/email/forgot-password`
     logger.debug('[FORGOT PASSWORD] Submitting to:', apiUrl)
-      logger.debug('[FORGOT PASSWORD] Email:', email)
-    }
+    logger.debug('[FORGOT PASSWORD] Email:', email)
 
     try {
       const response = await fetch(apiUrl, {
@@ -37,12 +36,10 @@ export default function ForgotPasswordPage() {
       })
 
       logger.debug('[FORGOT PASSWORD] Response status:', response.status)
-      }
 
       const data = await response.json()
 
       logger.debug('[FORGOT PASSWORD] Response data:', data)
-      }
 
       if (response.ok) {
         setSuccess(true)

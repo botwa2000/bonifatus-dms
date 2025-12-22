@@ -101,11 +101,10 @@ export default function BatchUploadPage() {
       setCategories(data.categories)
 
       logger.debug('[UPLOAD DEBUG] === Available Categories Loaded ===')
-        logger.debug('[UPLOAD DEBUG] Total categories:', data.categories.length)
-        data.categories.forEach((cat: Category) => {
-          logger.debug(`[UPLOAD DEBUG]   - ID: ${cat.id}, Name: "${cat.name}"`)
-        })
-      }
+      logger.debug('[UPLOAD DEBUG] Total categories:', data.categories.length)
+      data.categories.forEach((cat: Category) => {
+        logger.debug(`[UPLOAD DEBUG]   - ID: ${cat.id}, Name: "${cat.name}"`)
+      })
     } catch (error) {
       logger.error('Failed to load categories:', error)
     }
@@ -341,8 +340,7 @@ export default function BatchUploadPage() {
 
       // Build upload states only for successful analyses
       logger.debug('[UPLOAD DEBUG] ==== Analysis Results ====')
-        logger.debug(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
-      }
+      logger.debug(`[UPLOAD DEBUG] Total files analyzed: ${result.total_files}, Successful: ${result.successful}`)
 
       const states: FileUploadState[] = result.results
         .filter((r: FileAnalysisResult): r is FileAnalysisSuccess => r.success)
@@ -351,29 +349,28 @@ export default function BatchUploadPage() {
           const suggestedCategory = categories.find(c => c.id === r.analysis.suggested_category_id)
 
           logger.debug(`[UPLOAD DEBUG] === File Analysis Complete ===`)
-            logger.debug(`[UPLOAD DEBUG] File: ${r.original_filename}`)
-            logger.debug(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
-            logger.debug(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
-            logger.debug(`[UPLOAD DEBUG]   - Entities: ${r.analysis.entities?.length || 0}`)
-            if (r.analysis.entities && r.analysis.entities.length > 0) {
-              logger.debug(`[UPLOAD DEBUG]   - Entity details:`, r.analysis.entities)
-            }
-            logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
-            logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
-            logger.debug(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
+          logger.debug(`[UPLOAD DEBUG] File: ${r.original_filename}`)
+          logger.debug(`[UPLOAD DEBUG]   - Language: ${r.analysis.detected_language}`)
+          logger.debug(`[UPLOAD DEBUG]   - Keywords: ${r.analysis.keywords?.length || 0}`)
+          logger.debug(`[UPLOAD DEBUG]   - Entities: ${r.analysis.entities?.length || 0}`)
+          if (r.analysis.entities && r.analysis.entities.length > 0) {
+            logger.debug(`[UPLOAD DEBUG]   - Entity details:`, r.analysis.entities)
+          }
+          logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category ID: ${r.analysis.suggested_category_id || 'None'}`)
+          logger.debug(`[UPLOAD DEBUG]   - Auto-Assigned Category Name: ${suggestedCategory?.name || 'None'}`)
+          logger.debug(`[UPLOAD DEBUG]   - Confidence: ${r.analysis.confidence || 0}%`)
 
-            // CRITICAL DEBUG: Show if category ID mismatch
-            if (r.analysis.suggested_category_id && !suggestedCategory) {
-              logger.error(`[CHECKBOX DEBUG] ❌❌❌ CATEGORY ID MISMATCH!`)
-              logger.error(`[CHECKBOX DEBUG] Backend suggested category ID: ${r.analysis.suggested_category_id}`)
-              logger.error(`[CHECKBOX DEBUG] This ID is NOT in the available categories list!`)
-              logger.error(`[CHECKBOX DEBUG] Available category IDs:`, categories.map(c => c.id))
-              logger.error(`[CHECKBOX DEBUG] Available "Other" categories:`, categories.filter(c => c.name?.toLowerCase().includes('other') || c.name?.toLowerCase().includes('sonstige')))
-              logger.error(`[CHECKBOX DEBUG] Result: Checkbox will NOT be checked because ID doesn't exist in list`)
-            } else if (suggestedCategory) {
-              logger.debug(`[CHECKBOX DEBUG] ✅ Category found: ${suggestedCategory.name} (${suggestedCategory.id})`)
-              logger.debug(`[CHECKBOX DEBUG] Checkbox WILL be checked`)
-            }
+          // CRITICAL DEBUG: Show if category ID mismatch
+          if (r.analysis.suggested_category_id && !suggestedCategory) {
+            logger.error(`[CHECKBOX DEBUG] ❌❌❌ CATEGORY ID MISMATCH!`)
+            logger.error(`[CHECKBOX DEBUG] Backend suggested category ID: ${r.analysis.suggested_category_id}`)
+            logger.error(`[CHECKBOX DEBUG] This ID is NOT in the available categories list!`)
+            logger.error(`[CHECKBOX DEBUG] Available category IDs:`, categories.map(c => c.id))
+            logger.error(`[CHECKBOX DEBUG] Available "Other" categories:`, categories.filter(c => c.name?.toLowerCase().includes('other') || c.name?.toLowerCase().includes('sonstige')))
+            logger.error(`[CHECKBOX DEBUG] Result: Checkbox will NOT be checked because ID doesn't exist in list`)
+          } else if (suggestedCategory) {
+            logger.debug(`[CHECKBOX DEBUG] ✅ Category found: ${suggestedCategory.name} (${suggestedCategory.id})`)
+            logger.debug(`[CHECKBOX DEBUG] Checkbox WILL be checked`)
           }
 
           // NEW: Use multi-category suggestions if available, otherwise fall back to single category

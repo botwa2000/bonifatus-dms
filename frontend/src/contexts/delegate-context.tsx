@@ -35,6 +35,17 @@ export function DelegateProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAccess(true)
       const response = await delegateService.listGrantedAccess()
       setGrantedAccess(response.granted_access)
+
+      // Validate actingAsUserId - clear if no longer in granted access list
+      const stored = localStorage.getItem('actingAsUserId')
+      if (stored) {
+        const hasAccess = response.granted_access.some(access => access.owner_user_id === stored)
+        if (!hasAccess) {
+          logger.warn('[DELEGATE] Clearing stale actingAsUserId from localStorage:', stored)
+          localStorage.removeItem('actingAsUserId')
+          setActingAsUserId(null)
+        }
+      }
     } catch (error) {
       logger.error('Failed to load granted access:', error)
       setGrantedAccess([])

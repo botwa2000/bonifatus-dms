@@ -195,9 +195,8 @@ export default function DocumentsPage() {
 
   const handleDelete = async (documentId: string) => {
     logger.debug('[DELETE DEBUG] === Frontend Delete Started ===')
-      logger.debug('[DELETE DEBUG] Document ID:', documentId)
-      logger.debug('[DELETE DEBUG] Document ID type:', typeof documentId)
-    }
+    logger.debug('[DELETE DEBUG] Document ID:', documentId)
+    logger.debug('[DELETE DEBUG] Document ID type:', typeof documentId)
 
     try {
       logger.debug('[DELETE DEBUG] Calling API delete endpoint:', `/api/v1/documents/${documentId}`)
@@ -214,10 +213,8 @@ export default function DocumentsPage() {
       await loadDocuments()
       logger.debug('[DELETE DEBUG] ✅✅✅ Delete completed successfully')
     } catch (err) {
-      
-        logger.error('[DELETE DEBUG] ❌ Delete failed:', err)
-        logger.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
-      }
+      logger.error('[DELETE DEBUG] ❌ Delete failed:', err)
+      logger.error('[DELETE DEBUG] Error details:', JSON.stringify(err, null, 2))
 
       // Close modal on error to prevent double-delete attempts
       setDeletingDocument(null)

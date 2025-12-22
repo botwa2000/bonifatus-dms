@@ -252,10 +252,28 @@ export class ApiClient {
 
   private createHttpError(response: Response, data: unknown): ApiError {
     const errorData = data as Record<string, unknown>
-    
+
+    // Extract error message
+    let message: string
+    if (errorData?.message && typeof errorData.message === 'string') {
+      message = errorData.message
+    } else if (errorData?.detail) {
+      // Handle structured detail objects (e.g., { code: "...", message: "..." })
+      if (typeof errorData.detail === 'object' && errorData.detail !== null) {
+        const detailObj = errorData.detail as Record<string, unknown>
+        message = (detailObj.message as string) || `HTTP ${response.status}: ${response.statusText}`
+      } else if (typeof errorData.detail === 'string') {
+        message = errorData.detail
+      } else {
+        message = `HTTP ${response.status}: ${response.statusText}`
+      }
+    } else {
+      message = `HTTP ${response.status}: ${response.statusText}`
+    }
+
     return {
       name: 'HttpError',
-      message: errorData?.message as string || errorData?.detail as string || `HTTP ${response.status}: ${response.statusText}`,
+      message,
       status: response.status,
       response: {
         data: errorData,
