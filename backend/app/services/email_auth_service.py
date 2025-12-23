@@ -7,6 +7,7 @@ Handles user registration, login, email verification, and password reset
 import logging
 import secrets
 import string
+import hashlib
 from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
 import bcrypt
@@ -36,34 +37,53 @@ class EmailAuthService:
 
     def hash_password(self, password: str) -> str:
         """
-        Hash password using bcrypt with 12 rounds
+        Hash password using SHA-256 pre-hashing followed by bcrypt
+
+        To support passwords of unlimited length while maintaining bcrypt's security:
+        1. SHA-256 hash the password (supports unlimited input length)
+        2. Bcrypt the SHA-256 hash (fixed 64-char hex string, well within 72-byte limit)
+
+        This approach provides:
+        - Unlimited password length support
+        - Bcrypt's slow hashing protection against brute force
+        - SHA-256's cryptographic strength
 
         Args:
-            password: Plain text password
+            password: Plain text password of any length
 
         Returns:
             Bcrypt hash string
         """
-        password_bytes = password.encode('utf-8')
+        # Step 1: SHA-256 hash the password (handles unlimited length)
+        sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+        # Step 2: Bcrypt the SHA-256 hash (64 chars hex, well under 72-byte limit)
         salt = bcrypt.gensalt(rounds=self.BCRYPT_ROUNDS)
-        hashed = bcrypt.hashpw(password_bytes, salt)
+        hashed = bcrypt.hashpw(sha256_hash.encode('utf-8'), salt)
         return hashed.decode('utf-8')
 
     def verify_password(self, password: str, password_hash: str) -> bool:
         """
-        Verify password against bcrypt hash
+        Verify password against bcrypt hash using SHA-256 pre-hashing
+
+        Must use the same SHA-256 pre-hashing as hash_password:
+        1. SHA-256 hash the input password
+        2. Verify the hash against the stored bcrypt hash
 
         Args:
-            password: Plain text password
+            password: Plain text password of any length
             password_hash: Bcrypt hash to verify against
 
         Returns:
             True if password matches, False otherwise
         """
         try:
-            password_bytes = password.encode('utf-8')
+            # Step 1: SHA-256 hash the password (same as hash_password)
+            sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+            # Step 2: Verify against bcrypt hash
             hash_bytes = password_hash.encode('utf-8')
-            return bcrypt.checkpw(password_bytes, hash_bytes)
+            return bcrypt.checkpw(sha256_hash.encode('utf-8'), hash_bytes)
         except Exception as e:
             logger.error(f"Password verification error: {e}")
             return False
@@ -540,8 +560,8 @@ class EmailAuthService:
             if not user:
                 return None
 
-            # Generate secure random token (64 characters)
-            token = encryption_service.generate_secure_token(32)  # Returns 64-char hex string
+            # Generate secure random token (64 characters base64)
+            token = encryption_service.generate_secure_token(48)  # 48 bytes = 64 chars in base64
 
             # Create reset token record
             from uuid import uuid4
