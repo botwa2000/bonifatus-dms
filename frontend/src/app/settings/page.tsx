@@ -202,7 +202,7 @@ export default function SettingsPage() {
         logger.debug('[DELEGATE DEBUG] 409 error detail:', detail)
         logger.debug('[DELEGATE DEBUG] Full error:', error)
 
-        if (typeof detail === 'object' && detail?.code === 'USER_NOT_REGISTERED') {
+        if (typeof detail === 'object' && detail !== null && 'code' in detail && detail.code === 'USER_NOT_REGISTERED') {
           // Show confirmation dialog
           const confirmed = window.confirm(
             detail.message ||
