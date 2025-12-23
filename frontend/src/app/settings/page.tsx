@@ -197,7 +197,7 @@ export default function SettingsPage() {
       logger.debug('[DELEGATE] Extracted status:', status)
       if (status === 409) {
         // Try multiple paths to get the detail object
-        let detail = error?.response?.data?.detail || error?.error?.detail || error?.response?.data
+        const detail = error?.response?.data?.detail || error?.error?.detail || error?.response?.data
 
         logger.debug('[DELEGATE DEBUG] 409 error detail:', detail)
         logger.debug('[DELEGATE DEBUG] Full error:', error)

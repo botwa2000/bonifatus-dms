@@ -149,7 +149,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </h4>
             <p className="text-sm text-yellow-800">
               By canceling your <span className="font-medium">{subscription.tier_name}</span> subscription,
-              you'll lose access to premium features and be limited to basic functionality.
+              you&apos;ll lose access to premium features and be limited to basic functionality.
               Your investment in professional document management will be paused.
             </p>
           </div>
@@ -169,7 +169,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
               <p className="font-medium text-blue-900">14-Day Money-Back Guarantee</p>
               <p className="text-sm mt-1 text-blue-700">
                 You subscribed {subscriptionAgeDays} day{subscriptionAgeDays !== 1 ? 's' : ''} ago.
-                You're eligible for a full refund if you cancel immediately.
+                You&apos;re eligible for a full refund if you cancel immediately.
               </p>
             </div>
           )}
@@ -198,7 +198,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
       <ModalContent>
         <div className="space-y-6">
           <p className="text-neutral-600">
-            We'd love to know why you're canceling. Your feedback helps us improve.
+            We&apos;d love to know why you&apos;re canceling. Your feedback helps us improve.
           </p>
 
           {/* Cancellation type selection */}
@@ -392,7 +392,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             </p>
             {!result?.downgraded_to_free && (
               <p className="text-sm text-blue-800 mt-2">
-                After this date, you'll be automatically downgraded to the Free tier.
+                After this date, you&apos;ll be automatically downgraded to the Free tier.
               </p>
             )}
           </div>

@@ -96,7 +96,7 @@ export default function LoginPageContent() {
             </Link>
 
             <div className="text-sm text-neutral-600 dark:text-neutral-400">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/signup" className="text-admin-primary hover:text-admin-primary-dark font-medium">
                 Sign up
               </Link>

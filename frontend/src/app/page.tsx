@@ -274,7 +274,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Email Your Documents</h3>
               <p className="text-neutral-600 dark:text-neutral-400">
-                Forward to your@docs.bonidoc.com - we'll process and organize it automatically (Pro)
+                Forward to your@docs.bonidoc.com - we&apos;ll process and organize it automatically (Pro)
               </p>
             </div>
 

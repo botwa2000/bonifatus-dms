@@ -130,7 +130,7 @@ function AcceptInvitationContent() {
 
             <p className="text-gray-600 dark:text-gray-400 mb-2">
               You now have <strong className="text-gray-900 dark:text-white">{invitationDetails.role}</strong> access to{' '}
-              <strong className="text-gray-900 dark:text-white">{invitationDetails.owner_name}'s</strong> documents.
+              <strong className="text-gray-900 dark:text-white">{invitationDetails.owner_name}&apos;s</strong> documents.
             </p>
 
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
@@ -166,7 +166,7 @@ function AcceptInvitationContent() {
 
           <div className="mb-8">
             <p className="text-gray-600 dark:text-gray-400 text-center">
-              You've been invited to access another user's document library as a delegate.
+              You&apos;ve been invited to access another user&apos;s document library as a delegate.
             </p>
           </div>
 

@@ -172,7 +172,7 @@ export default function ForgotPasswordPage() {
               {/* Info Box */}
               <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  <strong className="text-neutral-900 dark:text-white">Didn't receive the email?</strong><br />
+                  <strong className="text-neutral-900 dark:text-white">Didn&apos;t receive the email?</strong><br />
                   Check your spam folder. The link expires in 1 hour.
                 </p>
               </div>
