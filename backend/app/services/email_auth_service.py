@@ -168,7 +168,7 @@ class EmailAuthService:
 
                     return {
                         'success': False,
-                        'message': 'This email is already registered but not verified. We\'ve sent a new verification code to your email.',
+                        'message': 'You started registration with this email earlier. We\'ve sent a fresh verification code to your inbox. Please check your email and enter the code to complete registration.',
                         'requires_verification': True,
                         'email': email.lower(),
                         'verification_code_id': code_result['code_id'],
@@ -178,7 +178,7 @@ class EmailAuthService:
                 # Email verified - user should login
                 return {
                     'success': False,
-                    'message': 'This email is already registered. Please log in or use "Forgot Password" if you need to reset your password.',
+                    'message': 'An account with this email already exists. Please login instead. If you forgot your password, click "Forgot Password" to reset it.',
                     'requires_login': True,
                     'user_friendly': True
                 }
@@ -301,15 +301,19 @@ class EmailAuthService:
             if not user:
                 return {
                     'success': False,
-                    'message': 'Invalid email or password'
+                    'message': 'No account found with this email address. Please sign up or check that you entered the correct email.',
+                    'account_not_found': True
                 }
 
             # Check if account is locked
             if user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
+                time_remaining = user.account_locked_until - datetime.now(timezone.utc)
+                minutes_remaining = int(time_remaining.total_seconds() / 60) + 1
                 return {
                     'success': False,
-                    'message': 'Account is temporarily locked. Please try again later.',
-                    'locked_until': user.account_locked_until.isoformat()
+                    'message': f'Too many failed login attempts. Your account is locked for {minutes_remaining} more minute{"s" if minutes_remaining != 1 else ""}. Please try again later.',
+                    'locked_until': user.account_locked_until.isoformat(),
+                    'minutes_remaining': minutes_remaining
                 }
 
             # Check if user has password (email auth)
@@ -340,19 +344,27 @@ class EmailAuthService:
                     session=session
                 )
 
+                attempts_left = max(0, 5 - user.failed_login_attempts)
+                if attempts_left > 0:
+                    message = f'Incorrect password. You have {attempts_left} attempt{"s" if attempts_left != 1 else ""} remaining before your account is temporarily locked. Forgot your password? Click "Forgot Password" to reset it.'
+                else:
+                    message = 'Incorrect password. Your account will be locked for security.'
+
                 return {
                     'success': False,
-                    'message': 'Invalid email or password',
-                    'attempts_remaining': max(0, 5 - user.failed_login_attempts)
+                    'message': message,
+                    'attempts_remaining': attempts_left,
+                    'wrong_password': True
                 }
 
             # Check email verification
             if not user.email_verified:
                 return {
                     'success': False,
-                    'message': 'Please verify your email before logging in',
+                    'message': 'Please verify your email first before logging in. Check your inbox for the verification code. Didn\'t receive it? Click "Resend Verification Code".',
                     'requires_verification': True,
-                    'user_id': str(user.id)
+                    'user_id': str(user.id),
+                    'email': user.email
                 }
 
             # Login successful - reset failed attempts
@@ -557,6 +569,13 @@ class EmailAuthService:
 
             if not user:
                 return None
+
+            # Check if email is verified
+            if not user.email_verified:
+                return {
+                    'error': 'email_not_verified',
+                    'message': 'Please verify your email address first before resetting your password. Check your inbox for the verification code.'
+                }
 
             # Generate secure random token (64 characters base64)
             token = encryption_service.generate_secure_token(48)  # 48 bytes = 64 chars in base64

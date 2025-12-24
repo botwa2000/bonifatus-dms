@@ -529,15 +529,22 @@ async def download_document(
                 detail="Document not found"
             )
 
-        # Check if user has connected Google Drive
-        if not current_user.drive_refresh_token_encrypted:
+        # Get document owner's Google Drive credentials (for delegate access)
+        from app.database.connection import get_db as get_db_direct
+        from sqlalchemy import select
+        db_session = next(get_db_direct())
+        owner = db_session.execute(
+            select(User).where(User.id == document.user_id)
+        ).scalar_one_or_none()
+
+        if not owner or not owner.drive_refresh_token_encrypted:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Please connect your Google Drive account in Settings before downloading documents"
+                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
             )
 
         file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
             drive_file_id=document.google_drive_file_id
         )
 
@@ -547,7 +554,7 @@ async def download_document(
                 detail="Document content not available"
             )
 
-        logger.info(f"Document downloaded: {document_id} by user {current_user.email}")
+        logger.info(f"Document downloaded: {document_id} by user {current_user.email} (owner: {owner.email})")
 
         return StreamingResponse(
             io.BytesIO(file_content_bytes),
@@ -594,15 +601,22 @@ async def get_document_content(
                 detail="Document not found"
             )
 
-        # Check if user has connected Google Drive
-        if not current_user.drive_refresh_token_encrypted:
+        # Get document owner's Google Drive credentials (for delegate access)
+        from app.database.connection import get_db as get_db_direct
+        from sqlalchemy import select
+        db_session = next(get_db_direct())
+        owner = db_session.execute(
+            select(User).where(User.id == document.user_id)
+        ).scalar_one_or_none()
+
+        if not owner or not owner.drive_refresh_token_encrypted:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Please connect your Google Drive account in Settings"
+                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
             )
 
         file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
             drive_file_id=document.google_drive_file_id
         )
 
@@ -705,16 +719,23 @@ async def reprocess_document(
                 detail="Document not found"
             )
 
-        # Check if user has connected Google Drive
-        if not current_user.drive_refresh_token_encrypted:
+        # Get document owner's Google Drive credentials (for delegate access)
+        from app.database.connection import get_db as get_db_direct
+        from sqlalchemy import select
+        db_session = next(get_db_direct())
+        owner = db_session.execute(
+            select(User).where(User.id == document.user_id)
+        ).scalar_one_or_none()
+
+        if not owner or not owner.drive_refresh_token_encrypted:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Please connect your Google Drive account in Settings"
+                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
             )
 
         # Download document content
         file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=current_user.drive_refresh_token_encrypted,
+            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
             drive_file_id=document.google_drive_file_id
         )
 

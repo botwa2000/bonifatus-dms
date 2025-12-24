@@ -499,8 +499,10 @@ async def get_public_tier_plans():
                 'currency': tier.currency,
                 'currency_symbol': currency_symbol,
                 'max_monthly_upload_bytes': tier.max_monthly_upload_bytes,
+                'storage_quota_bytes': tier.max_monthly_upload_bytes,  # Frontend expects this name
                 'max_file_size_bytes': tier.max_file_size_bytes,
                 'max_pages_per_month': tier.max_pages_per_month,
+                'max_documents': None,  # No per-tier document limit, using pages limit instead
                 'max_translations_per_month': tier.max_translations_per_month,
                 'max_api_calls_per_month': tier.max_api_calls_per_month,
                 'max_team_members': tier.max_team_members,
