@@ -34,6 +34,11 @@ start_clamav_lazy() {
         mkdir -p /var/log/clamav
         chown clamav:clamav /var/log/clamav
 
+        # Ensure log file exists with proper permissions
+        touch /var/log/clamav/clamav.log
+        chown clamav:clamav /var/log/clamav/clamav.log
+        chmod 644 /var/log/clamav/clamav.log
+
         # Keepalive loop - restart clamd if it dies
         while true; do
             echo "[ClamAV] Starting daemon..."
@@ -111,6 +116,11 @@ else
     # Create log directory if it doesn't exist
     mkdir -p /var/log/clamav
     chown clamav:clamav /var/log/clamav
+
+    # Ensure log file exists with proper permissions
+    touch /var/log/clamav/clamav.log
+    chown clamav:clamav /var/log/clamav/clamav.log
+    chmod 644 /var/log/clamav/clamav.log
 
     # Start ClamAV daemon (will daemonize itself)
     echo "[ClamAV] Starting daemon..."

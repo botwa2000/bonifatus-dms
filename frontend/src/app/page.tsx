@@ -28,6 +28,7 @@ interface TierPlan {
   storage_quota_bytes: number
   max_file_size_bytes: number
   max_documents: number | null
+  max_pages_per_month: number | null
   max_batch_upload_size: number | null
   bulk_operations_enabled: boolean
   api_access_enabled: boolean
@@ -445,9 +446,9 @@ export default function HomePage() {
                 const storageDisplay = tier.storage_quota_bytes >= 1000000000000 || tier.storage_quota_bytes === null
                   ? 'Unlimited'
                   : formatStorage(tier.storage_quota_bytes)
-                const documentsDisplay = tier.max_documents === null
-                  ? 'Unlimited documents'
-                  : `${tier.max_documents} documents/month`
+                const pagesDisplay = tier.max_pages_per_month === null
+                  ? 'Unlimited pages'
+                  : `${tier.max_pages_per_month} pages/month`
 
                 return (
                   <div
@@ -491,7 +492,7 @@ export default function HomePage() {
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                         <span className="text-neutral-700 dark:text-neutral-300">
-                          <strong>{documentsDisplay}</strong>
+                          <strong>{pagesDisplay}</strong>
                         </span>
                       </li>
 

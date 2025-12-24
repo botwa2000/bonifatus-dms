@@ -531,10 +531,24 @@ async def download_document(
 
         # Get document owner's Google Drive credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
+        from app.database.models import Document as DocumentModel
         from sqlalchemy import select
         db_session = next(get_db_direct())
+
+        # First get the document from DB to get owner's user_id
+        doc_model = db_session.execute(
+            select(DocumentModel).where(DocumentModel.id == document_id)
+        ).scalar_one_or_none()
+
+        if not doc_model:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+
+        # Now get the owner
         owner = db_session.execute(
-            select(User).where(User.id == document.user_id)
+            select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
         if not owner or not owner.drive_refresh_token_encrypted:
@@ -603,10 +617,24 @@ async def get_document_content(
 
         # Get document owner's Google Drive credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
+        from app.database.models import Document as DocumentModel
         from sqlalchemy import select
         db_session = next(get_db_direct())
+
+        # First get the document from DB to get owner's user_id
+        doc_model = db_session.execute(
+            select(DocumentModel).where(DocumentModel.id == document_id)
+        ).scalar_one_or_none()
+
+        if not doc_model:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+
+        # Now get the owner
         owner = db_session.execute(
-            select(User).where(User.id == document.user_id)
+            select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
         if not owner or not owner.drive_refresh_token_encrypted:
@@ -721,10 +749,24 @@ async def reprocess_document(
 
         # Get document owner's Google Drive credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
+        from app.database.models import Document as DocumentModel
         from sqlalchemy import select
         db_session = next(get_db_direct())
+
+        # First get the document from DB to get owner's user_id
+        doc_model = db_session.execute(
+            select(DocumentModel).where(DocumentModel.id == document_id)
+        ).scalar_one_or_none()
+
+        if not doc_model:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+
+        # Now get the owner
         owner = db_session.execute(
-            select(User).where(User.id == document.user_id)
+            select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
         if not owner or not owner.drive_refresh_token_encrypted:
