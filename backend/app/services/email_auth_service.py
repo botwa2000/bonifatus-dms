@@ -7,7 +7,6 @@ Handles user registration, login, email verification, and password reset
 import logging
 import secrets
 import string
-import hashlib
 from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
@@ -20,7 +19,18 @@ from app.database.auth_models import EmailVerificationCode, PasswordResetToken, 
 from app.services.encryption_service import encryption_service
 
 logger = logging.getLogger(__name__)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Use Argon2id - OWASP recommended, no password length limit
+# Configuration follows OWASP recommendations for 2024
+pwd_context = CryptContext(
+    schemes=["argon2", "bcrypt"],  # argon2 preferred, bcrypt for legacy
+    deprecated="auto",
+    argon2__memory_cost=65536,      # 64 MB (OWASP recommended)
+    argon2__time_cost=3,            # 3 iterations (OWASP recommended)
+    argon2__parallelism=4,          # 4 threads
+    argon2__hash_len=32,            # 32 bytes output
+    argon2__salt_len=16             # 16 bytes salt
+)
 
 
 class EmailAuthService:
@@ -38,60 +48,40 @@ class EmailAuthService:
 
     def hash_password(self, password: str) -> str:
         """
-        Hash password using SHA-256 pre-hashing followed by bcrypt
+        Hash password using Argon2id (OWASP 2024 recommendation)
 
-        To support passwords of unlimited length while maintaining bcrypt's security:
-        1. SHA-256 hash the password (supports unlimited input length)
-        2. Bcrypt the SHA-256 hash (fixed 64-char hex string, well within 72-byte limit)
-
-        This approach provides:
-        - Unlimited password length support
-        - Bcrypt's slow hashing protection against brute force
-        - SHA-256's cryptographic strength
+        Argon2id provides:
+        - No password length limit (handles unlimited length natively)
+        - Superior security vs bcrypt (GPU/ASIC resistant)
+        - Memory-hard algorithm (prevents hardware attacks)
+        - Configurable memory, time, and parallelism costs
+        - FIPS compliant and industry standard
 
         Args:
             password: Plain text password of any length
 
         Returns:
-            Bcrypt hash string
+            Argon2id hash string (format: $argon2id$...)
         """
-        # Step 1: SHA-256 hash the password (handles unlimited length)
-        sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-
-        logger.info(f"[PASSWORD HASH DEBUG] Original password length: {len(password)}")
-        logger.info(f"[PASSWORD HASH DEBUG] SHA-256 hash length: {len(sha256_hash)}")
-        logger.info(f"[PASSWORD HASH DEBUG] SHA-256 hash sample: {sha256_hash[:20]}...")
-
-        # Step 2: Bcrypt the SHA-256 hash (64 chars hex, well under 72-byte limit)
-        try:
-            result = pwd_context.hash(sha256_hash)
-            logger.info(f"[PASSWORD HASH DEBUG] Hash successful")
-            return result
-        except Exception as e:
-            logger.error(f"[PASSWORD HASH DEBUG] pwd_context.hash() failed: {e}")
-            raise
+        return pwd_context.hash(password)
 
     def verify_password(self, password: str, password_hash: str) -> bool:
         """
-        Verify password against bcrypt hash using SHA-256 pre-hashing
+        Verify password against stored hash (supports Argon2id and bcrypt)
 
-        Must use the same SHA-256 pre-hashing as hash_password:
-        1. SHA-256 hash the input password
-        2. Verify the hash against the stored bcrypt hash
+        Automatically detects hash type and uses correct algorithm.
+        Supports legacy bcrypt hashes for backward compatibility.
 
         Args:
             password: Plain text password of any length
-            password_hash: Bcrypt hash to verify against
+            password_hash: Stored password hash (Argon2id or bcrypt format)
 
         Returns:
             True if password matches, False otherwise
         """
         try:
-            # Step 1: SHA-256 hash the password (same as hash_password)
-            sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-
-            # Step 2: Verify against bcrypt hash using pwd_context
-            return pwd_context.verify(sha256_hash, password_hash)
+            # CryptContext automatically detects hash type and verifies
+            return pwd_context.verify(password, password_hash)
         except Exception as e:
             logger.error(f"Password verification error: {e}")
             return False
