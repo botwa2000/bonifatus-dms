@@ -58,8 +58,18 @@ class EmailAuthService:
         # Step 1: SHA-256 hash the password (handles unlimited length)
         sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
+        logger.info(f"[PASSWORD HASH DEBUG] Original password length: {len(password)}")
+        logger.info(f"[PASSWORD HASH DEBUG] SHA-256 hash length: {len(sha256_hash)}")
+        logger.info(f"[PASSWORD HASH DEBUG] SHA-256 hash sample: {sha256_hash[:20]}...")
+
         # Step 2: Bcrypt the SHA-256 hash (64 chars hex, well under 72-byte limit)
-        return pwd_context.hash(sha256_hash)
+        try:
+            result = pwd_context.hash(sha256_hash)
+            logger.info(f"[PASSWORD HASH DEBUG] Hash successful")
+            return result
+        except Exception as e:
+            logger.error(f"[PASSWORD HASH DEBUG] pwd_context.hash() failed: {e}")
+            raise
 
     def verify_password(self, password: str, password_hash: str) -> bool:
         """
