@@ -10,7 +10,7 @@ import string
 import hashlib
 from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
-import bcrypt
+from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from app.database.auth_models import EmailVerificationCode, PasswordResetToken, 
 from app.services.encryption_service import encryption_service
 
 logger = logging.getLogger(__name__)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class EmailAuthService:
@@ -58,9 +59,7 @@ class EmailAuthService:
         sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
         # Step 2: Bcrypt the SHA-256 hash (64 chars hex, well under 72-byte limit)
-        salt = bcrypt.gensalt(rounds=self.BCRYPT_ROUNDS)
-        hashed = bcrypt.hashpw(sha256_hash.encode('utf-8'), salt)
-        return hashed.decode('utf-8')
+        return pwd_context.hash(sha256_hash)
 
     def verify_password(self, password: str, password_hash: str) -> bool:
         """
@@ -81,9 +80,8 @@ class EmailAuthService:
             # Step 1: SHA-256 hash the password (same as hash_password)
             sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-            # Step 2: Verify against bcrypt hash
-            hash_bytes = password_hash.encode('utf-8')
-            return bcrypt.checkpw(sha256_hash.encode('utf-8'), hash_bytes)
+            # Step 2: Verify against bcrypt hash using pwd_context
+            return pwd_context.verify(sha256_hash, password_hash)
         except Exception as e:
             logger.error(f"Password verification error: {e}")
             return False
