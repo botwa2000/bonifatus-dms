@@ -7,7 +7,7 @@ Business logic for multi-user delegate access management
 import logging
 import secrets
 from typing import Optional, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, or_
@@ -111,12 +111,12 @@ class DelegateService:
                 elif existing.status == 'revoked':
                     # Re-invite revoked user: update existing record to pending
                     token = self._generate_invitation_token()
-                    expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
+                    expires_at = datetime.now(timezone.utc) + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
                     existing.status = 'pending'
                     existing.role = role
                     existing.invitation_token = token
-                    existing.invitation_sent_at = datetime.utcnow()
+                    existing.invitation_sent_at = datetime.now(timezone.utc)
                     existing.invitation_expires_at = expires_at
                     existing.access_expires_at = access_expires_at
                     existing.revoked_at = None
@@ -132,7 +132,7 @@ class DelegateService:
 
             # Generate invitation token for new invitation
             token = self._generate_invitation_token()
-            expires_at = datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=self.INVITATION_EXPIRY_DAYS)
 
             # Create new delegate invitation
             # delegate_user_id will be NULL if user is not registered yet
@@ -143,7 +143,7 @@ class DelegateService:
                 role=role,
                 status='pending',
                 invitation_token=token,
-                invitation_sent_at=datetime.utcnow(),
+                invitation_sent_at=datetime.now(timezone.utc),
                 invitation_expires_at=expires_at,
                 access_expires_at=access_expires_at
             )
@@ -186,7 +186,7 @@ class DelegateService:
             if delegate.status != 'pending':
                 return None, "This invitation has already been processed"
 
-            if delegate.invitation_expires_at and delegate.invitation_expires_at < datetime.utcnow():
+            if delegate.invitation_expires_at and delegate.invitation_expires_at < datetime.now(timezone.utc):
                 return None, "This invitation has expired"
 
             # Verify delegate user exists
@@ -206,7 +206,7 @@ class DelegateService:
             # Accept invitation
             delegate.delegate_user_id = delegate_user_id
             delegate.status = 'active'
-            delegate.invitation_accepted_at = datetime.utcnow()
+            delegate.invitation_accepted_at = datetime.now(timezone.utc)
 
             session.commit()
 
@@ -302,7 +302,7 @@ class DelegateService:
                 return False, "Access already revoked"
 
             delegate.status = 'revoked'
-            delegate.revoked_at = datetime.utcnow()
+            delegate.revoked_at = datetime.now(timezone.utc)
             delegate.revoked_by = revoked_by_user_id
 
             session.commit()
@@ -340,15 +340,15 @@ class DelegateService:
                 return False, None
 
             # Check if access has expired
-            if delegate.access_expires_at and delegate.access_expires_at < datetime.utcnow():
+            if delegate.access_expires_at and delegate.access_expires_at < datetime.now(timezone.utc):
                 # Auto-revoke expired access
                 delegate.status = 'revoked'
-                delegate.revoked_at = datetime.utcnow()
+                delegate.revoked_at = datetime.now(timezone.utc)
                 session.commit()
                 return False, None
 
             # Update last accessed timestamp
-            delegate.last_accessed_at = datetime.utcnow()
+            delegate.last_accessed_at = datetime.now(timezone.utc)
             session.commit()
 
             return True, delegate.role

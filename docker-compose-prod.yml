@@ -1,0 +1,158 @@
+services:
+  backend:
+    build: ./backend
+    container_name: bonifatus-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - BREVO_API_KEY=${BREVO_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true  # Prevent privilege escalation
+    cap_drop:
+      - ALL  # Drop all Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE  # Allow binding to ports < 1024 if needed
+    # Writable tmpfs volumes (rest of filesystem can be read-only in future)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=500m  # Temp files
+      - /app/logs:noexec,nosuid,size=200m  # Application logs
+      - /app/temp:noexec,nosuid,size=1G  # Batch processing temp files
+    # Resource limits to prevent DoS
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 5G  # Increased for libpostal language models
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://api.bonidoc.com
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: G-4ZJWP2FWRZ
+        NEXT_PUBLIC_POSTHOG_KEY: phc_h3K1bLEqWza5EYj1qs3WO1QWpcTyCownrVXjGAipWnA
+        NEXT_PUBLIC_POSTHOG_HOST: https://app.posthog.com
+    container_name: bonifatus-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true  # Prevent privilege escalation
+    cap_drop:
+      - ALL  # Drop all Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE  # Allow binding to port 3000
+    # Writable tmpfs volumes
+    tmpfs:
+      - /tmp:noexec,nosuid,size=200m  # Temp files
+      - /app/.next/cache:noexec,nosuid,size=100m  # Next.js cache
+    # Resource limits to prevent crypto mining
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'  # Prevent 400% CPU usage like we saw
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 100M
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: bonifatus-translator
+    restart: unless-stopped
+    user: "0:0"  # Run as root to avoid permission issues
+    ports:
+      - "127.0.0.1:5000:5000"  # Only accessible from localhost
+    environment:
+      - LT_HOST=0.0.0.0
+      - LT_PORT=5000
+      - LT_CHAR_LIMIT=5000
+      - LT_LOAD_ONLY=en,de,ru,fr  # Only load needed languages to save memory
+    volumes:
+      - ./translator-data:/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/languages"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # LibreTranslate needs time to load models
+
+  redis:
+    image: redis:7-alpine
+    container_name: bonifatus-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible from localhost
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID  # Allow user switching
+      - SETGID  # Allow group switching
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 50M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  celery-worker:
+    build: ./backend
+    container_name: bonifatus-celery-worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      - BREVO_API_KEY=${BREVO_API_KEY}
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Writable tmpfs volumes (same as backend)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=500m
+      - /app/logs:noexec,nosuid,size=200m
+      - /app/temp:noexec,nosuid,size=1G
+    # Resource limits (same as backend for processing)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
