@@ -1,6 +1,7 @@
 # backend/app/services/auth_service.py
 import logging
 import time
+import hashlib
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -32,12 +33,52 @@ class AuthService:
         self.refresh_token_expire_days = settings.security.refresh_token_expire_days
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify a plaintext password against its hash"""
-        return pwd_context.verify(plain_password, hashed_password)
+        """
+        Verify a plaintext password against its hash using SHA-256 pre-hashing
+
+        Uses SHA-256 pre-hashing before bcrypt to support unlimited password length:
+        1. SHA-256 hash the input password
+        2. Verify the hash against the stored bcrypt hash
+
+        Args:
+            plain_password: Plain text password of any length
+            hashed_password: Bcrypt hash to verify against
+
+        Returns:
+            True if password matches, False otherwise
+        """
+        try:
+            # SHA-256 hash the password first (same as get_password_hash)
+            sha256_hash = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+            # Verify the SHA-256 hash against the bcrypt hash
+            return pwd_context.verify(sha256_hash, hashed_password)
+        except Exception as e:
+            logger.error(f"Password verification error: {e}")
+            return False
 
     def get_password_hash(self, password: str) -> str:
-        """Generate password hash"""
-        return pwd_context.hash(password)
+        """
+        Generate password hash using SHA-256 pre-hashing followed by bcrypt
+
+        To support passwords of unlimited length while maintaining bcrypt's security:
+        1. SHA-256 hash the password (supports unlimited input length)
+        2. Bcrypt the SHA-256 hash (fixed 64-char hex string, well within 72-byte limit)
+
+        This approach provides:
+        - Unlimited password length support
+        - Bcrypt's slow hashing protection against brute force
+        - SHA-256's cryptographic strength
+
+        Args:
+            password: Plain text password of any length
+
+        Returns:
+            Bcrypt hash string
+        """
+        # Step 1: SHA-256 hash the password (handles unlimited length)
+        sha256_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        # Step 2: Bcrypt the SHA-256 hash (64 chars hex, well under 72-byte limit)
+        return pwd_context.hash(sha256_hash)
 
     def _copy_template_categories_to_user(self, user_id: UUID, db: Session) -> None:
         """
