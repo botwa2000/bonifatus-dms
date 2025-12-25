@@ -17,8 +17,9 @@ start_clamav_lazy() {
     # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
-        # Log directory already exists with clamav:clamav ownership from Dockerfile
-        # ClamAV will create log files automatically with proper permissions
+        # Fix log directory ownership after tmpfs mount (tmpfs creates as root:root)
+        chown clamav:clamav /var/log/clamav
+        chmod 755 /var/log/clamav
         echo "[ClamAV] Log directory: /var/log/clamav (owned by clamav:clamav)"
 
         # Update database if needed
@@ -99,8 +100,9 @@ elif should_lazy_load_clamav; then
 else
     echo "[Startup] Using SYNCHRONOUS LOADING strategy for ClamAV"
 
-    # Log directory already exists with clamav:clamav ownership from Dockerfile
-    # ClamAV will create log files automatically with proper permissions
+    # Fix log directory ownership after tmpfs mount (tmpfs creates as root:root)
+    chown clamav:clamav /var/log/clamav
+    chmod 755 /var/log/clamav
     echo "[ClamAV] Log directory: /var/log/clamav (owned by clamav:clamav)"
 
     # Update ClamAV virus database
