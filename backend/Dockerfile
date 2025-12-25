@@ -50,8 +50,7 @@ RUN apt-get update \
         automake \
         libtool \
         pkg-config \
-    && rm -rf /var/lib/apt/lists/* \
-    && chown -R root:root /var/lib/clamav /var/log/clamav /var/run/clamav ||  true
+    && rm -rf /var/lib/apt/lists/*
 
 # Install libpostal for address extraction (60+ countries, all languages)
 # Using master branch as v1.1 has incompatible pointer type errors with modern GCC
@@ -67,8 +66,9 @@ RUN curl -L https://github.com/openvenues/libpostal/archive/refs/heads/master.ta
     && cd / \
     && rm -rf /tmp/libpostal-master /tmp/libpostal.tar.gz
 
-# Configure ClamAV directories (owned by root since no user-switching in container)
+# Configure ClamAV with proper ownership for clamav user (industry-standard)
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
+    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav \
     && chmod 755 /var/run/clamav /var/lib/clamav /var/log/clamav
 
 # Copy optimized ClamAV configurations
@@ -76,7 +76,8 @@ COPY clamd.conf /etc/clamav/clamd.conf
 COPY freshclam.conf /etc/clamav/freshclam.conf
 
 # Set proper permissions for ClamAV configs
-RUN chmod 644 /etc/clamav/clamd.conf /etc/clamav/freshclam.conf
+RUN chown clamav:clamav /etc/clamav/clamd.conf /etc/clamav/freshclam.conf \
+    && chmod 644 /etc/clamav/clamd.conf /etc/clamav/freshclam.conf
 
 # Install Python dependencies
 COPY requirements.txt .
