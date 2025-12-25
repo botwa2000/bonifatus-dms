@@ -19,6 +19,8 @@ start_clamav_lazy() {
     (
         # Create log directory and files with proper permissions FIRST
         mkdir -p /var/log/clamav
+        # Remove any existing log files from package installation
+        rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
         touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
         chown -R clamav:clamav /var/log/clamav
         chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
@@ -103,6 +105,8 @@ else
 
     # Create log directory and files with proper permissions FIRST
     mkdir -p /var/log/clamav
+    # Remove any existing log files from package installation
+    rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
     touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
     chown -R clamav:clamav /var/log/clamav
     chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
