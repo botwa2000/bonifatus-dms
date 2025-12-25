@@ -24,6 +24,7 @@ services:
       - /tmp:noexec,nosuid,size=500m  # Temp files
       - /app/logs:noexec,nosuid,size=200m  # Application logs
       - /app/temp:noexec,nosuid,size=1G  # Batch processing temp files
+      - /var/log/clamav:size=50m  # ClamAV logs (fresh on each restart)
     # Resource limits to prevent DoS
     deploy:
       resources:
