@@ -1009,143 +1009,24 @@ export default function TermsAcceptanceModal() {
 
 ### 8.2 Routine Code Deployment (Most Common)
 
-**CRITICAL: When to Use Docker Cache vs --no-cache**
+**Docker Build Cache Strategy**
 
-Docker cache is **SAFE and RECOMMENDED** for 95% of deployments. Use this simple rule:
+Docker cache is **SAFE and RECOMMENDED** for 95% of deployments.
 
-#### ✅ Use Cache (DEFAULT) - Fast Build (2-3 min)
+| Build Type | Command | Time | When to Use |
+|------------|---------|------|-------------|
+| **With Cache** (default) | `docker compose build` | 2-3 min | Code/config changes, daily deployments, bug fixes |
+| **No Cache** (rare) | `docker compose build --no-cache` | 10-15 min | Monthly maintenance, Dockerfile base image changes, first deployment |
 
+**Rule of Thumb:** Use cache unless you're changing system dependencies or doing monthly maintenance.
+
+**Monthly Maintenance** (first Sunday):
 ```bash
-docker compose build
-```
-
-**Use for ALL of these changes:**
-- ✅ Python code changes (any .py file)
-- ✅ TypeScript/JavaScript changes (any .ts/.tsx/.js file)
-- ✅ requirements.txt changes (adding/updating packages)
-- ✅ package.json changes (adding/updating npm packages)
-- ✅ Configuration file changes (.env, config.py, etc.)
-- ✅ Database migrations (run at runtime, not build time)
-- ✅ HTML/CSS/static file changes
-- ✅ **Daily deployments, bug fixes, feature additions**
-
-**Why it's safe:** Docker detects file changes and rebuilds from that point forward. Your changes WILL be deployed.
-
-#### ❌ Use --no-cache - Slow Build (10-15 min)
-
-```bash
-docker compose build --no-cache
-```
-
-**ONLY use for these rare situations:**
-- ❌ Monthly maintenance (force fresh system packages)
-- ❌ Changing Dockerfile base image (e.g., `FROM python:3.11` → `FROM python:3.12`)
-- ❌ System dependency updates (apt-get packages need security updates)
-- ❌ Debugging build issues (suspected cache corruption)
-- ❌ First deployment to new server
-- ❌ After major Docker/OS upgrades
-
-**Why it's slow:** Downloads and installs everything from scratch, even if unchanged.
-
-#### Decision Tree
-
-```
-┌─────────────────────────────────────┐
-│ What did you change?                │
-└─────────────┬───────────────────────┘
-              │
-      ┌───────┴───────┐
-      │               │
-  Code/Config?    System/Base?
-      │               │
-      │               │
-   YES│            NO│
-      │               │
-      ▼               ▼
-┌─────────────┐ ┌──────────────────┐
-│   USE CACHE │ │ USE --no-cache   │
-│  (default)  │ │   (rare)         │
-│             │ │                  │
-│ ✅ Fast     │ │ ⚠️ Slow          │
-│ ✅ Safe     │ │ ⚠️ Only when     │
-│ ✅ Changes  │ │    needed        │
-│    deployed │ │                  │
-└─────────────┘ └──────────────────┘
-```
-
-#### How to Know if Cache Worked
-
-Watch the build output:
-
-**✅ Cache Hit (Old Layers Reused):**
-```
-#5 [3/10] RUN apt-get update && apt-get install -y gcc
-#5 CACHED
-```
-→ No changes in system packages, using cached layer
-
-**✅ Cache Miss (Rebuilding from Here):**
-```
-#8 [6/10] COPY backend/ /app/
-#8 0.234s done
-#9 [7/10] RUN pip install -r requirements.txt
-#9 12.3s done
-```
-→ Detected code changes, rebuilding from COPY step forward
-
-#### Monthly Maintenance Schedule
-
-Run this ONCE per month (not during deployments):
-
-```bash
-# First Sunday of month, 2 AM
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms
-docker compose build --no-cache backend
-docker compose up -d
+docker compose build --no-cache backend && docker compose up -d
 docker image prune -a --force  # Clean old images
 ```
 
-**Purpose:** Ensures system packages are up-to-date with security patches.
-
-#### Common Deployment Workflows
-
-**🟢 Normal Deployment (95% of time):**
-```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms
-git pull origin main
-docker compose build              # ← WITH cache
-docker compose up -d
-docker compose ps
-```
-**Time:** 2-3 minutes
-**Use for:** Code changes, bug fixes, new features
-
-**🟡 Dev Deployment:**
-```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms-dev
-git pull origin main
-docker compose build              # ← WITH cache
-docker compose up -d
-nginx -t && systemctl reload nginx  # IP whitelist
-```
-**Time:** 2-3 minutes
-**Use for:** Testing before production
-
-**🔴 Monthly Maintenance (rare):**
-```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms
-docker compose build --no-cache backend  # ← NO cache
-docker compose up -d
-docker image prune -a --force
-```
-**Time:** 10-15 minutes
-**Use for:** First Sunday of month, system updates
-
-**Simple push - takes 2-3 minutes:**
+**Normal Deployment:**
 
 ```bash
 ssh deploy@YOUR_SERVER_IP
@@ -1179,223 +1060,48 @@ docker exec bonifatus-backend alembic current
 
 ### 8.2a Development Environment Deployment
 
-**Deploy to Dev (dev.bonidoc.com) - Test Before Production**
-
-Development environment is isolated from production with:
-- Separate database (`bonifatus_dms_dev`)
-- Different ports (3001/8081/5001)
-- Different container names (with `-dev` suffix)
-- Debug logs enabled
-- Clean test data
-
-**⚠️ IMPORTANT:** Always test features on dev first before deploying to production!
-
-**Critical Configuration - Dev docker-compose.yml**
-
-The dev environment MUST have these specific settings to avoid conflicts with production:
-
-```yaml
-services:
-  backend:
-    build: ./backend
-    container_name: bonifatus-backend-dev    # ⚠️ MUST have -dev suffix
-    ports:
-      - "8081:8080"                          # ⚠️ External port 8081 (not 8080)
-    env_file:
-      - .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com  # ⚠️ MUST use dev API
-    container_name: bonifatus-frontend-dev   # ⚠️ MUST have -dev suffix
-    ports:
-      - "3001:3000"                          # ⚠️ External port 3001 (not 3000)
-    restart: unless-stopped
-    depends_on:
-      - backend
-
-  libretranslate:
-    image: libretranslate/libretranslate:latest
-    container_name: bonifatus-translator-dev # ⚠️ MUST have -dev suffix
-    restart: unless-stopped
-    user: "0:0"
-    ports:
-      - "127.0.0.1:5001:5000"                # ⚠️ External port 5001 (not 5000)
-    environment:
-      - LT_HOST=0.0.0.0
-      - LT_PORT=5000
-      - LT_CHAR_LIMIT=5000
-      - LT_LOAD_ONLY=en,de,ru,fr
-    volumes:
-      - ./translator-data:/app/db
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/languages"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-```
+**Purpose:** Test changes on dev.bonidoc.com before deploying to production.
 
 **Key Differences from Production:**
 
 | Setting | Production | Development |
 |---------|-----------|-------------|
-| **Container Names** | `bonifatus-backend` | `bonifatus-backend-dev` |
-| | `bonifatus-frontend` | `bonifatus-frontend-dev` |
-| | `bonifatus-translator` | `bonifatus-translator-dev` |
-| **Backend Port** | 8080 | 8081 |
-| **Frontend Port** | 3000 | 3001 |
-| **Translator Port** | 5000 | 5001 |
-| **API URL** | `https://api.bonidoc.com` | `https://api-dev.bonidoc.com` |
+| **Directory** | `/opt/bonifatus-dms` | `/opt/bonifatus-dms-dev` |
+| **Container Names** | `bonifatus-*` | `bonifatus-*-dev` (with -dev suffix) |
+| **Ports** | Backend: 8080, Frontend: 3000, Translator: 5000 | Backend: 8081, Frontend: 3001, Translator: 5001 |
+| **URLs** | `api.bonidoc.com`, `bonidoc.com` | `api-dev.bonidoc.com`, `dev.bonidoc.com` |
 | **Database** | `bonifatus_dms` | `bonifatus_dms_dev` |
-| **Debug Mode** | `false` | `true` |
-| **ClamAV** | Enabled | Disabled (CLAMAV_ENABLED=false) |
-| **IP Whitelist** | None (public) | Yes (specific IPs only) |
-| **CORS Origins** | `bonidoc.com` | `dev.bonidoc.com` |
+| **IP Whitelist** | None (public) | Yes (see §8.2b) |
+| **ClamAV** | Enabled (lazy load) | Optional (can disable) |
 
-**⚠️ CRITICAL:** If you see container name conflicts during deployment, the docker-compose.yml was not configured correctly. The `-dev` suffix on container names is MANDATORY to prevent conflicts with production containers.
+**⚠️ CRITICAL:** Container names MUST have `-dev` suffix to avoid conflicts with production containers.
 
-**Keeping Dev and Prod in Sync:**
-
-Both environments run identical code but with different configurations. To sync:
+**Deployment Procedure:**
 
 ```bash
-# Sync code to both environments (after git push)
-ssh root@91.99.212.17
+# Deploy to development
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
+  git pull origin main && \
+  docker compose build && \
+  docker compose up -d && \
+  nginx -t && systemctl reload nginx"
 
-# Update production
-cd /opt/bonifatus-dms
-git pull origin main
-docker compose build
-docker compose up -d
-
-# Update development
-cd /opt/bonifatus-dms-dev
-git pull origin main
-docker compose build
-docker compose up -d
-
-# Verify both are in sync
-curl -s https://api.bonidoc.com/health | grep environment    # Should show "production"
-curl -s https://api-dev.bonidoc.com/health | grep environment # Should show "development"
+# Verify deployment
+curl -s https://api-dev.bonidoc.com/health
 ```
 
-**⚠️ Environment-Specific Files (NEVER SYNC):**
-- `.env` files contain environment-specific secrets and settings
-- `docker-compose.yml` files contain environment-specific ports/names
-- Database contents are separate (prod data ≠ dev data)
-- **Nginx config for dev includes IP whitelist (see §8.2b)**
+**Common Issues:**
 
-**Common Sync Issues:**
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| CORS errors | Frontend calling wrong API | Rebuild frontend: `docker compose build frontend --no-cache` |
+| Container conflicts | Missing `-dev` suffix | Fix docker-compose.yml container names |
+| Access denied | IP not whitelisted | Add IP to nginx config (see §8.2b) |
 
-1. **Frontend calling wrong API** → Rebuild frontend with `--no-cache`
-2. **CORS errors** → Check `APP_CORS_ORIGINS` in `.env` matches frontend URL
-3. **Container name conflicts** → Verify `-dev` suffix in dev docker-compose.yml
-4. **Database connection errors** → Check pg_hba.conf has entry for dev network (172.21.0.0/16)
-
-**Step 1: Deploy code changes to dev**
-
-```bash
-ssh root@91.99.212.17
-
-# Navigate to dev directory
-cd /opt/bonifatus-dms-dev
-
-# Pull latest code
-git pull origin main
-
-# Rebuild containers (WITH CACHE - see §8.2 for cache decision)
-docker compose build              # ← Default: uses cache (2-3 min)
-# Only use --no-cache for monthly maintenance or system updates
-
-# Restart containers
-docker compose up -d
-
-# Reload nginx (CRITICAL for IP whitelist)
-nginx -t && systemctl reload nginx
-
-# Check status
-docker compose ps
-```
-
-**⚠️ Cache Usage:** Unless you're doing monthly maintenance or changed the Dockerfile base image, **always use cache** (default `docker compose build`). Your code changes WILL be deployed. See §8.2 for full cache decision tree.
-
-**⚠️ If frontend is calling wrong API (CORS errors):**
-
-If you see CORS errors like "Access to fetch at 'https://api.bonidoc.com' from origin 'https://dev.bonidoc.com' has been blocked", the frontend was built with wrong API URL. Rebuild with:
-
-```bash
-cd /opt/bonifatus-dms-dev
-
-# Force rebuild frontend with correct API URL
-docker compose build frontend --no-cache
-docker compose up -d frontend
-
-# Verify it's calling dev API (should show api-dev.bonidoc.com)
-curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
-```
-
-**Step 2: Verify dev deployment**
-
-```bash
-# 1. Backend health
-curl https://api-dev.bonidoc.com/health
-
-# 2. Frontend health
-curl https://dev.bonidoc.com
-
-# 3. Database verification
-docker exec bonifatus-backend-dev alembic current
-
-# 4. Check debug logs are enabled
-grep -i debug /opt/bonifatus-dms-dev/.env
-grep -i debug /opt/bonifatus-dms-dev/docker-compose.yml
-
-# Should show:
-# APP_DEBUG_MODE=true
-# NEXT_PUBLIC_DEBUG_LOGS: "true"
-```
-
-**Step 3: Test the feature**
-
-- Open browser to https://dev.bonidoc.com
-- Test all new functionality thoroughly
-- Check browser console for debug logs
-- Verify database changes (if any)
-
-**Step 4: Once verified, deploy to production**
-
-```bash
-# After dev testing passes, deploy to prod
-cd /opt/bonifatus-dms
-
-# ⚠️ NEVER copy .env or docker-compose.yml from dev!
-# Only copy application code files
-
-# Pull code (or rsync specific files)
-git pull origin main
-
-# Rebuild and restart
-docker compose build
-docker compose up -d
-```
-
-**Important Notes:**
-- **Credentials:** See `HETZNER_SETUP_ACTUAL.md` for dev database credentials
-- **Migration Guide:** See `/opt/DEV_TO_PROD_MIGRATION.md` for variables that must NOT be copied
-- **Debug Logs:** Always verify debug is `false` on prod after deployment
-- **Testing:** Always test on dev.bonidoc.com before deploying to bonidoc.com
+**Environment-Specific Files (NEVER sync between dev/prod):**
+- `.env` files (different secrets/settings)
+- `docker-compose.yml` (different ports/names)
+- Database contents (separate data)
 
 ### 8.2b IP Whitelist and Nginx Reload (CRITICAL for Dev Access)
 
@@ -1993,6 +1699,162 @@ alembic upgrade head
 - Application logs: email send success/failure
 - Free tier limit: 300 emails/day
 
+### 9.4.2 ClamAV Malware Scanner Configuration
+
+**Version:** ClamAV 1.4.3
+**Purpose:** Virus/malware scanning for uploaded documents
+**Integration:** Runs embedded in backend container with lazy-loading for fast startup
+
+**Environment Variables:**
+```bash
+# Optional - ClamAV is enabled by default in production
+CLAMAV_ENABLED=true              # Set to false to disable in dev
+CLAMAV_LAZY_LOAD=true            # Background initialization (recommended)
+APP_ENVIRONMENT=production       # Determines lazy vs sync loading
+```
+
+**Docker Configuration (docker-compose.yml):**
+
+The ClamAV daemon runs inside the backend container and requires specific capabilities and tmpfs mounts:
+
+```yaml
+backend:
+  cap_add:
+    - SETUID  # Allow ClamAV user switching
+    - SETGID  # Allow supplementary groups
+    - CHOWN   # Allow ownership changes
+  tmpfs:
+    - /var/log/clamav:size=50m,mode=777  # CRITICAL: Must be writable for freshclam
+    - /var/run/clamav:size=10m,mode=777  # For PID and socket files
+```
+
+**⚠️ CRITICAL CONFIGURATION:**
+
+1. **Log Directory Permissions**: The tmpfs mount for `/var/log/clamav` **must have mode=777**. Using mode=755 will cause freshclam to fail with "Permission denied" when trying to download virus databases.
+
+2. **User Configuration**: ClamAV config files have commented-out user directives to run as root inside the container:
+   ```conf
+   # clamd.conf
+   # User clamav          # COMMENTED OUT - runs as root in container
+   AllowSupplementaryGroups yes
+
+   # freshclam.conf
+   # DatabaseOwner clamav  # COMMENTED OUT - runs as root in container
+   ```
+
+3. **Why Run as Root in Container**:
+   - Container provides isolation layer
+   - Docker security restrictions prevent proper user-switching
+   - Industry-standard approach for containerized ClamAV
+   - Process capabilities are still restricted via cap_drop/cap_add
+
+**Startup Behavior:**
+
+- **Lazy Loading (Production)**: ClamAV initializes in background while FastAPI starts immediately
+  - Application starts in ~5 seconds
+  - ClamAV becomes available after ~30-60 seconds
+  - Health endpoint shows `clamav: "initializing"` then `clamav: "available"`
+
+- **Synchronous Loading (Development)**: ClamAV initializes before FastAPI starts
+  - Slower startup (~60-90 seconds)
+  - Guaranteed availability when app is ready
+  - Useful for testing/debugging
+
+**Health Check:**
+```bash
+# Check ClamAV status
+curl -s https://api.bonidoc.com/health | jq '.malware_scanner'
+
+# Expected output:
+{
+  "clamav": "available",
+  "clamav_version": "ClamAV 1.4.3/27860/Wed Dec 24 07:25:36 2025",
+  "pdf_validator": "available"
+}
+
+# Verify database files downloaded
+docker exec bonifatus-backend ls -lh /var/lib/clamav/
+# Should show: main.cvd (85MB), daily.cvd (23MB), bytecode.cvd (276KB)
+
+# Verify daemon is running
+docker exec bonifatus-backend ps aux | grep clamd
+# Should show: clamd process using ~1GB RAM
+```
+
+**Memory Usage:**
+- Database files: ~108MB disk space
+- Daemon process: ~900MB-1.2GB RAM (configured for memory efficiency)
+- Total container limit: 5GB (allows headroom for document processing)
+
+**Configuration Files:**
+
+Located in `backend/` directory:
+
+- **clamd.conf**: Daemon configuration optimized for Cloud Run/Docker
+  - MaxThreads: 1 (sequential scanning, saves memory)
+  - StreamMaxLength: 100MB
+  - PhishingSignatures: disabled (saves memory)
+  - ExitOnOOM: yes (clean shutdown on memory pressure)
+
+- **freshclam.conf**: Virus database updater configuration
+  - Downloads: main.cvd, daily.cvd, bytecode.cvd (essential databases only)
+  - UpdateLogFile: /var/log/clamav/freshclam.log
+  - Checks: 1 (updates once at startup, not continuous)
+
+**Troubleshooting Common Issues:**
+
+1. **ClamAV shows "unavailable" in health check:**
+   ```bash
+   # Check startup logs
+   docker logs bonifatus-backend | grep ClamAV
+
+   # Common causes:
+   # - Database download failed (check freshclam.log)
+   # - Daemon failed to start (check clamav.log)
+   # - Permissions error on log directory
+   ```
+
+2. **"Permission denied" on log files:**
+   ```bash
+   # Verify tmpfs mount permissions
+   docker inspect bonifatus-backend | grep -A 5 tmpfs
+
+   # Should show: /var/log/clamav with mode=777
+   # If not, update docker-compose.yml and rebuild
+   ```
+
+3. **"Can't open file or directory" error:**
+   ```bash
+   # Verify database files exist
+   docker exec bonifatus-backend ls -la /var/lib/clamav/
+
+   # If empty, database download failed - check:
+   docker exec bonifatus-backend cat /var/log/clamav/freshclam.log
+   ```
+
+4. **Daemon won't start - "initgroups() failed":**
+   ```bash
+   # Verify Docker capabilities
+   docker inspect bonifatus-backend | grep -A 10 CapAdd
+
+   # Should show: SETUID, SETGID, CHOWN
+   # If missing, add to docker-compose.yml cap_add section
+   ```
+
+**Disabling ClamAV (Development):**
+
+For faster dev environment startup, disable ClamAV:
+
+```bash
+# In .env file
+CLAMAV_ENABLED=false
+
+# Restart container
+docker compose restart backend
+```
+
+When disabled, document uploads skip malware scanning (PDF validation still runs).
+
 ### 9.5 Docker Compose Configuration
 
 ```yaml
@@ -2111,57 +1973,7 @@ server {
 
 ## 11. Feature History
 
-### 10.1 Completed Phases
-
-#### Phase 1: Security Foundation ✅
-
-- Database cleanup and consolidation
-- Encryption service (Fernet AES-256 for OAuth tokens)
-- Session management with revocation
-- 3-tier rate limiting system
-- File validation service
-- Security headers on all responses
-- Audit logging with full context
-- Replaced localStorage with httpOnly cookies
-- Reduced token expiry (15min access, 7day refresh)
-
-#### Phase 2A: OCR & Text Extraction ✅
-
-- PyMuPDF for native PDF text extraction
-- Tesseract for scanned/image PDFs
-- Structure-based PDF detection: Analyzes embedded fonts, text blocks, and images to determine if PDF is native or scanned (language-agnostic, prevents false positives)
-- Spell-checking validation: Post-OCR quality check using Hunspell dictionaries (en_US, de_DE, ru_RU, fr_FR)
-- Image preprocessing (rotation, deskewing)
-- Language detection (3-pass for accuracy)
-- Keyword extraction (frequency + stop word filtering)
-
-#### Phase 2B: Category Learning System ✅
-
-- Classification logging (track all decisions)
-- Daily accuracy metrics per category
-- Keyword weight adjustment (+10% correct, -5% incorrect)
-- Confidence-based suggestions
-- Multi-category support (unlimited per document, one primary)
-
-#### Phase 2C: Multi-Language Support ✅
-
-**Supported Languages:** English, German, Russian, French
-
-- Full UI localization
-- Document language detection
-- Language-specific keyword extraction
-- User preference for document languages (separate from UI language)
-- Category auto-translation to user's selected languages
-- No hardcoded language lists (all from database)
-
-#### Phase 3: Google Drive Integration ✅
-
-- Automatic folder structure creation
-- Document upload to category folders
-- Temporary download links
-- Storage quota tracking
-- Sync status monitoring
-- User maintains full control (can delete/move in Drive)
+> **Note:** See §6.1 for completed phases summary.
 
 ### 10.2 Pricing Model & Business
 
