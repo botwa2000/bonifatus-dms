@@ -21,9 +21,9 @@ start_clamav_lazy() {
         mkdir -p /var/log/clamav
         # Remove any existing log files from package installation
         rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-        touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-        chown -R clamav:clamav /var/log/clamav
-        chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+        # Create log files with world-writable permissions (no chown needed)
+        install -m 0666 /dev/null /var/log/clamav/clamav.log
+        install -m 0666 /dev/null /var/log/clamav/freshclam.log
 
         # Update database if needed
         if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
@@ -107,9 +107,9 @@ else
     mkdir -p /var/log/clamav
     # Remove any existing log files from package installation
     rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-    touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-    chown -R clamav:clamav /var/log/clamav
-    chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+    # Create log files with world-writable permissions (no chown needed)
+    install -m 0666 /dev/null /var/log/clamav/clamav.log
+    install -m 0666 /dev/null /var/log/clamav/freshclam.log
 
     # Update ClamAV virus database
     echo "[ClamAV] Checking virus database..."
