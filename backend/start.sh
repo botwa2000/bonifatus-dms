@@ -17,8 +17,8 @@ start_clamav_lazy() {
     # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
-        # Log directory created by tmpfs with clamav:clamav ownership (uid=100, gid=101)
-        echo "[ClamAV] Log directory: /var/log/clamav (tmpfs mount with clamav:clamav)"
+        # Log directory created by tmpfs with root:root ownership (uid=0, gid=0)
+        echo "[ClamAV] Log directory: /var/log/clamav (tmpfs mount with root:root)"
 
         # Update database if needed
         if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
@@ -98,8 +98,8 @@ elif should_lazy_load_clamav; then
 else
     echo "[Startup] Using SYNCHRONOUS LOADING strategy for ClamAV"
 
-    # Log directory created by tmpfs with clamav:clamav ownership (uid=100, gid=101)
-    echo "[ClamAV] Log directory: /var/log/clamav (tmpfs mount with clamav:clamav)"
+    # Log directory created by tmpfs with root:root ownership (uid=0, gid=0)
+    echo "[ClamAV] Log directory: /var/log/clamav (tmpfs mount with root:root)"
 
     # Update ClamAV virus database
     echo "[ClamAV] Checking virus database..."
