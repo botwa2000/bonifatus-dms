@@ -16,6 +16,8 @@ services:
       - ALL  # Drop all Linux capabilities
     cap_add:
       - NET_BIND_SERVICE  # Allow binding to ports < 1024 if needed
+      - SETUID  # Allow ClamAV to switch to clamav user
+      - SETGID  # Allow ClamAV to set supplementary groups
     # Writable tmpfs volumes (rest of filesystem can be read-only in future)
     tmpfs:
       - /tmp:noexec,nosuid,size=500m  # Temp files
@@ -135,6 +137,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID  # Allow ClamAV to switch to clamav user
+      - SETGID  # Allow ClamAV to set supplementary groups
     # Writable tmpfs volumes (same as backend)
     tmpfs:
       - /tmp:noexec,nosuid,size=500m
