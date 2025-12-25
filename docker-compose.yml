@@ -18,6 +18,7 @@ services:
       - NET_BIND_SERVICE  # Allow binding to ports < 1024 if needed
       - SETUID  # Allow ClamAV to switch to clamav user
       - SETGID  # Allow ClamAV to set supplementary groups
+      - CHOWN   # Allow ClamAV entrypoint to set ownership (industry standard)
     # Writable tmpfs volumes (rest of filesystem can be read-only in future)
     tmpfs:
       - /tmp:noexec,nosuid,size=500m  # Temp files
@@ -140,6 +141,7 @@ services:
     cap_add:
       - SETUID  # Allow ClamAV to switch to clamav user
       - SETGID  # Allow ClamAV to set supplementary groups
+      - CHOWN   # Allow ClamAV entrypoint to set ownership (industry standard)
     # Writable tmpfs volumes (same as backend)
     tmpfs:
       - /tmp:noexec,nosuid,size=500m

@@ -17,13 +17,9 @@ start_clamav_lazy() {
     # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
-        # Create log directory and files with proper permissions FIRST
-        mkdir -p /var/log/clamav
-        # Remove any existing log files from package installation
-        rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-        # Create log files with world-writable permissions (no chown needed)
-        install -m 0666 /dev/null /var/log/clamav/clamav.log
-        install -m 0666 /dev/null /var/log/clamav/freshclam.log
+        # Log directory already exists with clamav:clamav ownership from Dockerfile
+        # ClamAV will create log files automatically with proper permissions
+        echo "[ClamAV] Log directory: /var/log/clamav (owned by clamav:clamav)"
 
         # Update database if needed
         if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
@@ -103,13 +99,9 @@ elif should_lazy_load_clamav; then
 else
     echo "[Startup] Using SYNCHRONOUS LOADING strategy for ClamAV"
 
-    # Create log directory and files with proper permissions FIRST
-    mkdir -p /var/log/clamav
-    # Remove any existing log files from package installation
-    rm -f /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-    # Create log files with world-writable permissions (no chown needed)
-    install -m 0666 /dev/null /var/log/clamav/clamav.log
-    install -m 0666 /dev/null /var/log/clamav/freshclam.log
+    # Log directory already exists with clamav:clamav ownership from Dockerfile
+    # ClamAV will create log files automatically with proper permissions
+    echo "[ClamAV] Log directory: /var/log/clamav (owned by clamav:clamav)"
 
     # Update ClamAV virus database
     echo "[ClamAV] Checking virus database..."

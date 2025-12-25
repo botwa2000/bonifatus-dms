@@ -66,11 +66,10 @@ RUN curl -L https://github.com/openvenues/libpostal/archive/refs/heads/master.ta
     && cd / \
     && rm -rf /tmp/libpostal-master /tmp/libpostal.tar.gz
 
-# Configure ClamAV directories (log files created at runtime in start.sh)
+# Configure ClamAV directories with proper ownership (following official ClamAV Docker practices)
 RUN mkdir -p /var/run/clamav /var/lib/clamav /var/log/clamav \
-    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav \
-    && chmod 777 /var/log/clamav /var/run/clamav \
-    && chmod 755 /var/lib/clamav
+    && chown -R clamav:clamav /var/run/clamav /var/lib/clamav /var/log/clamav \
+    && chmod 755 /var/log/clamav /var/run/clamav /var/lib/clamav
 
 # Copy optimized ClamAV configurations
 COPY clamd.conf /etc/clamav/clamd.conf
