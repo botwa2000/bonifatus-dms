@@ -17,6 +17,12 @@ start_clamav_lazy() {
     # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
+        # Create log directory and files with proper permissions FIRST
+        mkdir -p /var/log/clamav
+        touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+        chown -R clamav:clamav /var/log/clamav
+        chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+
         # Update database if needed
         if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
             echo "[ClamAV] No database found. Downloading..."
@@ -29,10 +35,6 @@ start_clamav_lazy() {
         else
             echo "[ClamAV] Database exists."
         fi
-
-        # Create log directory if it doesn't exist
-        mkdir -p /var/log/clamav
-        chown clamav:clamav /var/log/clamav
 
         # Keepalive loop - restart clamd if it dies
         while true; do
@@ -99,18 +101,20 @@ elif should_lazy_load_clamav; then
 else
     echo "[Startup] Using SYNCHRONOUS LOADING strategy for ClamAV"
 
+    # Create log directory and files with proper permissions FIRST
+    mkdir -p /var/log/clamav
+    touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+    chown -R clamav:clamav /var/log/clamav
+    chmod 666 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
+
     # Update ClamAV virus database
     echo "[ClamAV] Checking virus database..."
     if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
         echo "[ClamAV] Downloading initial database..."
-        freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav || {
+        freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || {
             echo "[ClamAV] Warning: Database download failed. Continuing without ClamAV."
         }
     fi
-
-    # Create log directory if it doesn't exist
-    mkdir -p /var/log/clamav
-    chown clamav:clamav /var/log/clamav
 
     # Start ClamAV daemon (will daemonize itself)
     echo "[ClamAV] Starting daemon..."
