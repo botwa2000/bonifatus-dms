@@ -50,7 +50,8 @@ RUN apt-get update \
         automake \
         libtool \
         pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && chown -R root:root /var/lib/clamav /var/log/clamav /var/run/clamav ||  true
 
 # Install libpostal for address extraction (60+ countries, all languages)
 # Using master branch as v1.1 has incompatible pointer type errors with modern GCC
