@@ -17,10 +17,13 @@ start_clamav_lazy() {
     # Always start in a single background process with keepalive loop
     echo "[ClamAV] Starting initialization in background..."
     (
+        # Create directories for ClamAV runtime files
+        mkdir -p /var/log/clamav /var/run/clamav
+
         # Update database if needed
         if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
             echo "[ClamAV] No database found. Downloading..."
-            freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log
+            freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav
             if [ $? -ne 0 ]; then
                 echo "[ClamAV] Database download failed. ClamAV will not be available."
                 exit 1
@@ -29,15 +32,6 @@ start_clamav_lazy() {
         else
             echo "[ClamAV] Database exists."
         fi
-
-        # Create log directory if it doesn't exist
-        mkdir -p /var/log/clamav
-        chown clamav:clamav /var/log/clamav
-
-        # Ensure log files exist with proper permissions before clamd starts
-        touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-        chown clamav:clamav /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-        chmod 644 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
 
         # Keepalive loop - restart clamd if it dies
         while true; do
@@ -54,7 +48,7 @@ start_clamav_lazy() {
 
                 # Update database in background (first time only)
                 if [ ! -f /var/lib/clamav/.updated ]; then
-                    freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav 2>&1 | tee -a /var/log/clamav/freshclam.log || true
+                    freshclam --config-file=/etc/clamav/freshclam.conf --datadir=/var/lib/clamav || true
                     touch /var/lib/clamav/.updated
                 fi
 
@@ -104,6 +98,9 @@ elif should_lazy_load_clamav; then
 else
     echo "[Startup] Using SYNCHRONOUS LOADING strategy for ClamAV"
 
+    # Create directories for ClamAV runtime files
+    mkdir -p /var/log/clamav /var/run/clamav
+
     # Update ClamAV virus database
     echo "[ClamAV] Checking virus database..."
     if [ ! -f /var/lib/clamav/main.cvd ] && [ ! -f /var/lib/clamav/main.cld ]; then
@@ -112,15 +109,6 @@ else
             echo "[ClamAV] Warning: Database download failed. Continuing without ClamAV."
         }
     fi
-
-    # Create log directory if it doesn't exist
-    mkdir -p /var/log/clamav
-    chown clamav:clamav /var/log/clamav
-
-    # Ensure log files exist with proper permissions before clamd starts
-    touch /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-    chown clamav:clamav /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
-    chmod 644 /var/log/clamav/clamav.log /var/log/clamav/freshclam.log
 
     # Start ClamAV daemon (will daemonize itself)
     echo "[ClamAV] Starting daemon..."
