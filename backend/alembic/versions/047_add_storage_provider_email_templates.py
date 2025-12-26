@@ -29,8 +29,8 @@ def upgrade():
         ) VALUES (
             'provider_connected',
             'Storage Provider Connected',
-            'Notification sent when a cloud storage provider is successfully connected',
-            '{{provider_name}} Connected Successfully - {{app_name}}',
+            'Notification sent when cloud storage provider successfully connected',
+            '{{provider_name}} Connected - {{app_name}}',
             '<html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -67,8 +67,8 @@ def upgrade():
             'system',
             true,
             true,
-            'BoniDoc',
-            'info@bonidoc.com'
+            NULL,
+            NULL
         )
     """))
 
@@ -76,12 +76,12 @@ def upgrade():
     conn.execute(text("""
         INSERT INTO email_templates (
             name, display_name, description, subject, html_body, text_body,
-            available_variables, category, is_active, is_system, send_from_name, send_from_email
+            available_variables, category, is_active, is_system
         ) VALUES (
             'provider_disconnected',
-            'Storage Provider Disconnected',
+            'Provider Disconnected',
             'Notification sent when a cloud storage provider is disconnected',
-            '{{provider_name}} Disconnected - {{app_name}}',
+            'Provider Disconnected - {{app_name}}',
             '<html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -118,8 +118,8 @@ def upgrade():
             'system',
             true,
             true,
-            'BoniDoc',
-            'info@bonidoc.com'
+            NULL,
+            NULL
         )
     """))
 
