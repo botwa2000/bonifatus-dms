@@ -458,6 +458,124 @@ class EmailService:
             reply_to=settings.email.email_from_info
         )
 
+    async def send_storage_provider_connected_notification(
+        self,
+        session: Session,
+        to_email: str,
+        user_name: str,
+        provider_name: str,
+        dashboard_url: str,
+        user_can_receive_marketing: bool = True
+    ) -> bool:
+        """
+        Send notification when any storage provider is successfully connected
+
+        Args:
+            session: Database session
+            to_email: User email
+            user_name: User name
+            provider_name: Display name of provider (e.g., 'OneDrive', 'Google Drive')
+            dashboard_url: Dashboard URL
+            user_can_receive_marketing: Check if user opted in for marketing emails
+
+        Returns:
+            True if email sent successfully
+        """
+        # Optional email - check user preferences
+        if not user_can_receive_marketing:
+            logger.info(f"Skipping {provider_name} connection email to {to_email} - marketing emails disabled")
+            return False
+
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'provider_name': provider_name,
+            'app_name': 'BoniDoc',
+            'dashboard_url': dashboard_url,
+            'button_color': '#3498db',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='storage_provider_connected',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'storage_provider_connected' not found")
+            raise Exception("Email template 'storage_provider_connected' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
+            reply_to=settings.email.email_from_info
+        )
+
+    async def send_storage_provider_disconnected_notification(
+        self,
+        session: Session,
+        to_email: str,
+        user_name: str,
+        provider_name: str,
+        dashboard_url: str,
+        user_can_receive_marketing: bool = True
+    ) -> bool:
+        """
+        Send notification when a storage provider is disconnected
+
+        Args:
+            session: Database session
+            to_email: User email
+            user_name: User name
+            provider_name: Display name of provider (e.g., 'OneDrive', 'Google Drive')
+            dashboard_url: Dashboard URL
+            user_can_receive_marketing: Check if user opted in for marketing emails
+
+        Returns:
+            True if email sent successfully
+        """
+        # Optional email - check user preferences
+        if not user_can_receive_marketing:
+            logger.info(f"Skipping {provider_name} disconnection email to {to_email} - marketing emails disabled")
+            return False
+
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'provider_name': provider_name,
+            'app_name': 'BoniDoc',
+            'dashboard_url': dashboard_url,
+            'button_color': '#3498db',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name='storage_provider_disconnected',
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template 'storage_provider_disconnected' not found")
+            raise Exception("Email template 'storage_provider_disconnected' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
+            reply_to=settings.email.email_from_info
+        )
+
     async def send_account_deleted_notification(
         self,
         session: Session,

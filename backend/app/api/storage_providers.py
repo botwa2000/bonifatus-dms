@@ -64,6 +64,9 @@ async def get_available_providers(
     - enabled: Whether this provider is enabled for user's tier
     """
     try:
+        # Refresh user from database to get latest connection status
+        db.refresh(current_user)
+
         logger.info(f"🔵 Getting available providers for user {current_user.id}")
         logger.debug(f"🔍 User active_storage_provider: {current_user.active_storage_provider}")
 
@@ -298,6 +301,23 @@ async def provider_oauth_callback(
             # Don't fail the connection if folder initialization fails
             # User can manually create categories or we can retry later
 
+        # Send email notification
+        try:
+            from app.services.email_service import email_service
+            dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
+            await email_service.send_storage_provider_connected_notification(
+                session=db,
+                to_email=current_user.email,
+                user_name=current_user.full_name,
+                provider_name=_format_provider_name(provider_type),
+                dashboard_url=dashboard_url,
+                user_can_receive_marketing=current_user.email_marketing_enabled
+            )
+            logger.info(f"✅ Sent connection notification email to {current_user.email}")
+        except Exception as email_error:
+            logger.error(f"⚠️ Failed to send connection email: {email_error}", exc_info=True)
+            # Don't fail the connection if email fails
+
         logger.info(f"✅ SUCCESS - User {current_user.id} connected {provider_type} successfully")
 
         return {
@@ -413,6 +433,45 @@ async def disconnect_provider(
 
         db.commit()
         logger.info(f"User {current_user.id} disconnected {provider_type}")
+
+        # Cancel any in-progress upload batches
+        try:
+            from app.database.models import UploadBatch
+            from sqlalchemy import update
+
+            # Mark in-progress batches as failed
+            stmt = update(UploadBatch).where(
+                UploadBatch.user_id == current_user.id,
+                UploadBatch.status.in_(['processing', 'pending'])
+            ).values(
+                status='failed',
+                error_message=f'Upload cancelled: {_format_provider_name(provider_type)} was disconnected'
+            )
+            result = db.execute(stmt)
+            db.commit()
+
+            if result.rowcount > 0:
+                logger.info(f"⚠️ Cancelled {result.rowcount} in-progress upload batches due to provider disconnect")
+        except Exception as batch_error:
+            logger.error(f"⚠️ Failed to cancel in-progress batches: {batch_error}", exc_info=True)
+            # Don't fail the disconnection if batch cleanup fails
+
+        # Send email notification
+        try:
+            from app.services.email_service import email_service
+            dashboard_url = f"{settings.app.app_frontend_url}/settings"
+            await email_service.send_storage_provider_disconnected_notification(
+                session=db,
+                to_email=current_user.email,
+                user_name=current_user.full_name,
+                provider_name=_format_provider_name(provider_type),
+                dashboard_url=dashboard_url,
+                user_can_receive_marketing=current_user.email_marketing_enabled
+            )
+            logger.info(f"✅ Sent disconnection notification email to {current_user.email}")
+        except Exception as email_error:
+            logger.error(f"⚠️ Failed to send disconnection email: {email_error}", exc_info=True)
+            # Don't fail the disconnection if email fails
 
         return {
             'success': True,
