@@ -9,6 +9,8 @@ import { Card, CardHeader, CardContent, Button, Select, Alert, Input, Badge, Mod
 import AppHeader from '@/components/AppHeader'
 import { logger } from '@/lib/logger'
 import { delegateService, type Delegate, type GrantedAccess, type PendingInvitation } from '@/services/delegate.service'
+import { storageProviderService, type ProviderInfo } from '@/services/storage-provider.service'
+import { ProviderCard } from '@/components/settings/ProviderCard'
 import type { BadgeVariant } from '@/components/ui'
 
 interface UserPreferences {
@@ -51,6 +53,9 @@ export default function SettingsPage() {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null)
   const [saving, setSaving] = useState(false)
   const [driveLoading, setDriveLoading] = useState(false)
+  const [storageProviders, setStorageProviders] = useState<ProviderInfo[]>([])
+  const [providersLoading, setProvidersLoading] = useState(false)
+  const [activeProviderId, setActiveProviderId] = useState<string | null>(null)
   const [resettingCategories, setResettingCategories] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
@@ -120,10 +125,30 @@ export default function SettingsPage() {
 
       // Load shared with me (for all users)
       await loadSharedWithMe()
+
+      // Load storage providers
+      await loadStorageProviders()
     } catch {
       // Error already logged by API client, just show user message
       logger.debug('[SETTINGS DEBUG] ❌ Failed to load settings')
       setMessage({ type: 'error', text: 'Failed to load settings. Please try again.' })
+    }
+  }
+
+  const loadStorageProviders = async () => {
+    try {
+      logger.debug('[SETTINGS DEBUG] Loading storage providers...')
+      const response = await storageProviderService.getAvailableProviders()
+      setStorageProviders(response.providers)
+
+      // Set active provider ID
+      const activeProvider = response.providers.find(p => p.is_active)
+      setActiveProviderId(activeProvider?.type || null)
+
+      logger.debug('[SETTINGS DEBUG] Loaded storage providers:', response.providers)
+    } catch (error) {
+      logger.error('[SETTINGS DEBUG] Failed to load storage providers:', error)
+      // Don't show error to user - fall back to Google Drive only mode
     }
   }
 
@@ -419,6 +444,72 @@ export default function SettingsPage() {
     }
   }
 
+  // Storage Provider Handlers
+  const handleConnectProvider = async (providerType: string) => {
+    setProvidersLoading(true)
+    setMessage(null)
+
+    try {
+      logger.debug(`[SETTINGS] Initiating ${providerType} connection...`)
+      const response = await storageProviderService.getAuthorizationUrl(providerType)
+
+      // Redirect to provider's OAuth page
+      window.location.href = response.authorization_url
+    } catch (error) {
+      logger.error(`[SETTINGS] Failed to initiate ${providerType} connection:`, error)
+      setMessage({ type: 'error', text: `Failed to connect ${providerType}. Please try again.` })
+      setProvidersLoading(false)
+    }
+  }
+
+  const handleDisconnectProvider = async (providerType: string) => {
+    const providerName = storageProviders.find(p => p.type === providerType)?.name || providerType
+
+    if (!confirm(`Are you sure you want to disconnect ${providerName}? Your documents will remain in ${providerName}.`)) {
+      return
+    }
+
+    setProvidersLoading(true)
+    setMessage(null)
+
+    try {
+      logger.debug(`[SETTINGS] Disconnecting ${providerType}...`)
+      const response = await storageProviderService.disconnectProvider(providerType)
+
+      setMessage({ type: 'success', text: response.message })
+
+      // Reload storage providers
+      await loadStorageProviders()
+    } catch (error) {
+      logger.error(`[SETTINGS] Failed to disconnect ${providerType}:`, error)
+      setMessage({ type: 'error', text: `Failed to disconnect ${providerName}. Please try again.` })
+    } finally {
+      setProvidersLoading(false)
+    }
+  }
+
+  const handleActivateProvider = async (providerType: string) => {
+    setProvidersLoading(true)
+    setMessage(null)
+
+    try {
+      logger.debug(`[SETTINGS] Activating ${providerType}...`)
+      const response = await storageProviderService.activateProvider(providerType)
+
+      setMessage({ type: 'success', text: response.message })
+      setActiveProviderId(providerType)
+
+      // Reload storage providers to get updated status
+      await loadStorageProviders()
+    } catch (error) {
+      logger.error(`[SETTINGS] Failed to activate ${providerType}:`, error)
+      const providerName = storageProviders.find(p => p.type === providerType)?.name || providerType
+      setMessage({ type: 'error', text: `Failed to activate ${providerName}. Please try again.` })
+    } finally {
+      setProvidersLoading(false)
+    }
+  }
+
   const handleResetCategories = async () => {
     if (!confirm('Are you sure you want to reset to default categories? This will DELETE ALL your custom categories and restore only the system default categories. This action cannot be undone.')) {
       return
@@ -667,62 +758,23 @@ export default function SettingsPage() {
           <Card>
             <CardHeader title="Cloud Storage" />
             <CardContent>
-              {driveStatus.connected ? (
+              {storageProviders.length > 0 ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <svg className="h-10 w-10 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">Google Drive Connected</p>
-                        <p className="text-xs text-neutral-500">{driveStatus.email}</p>
-                        {driveStatus.connected_at && (
-                          <p className="text-xs text-neutral-400">
-                            Connected {new Date(driveStatus.connected_at).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      onClick={handleDisconnectDrive}
-                      disabled={driveLoading}
-                    >
-                      {driveLoading ? 'Disconnecting...' : 'Disconnect'}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-neutral-500">
-                    Your documents are automatically saved to Google Drive with full version history and sharing capabilities.
-                  </p>
+                  {storageProviders.map((provider) => (
+                    <ProviderCard
+                      key={provider.type}
+                      provider={provider}
+                      loading={providersLoading}
+                      onConnect={handleConnectProvider}
+                      onDisconnect={handleDisconnectProvider}
+                      onActivate={handleActivateProvider}
+                    />
+                  ))}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <svg className="h-10 w-10 text-neutral-400" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">Connect Google Drive</p>
-                        <p className="text-xs text-neutral-500">Store your documents securely in the cloud</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="primary"
-                      onClick={handleConnectDrive}
-                      disabled={driveLoading}
-                    >
-                      {driveLoading ? 'Connecting...' : 'Connect'}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-neutral-500">
-                    Connect your Google Drive to automatically sync and backup your documents with version control and easy sharing.
-                  </p>
+                <div className="text-center py-8">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
+                  <p className="mt-4 text-sm text-neutral-600">Loading storage providers...</p>
                 </div>
               )}
             </CardContent>
