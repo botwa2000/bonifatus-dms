@@ -12,7 +12,7 @@ from datetime import datetime
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.api.dependencies import get_current_active_user
+from app.middleware.auth_middleware import get_current_active_user
 from app.services.document_storage_service import document_storage_service
 from app.services.storage.provider_factory import ProviderFactory
 from app.core.config import settings
