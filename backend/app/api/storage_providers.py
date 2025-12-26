@@ -253,6 +253,51 @@ async def provider_oauth_callback(
             logger.debug(f"  - onedrive_connected_at: {current_user.onedrive_connected_at}")
             logger.debug(f"  - active_storage_provider: {current_user.active_storage_provider}")
 
+        # Initialize categories and folder structure if this is user's first storage provider
+        try:
+            from app.services.category_service import category_service
+            from sqlalchemy import select, func
+            from app.database.models import Category
+
+            # Check if user has any categories
+            category_count = db.execute(
+                select(func.count(Category.id)).where(Category.user_id == current_user.id)
+            ).scalar()
+
+            logger.info(f"📁 User has {category_count} categories")
+
+            if category_count == 0:
+                logger.info(f"📋 Creating default categories for user {current_user.id}...")
+                await category_service.restore_default_categories(
+                    user_id=str(current_user.id),
+                    ip_address=None
+                )
+                logger.info(f"✅ Default categories created")
+
+            # Get category codes for folder initialization
+            categories = db.execute(
+                select(Category.category_code).where(
+                    Category.user_id == current_user.id,
+                    Category.is_active == True
+                )
+            ).scalars().all()
+
+            category_codes = [cat for cat in categories if cat]
+            logger.info(f"📂 Initializing {len(category_codes)} folders in {provider_type}...")
+
+            # Initialize folder structure in the cloud storage
+            folder_map = document_storage_service.initialize_folder_structure(
+                user=current_user,
+                folder_names=category_codes,
+                provider_type=provider_type
+            )
+            logger.info(f"✅ Initialized {len(folder_map)} folders in {provider_type}")
+
+        except Exception as init_error:
+            logger.error(f"⚠️ Failed to initialize categories/folders: {init_error}", exc_info=True)
+            # Don't fail the connection if folder initialization fails
+            # User can manually create categories or we can retry later
+
         logger.info(f"✅ SUCCESS - User {current_user.id} connected {provider_type} successfully")
 
         return {
