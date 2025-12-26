@@ -430,7 +430,7 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         db.close()
 
 
-def _send_migration_email(user_email: str, user_name: str, migration: MigrationTask, marketing_enabled: bool):
+def _send_migration_email(user_email: str, user_name: str, migration: 'MigrationTask', marketing_enabled: bool):
     """
     Send migration completion email in a separate database session.
 
