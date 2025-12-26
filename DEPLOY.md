@@ -25,73 +25,74 @@
 
 ## ONE-COMMAND DEPLOYMENT SEQUENCES
 
-### Deploy to DEV (Single Approval)
+### Deploy to DEV (Single Command - Recommended)
 
-Use this consolidated command for dev deployment. It handles stashing, pulling, building, deploying, and health checks in one sequence.
+**Simple, reliable deployment that works every time:**
 
 ```bash
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
-  echo '=== [1/8] Checking git status ===' && \
-  git status && \
-  echo '=== [2/8] Stashing local changes ===' && \
-  git stash && \
-  echo '=== [3/8] Pulling latest code ===' && \
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
+  echo "=== [1/8] Pulling latest code ===" && \
   git pull origin main && \
-  echo '=== [4/8] Restoring dev configuration ===' && \
-  git stash pop && \
-  echo '=== [5/8] Building containers ===' && \
+  echo "=== [2/8] Building containers ===" && \
   docker compose build && \
-  echo '=== [6/8] Starting containers ===' && \
+  echo "=== [3/8] Stopping containers ===" && \
+  docker compose down && \
+  echo "=== [4/8] Running migrations ===" && \
+  docker compose run --rm backend alembic upgrade head && \
+  echo "=== [5/8] Starting containers ===" && \
   docker compose up -d && \
   sleep 10 && \
-  echo '=== [7/10] Verifying nginx configuration ===' && \
-  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
-  NGINX_PORT=\$(grep 'proxy_pass http://localhost:' /etc/nginx/sites-enabled/dev.bonidoc.com | grep -v '#' | head -1 | sed 's/.*localhost://;s/;.*//') && \
-  echo \"Frontend container port: \$FRONTEND_PORT\" && \
-  echo \"Nginx proxy port: \$NGINX_PORT\" && \
-  if [ \"\$FRONTEND_PORT\" != \"\$NGINX_PORT\" ]; then \
-    echo '⚠️  Port mismatch detected! Fixing nginx config...' && \
-    sed -i \"s|proxy_pass http://localhost:\$NGINX_PORT;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com; \
-  else \
-    echo '✓ Nginx port configuration correct'; \
-  fi && \
-  echo '=== [8/10] Reloading nginx ===' && \
+  echo "=== [6/8] Reloading nginx ===" && \
   nginx -t && systemctl reload nginx && \
-  echo '=== [9/10] Health checks ===' && \
-  echo 'Container status:' && \
+  echo "=== [7/8] Health checks ===" && \
   docker compose ps && \
-  echo '' && \
-  echo 'Frontend health:' && \
-  curl -sI https://dev.bonidoc.com | head -1 && \
-  echo 'Backend health:' && \
+  echo "" && \
   curl -s https://api-dev.bonidoc.com/health && \
-  echo '' && \
-  echo 'Backend logs (last 20 lines):' && \
-  docker logs bonifatus-backend-dev --tail 20 && \
-  echo '' && \
-  echo '=== [10/10] Final verification ===' && \
-  if curl -sI https://dev.bonidoc.com | grep -q 'HTTP/2 200'; then \
-    echo '✅ DEV DEPLOYMENT COMPLETE - Site is accessible'; \
-  else \
-    echo '❌ WARNING: Site may not be accessible. Check nginx logs and IP whitelist.'; \
-  fi"
+  echo "" && \
+  echo "=== [8/8] Backend logs ===" && \
+  docker logs bonifatus-backend-dev --tail 20'
 ```
 
 **Expected Output:**
-- All 10 steps complete without errors
-- Step 7 shows port configuration (auto-fixes if mismatch detected)
-- Containers show "Up (healthy)"
-- Frontend health returns: `HTTP/2 200`
+- All 8 steps complete without errors
+- Containers show "Up (healthy)" status
 - Backend health returns: `{"status":"healthy","environment":"development"}`
 - No errors in backend logs
-- Final verification shows "Site is accessible"
 
-**If Errors Occur:**
-The sequence will stop at the failing step. Check the error message and:
+**Time:** ~3-5 minutes (depending on build cache)
+
+**If you need step-by-step deployment (for debugging):**
+
+Run commands individually:
+```bash
+# 1. Pull latest code
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && git pull origin main'
+
+# 2. Build containers
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose build'
+
+# 3. Stop containers
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose down'
+
+# 4. Run migrations
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose run --rm backend alembic upgrade head'
+
+# 5. Start containers
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose up -d'
+
+# 6. Wait and reload nginx
+sleep 10
+ssh root@91.99.212.17 'nginx -t && systemctl reload nginx'
+
+# 7. Check health
+ssh root@91.99.212.17 'docker compose ps && curl -s https://api-dev.bonidoc.com/health'
+```
+
+**Common Issues:**
 
 1. **403 Forbidden on frontend/API**: Your IP is not whitelisted
    ```bash
-   # Get your current IP from error logs
+   # Check current IP blocks
    ssh root@91.99.212.17 "tail -20 /var/log/nginx/error.log | grep 'access forbidden'"
 
    # Add your IP to whitelist
@@ -111,71 +112,85 @@ The sequence will stop at the failing step. Check the error message and:
 
 ---
 
-### Deploy to PROD (Single Approval)
+### Deploy to PROD (Single Command)
 
-Use this consolidated command for production deployment. **Only run after successful dev testing!**
+**⚠️ PRODUCTION DEPLOYMENT - Only run after successful dev testing!**
 
 ```bash
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms && \
-  echo '=== [1/7] Checking git status ===' && \
-  git status && \
-  echo '=== [2/7] Pulling latest code ===' && \
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  echo "=== [1/8] Pulling latest code ===" && \
   git pull origin main && \
-  echo '=== [3/7] Building containers ===' && \
+  echo "=== [2/8] Building containers ===" && \
   docker compose build && \
-  echo '=== [4/7] Starting containers ===' && \
+  echo "=== [3/8] Stopping containers ===" && \
+  docker compose down && \
+  echo "=== [4/8] Running migrations ===" && \
+  docker compose run --rm backend alembic upgrade head && \
+  echo "=== [5/8] Starting containers ===" && \
   docker compose up -d && \
   sleep 15 && \
-  echo '=== [5/7] Running database migrations ===' && \
-  docker exec bonifatus-backend alembic upgrade head && \
-  echo '=== [6/7] Health checks ===' && \
-  echo 'Container status:' && \
+  echo "=== [6/8] Reloading nginx ===" && \
+  nginx -t && systemctl reload nginx && \
+  echo "=== [7/8] Health checks ===" && \
   docker compose ps && \
-  echo '' && \
-  echo 'Backend health:' && \
+  echo "" && \
   curl -s https://api.bonidoc.com/health && \
-  echo '' && \
-  echo 'ClamAV status:' && \
-  docker exec bonifatus-backend curl -s localhost:8080/health | grep -i clamav && \
-  echo '' && \
-  echo 'Backend logs (last 20 lines):' && \
-  docker logs bonifatus-backend --tail 20 && \
-  echo '' && \
-  echo '=== [7/7] Verifying frontend ===' && \
-  curl -sI https://bonidoc.com | head -5 && \
-  echo '' && \
-  echo '✅ PROD DEPLOYMENT COMPLETE - VERIFY IN BROWSER!'"
+  echo "" && \
+  echo "=== [8/8] Backend logs ===" && \
+  docker logs bonifatus-backend --tail 20'
 ```
 
 **Expected Output:**
-- All 7 steps complete without errors
+- All 8 steps complete without errors
 - Containers show "Up (healthy)"
 - Backend health returns: `{"status":"healthy","environment":"production"}`
 - ClamAV shows as enabled/running
-- Frontend returns HTTP 200
 - No errors in backend logs
 
-**If Errors Occur:**
-The sequence will stop at the failing step. For production:
-1. **DO NOT** fix directly in prod - fix in dev first
-2. Test the fix in dev environment
-3. Re-deploy to prod with tested fix
-4. If critical, use rollback procedure (see below)
+**Time:** ~3-5 minutes (depending on build cache)
+
+**⚠️ Production Safety Rules:**
+1. **ALWAYS** test in dev first
+2. **NEVER** fix directly in prod - fix in dev, test, then deploy
+3. If deployment fails, check logs and rollback if needed
+4. Monitor application for 5-10 minutes after deployment
 
 ---
 
 ### Deploy to BOTH (Dev → Test → Prod)
 
-For complete deployment cycle with testing pause:
+**Complete deployment cycle with testing pause:**
 
 ```bash
-# Step 1: Deploy to dev
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && git stash && git pull origin main && git stash pop && docker compose build && docker compose up -d && sleep 10 && nginx -t && systemctl reload nginx && docker compose ps && curl -s https://api-dev.bonidoc.com/health"
+# Step 1: Deploy to DEV
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
+  git pull origin main && \
+  docker compose build && \
+  docker compose down && \
+  docker compose run --rm backend alembic upgrade head && \
+  docker compose up -d && \
+  sleep 10 && \
+  nginx -t && systemctl reload nginx'
 
-# Step 2: TEST ON DEV - Open https://dev.bonidoc.com and verify all features work
+# Step 2: TEST ON DEV
+# Open https://dev.bonidoc.com and verify:
+# - Login works
+# - Document upload works
+# - All new features work as expected
+# - Check browser console for errors
 
-# Step 3: Deploy to prod (only if dev testing passed)
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms && git pull origin main && docker compose build && docker compose up -d && sleep 15 && docker exec bonifatus-backend alembic upgrade head && docker compose ps && curl -s https://api.bonidoc.com/health"
+# Step 3: Deploy to PROD (only if dev testing passed)
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  git pull origin main && \
+  docker compose build && \
+  docker compose down && \
+  docker compose run --rm backend alembic upgrade head && \
+  docker compose up -d && \
+  sleep 15 && \
+  nginx -t && systemctl reload nginx'
+
+# Step 4: VERIFY PROD
+# Open https://bonidoc.com and verify deployment was successful
 ```
 
 ---

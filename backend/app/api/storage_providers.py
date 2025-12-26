@@ -174,6 +174,9 @@ async def provider_oauth_callback(
     logger.info(f"🔵 OAuth callback START - Provider: {provider_type}, User: {current_user.id}, Code: {code[:10]}..., State: {state}")
 
     try:
+        # Merge current_user into the db session to avoid "not persistent" error
+        current_user = db.merge(current_user)
+
         # Validate state parameter
         expected_state = f"{current_user.id}:{provider_type}"
         logger.debug(f"🔍 Validating state - Expected: {expected_state}, Received: {state}")
