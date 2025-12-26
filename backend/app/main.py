@@ -319,6 +319,7 @@ routers = [
     ("app.api.auth", "Auth"),
     ("app.api.admin", "Admin"),
     ("app.api.users", "Users"),
+    ("app.api.storage_providers", "StorageProviders"),
     ("app.api.settings", "Settings"),
     ("app.api.categories", "Categories"),
     ("app.api.document_analysis", "DocumentAnalysis"),

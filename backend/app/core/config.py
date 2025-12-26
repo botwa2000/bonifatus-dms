@@ -43,9 +43,23 @@ class GoogleSettings(BaseSettings):
         env_file = ".env"
 
 
+class OneDriveSettings(BaseSettings):
+    """Microsoft OneDrive configuration"""
+
+    onedrive_client_id: str = Field(..., env="ONEDRIVE_CLIENT_ID", description="Microsoft Azure app client ID")
+    onedrive_client_secret: str = Field(..., env="ONEDRIVE_CLIENT_SECRET", description="Microsoft Azure app client secret")
+    onedrive_redirect_uri: str = Field(..., env="ONEDRIVE_REDIRECT_URI", description="OneDrive OAuth redirect URI")
+    onedrive_folder_name: str = Field(default="Bonifatus_DMS", env="ONEDRIVE_FOLDER_NAME", description="OneDrive folder name for documents (use different names for dev/prod)")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+        env_file = ".env"
+
+
 class SecuritySettings(BaseSettings):
     """Security configuration from environment variables"""
-    
+
     security_secret_key: str = Field(..., description="JWT secret key")
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=480, description="JWT access token expiration (8 hours)")
@@ -184,6 +198,7 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     google: GoogleSettings = Field(default_factory=GoogleSettings)
+    onedrive: OneDriveSettings = Field(default_factory=OneDriveSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     translation: TranslationSettings = Field(default_factory=TranslationSettings)
     scanner: ScannerSettings = Field(default_factory=ScannerSettings)

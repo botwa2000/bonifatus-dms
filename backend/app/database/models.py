@@ -142,6 +142,24 @@ class User(Base, TimestampMixin):
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)
 
+    # Multi-cloud storage provider fields
+    active_storage_provider = Column(String(50), nullable=True, index=True)
+
+    # OneDrive storage
+    onedrive_refresh_token_encrypted = Column(Text, nullable=True)
+    onedrive_enabled = Column(Boolean, default=False, nullable=False)
+    onedrive_connected_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Dropbox storage (for future implementation)
+    dropbox_refresh_token_encrypted = Column(Text, nullable=True)
+    dropbox_enabled = Column(Boolean, default=False, nullable=False)
+    dropbox_connected_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Box storage (for future implementation)
+    box_refresh_token_encrypted = Column(Text, nullable=True)
+    box_enabled = Column(Boolean, default=False, nullable=False)
+    box_connected_at = Column(DateTime(timezone=True), nullable=True)
+
     # Email preferences (GDPR/CAN-SPAM compliance)
     email_marketing_enabled = Column(Boolean, default=True, nullable=False, server_default='true')
 
@@ -236,7 +254,8 @@ class Document(Base, TimestampMixin):
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
     file_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hash for deduplication
-    google_drive_file_id = Column(String(100), nullable=False, unique=True)
+    storage_file_id = Column(String(100), nullable=False)
+    storage_provider_type = Column(String(50), nullable=False, index=True)
     web_view_link = Column(String(500), nullable=True)  # Google Drive web link for direct access
 
     # Processing status
@@ -279,7 +298,7 @@ class Document(Base, TimestampMixin):
         Index('idx_document_user_id', 'user_id'),
         Index('idx_document_category_id', 'category_id'),
         Index('idx_document_status', 'processing_status'),
-        Index('idx_document_google_drive', 'google_drive_file_id'),
+        Index('idx_document_storage_file", "storage_file_id'),
         Index('idx_document_primary_lang', 'primary_language'),
         Index('idx_document_date', 'document_date'),
         Index('idx_documents_batch', 'batch_id'),
