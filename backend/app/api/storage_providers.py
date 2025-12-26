@@ -111,7 +111,7 @@ async def get_provider_authorization_url(
         state = f"{current_user.id}:{provider_type}"
 
         # Build redirect URI
-        redirect_uri = f"{settings.app.app_frontend_url}/settings/{provider_type}/callback"
+        redirect_uri = f"{settings.app.app_frontend_url}/settings/storage/{provider_type}/callback"
 
         # Get authorization URL from provider
         auth_url = document_storage_service.get_authorization_url(
@@ -167,7 +167,7 @@ async def provider_oauth_callback(
             raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_type}")
 
         # Build redirect URI (must match the one used in authorization)
-        redirect_uri = f"{settings.app.app_frontend_url}/settings/{provider_type}/callback"
+        redirect_uri = f"{settings.app.app_frontend_url}/settings/storage/{provider_type}/callback"
 
         # Exchange code for tokens
         tokens = document_storage_service.exchange_code_for_tokens(
