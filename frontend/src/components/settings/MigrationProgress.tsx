@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import { useAuth } from '@/contexts/auth-context'
+import { apiClient } from '@/services/api-client'
 
 interface MigrationProgressProps {
   migrationId: string
@@ -35,7 +35,6 @@ export default function MigrationProgress({
   fromProvider,
   toProvider
 }: MigrationProgressProps) {
-  const { getAccessToken } = useAuth()
   const [status, setStatus] = useState<MigrationStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,21 +49,11 @@ export default function MigrationProgress({
 
     const pollMigrationStatus = async () => {
       try {
-        const token = await getAccessToken()
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/storage/migration-status/${migrationId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
+        const data = await apiClient.get<MigrationStatus>(
+          `/api/v1/storage/migration-status/${migrationId}`,
+          true
         )
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch migration status')
-        }
-
-        const data: MigrationStatus = await response.json()
         setStatus(data)
 
         // Continue polling if still processing
@@ -77,7 +66,7 @@ export default function MigrationProgress({
     }
 
     pollMigrationStatus()
-  }, [migrationId, isOpen, getAccessToken])
+  }, [migrationId, isOpen])
 
   if (!status) {
     return (

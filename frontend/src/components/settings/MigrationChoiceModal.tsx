@@ -184,7 +184,7 @@ export default function MigrationChoiceModal({
                                     </span>
                                     <span className="block mt-2 text-xs">
                                       ⚠ Files remain in {currentProviderName}<br />
-                                      ⚠ You'll lose search access in BoniDoc<br />
+                                      ⚠ You&apos;ll lose search access in BoniDoc<br />
                                       ⚠ Start with 0 documents
                                     </span>
                                   </RadioGroup.Description>
