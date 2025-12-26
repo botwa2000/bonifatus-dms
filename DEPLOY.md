@@ -44,32 +44,70 @@ ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
   echo '=== [6/8] Starting containers ===' && \
   docker compose up -d && \
   sleep 10 && \
-  echo '=== [7/8] Reloading nginx (CRITICAL for dev) ===' && \
+  echo '=== [7/10] Verifying nginx configuration ===' && \
+  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
+  NGINX_PORT=\$(grep 'proxy_pass http://localhost:' /etc/nginx/sites-enabled/dev.bonidoc.com | grep -v '#' | head -1 | sed 's/.*localhost://;s/;.*//') && \
+  echo \"Frontend container port: \$FRONTEND_PORT\" && \
+  echo \"Nginx proxy port: \$NGINX_PORT\" && \
+  if [ \"\$FRONTEND_PORT\" != \"\$NGINX_PORT\" ]; then \
+    echo '⚠️  Port mismatch detected! Fixing nginx config...' && \
+    sed -i \"s|proxy_pass http://localhost:\$NGINX_PORT;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com; \
+  else \
+    echo '✓ Nginx port configuration correct'; \
+  fi && \
+  echo '=== [8/10] Reloading nginx ===' && \
   nginx -t && systemctl reload nginx && \
-  echo '=== [8/8] Health checks ===' && \
+  echo '=== [9/10] Health checks ===' && \
   echo 'Container status:' && \
   docker compose ps && \
   echo '' && \
+  echo 'Frontend health:' && \
+  curl -sI https://dev.bonidoc.com | head -1 && \
   echo 'Backend health:' && \
   curl -s https://api-dev.bonidoc.com/health && \
   echo '' && \
   echo 'Backend logs (last 20 lines):' && \
   docker logs bonifatus-backend-dev --tail 20 && \
   echo '' && \
-  echo '✅ DEV DEPLOYMENT COMPLETE'"
+  echo '=== [10/10] Final verification ===' && \
+  if curl -sI https://dev.bonidoc.com | grep -q 'HTTP/2 200'; then \
+    echo '✅ DEV DEPLOYMENT COMPLETE - Site is accessible'; \
+  else \
+    echo '❌ WARNING: Site may not be accessible. Check nginx logs and IP whitelist.'; \
+  fi"
 ```
 
 **Expected Output:**
-- All 8 steps complete without errors
+- All 10 steps complete without errors
+- Step 7 shows port configuration (auto-fixes if mismatch detected)
 - Containers show "Up (healthy)"
+- Frontend health returns: `HTTP/2 200`
 - Backend health returns: `{"status":"healthy","environment":"development"}`
 - No errors in backend logs
+- Final verification shows "Site is accessible"
 
 **If Errors Occur:**
 The sequence will stop at the failing step. Check the error message and:
-1. Fix the issue (code error, merge conflict, etc.)
-2. Re-run the deployment sequence
-3. Or continue manually from the failed step
+
+1. **403 Forbidden on frontend/API**: Your IP is not whitelisted
+   ```bash
+   # Get your current IP from error logs
+   ssh root@91.99.212.17 "tail -20 /var/log/nginx/error.log | grep 'access forbidden'"
+
+   # Add your IP to whitelist
+   ssh root@91.99.212.17 "nano /etc/nginx/sites-enabled/dev.bonidoc.com"
+   # Add: allow YOUR_IP_HERE;  # Description
+
+   # Reload nginx
+   ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
+   ```
+
+2. **502 Bad Gateway**: Port mismatch (should be auto-fixed in step 7, but if not):
+   ```bash
+   ssh root@91.99.212.17 "sed -i 's|proxy_pass http://localhost:3000;|proxy_pass http://localhost:3001;|g' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
+   ```
+
+3. **Other errors**: Re-run the deployment sequence or continue manually from the failed step
 
 ---
 
@@ -336,15 +374,136 @@ docker logs bonifatus-backend-dev --tail 100
 docker compose restart backend
 ```
 
-### If Nginx Returns 403 (IP Whitelist)
+### Nginx Issues (Common After Deployment)
 
+#### Issue 1: 403 Forbidden (IP Whitelist)
+
+**Symptoms:**
+```
+HTTP/2 403
+access forbidden by rule, client: X.X.X.X
+```
+
+**Fix:**
 ```bash
+# Get your current IP from nginx error logs
+ssh root@91.99.212.17 "tail -50 /var/log/nginx/error.log | grep 'access forbidden' | tail -5"
+
 # Add your IP to dev whitelist
-nano /etc/nginx/sites-enabled/dev.bonidoc.com
-# Add: allow YOUR_IP_HERE;
+ssh root@91.99.212.17 "nano /etc/nginx/sites-enabled/dev.bonidoc.com"
+# Navigate to the IP whitelist section (around line 45-60)
+# Add your IP: allow YOUR_IP_HERE;  # Description
+
+# For IPv4 addresses:
+allow 1.2.3.4;  # Your description
+
+# For IPv6 addresses:
+allow 2001:db8::1;  # Your description
 
 # Test and reload
-nginx -t && systemctl reload nginx
+ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
+
+# Verify access
+curl -I https://dev.bonidoc.com
+```
+
+**Permanent Fix (add server localhost to whitelist):**
+```bash
+# Add server's own IP for health checks
+ssh root@91.99.212.17 "sed -i '/allow 216.131.111.81/a \    allow 2a01:4f8:c17:bbd1::1;  # Server localhost IPv6' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
+```
+
+#### Issue 2: 502 Bad Gateway (Port Mismatch)
+
+**Symptoms:**
+```
+HTTP/2 502
+curl: (52) Empty reply from server
+```
+
+**Cause:** Nginx is proxying to wrong port (3000 instead of 3001 for dev)
+
+**Automatic Fix (recommended):**
+```bash
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
+  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
+  sed -i \"s|proxy_pass http://localhost:[0-9]*;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com && \
+  nginx -t && systemctl reload nginx && \
+  echo 'Port fixed to \$FRONTEND_PORT'"
+```
+
+**Manual Fix:**
+```bash
+# Check what port frontend is running on
+ssh root@91.99.212.17 "docker compose ps | grep frontend-dev"
+# Should show: 0.0.0.0:3001->3000/tcp
+
+# Fix nginx config to use 3001
+ssh root@91.99.212.17 "sed -i 's|proxy_pass http://localhost:3000;|proxy_pass http://localhost:3001;|g' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
+
+# Verify
+curl -I https://dev.bonidoc.com
+```
+
+#### Issue 3: Nginx Won't Reload
+
+**Symptoms:**
+```
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+```
+
+**Fix:**
+```bash
+# Check what's using port 80/443
+ssh root@91.99.212.17 "netstat -tlnp | grep ':80\|:443'"
+
+# Kill conflicting process (if safe)
+ssh root@91.99.212.17 "systemctl stop nginx && sleep 2 && systemctl start nginx"
+```
+
+#### Issue 4: Config Syntax Error
+
+**Symptoms:**
+```
+nginx: [emerg] unexpected "}" in /etc/nginx/sites-enabled/dev.bonidoc.com:123
+```
+
+**Fix:**
+```bash
+# Test config syntax
+ssh root@91.99.212.17 "nginx -t"
+
+# Check recent changes
+ssh root@91.99.212.17 "tail -50 /etc/nginx/sites-enabled/dev.bonidoc.com"
+
+# Restore from backup if needed
+ssh root@91.99.212.17 "ls -la /etc/nginx/sites-enabled/*.backup*"
+ssh root@91.99.212.17 "cp /etc/nginx/sites-enabled/dev.bonidoc.com.backup /etc/nginx/sites-enabled/dev.bonidoc.com"
+```
+
+#### Nginx Quick Diagnostic Commands
+
+```bash
+# Check nginx status
+ssh root@91.99.212.17 "systemctl status nginx"
+
+# Test config syntax
+ssh root@91.99.212.17 "nginx -t"
+
+# View error logs
+ssh root@91.99.212.17 "tail -50 /var/log/nginx/error.log"
+
+# Check access logs
+ssh root@91.99.212.17 "tail -50 /var/log/nginx/access.log"
+
+# View current port configuration
+ssh root@91.99.212.17 "grep 'proxy_pass' /etc/nginx/sites-enabled/dev.bonidoc.com"
+
+# View IP whitelist
+ssh root@91.99.212.17 "grep -A 20 'IP Whitelist' /etc/nginx/sites-enabled/dev.bonidoc.com"
+
+# Verify frontend container port
+ssh root@91.99.212.17 "docker compose ps | grep frontend"
 ```
 
 ---
@@ -377,16 +536,45 @@ cat /opt/bonifatus-dms-dev/backend/.env | grep -v PASSWORD
 | ClamAV | Disabled | Enabled |
 | Memory limits | 5GB backend | 6GB backend |
 
-### Nginx Reload Requirement
+### Nginx Configuration Management
 
-**DEV ONLY:** Must reload nginx after deployment
+**DEV:** Requires nginx verification and reload after deployment
+
+**Why nginx needs attention on dev:**
+1. Docker container restart can change port mappings
+2. Nginx proxy configuration may get out of sync with container ports
+3. IP whitelisting blocks unauthorized access
+
+**Automatic Fix (built into deployment sequence):**
+The enhanced dev deployment sequence (steps 7-10) now includes:
+- Automatic port verification
+- Auto-correction of port mismatches
+- Frontend accessibility verification
+- Health check validation
+
+**Manual Nginx Management:**
 ```bash
-nginx -t && systemctl reload nginx
+# Verify and reload nginx (always safe to run)
+ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
+
+# Check if nginx port matches container port
+ssh root@91.99.212.17 "
+  cd /opt/bonifatus-dms-dev && \
+  echo 'Container port:' && docker compose ps | grep frontend-dev | awk '{print \$NF}' && \
+  echo 'Nginx proxy port:' && grep 'proxy_pass' /etc/nginx/sites-enabled/dev.bonidoc.com | grep -v '#'
+"
+
+# Auto-fix port mismatch
+ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
+  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
+  sed -i \"s|proxy_pass http://localhost:[0-9]*;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com && \
+  nginx -t && systemctl reload nginx"
 ```
 
-**Reason:** Docker container restart can break nginx routing on dev
+**PROD:** Nginx reload not typically required (different network setup, stable port mapping)
 
-**PROD:** Not required (separate nginx config, different network setup)
+**Common Nginx Issues:**
+- See "Nginx Issues (Common After Deployment)" section for detailed troubleshooting
 
 ---
 

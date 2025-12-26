@@ -36,7 +36,16 @@ def _format_provider_name(provider_type: str) -> str:
 
 def _is_provider_connected(user: User, provider_type: str) -> bool:
     """Check if user has connected a specific provider."""
-    return document_storage_service.is_provider_connected(user, provider_type)
+    is_connected = document_storage_service.is_provider_connected(user, provider_type)
+    logger.debug(f"🔍 Provider connection check - User: {user.id}, Provider: {provider_type}, Connected: {is_connected}")
+
+    # Debug: Log the actual token status
+    if provider_type == 'onedrive':
+        logger.debug(f"🔍 OneDrive token encrypted: {user.onedrive_refresh_token_encrypted[:50] if user.onedrive_refresh_token_encrypted else 'None'}...")
+        logger.debug(f"🔍 OneDrive enabled: {user.onedrive_enabled}")
+        logger.debug(f"🔍 OneDrive connected_at: {user.onedrive_connected_at}")
+
+    return is_connected
 
 
 @router.get("/providers/available")
@@ -55,8 +64,12 @@ async def get_available_providers(
     - enabled: Whether this provider is enabled for user's tier
     """
     try:
+        logger.info(f"🔵 Getting available providers for user {current_user.id}")
+        logger.debug(f"🔍 User active_storage_provider: {current_user.active_storage_provider}")
+
         # Get all registered providers
         all_providers = ProviderFactory.get_available_providers()
+        logger.debug(f"🔍 Registered providers: {all_providers}")
 
         # For now, all providers are available (tier checking will be added later)
         # In production, this would call tier_service.get_available_providers()
@@ -71,12 +84,14 @@ async def get_available_providers(
                 'is_active': current_user.active_storage_provider == provider_type,
                 'enabled': True  # Will be tier-based later
             }
+            logger.debug(f"📋 Provider info: {provider_info}")
             provider_list.append(provider_info)
 
+        logger.info(f"✅ Returning {len(provider_list)} providers")
         return {'providers': provider_list}
 
     except Exception as e:
-        logger.error(f"Failed to get available providers: {e}")
+        logger.error(f"Failed to get available providers: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve provider list")
 
 
@@ -199,12 +214,20 @@ async def provider_oauth_callback(
             logger.debug(f"✅ Google Drive fields updated - Enabled: {current_user.google_drive_enabled}, Active: {current_user.active_storage_provider}")
 
         elif provider_type == 'onedrive':
+            logger.debug(f"💾 Setting OneDrive fields for user {current_user.id}...")
+            logger.debug(f"🔍 Before - onedrive_enabled: {current_user.onedrive_enabled}, active_storage_provider: {current_user.active_storage_provider}")
+
             current_user.onedrive_refresh_token_encrypted = refresh_token_encrypted
             current_user.onedrive_enabled = True
             current_user.onedrive_connected_at = datetime.utcnow()
             if not current_user.active_storage_provider:
                 current_user.active_storage_provider = 'onedrive'
+                logger.debug(f"✅ Set active_storage_provider to 'onedrive' (was None)")
+            else:
+                logger.debug(f"ℹ️ active_storage_provider already set to: {current_user.active_storage_provider}")
+
             logger.debug(f"✅ OneDrive fields updated - Enabled: {current_user.onedrive_enabled}, Active: {current_user.active_storage_provider}")
+            logger.debug(f"🔍 Token length: {len(refresh_token_encrypted)} chars")
 
         elif provider_type == 'dropbox':
             current_user.dropbox_refresh_token_encrypted = refresh_token_encrypted
@@ -216,6 +239,17 @@ async def provider_oauth_callback(
 
         logger.info(f"💾 Committing database transaction...")
         db.commit()
+        db.refresh(current_user)  # Refresh to get the latest state from database
+        logger.info(f"✅ Database committed and refreshed")
+
+        # Verify the data was actually saved
+        if provider_type == 'onedrive':
+            logger.debug(f"🔍 Post-commit verification:")
+            logger.debug(f"  - onedrive_enabled: {current_user.onedrive_enabled}")
+            logger.debug(f"  - onedrive_refresh_token_encrypted exists: {bool(current_user.onedrive_refresh_token_encrypted)}")
+            logger.debug(f"  - onedrive_connected_at: {current_user.onedrive_connected_at}")
+            logger.debug(f"  - active_storage_provider: {current_user.active_storage_provider}")
+
         logger.info(f"✅ SUCCESS - User {current_user.id} connected {provider_type} successfully")
 
         return {
