@@ -21,13 +21,13 @@ def upgrade():
 
     conn = op.get_bind()
 
-    # Template 1: storage_provider_connected
+    # Template 1: provider_connected
     conn.execute(text("""
         INSERT INTO email_templates (
             name, display_name, description, subject, html_body, text_body,
             available_variables, category, is_active, is_system, send_from_name, send_from_email
         ) VALUES (
-            'storage_provider_connected',
+            'provider_connected',
             'Storage Provider Connected',
             'Notification sent when a cloud storage provider is successfully connected',
             '{{provider_name}} Connected Successfully - {{app_name}}',
@@ -72,13 +72,13 @@ def upgrade():
         )
     """))
 
-    # Template 2: storage_provider_disconnected
+    # Template 2: provider_disconnected
     conn.execute(text("""
         INSERT INTO email_templates (
             name, display_name, description, subject, html_body, text_body,
             available_variables, category, is_active, is_system, send_from_name, send_from_email
         ) VALUES (
-            'storage_provider_disconnected',
+            'provider_disconnected',
             'Storage Provider Disconnected',
             'Notification sent when a cloud storage provider is disconnected',
             '{{provider_name}} Disconnected - {{app_name}}',
@@ -129,8 +129,8 @@ def downgrade():
     conn = op.get_bind()
 
     template_names = [
-        'storage_provider_disconnected',
-        'storage_provider_connected'
+        'provider_disconnected',
+        'provider_connected'
     ]
 
     for template_name in template_names:

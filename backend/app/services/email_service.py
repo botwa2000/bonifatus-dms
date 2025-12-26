@@ -498,15 +498,15 @@ class EmailService:
 
         email_data = email_template_service.prepare_email(
             session=session,
-            template_name='storage_provider_connected',
+            template_name='provider_connected',
             variables=template_variables,
             recipient_email=to_email,
             recipient_name=user_name
         )
 
         if not email_data:
-            logger.error(f"Database template 'storage_provider_connected' not found")
-            raise Exception("Email template 'storage_provider_connected' not found in database")
+            logger.error(f"Database template 'provider_connected' not found")
+            raise Exception("Email template 'provider_connected' not found in database")
 
         return await self.send_email(
             to_email=email_data['to_email'],
@@ -557,15 +557,15 @@ class EmailService:
 
         email_data = email_template_service.prepare_email(
             session=session,
-            template_name='storage_provider_disconnected',
+            template_name='provider_disconnected',
             variables=template_variables,
             recipient_email=to_email,
             recipient_name=user_name
         )
 
         if not email_data:
-            logger.error(f"Database template 'storage_provider_disconnected' not found")
-            raise Exception("Email template 'storage_provider_disconnected' not found in database")
+            logger.error(f"Database template 'provider_disconnected' not found")
+            raise Exception("Email template 'provider_disconnected' not found in database")
 
         return await self.send_email(
             to_email=email_data['to_email'],
