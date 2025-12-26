@@ -82,11 +82,11 @@ async def upload_document(
 
         ip_address = get_client_ip(request)
 
-        # Check if Google Drive is connected
-        if not current_user.google_drive_enabled:
+        # Check if any storage provider is connected
+        if not current_user.active_storage_provider:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="GOOGLE_DRIVE_NOT_CONNECTED"  # Special code for frontend to handle
+                detail="STORAGE_PROVIDER_NOT_CONNECTED"  # Special code for frontend to handle
             )
 
         if not file.filename:

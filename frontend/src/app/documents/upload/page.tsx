@@ -453,12 +453,12 @@ export default function BatchUploadPage() {
         errorMessage = errorObj.detail || errorObj.message || JSON.stringify(error)
       }
 
-      // Check for Google Drive not connected error
-      if (typeof errorMessage === 'string' && errorMessage.includes('GOOGLE_DRIVE_NOT_CONNECTED')) {
+      // Check for storage provider not connected error
+      if (typeof errorMessage === 'string' && errorMessage.includes('STORAGE_PROVIDER_NOT_CONNECTED')) {
         errorMessage = (
           <div>
-            <p className="font-medium mb-2">Google Drive Not Connected</p>
-            <p className="mb-3">You need to connect your Google Drive account before uploading documents.</p>
+            <p className="font-medium mb-2">Storage Provider Not Connected</p>
+            <p className="mb-3">You need to connect a cloud storage provider (Google Drive, OneDrive, etc.) before uploading documents.</p>
             <Link
               href="/settings"
               className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
