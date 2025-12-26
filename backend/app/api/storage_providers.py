@@ -156,10 +156,14 @@ async def provider_oauth_callback(
         provider: Provider type
         message: Success message
     """
+    logger.info(f"🔵 OAuth callback START - Provider: {provider_type}, User: {current_user.id}, Code: {code[:10]}..., State: {state}")
+
     try:
         # Validate state parameter
         expected_state = f"{current_user.id}:{provider_type}"
+        logger.debug(f"🔍 Validating state - Expected: {expected_state}, Received: {state}")
         if state != expected_state:
+            logger.error(f"❌ State validation failed - Expected: {expected_state}, Received: {state}")
             raise HTTPException(status_code=400, detail="Invalid state parameter - possible CSRF attack")
 
         # Validate provider
@@ -168,24 +172,31 @@ async def provider_oauth_callback(
 
         # Build redirect URI (must match the one used in authorization)
         redirect_uri = f"{settings.app.app_frontend_url}/settings/storage/{provider_type}/callback"
+        logger.debug(f"🔗 Redirect URI: {redirect_uri}")
 
         # Exchange code for tokens
+        logger.info(f"🔄 Exchanging authorization code for tokens...")
         tokens = document_storage_service.exchange_code_for_tokens(
             provider_type=provider_type,
             code=code,
             redirect_uri=redirect_uri
         )
+        logger.info(f"✅ Token exchange successful - Access token length: {len(tokens.get('access_token', ''))}, Has refresh token: {bool(tokens.get('refresh_token'))}")
 
         # Encrypt refresh token
+        logger.debug(f"🔐 Encrypting refresh token...")
         refresh_token_encrypted = encrypt_token(tokens['refresh_token'])
+        logger.debug(f"✅ Refresh token encrypted - Length: {len(refresh_token_encrypted)}")
 
         # Store tokens in database based on provider type
+        logger.info(f"💾 Storing tokens for {provider_type} in database...")
         if provider_type == 'google_drive':
             current_user.drive_refresh_token_encrypted = refresh_token_encrypted
             current_user.google_drive_enabled = True
             current_user.drive_permissions_granted_at = datetime.utcnow()
             if not current_user.active_storage_provider:
                 current_user.active_storage_provider = 'google_drive'
+            logger.debug(f"✅ Google Drive fields updated - Enabled: {current_user.google_drive_enabled}, Active: {current_user.active_storage_provider}")
 
         elif provider_type == 'onedrive':
             current_user.onedrive_refresh_token_encrypted = refresh_token_encrypted
@@ -193,6 +204,7 @@ async def provider_oauth_callback(
             current_user.onedrive_connected_at = datetime.utcnow()
             if not current_user.active_storage_provider:
                 current_user.active_storage_provider = 'onedrive'
+            logger.debug(f"✅ OneDrive fields updated - Enabled: {current_user.onedrive_enabled}, Active: {current_user.active_storage_provider}")
 
         elif provider_type == 'dropbox':
             current_user.dropbox_refresh_token_encrypted = refresh_token_encrypted
@@ -200,9 +212,11 @@ async def provider_oauth_callback(
             current_user.dropbox_connected_at = datetime.utcnow()
             if not current_user.active_storage_provider:
                 current_user.active_storage_provider = 'dropbox'
+            logger.debug(f"✅ Dropbox fields updated - Enabled: {current_user.dropbox_enabled}, Active: {current_user.active_storage_provider}")
 
+        logger.info(f"💾 Committing database transaction...")
         db.commit()
-        logger.info(f"User {current_user.id} connected {provider_type} successfully")
+        logger.info(f"✅ SUCCESS - User {current_user.id} connected {provider_type} successfully")
 
         return {
             'success': True,
@@ -210,10 +224,11 @@ async def provider_oauth_callback(
             'message': f'{_format_provider_name(provider_type)} connected successfully'
         }
 
-    except HTTPException:
+    except HTTPException as he:
+        logger.error(f"❌ HTTP Exception in OAuth callback - Status: {he.status_code}, Detail: {he.detail}")
         raise
     except Exception as e:
-        logger.error(f"OAuth callback failed for {provider_type}: {e}")
+        logger.error(f"❌ OAuth callback failed for {provider_type}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to complete OAuth connection")
 

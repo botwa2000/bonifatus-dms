@@ -35,12 +35,8 @@ function StorageCallbackContent() {
       const state = searchParams.get('state')
       const error = searchParams.get('error')
 
-      logger.debug(`[${providerName} Callback] Starting OAuth callback`, {
-        provider,
-        hasCode: !!code,
-        hasState: !!state,
-        error
-      })
+      logger.info(`🔵 [${providerName} Callback] Starting OAuth callback`)
+      logger.info(`🔍 URL Params:`, { code: code?.substring(0, 20) + '...', state, error, fullUrl: window.location.href })
 
       // Handle OAuth error from provider
       if (error) {
@@ -63,7 +59,7 @@ function StorageCallbackContent() {
 
       // Call backend to complete OAuth flow
       try {
-        logger.debug(`[${providerName} Callback] Calling backend OAuth callback with code and state...`)
+        logger.info(`🔄 [${providerName} Callback] Calling backend OAuth callback...`)
 
         const result = await storageProviderService.handleOAuthCallback(
           provider,
@@ -71,41 +67,41 @@ function StorageCallbackContent() {
           state
         )
 
-        logger.debug(`[${providerName} Callback] Backend response:`, result)
+        logger.info(`✅ [${providerName} Callback] Backend response:`, result)
 
         if (result.success) {
-          logger.debug(`[${providerName} Callback] ✅ Connection successful, refreshing auth tokens...`)
+          logger.info(`✅ [${providerName} Callback] Connection successful, refreshing auth tokens...`)
 
           // Refresh auth tokens to prevent logout after OAuth connection
           // OAuth flow can take time, and access token might be close to expiring
           try {
-            logger.debug(`[${providerName} Callback] Calling /auth/refresh...`)
+            logger.info(`🔄 [${providerName} Callback] Refreshing auth tokens...`)
             await apiClient.post('/api/v1/auth/refresh', {}, true)
-            logger.debug(`[${providerName} Callback] ✅ Auth tokens refreshed successfully`)
+            logger.info(`✅ [${providerName} Callback] Auth tokens refreshed successfully`)
           } catch (refreshError) {
-            logger.error(`[${providerName} Callback] ❌ Token refresh failed:`, refreshError)
+            logger.error(`❌ [${providerName} Callback] Token refresh failed:`, refreshError)
             // Continue anyway - user might still be logged in with existing token
           }
 
-          logger.debug(`[${providerName} Callback] Setting success status and redirecting to /settings in 2s...`)
+          logger.info(`🎉 [${providerName} Callback] Setting success status, redirecting to /settings in 2s`)
           setStatus('success')
           setMessage(result.message || `${providerName} connected successfully!`)
           setTimeout(() => {
-            logger.debug(`[${providerName} Callback] Executing router.push to /settings`)
+            logger.info(`➡️ [${providerName} Callback] Redirecting to /settings`)
             router.push('/settings')
           }, 2000)
         } else {
-          logger.error(`[${providerName} Callback] ❌ Connection failed:`, result.message)
+          logger.error(`❌ [${providerName} Callback] Connection failed:`, result.message)
           setStatus('error')
           setMessage(result.message || `Failed to connect ${providerName}`)
           setTimeout(() => router.push('/settings'), 3000)
         }
       } catch (error) {
-        logger.error(`[${providerName} Callback] ❌ Exception caught:`, error)
+        logger.error(`❌ [${providerName} Callback] Exception caught:`, error)
         setStatus('error')
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
         setMessage(errorMessage)
-        logger.debug(`[${providerName} Callback] Redirecting to /settings in 3s after error`)
+        logger.info(`➡️ [${providerName} Callback] Redirecting to /settings in 3s after error`)
         setTimeout(() => router.push('/settings'), 3000)
       }
     }
