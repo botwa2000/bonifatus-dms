@@ -303,19 +303,31 @@ async def provider_oauth_callback(
             # Don't fail the connection if folder initialization fails
             # User can manually create categories or we can retry later
 
-        # Send email notification
+        # Store user info before session cleanup
+        user_email = current_user.email
+        user_full_name = current_user.full_name
+        user_marketing_enabled = current_user.email_marketing_enabled
+
+        # Send email notification in a separate session to prevent rollback
         try:
             from app.services.email_service import email_service
-            dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
-            await email_service.send_storage_provider_connected_notification(
-                session=db,
-                to_email=current_user.email,
-                user_name=current_user.full_name,
-                provider_name=_format_provider_name(provider_type),
-                dashboard_url=dashboard_url,
-                user_can_receive_marketing=current_user.email_marketing_enabled
-            )
-            logger.info(f"✅ Sent connection notification email to {current_user.email}")
+            from app.database.session import SessionLocal
+
+            # Create a new session for email operation
+            email_session = SessionLocal()
+            try:
+                dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
+                await email_service.send_storage_provider_connected_notification(
+                    session=email_session,
+                    to_email=user_email,
+                    user_name=user_full_name,
+                    provider_name=_format_provider_name(provider_type),
+                    dashboard_url=dashboard_url,
+                    user_can_receive_marketing=user_marketing_enabled
+                )
+                logger.info(f"✅ Sent connection notification email to {user_email}")
+            finally:
+                email_session.close()
         except Exception as email_error:
             logger.error(f"⚠️ Failed to send connection email: {email_error}", exc_info=True)
             # Don't fail the connection if email fails
@@ -436,6 +448,12 @@ async def disconnect_provider(
         db.commit()
         logger.info(f"User {current_user.id} disconnected {provider_type}")
 
+        # Store user info before session cleanup
+        user_email = current_user.email
+        user_full_name = current_user.full_name
+        user_marketing_enabled = current_user.email_marketing_enabled
+        user_id = current_user.id
+
         # Cancel any in-progress upload batches
         try:
             from app.database.models import UploadBatch
@@ -443,7 +461,7 @@ async def disconnect_provider(
 
             # Mark in-progress batches as failed
             stmt = update(UploadBatch).where(
-                UploadBatch.user_id == current_user.id,
+                UploadBatch.user_id == user_id,
                 UploadBatch.status.in_(['processing', 'pending'])
             ).values(
                 status='failed',
@@ -458,19 +476,26 @@ async def disconnect_provider(
             logger.error(f"⚠️ Failed to cancel in-progress batches: {batch_error}", exc_info=True)
             # Don't fail the disconnection if batch cleanup fails
 
-        # Send email notification
+        # Send email notification in a separate session to prevent rollback
         try:
             from app.services.email_service import email_service
-            dashboard_url = f"{settings.app.app_frontend_url}/settings"
-            await email_service.send_storage_provider_disconnected_notification(
-                session=db,
-                to_email=current_user.email,
-                user_name=current_user.full_name,
-                provider_name=_format_provider_name(provider_type),
-                dashboard_url=dashboard_url,
-                user_can_receive_marketing=current_user.email_marketing_enabled
-            )
-            logger.info(f"✅ Sent disconnection notification email to {current_user.email}")
+            from app.database.session import SessionLocal
+
+            # Create a new session for email operation
+            email_session = SessionLocal()
+            try:
+                dashboard_url = f"{settings.app.app_frontend_url}/settings"
+                await email_service.send_storage_provider_disconnected_notification(
+                    session=email_session,
+                    to_email=user_email,
+                    user_name=user_full_name,
+                    provider_name=_format_provider_name(provider_type),
+                    dashboard_url=dashboard_url,
+                    user_can_receive_marketing=user_marketing_enabled
+                )
+                logger.info(f"✅ Sent disconnection notification email to {user_email}")
+            finally:
+                email_session.close()
         except Exception as email_error:
             logger.error(f"⚠️ Failed to send disconnection email: {email_error}", exc_info=True)
             # Don't fail the disconnection if email fails
