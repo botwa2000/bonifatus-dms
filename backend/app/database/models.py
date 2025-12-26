@@ -1553,6 +1553,60 @@ class DelegateAccessLog(Base):
     )
 
 
+class MigrationTask(Base, TimestampMixin):
+    """Track cloud storage provider migration tasks"""
+    __tablename__ = "migration_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Provider information
+    from_provider = Column(String(50), nullable=False)  # 'google_drive', 'onedrive', etc.
+    to_provider = Column(String(50), nullable=False)
+
+    # Progress tracking
+    total_documents = Column(Integer, nullable=False, server_default='0')
+    processed_documents = Column(Integer, nullable=False, server_default='0')
+    successful_documents = Column(Integer, nullable=False, server_default='0')
+    failed_documents = Column(Integer, nullable=False, server_default='0')
+
+    # Status tracking
+    status = Column(String(50), nullable=False, server_default='pending')  # 'pending', 'processing', 'completed', 'partial', 'failed'
+    current_document_name = Column(String(500), nullable=True)
+
+    # Detailed results - array of {document_id, filename, success, error, old_file_id, new_file_id}
+    results = Column(JSONB, nullable=True)
+
+    # Folder deletion tracking
+    folder_deleted = Column(Boolean, nullable=False, server_default='false')
+    folder_deletion_attempted = Column(Boolean, nullable=False, server_default='false')
+    folder_deletion_error = Column(Text, nullable=True)
+
+    # Timing
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+
+    # Celery task ID for async processing
+    celery_task_id = Column(String(255), nullable=True)
+
+    # Relationships
+    user = relationship("User", backref="migration_tasks")
+
+    __table_args__ = (
+        Index('idx_migration_user_status', 'user_id', 'status'),
+        Index('idx_migration_celery_task', 'celery_task_id'),
+        Index('idx_migration_providers', 'from_provider', 'to_provider'),
+        Index('idx_migration_created', 'created_at'),
+        sa.CheckConstraint(
+            "status IN ('pending', 'processing', 'completed', 'partial', 'failed')",
+            name='check_migration_status'
+        ),
+    )
+
+
 # Import auth models to register them with Base.metadata
 # This ensures SQLAlchemy knows about these tables and relationships
 # Email processing models (AllowedSender, EmailProcessingLog, etc.) are defined in auth_models.py
