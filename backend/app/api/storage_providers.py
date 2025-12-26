@@ -311,7 +311,7 @@ async def provider_oauth_callback(
         # Send email notification in a separate session to prevent rollback
         try:
             from app.services.email_service import email_service
-            from app.database.session import SessionLocal
+            from app.database.connection import SessionLocal
 
             # Create a new session for email operation
             email_session = SessionLocal()
@@ -479,7 +479,7 @@ async def disconnect_provider(
         # Send email notification in a separate session to prevent rollback
         try:
             from app.services.email_service import email_service
-            from app.database.session import SessionLocal
+            from app.database.connection import SessionLocal
 
             # Create a new session for email operation
             email_session = SessionLocal()
