@@ -46,6 +46,7 @@ celery_app.conf.update(
     # Task routing
     task_routes={
         'app.celery_app.process_batch_task': {'queue': 'document_processing'},
+        'app.celery_app.migrate_provider_documents_task': {'queue': 'storage_migration'},
     },
 
     # Queue settings
@@ -179,3 +180,305 @@ def get_queue_stats():
         'scheduled_tasks': scheduled_count,
         'total_pending': reserved_count + scheduled_count
     }
+
+
+@celery_app.task(bind=True, name='app.celery_app.migrate_provider_documents_task')
+def migrate_provider_documents_task(self, migration_id: str, user_id: str):
+    """
+    Celery task for migrating documents between cloud storage providers
+
+    Args:
+        migration_id: UUID of the MigrationTask
+        user_id: UUID of the user
+
+    Returns:
+        dict: Migration result summary
+    """
+    import uuid
+    import gc
+    from datetime import datetime
+    from io import BytesIO
+    from app.database.connection import SessionLocal
+    from app.database.models import MigrationTask, Document, User, Category
+    from app.services.storage.google_drive_provider import GoogleDriveProvider
+    from app.services.storage.onedrive_provider import OneDriveProvider
+
+    logger.info(f"[Migration] Starting migration task {migration_id} for user {user_id}")
+
+    db = SessionLocal()
+    try:
+        # Load migration task
+        migration = db.query(MigrationTask).filter(
+            MigrationTask.id == uuid.UUID(migration_id)
+        ).first()
+
+        if not migration:
+            raise ValueError(f"Migration task {migration_id} not found")
+
+        # Load user
+        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        # Update status to processing
+        migration.status = 'processing'
+        migration.started_at = datetime.utcnow()
+        migration.celery_task_id = self.request.id
+        db.commit()
+
+        # Initialize providers
+        from_provider_type = migration.from_provider
+        to_provider_type = migration.to_provider
+
+        if from_provider_type == 'google_drive':
+            from_provider = GoogleDriveProvider()
+            from_token = user.google_drive_refresh_token_encrypted
+        elif from_provider_type == 'onedrive':
+            from_provider = OneDriveProvider()
+            from_token = user.onedrive_refresh_token_encrypted
+        else:
+            raise ValueError(f"Unsupported source provider: {from_provider_type}")
+
+        if to_provider_type == 'google_drive':
+            to_provider = GoogleDriveProvider()
+            to_token = user.google_drive_refresh_token_encrypted
+        elif to_provider_type == 'onedrive':
+            to_provider = OneDriveProvider()
+            to_token = user.onedrive_refresh_token_encrypted
+        else:
+            raise ValueError(f"Unsupported target provider: {to_provider_type}")
+
+        # Query all documents from the old provider
+        documents = db.query(Document).filter(
+            Document.user_id == uuid.UUID(user_id),
+            Document.storage_provider_type == from_provider_type
+        ).all()
+
+        migration.total_documents = len(documents)
+        db.commit()
+
+        logger.info(f"[Migration] Found {len(documents)} documents to migrate")
+
+        # Initialize folder structure on new provider
+        categories = db.query(Category).filter(Category.user_id == uuid.UUID(user_id)).all()
+        folder_names = [cat.name for cat in categories]
+
+        try:
+            folder_map = to_provider.initialize_folder_structure(to_token, folder_names)
+        except Exception as e:
+            logger.error(f"[Migration] Failed to initialize folder structure: {e}")
+            migration.status = 'failed'
+            migration.error_message = f"Failed to initialize folder structure: {str(e)}"
+            migration.completed_at = datetime.utcnow()
+            db.commit()
+            return {'status': 'failed', 'error': str(e)}
+
+        # Migrate documents one by one
+        results = []
+        successful_count = 0
+        failed_count = 0
+
+        for idx, doc in enumerate(documents):
+            migration.processed_documents = idx
+            migration.current_document_name = doc.original_filename
+            db.commit()
+
+            # Update Celery task state for real-time progress
+            self.update_state(
+                state='PROCESSING',
+                meta={
+                    'migration_id': migration_id,
+                    'total_documents': migration.total_documents,
+                    'processed_documents': idx,
+                    'successful_documents': successful_count,
+                    'failed_documents': failed_count,
+                    'current_document': doc.original_filename
+                }
+            )
+
+            try:
+                # Download from old provider
+                logger.info(f"[Migration] Downloading document {doc.id}: {doc.original_filename}")
+                file_content = from_provider.download_document(from_token, doc.storage_file_id)
+
+                # Upload to new provider (get folder ID for category)
+                category_folder_id = None
+                if doc.category_id:
+                    category = db.query(Category).filter(Category.id == doc.category_id).first()
+                    if category:
+                        category_folder_id = folder_map.get(category.name)
+
+                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
+                file_stream = BytesIO(file_content)
+                upload_result = to_provider.upload_document(
+                    to_token,
+                    file_stream,
+                    doc.original_filename,
+                    doc.mime_type,
+                    category_folder_id
+                )
+
+                # Update document in database
+                old_file_id = doc.storage_file_id
+                doc.storage_file_id = upload_result.file_id
+                doc.storage_provider_type = to_provider_type
+                db.commit()
+
+                successful_count += 1
+                results.append({
+                    'document_id': str(doc.id),
+                    'filename': doc.original_filename,
+                    'success': True,
+                    'old_file_id': old_file_id,
+                    'new_file_id': upload_result.file_id
+                })
+
+                logger.info(f"[Migration] Successfully migrated: {doc.original_filename}")
+
+                # Memory cleanup
+                del file_content
+                del file_stream
+                gc.collect()
+
+            except Exception as e:
+                failed_count += 1
+                error_msg = str(e)
+                results.append({
+                    'document_id': str(doc.id),
+                    'filename': doc.original_filename,
+                    'success': False,
+                    'error': error_msg
+                })
+                logger.error(f"[Migration] Failed to migrate {doc.original_filename}: {error_msg}")
+                # Continue to next document
+
+        # Final counts
+        migration.processed_documents = len(documents)
+        migration.successful_documents = successful_count
+        migration.failed_documents = failed_count
+        migration.results = results
+        migration.completed_at = datetime.utcnow()
+
+        # Determine final status and handle folder deletion
+        if failed_count == 0:
+            # All successful - delete old provider folder
+            migration.status = 'completed'
+            migration.folder_deletion_attempted = True
+
+            try:
+                deletion_result = from_provider.delete_app_folder(from_token)
+                migration.folder_deleted = deletion_result['success']
+                if not deletion_result['success']:
+                    migration.folder_deletion_error = deletion_result['message']
+                logger.info(f"[Migration] Folder deletion result: {deletion_result}")
+            except Exception as e:
+                migration.folder_deletion_error = str(e)
+                logger.error(f"[Migration] Folder deletion failed: {e}")
+
+            # Disconnect old provider
+            if from_provider_type == 'google_drive':
+                user.google_drive_enabled = False
+                user.google_drive_refresh_token_encrypted = None
+                user.google_drive_access_token_encrypted = None
+            elif from_provider_type == 'onedrive':
+                user.onedrive_enabled = False
+                user.onedrive_refresh_token_encrypted = None
+
+        elif failed_count == len(documents):
+            # All failed
+            migration.status = 'failed'
+            migration.error_message = "All documents failed to migrate"
+        else:
+            # Partial success
+            migration.status = 'partial'
+
+        db.commit()
+
+        logger.info(f"[Migration] Migration {migration_id} completed: {successful_count} successful, {failed_count} failed")
+
+        # Send email notification (in separate session to prevent rollback)
+        try:
+            from app.services.email_service import email_service
+            _send_migration_email(user.email, user.full_name, migration, user.email_marketing_enabled)
+        except Exception as e:
+            logger.error(f"[Migration] Failed to send email notification: {e}")
+
+        return {
+            'migration_id': migration_id,
+            'status': migration.status,
+            'total_documents': migration.total_documents,
+            'successful_documents': successful_count,
+            'failed_documents': failed_count,
+            'folder_deleted': migration.folder_deleted
+        }
+
+    except Exception as e:
+        logger.error(f"[Migration] Migration {migration_id} failed: {str(e)}")
+
+        # Update migration status to failed
+        try:
+            migration.status = 'failed'
+            migration.error_message = str(e)
+            migration.completed_at = datetime.utcnow()
+            db.commit()
+        except Exception as db_error:
+            logger.error(f"[Migration] Failed to update migration status: {str(db_error)}")
+
+        raise
+
+    finally:
+        db.close()
+
+
+def _send_migration_email(user_email: str, user_name: str, migration: MigrationTask, marketing_enabled: bool):
+    """
+    Send migration completion email in a separate database session.
+
+    Args:
+        user_email: User's email address
+        user_name: User's full name
+        migration: MigrationTask instance
+        marketing_enabled: Whether user accepts marketing emails
+    """
+    from app.services.email_service import email_service
+    from app.database.connection import SessionLocal
+
+    email_session = SessionLocal()
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            if migration.status == 'completed':
+                template_name = 'migration_completed'
+            elif migration.status == 'partial':
+                template_name = 'migration_partial'
+            else:
+                template_name = 'migration_failed'
+
+            from app.core.config import settings
+            dashboard_url = f"{settings.app.app_frontend_url}/settings"
+
+            loop.run_until_complete(
+                email_service.send_migration_notification(
+                    session=email_session,
+                    to_email=user_email,
+                    user_name=user_name,
+                    template_name=template_name,
+                    from_provider=migration.from_provider,
+                    to_provider=migration.to_provider,
+                    successful_count=migration.successful_documents,
+                    failed_count=migration.failed_documents,
+                    total_count=migration.total_documents,
+                    dashboard_url=dashboard_url,
+                    error_message=migration.error_message or '',
+                    user_can_receive_marketing=marketing_enabled
+                )
+            )
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.error(f"[Migration] Email sending failed: {e}")
+    finally:
+        email_session.close()

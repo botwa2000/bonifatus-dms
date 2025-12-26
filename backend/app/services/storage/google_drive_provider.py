@@ -495,3 +495,69 @@ class GoogleDriveProvider(StorageProvider):
         except Exception as e:
             logger.error(f"Document move error: {e}")
             return False
+
+    def delete_app_folder(self, refresh_token_encrypted: str) -> Dict[str, Any]:
+        """
+        Delete the entire app folder from Google Drive.
+
+        This permanently deletes the app folder and all its contents (category folders and files).
+        Used during migration to clean up after successful document migration.
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from database
+
+        Returns:
+            Dictionary with:
+                - success: Boolean indicating if deletion was successful
+                - message: Human-readable status message
+                - folder_id: Optional ID of the deleted folder (if found)
+        """
+        try:
+            service = self._get_drive_service(refresh_token_encrypted)
+
+            # Find the main app folder
+            folder_id = self._find_folder(service, self.app_folder_name)
+
+            if not folder_id:
+                logger.info(f"App folder '{self.app_folder_name}' not found - nothing to delete")
+                return {
+                    'success': True,
+                    'message': f"Folder '{self.app_folder_name}' not found (already deleted or never existed)",
+                    'folder_id': None
+                }
+
+            # Delete the folder (Google Drive will recursively delete all contents)
+            service.files().delete(fileId=folder_id).execute()
+
+            logger.info(f"App folder '{self.app_folder_name}' (ID: {folder_id}) deleted successfully")
+            return {
+                'success': True,
+                'message': f"Folder '{self.app_folder_name}' and all contents deleted successfully",
+                'folder_id': folder_id
+            }
+
+        except HttpError as e:
+            if e.resp.status == 404:
+                # Folder already deleted
+                logger.info(f"App folder already deleted (404): {self.app_folder_name}")
+                return {
+                    'success': True,
+                    'message': f"Folder '{self.app_folder_name}' already deleted",
+                    'folder_id': None
+                }
+            else:
+                error_msg = f"Failed to delete app folder: {e}"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg,
+                    'folder_id': None
+                }
+        except Exception as e:
+            error_msg = f"Error deleting app folder: {e}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg,
+                'folder_id': None
+            }

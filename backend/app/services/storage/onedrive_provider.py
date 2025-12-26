@@ -386,3 +386,80 @@ class OneDriveProvider(StorageProvider):
         except Exception as e:
             logger.error(f"Failed to create folder '{folder_name}' in OneDrive: {e}")
             raise
+
+    def delete_app_folder(self, refresh_token_encrypted: str) -> Dict[str, Any]:
+        """
+        Delete the entire app folder from OneDrive.
+
+        This permanently deletes the app folder and all its contents (category folders and files).
+        Used during migration to clean up after successful document migration.
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from database
+
+        Returns:
+            Dictionary with:
+                - success: Boolean indicating if deletion was successful
+                - message: Human-readable status message
+                - folder_id: Optional ID of the deleted folder (if found)
+        """
+        try:
+            access_token = self.refresh_access_token(refresh_token_encrypted)
+            headers = {'Authorization': f'Bearer {access_token}'}
+
+            # Search for the main app folder
+            search_url = f"{self.graph_base_url}/me/drive/root/children"
+            search_params = {'$filter': f"name eq '{self.app_folder_name}' and folder ne null"}
+
+            search_response = requests.get(search_url, headers=headers, params=search_params)
+            search_response.raise_for_status()
+
+            folders = search_response.json().get('value', [])
+
+            if not folders:
+                logger.info(f"App folder '{self.app_folder_name}' not found in OneDrive - nothing to delete")
+                return {
+                    'success': True,
+                    'message': f"Folder '{self.app_folder_name}' not found (already deleted or never existed)",
+                    'folder_id': None
+                }
+
+            folder_id = folders[0]['id']
+
+            # Delete the folder (OneDrive will recursively delete all contents)
+            delete_url = f"{self.graph_base_url}/me/drive/items/{folder_id}"
+            delete_response = requests.delete(delete_url, headers=headers)
+            delete_response.raise_for_status()
+
+            logger.info(f"App folder '{self.app_folder_name}' (ID: {folder_id}) deleted successfully from OneDrive")
+            return {
+                'success': True,
+                'message': f"Folder '{self.app_folder_name}' and all contents deleted successfully",
+                'folder_id': folder_id
+            }
+
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                # Folder already deleted
+                logger.info(f"App folder already deleted (404) from OneDrive: {self.app_folder_name}")
+                return {
+                    'success': True,
+                    'message': f"Folder '{self.app_folder_name}' already deleted",
+                    'folder_id': None
+                }
+            else:
+                error_msg = f"Failed to delete app folder from OneDrive: {e}"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg,
+                    'folder_id': None
+                }
+        except Exception as e:
+            error_msg = f"Error deleting app folder from OneDrive: {e}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg,
+                'folder_id': None
+            }

@@ -100,6 +100,71 @@ async def get_available_providers(
         raise HTTPException(status_code=500, detail="Failed to retrieve provider list")
 
 
+@router.get("/providers/{provider_type}/connect-intent")
+async def check_provider_connect_intent(
+    provider_type: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check if connecting this provider requires migration from another provider.
+
+    This is called before the OAuth flow to determine if the user needs to
+    choose between migrating existing documents or starting fresh.
+
+    Args:
+        provider_type: Provider identifier (google_drive, onedrive, etc.)
+
+    Returns:
+        needs_migration: Boolean indicating if migration is needed
+        current_provider: Current active provider (if any)
+        document_count: Number of documents on current provider
+    """
+    try:
+        # Merge user into session
+        current_user = db.merge(current_user)
+
+        # Validate provider type
+        if not ProviderFactory.is_provider_available(provider_type):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown provider: {provider_type}"
+            )
+
+        # Check if user has another provider enabled
+        current_provider = None
+        if current_user.google_drive_enabled and provider_type != 'google_drive':
+            current_provider = 'google_drive'
+        elif current_user.onedrive_enabled and provider_type != 'onedrive':
+            current_provider = 'onedrive'
+
+        if not current_provider:
+            return {
+                'needs_migration': False,
+                'current_provider': None,
+                'document_count': 0
+            }
+
+        # Count documents on current provider
+        from app.database.models import Document
+        document_count = db.query(Document).filter(
+            Document.user_id == current_user.id,
+            Document.storage_provider_type == current_provider
+        ).count()
+
+        return {
+            'needs_migration': True,
+            'current_provider': current_provider,
+            'document_count': document_count
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to check connect intent for {provider_type}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check migration requirements")
+
+
 @router.get("/providers/{provider_type}/authorize")
 async def get_provider_authorization_url(
     provider_type: str,
@@ -157,6 +222,7 @@ async def provider_oauth_callback(
     provider_type: str,
     code: str = Query(..., description="Authorization code from OAuth provider"),
     state: str = Query(..., description="State parameter for CSRF validation"),
+    migration_choice: str = Query(None, description="Migration choice: 'migrate', 'fresh', or None"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -166,15 +232,22 @@ async def provider_oauth_callback(
     This endpoint is called after the user authorizes the app.
     It exchanges the authorization code for access and refresh tokens.
 
+    If migration_choice is provided and there's an existing provider with documents,
+    the endpoint will either:
+    - 'migrate': Create a migration task to move documents to the new provider
+    - 'fresh': Disconnect the old provider and start fresh
+
     Args:
         provider_type: Provider identifier
         code: Authorization code
         state: State parameter (should match user_id:provider_type)
+        migration_choice: Optional migration choice ('migrate' or 'fresh')
 
     Returns:
         success: True if connection successful
         provider: Provider type
         message: Success message
+        migration_id: Optional UUID of migration task (if migration was initiated)
     """
     logger.info(f"🔵 OAuth callback START - Provider: {provider_type}, User: {current_user.id}, Code: {code[:10]}..., State: {state}")
 
@@ -303,6 +376,69 @@ async def provider_oauth_callback(
             # Don't fail the connection if folder initialization fails
             # User can manually create categories or we can retry later
 
+        # Handle migration if user chose to migrate documents
+        migration_id = None
+        if migration_choice:
+            logger.info(f"🔄 Migration choice: {migration_choice}")
+
+            # Determine the old provider (the one being replaced)
+            old_provider = None
+            if current_user.google_drive_enabled and provider_type != 'google_drive':
+                old_provider = 'google_drive'
+            elif current_user.onedrive_enabled and provider_type != 'onedrive':
+                old_provider = 'onedrive'
+
+            if migration_choice == 'migrate' and old_provider:
+                # Create migration task
+                try:
+                    from app.database.models import MigrationTask
+                    import uuid
+
+                    migration = MigrationTask(
+                        id=uuid.uuid4(),
+                        user_id=current_user.id,
+                        from_provider=old_provider,
+                        to_provider=provider_type,
+                        status='pending'
+                    )
+                    db.add(migration)
+                    db.commit()
+                    db.refresh(migration)
+
+                    migration_id = str(migration.id)
+                    logger.info(f"✅ Created migration task: {migration_id}")
+
+                    # Queue Celery task for async migration
+                    from app.celery_app import migrate_provider_documents_task
+                    task = migrate_provider_documents_task.delay(
+                        migration_id=migration_id,
+                        user_id=str(current_user.id)
+                    )
+                    logger.info(f"✅ Queued migration task: {task.id}")
+
+                except Exception as migration_error:
+                    logger.error(f"⚠️ Failed to create migration task: {migration_error}", exc_info=True)
+                    # Don't fail the connection if migration creation fails
+
+            elif migration_choice == 'fresh' and old_provider:
+                # Disconnect old provider
+                logger.info(f"🗑️ Disconnecting old provider: {old_provider}")
+                try:
+                    if old_provider == 'google_drive':
+                        current_user.google_drive_enabled = False
+                        current_user.drive_refresh_token_encrypted = None
+                        current_user.google_drive_access_token_encrypted = None
+                    elif old_provider == 'onedrive':
+                        current_user.onedrive_enabled = False
+                        current_user.onedrive_refresh_token_encrypted = None
+
+                    # Update active provider to the new one
+                    current_user.active_storage_provider = provider_type
+                    db.commit()
+                    logger.info(f"✅ Disconnected old provider: {old_provider}")
+                except Exception as disconnect_error:
+                    logger.error(f"⚠️ Failed to disconnect old provider: {disconnect_error}", exc_info=True)
+
         # Store user info before session cleanup
         user_email = current_user.email
         user_full_name = current_user.full_name
@@ -334,11 +470,18 @@ async def provider_oauth_callback(
 
         logger.info(f"✅ SUCCESS - User {current_user.id} connected {provider_type} successfully")
 
-        return {
+        response = {
             'success': True,
             'provider': provider_type,
             'message': f'{_format_provider_name(provider_type)} connected successfully'
         }
+
+        # Add migration_id if migration was initiated
+        if migration_id:
+            response['migration_id'] = migration_id
+            response['migration_status'] = 'pending'
+
+        return response
 
     except HTTPException as he:
         logger.error(f"❌ HTTP Exception in OAuth callback - Status: {he.status_code}, Detail: {he.detail}")
@@ -530,3 +673,76 @@ async def get_active_provider(
         'active_provider': active,
         'provider_name': _format_provider_name(active) if active else None
     }
+
+
+@router.get("/migration-status/{migration_id}")
+async def get_migration_status(
+    migration_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the status of a cloud storage provider migration task.
+
+    This endpoint is polled by the frontend to show real-time progress
+    during document migration.
+
+    Args:
+        migration_id: UUID of the migration task
+
+    Returns:
+        status: Migration status (pending, processing, completed, partial, failed)
+        total_documents: Total number of documents to migrate
+        processed_documents: Number of documents processed so far
+        successful_documents: Number of successfully migrated documents
+        failed_documents: Number of failed documents
+        current_document: Name of document currently being processed
+        results: Array of migration results (only when completed)
+        folder_deleted: Whether the old provider's folder was deleted
+    """
+    try:
+        from app.database.models import MigrationTask
+        import uuid
+
+        # Query migration task
+        migration = db.query(MigrationTask).filter(
+            MigrationTask.id == uuid.UUID(migration_id),
+            MigrationTask.user_id == current_user.id  # Ensure user owns this migration
+        ).first()
+
+        if not migration:
+            raise HTTPException(status_code=404, detail="Migration task not found")
+
+        response = {
+            'migration_id': str(migration.id),
+            'status': migration.status,
+            'from_provider': migration.from_provider,
+            'to_provider': migration.to_provider,
+            'total_documents': migration.total_documents,
+            'processed_documents': migration.processed_documents,
+            'successful_documents': migration.successful_documents,
+            'failed_documents': migration.failed_documents,
+            'current_document': migration.current_document_name,
+            'started_at': migration.started_at.isoformat() if migration.started_at else None,
+            'completed_at': migration.completed_at.isoformat() if migration.completed_at else None
+        }
+
+        # Include results only when migration is complete
+        if migration.status in ['completed', 'partial', 'failed']:
+            response['results'] = migration.results
+            response['folder_deleted'] = migration.folder_deleted
+            response['folder_deletion_attempted'] = migration.folder_deletion_attempted
+            if migration.folder_deletion_error:
+                response['folder_deletion_error'] = migration.folder_deletion_error
+
+        # Include error message if failed
+        if migration.error_message:
+            response['error_message'] = migration.error_message
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get migration status for {migration_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve migration status")

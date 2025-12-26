@@ -576,6 +576,93 @@ class EmailService:
             reply_to=settings.email.email_from_info
         )
 
+    async def send_migration_notification(
+        self,
+        session: Session,
+        to_email: str,
+        user_name: str,
+        template_name: str,
+        from_provider: str,
+        to_provider: str,
+        successful_count: int,
+        failed_count: int,
+        total_count: int,
+        dashboard_url: str,
+        error_message: str = '',
+        user_can_receive_marketing: bool = True
+    ) -> bool:
+        """
+        Send notification about cloud storage provider migration results
+
+        Args:
+            session: Database session
+            to_email: User email
+            user_name: User name
+            template_name: Email template name ('migration_completed', 'migration_partial', 'migration_failed')
+            from_provider: Source provider type (e.g., 'google_drive')
+            to_provider: Target provider type (e.g., 'onedrive')
+            successful_count: Number of successfully migrated documents
+            failed_count: Number of failed documents
+            total_count: Total number of documents
+            dashboard_url: Dashboard URL
+            error_message: Error message (if any)
+            user_can_receive_marketing: Check if user opted in for marketing emails
+
+        Returns:
+            True if email sent successfully
+        """
+        # Optional email - check user preferences
+        if not user_can_receive_marketing:
+            logger.info(f"Skipping migration notification email to {to_email} - marketing emails disabled")
+            return False
+
+        # Format provider names for display
+        def format_provider_name(provider_type: str) -> str:
+            if provider_type == 'google_drive':
+                return 'Google Drive'
+            elif provider_type == 'onedrive':
+                return 'OneDrive'
+            else:
+                return provider_type.replace('_', ' ').title()
+
+        from_provider_name = format_provider_name(from_provider)
+        to_provider_name = format_provider_name(to_provider)
+
+        # Load template from database
+        template_variables = {
+            'user_name': user_name,
+            'from_provider_name': from_provider_name,
+            'to_provider_name': to_provider_name,
+            'successful_count': str(successful_count),
+            'failed_count': str(failed_count),
+            'total_count': str(total_count),
+            'dashboard_url': dashboard_url,
+            'error_message': error_message,
+            'button_color': '#3498db',
+            'company_signature': 'Best regards,<br>The BoniDoc Team'
+        }
+
+        email_data = email_template_service.prepare_email(
+            session=session,
+            template_name=template_name,
+            variables=template_variables,
+            recipient_email=to_email,
+            recipient_name=user_name
+        )
+
+        if not email_data:
+            logger.error(f"Database template '{template_name}' not found")
+            raise Exception(f"Email template '{template_name}' not found in database")
+
+        return await self.send_email(
+            to_email=email_data['to_email'],
+            to_name=email_data['to_name'],
+            subject=email_data['subject'],
+            html_content=email_data['html_body'],
+            from_email=email_data.get('from_email', settings.email.email_from_info),
+            reply_to=settings.email.email_from_info
+        )
+
     async def send_account_deleted_notification(
         self,
         session: Session,

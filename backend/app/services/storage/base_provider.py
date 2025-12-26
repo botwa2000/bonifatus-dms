@@ -210,3 +210,31 @@ class StorageProvider(ABC):
             - Should be idempotent (safe to call multiple times)
         """
         pass
+
+    @abstractmethod
+    def delete_app_folder(self, refresh_token_encrypted: str) -> Dict[str, Any]:
+        """
+        Delete the entire app folder from the cloud storage provider.
+
+        This is used during migration to clean up the old provider's folder
+        after all documents have been successfully migrated to a new provider.
+
+        Args:
+            refresh_token_encrypted: Encrypted refresh token from database
+
+        Returns:
+            Dictionary containing:
+                - success: Boolean indicating if deletion was successful
+                - message: Human-readable status message
+                - folder_id: Optional ID of the deleted folder (if found)
+
+        Raises:
+            Exception: If authentication is invalid
+
+        Implementation Notes:
+            - Should recursively delete folder and all contents
+            - Should handle 404/not found gracefully (return success=True if folder doesn't exist)
+            - Should be idempotent (safe to call multiple times)
+            - Deletion is permanent and cannot be undone
+        """
+        pass
