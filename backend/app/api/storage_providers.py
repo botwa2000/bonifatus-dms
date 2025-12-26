@@ -64,11 +64,13 @@ async def get_available_providers(
     - enabled: Whether this provider is enabled for user's tier
     """
     try:
-        # Refresh user from database to get latest connection status
-        db.refresh(current_user)
+        # Fetch fresh user data from database to get latest connection status
+        fresh_user = db.query(User).filter(User.id == current_user.id).first()
+        if not fresh_user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-        logger.info(f"🔵 Getting available providers for user {current_user.id}")
-        logger.debug(f"🔍 User active_storage_provider: {current_user.active_storage_provider}")
+        logger.info(f"🔵 Getting available providers for user {fresh_user.id}")
+        logger.debug(f"🔍 User active_storage_provider: {fresh_user.active_storage_provider}")
 
         # Get all registered providers
         all_providers = ProviderFactory.get_available_providers()
@@ -83,8 +85,8 @@ async def get_available_providers(
             provider_info = {
                 'type': provider_type,
                 'name': _format_provider_name(provider_type),
-                'connected': _is_provider_connected(current_user, provider_type),
-                'is_active': current_user.active_storage_provider == provider_type,
+                'connected': _is_provider_connected(fresh_user, provider_type),
+                'is_active': fresh_user.active_storage_provider == provider_type,
                 'enabled': True  # Will be tier-based later
             }
             logger.debug(f"📋 Provider info: {provider_info}")
