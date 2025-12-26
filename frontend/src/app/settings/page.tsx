@@ -11,6 +11,8 @@ import { logger } from '@/lib/logger'
 import { delegateService, type Delegate, type GrantedAccess, type PendingInvitation } from '@/services/delegate.service'
 import { storageProviderService, type ProviderInfo } from '@/services/storage-provider.service'
 import { ProviderCard } from '@/components/settings/ProviderCard'
+import MigrationChoiceModal from '@/components/settings/MigrationChoiceModal'
+import MigrationProgress from '@/components/settings/MigrationProgress'
 import type { BadgeVariant } from '@/components/ui'
 
 interface UserPreferences {
@@ -72,6 +74,16 @@ export default function SettingsPage() {
   const [sharedLoading, setSharedLoading] = useState(false)
   const [respondingToInvite, setRespondingToInvite] = useState<string | null>(null)
 
+  // Migration state
+  const [showMigrationChoice, setShowMigrationChoice] = useState(false)
+  const [showMigrationProgress, setShowMigrationProgress] = useState(false)
+  const [migrationData, setMigrationData] = useState<{
+    currentProvider: string
+    newProvider: string
+    documentCount: number
+    migrationId?: string
+  } | null>(null)
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -80,6 +92,31 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUser()
   }, [loadUser])
+
+  // Check for migration after OAuth callback
+  useEffect(() => {
+    const migrationId = sessionStorage.getItem('migration_id')
+    const fromProvider = sessionStorage.getItem('migration_from_provider')
+    const toProvider = sessionStorage.getItem('migration_to_provider')
+
+    if (migrationId && fromProvider && toProvider) {
+      logger.debug(`[SETTINGS] Migration detected: ${migrationId}`)
+      setMigrationData({
+        currentProvider: fromProvider,
+        newProvider: toProvider,
+        documentCount: 0,
+        migrationId
+      })
+      setShowMigrationProgress(true)
+
+      // Clear sessionStorage
+      sessionStorage.removeItem('migration_id')
+      sessionStorage.removeItem('migration_from_provider')
+      sessionStorage.removeItem('migration_to_provider')
+      sessionStorage.removeItem('migration_choice')
+      sessionStorage.removeItem('migration_new_provider')
+    }
+  }, [])
 
   // Load settings on mount
   // Security note: Middleware already protects this route (cookie check)
@@ -451,13 +488,52 @@ export default function SettingsPage() {
 
     try {
       logger.debug(`[SETTINGS] Initiating ${providerType} connection...`)
-      const response = await storageProviderService.getAuthorizationUrl(providerType)
 
-      // Redirect to provider's OAuth page
-      window.location.href = response.authorization_url
+      // First check if migration is needed
+      const intentResponse = await storageProviderService.checkConnectIntent(providerType)
+
+      if (intentResponse.needs_migration && intentResponse.current_provider) {
+        // Show migration choice modal
+        logger.debug(`[SETTINGS] Migration needed from ${intentResponse.current_provider} to ${providerType}`)
+        setMigrationData({
+          currentProvider: intentResponse.current_provider,
+          newProvider: providerType,
+          documentCount: intentResponse.document_count
+        })
+        setShowMigrationChoice(true)
+        setProvidersLoading(false)
+      } else {
+        // No migration needed, proceed directly to OAuth
+        logger.debug(`[SETTINGS] No migration needed, proceeding to OAuth`)
+        const response = await storageProviderService.getAuthorizationUrl(providerType)
+        window.location.href = response.authorization_url
+      }
     } catch (error) {
       logger.error(`[SETTINGS] Failed to initiate ${providerType} connection:`, error)
       setMessage({ type: 'error', text: `Failed to connect ${providerType}. Please try again.` })
+      setProvidersLoading(false)
+    }
+  }
+
+  const handleMigrationChoice = async (choice: 'migrate' | 'fresh') => {
+    if (!migrationData) return
+
+    logger.debug(`[SETTINGS] User chose: ${choice}`)
+
+    // Store migration choice in sessionStorage for callback
+    sessionStorage.setItem('migration_choice', choice)
+    sessionStorage.setItem('migration_new_provider', migrationData.newProvider)
+    sessionStorage.setItem('migration_from_provider', migrationData.currentProvider)
+
+    // Close modal and proceed to OAuth
+    setShowMigrationChoice(false)
+
+    try {
+      const response = await storageProviderService.getAuthorizationUrl(migrationData.newProvider)
+      window.location.href = response.authorization_url
+    } catch (error) {
+      logger.error(`[SETTINGS] Failed to get OAuth URL:`, error)
+      setMessage({ type: 'error', text: `Failed to connect ${migrationData.newProvider}. Please try again.` })
       setProvidersLoading(false)
     }
   }
@@ -1072,6 +1148,36 @@ export default function SettingsPage() {
                 </Button>
               </ModalFooter>
             </Modal>
+          )}
+
+          {/* Migration Choice Modal */}
+          {showMigrationChoice && migrationData && (
+            <MigrationChoiceModal
+              isOpen={showMigrationChoice}
+              onClose={() => {
+                setShowMigrationChoice(false)
+                setProvidersLoading(false)
+              }}
+              onConfirm={handleMigrationChoice}
+              currentProvider={migrationData.currentProvider}
+              newProvider={migrationData.newProvider}
+              documentCount={migrationData.documentCount}
+            />
+          )}
+
+          {/* Migration Progress Modal */}
+          {showMigrationProgress && migrationData?.migrationId && (
+            <MigrationProgress
+              migrationId={migrationData.migrationId}
+              isOpen={showMigrationProgress}
+              onClose={() => {
+                setShowMigrationProgress(false)
+                setMigrationData(null)
+                loadStorageProviders()
+              }}
+              fromProvider={migrationData.currentProvider}
+              toProvider={migrationData.newProvider}
+            />
           )}
 
           <div className="flex justify-end space-x-3">

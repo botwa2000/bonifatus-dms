@@ -41,6 +41,29 @@ export interface ActiveProviderResponse {
   provider_name: string | null
 }
 
+export interface ConnectIntentResponse {
+  needs_migration: boolean
+  current_provider: string | null
+  document_count: number
+}
+
+export interface MigrationStatusResponse {
+  migration_id: string
+  status: 'pending' | 'processing' | 'completed' | 'partial' | 'failed'
+  from_provider: string
+  to_provider: string
+  total_documents: number
+  processed_documents: number
+  successful_documents: number
+  failed_documents: number
+  current_document: string | null
+  folder_deleted?: boolean
+  folder_deletion_attempted?: boolean
+  error_message?: string
+  started_at?: string
+  completed_at?: string
+}
+
 class StorageProviderService {
   /**
    * Get list of all available storage providers with connection status
@@ -67,20 +90,51 @@ class StorageProviderService {
   }
 
   /**
+   * Check if connecting this provider requires migration
+   */
+  async checkConnectIntent(providerType: string): Promise<ConnectIntentResponse> {
+    logger.debug('[StorageProviderService] Checking connect intent for:', providerType)
+
+    return await apiClient.get<ConnectIntentResponse>(
+      `/api/v1/storage/providers/${providerType}/connect-intent`,
+      true
+    )
+  }
+
+  /**
    * Handle OAuth callback from storage provider
    */
   async handleOAuthCallback(
     providerType: string,
     code: string,
-    state: string
-  ): Promise<OAuthCallbackResponse> {
+    state: string,
+    migrationChoice?: 'migrate' | 'fresh'
+  ): Promise<OAuthCallbackResponse & { migration_id?: string; migration_status?: string }> {
     logger.debug('[StorageProviderService] Handling OAuth callback for:', providerType)
+    logger.debug('[StorageProviderService] Migration choice:', migrationChoice)
 
-    return await apiClient.post<OAuthCallbackResponse>(
+    const params: Record<string, string> = { code, state }
+    if (migrationChoice) {
+      params.migration_choice = migrationChoice
+    }
+
+    return await apiClient.post<OAuthCallbackResponse & { migration_id?: string; migration_status?: string }>(
       `/api/v1/storage/providers/${providerType}/callback`,
       {},
       true,
-      { params: { code, state } }
+      { params }
+    )
+  }
+
+  /**
+   * Get migration status by ID
+   */
+  async getMigrationStatus(migrationId: string): Promise<MigrationStatusResponse> {
+    logger.debug('[StorageProviderService] Getting migration status for:', migrationId)
+
+    return await apiClient.get<MigrationStatusResponse>(
+      `/api/v1/storage/migration-status/${migrationId}`,
+      true
     )
   }
 

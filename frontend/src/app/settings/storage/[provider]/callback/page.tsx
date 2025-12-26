@@ -54,6 +54,14 @@ function StorageCallbackContent() {
         return
       }
 
+      // Check for migration choice from sessionStorage
+      const migrationChoice = sessionStorage.getItem('migration_choice') as 'migrate' | 'fresh' | null
+      const fromProvider = sessionStorage.getItem('migration_from_provider')
+      const toProvider = sessionStorage.getItem('migration_new_provider')
+
+      logger.info(`🔍 [${providerName} Callback] Migration choice:`, migrationChoice)
+      logger.info(`🔍 [${providerName} Callback] From provider:`, fromProvider, 'To provider:', toProvider)
+
       // Update status message
       setMessage(`Connecting to ${providerName}...`)
 
@@ -64,7 +72,8 @@ function StorageCallbackContent() {
         const result = await storageProviderService.handleOAuthCallback(
           provider,
           code,
-          state
+          state,
+          migrationChoice || undefined
         )
 
         logger.info(`✅ [${providerName} Callback] Backend response:`, result)
@@ -83,9 +92,27 @@ function StorageCallbackContent() {
             // Continue anyway - user might still be logged in with existing token
           }
 
+          // Check if migration was initiated
+          if (result.migration_id && migrationChoice === 'migrate' && fromProvider) {
+            logger.info(`🔄 [${providerName} Callback] Migration initiated:`, result.migration_id)
+
+            // Store migration details in sessionStorage for Settings page
+            sessionStorage.setItem('migration_id', result.migration_id)
+            sessionStorage.setItem('migration_to_provider', provider)
+            // fromProvider is already stored, just keep it for Settings page to read
+
+            setMessage('Migration started! Redirecting to progress...')
+          } else {
+            // Clear migration sessionStorage if not migrating
+            sessionStorage.removeItem('migration_choice')
+            sessionStorage.removeItem('migration_new_provider')
+            sessionStorage.removeItem('migration_from_provider')
+
+            setMessage(result.message || `${providerName} connected successfully!`)
+          }
+
           logger.info(`🎉 [${providerName} Callback] Setting success status, redirecting to /settings in 2s`)
           setStatus('success')
-          setMessage(result.message || `${providerName} connected successfully!`)
           setTimeout(() => {
             logger.info(`➡️ [${providerName} Callback] Redirecting to /settings`)
             router.push('/settings')
