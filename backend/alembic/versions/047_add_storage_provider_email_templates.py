@@ -76,7 +76,7 @@ def upgrade():
     conn.execute(text("""
         INSERT INTO email_templates (
             name, display_name, description, subject, html_body, text_body,
-            available_variables, category, is_active, is_system
+            available_variables, category, is_active, is_system, send_from_name, send_from_email
         ) VALUES (
             'provider_disconnected',
             'Provider Disconnected',
