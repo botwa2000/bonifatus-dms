@@ -1,6 +1,6 @@
 """Add storage provider connected/disconnected email templates
 
-Revision ID: 047_add_storage_provider_email_templates
+Revision ID: 047_provider_email_templates
 Revises: 046_document_multi_provider
 Create Date: 2025-12-26 19:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
-revision = '047_add_storage_provider_email_templates'
+revision = '047_provider_email_templates'
 down_revision = '046_document_multi_provider'
 branch_labels = None
 depends_on = None
