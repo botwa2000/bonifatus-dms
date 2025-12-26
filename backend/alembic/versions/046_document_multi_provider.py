@@ -15,6 +15,7 @@ Changes:
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '046_document_multi_provider'
@@ -27,17 +28,24 @@ def upgrade():
     """
     Update documents table for multi-provider support.
     """
-    # First, drop the unique constraint on google_drive_file_id
-    # Note: Constraint name may vary, check your database
-    try:
-        op.drop_constraint('uq_documents_google_drive_file_id', 'documents', type_='unique')
-    except Exception:
-        # If constraint doesn't exist or has different name, try alternate names
-        try:
-            op.drop_constraint('documents_google_drive_file_id_key', 'documents', type_='unique')
-        except Exception:
-            # If still fails, constraint might not exist - that's okay
-            pass
+    # Get database connection to query for constraint name
+    conn = op.get_bind()
+
+    # Find the unique constraint on google_drive_file_id
+    constraint_query = text("""
+        SELECT constraint_name
+        FROM information_schema.table_constraints
+        WHERE table_name = 'documents'
+        AND constraint_type = 'UNIQUE'
+        AND constraint_name LIKE '%google_drive_file_id%'
+    """)
+
+    result = conn.execute(constraint_query).fetchone()
+
+    # Drop the constraint if it exists
+    if result:
+        constraint_name = result[0]
+        op.drop_constraint(constraint_name, 'documents', type_='unique')
 
     # Rename column from google_drive_file_id to storage_file_id
     op.alter_column('documents', 'google_drive_file_id',
