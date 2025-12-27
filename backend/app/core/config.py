@@ -314,8 +314,14 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 
+@lru_cache()
 def get_settings() -> Settings:
-    """Get settings instance without caching to ensure fresh environment variable reads"""
+    """
+    Get cached settings instance (secrets are read once at startup, then cached).
+
+    NOTE: In most cases, you should use the global 'settings' object directly instead of calling this function.
+    This function exists primarily for backwards compatibility and testing purposes.
+    """
     return Settings()
 
 
