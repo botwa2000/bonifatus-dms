@@ -30,10 +30,24 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-database_url = os.getenv("DATABASE_URL")
-if not database_url:
-    raise ValueError("DATABASE_URL environment variable is required for migrations")
+# Read database URL from Docker secret or environment variable
+from pathlib import Path
 
+def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
+    """Read secret from Docker Swarm or environment variable"""
+    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+    env_suffix = '_dev' if app_env == 'development' else '_prod'
+    secret_path = Path(f"/run/secrets/{secret_name}{env_suffix}")
+
+    if secret_path.exists():
+        return secret_path.read_text().strip()
+
+    if fallback_env_var and os.getenv(fallback_env_var):
+        return os.getenv(fallback_env_var)
+
+    raise ValueError(f"Secret '{secret_name}{env_suffix}' not found")
+
+database_url = read_secret("database_url", "DATABASE_URL")
 config.set_main_option("sqlalchemy.url", database_url)
 
 
