@@ -206,6 +206,7 @@ services:
       - DATABASE_CONNECT_TIMEOUT=60
       - GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS
       - ONEDRIVE_FOLDER_NAME=Bonifatus_DMS
+      - C_FORCE_ROOT=1  # Allow Celery to run as root
     depends_on:
       - redis
       - backend
@@ -229,9 +230,8 @@ services:
       mode: replicated
       replicas: 1
       restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        condition: any
+        delay: 2s
       resources:
         limits:
           cpus: '2.0'

@@ -200,6 +200,7 @@ services:
       - GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS_DEV
       - ONEDRIVE_FOLDER_NAME=Bonifatus_DMS_Dev
       - CLAMAV_ENABLED=false
+      - C_FORCE_ROOT=1  # Allow Celery to run as root
     depends_on:
       - redis
       - backend
@@ -220,9 +221,8 @@ services:
       mode: replicated
       replicas: 1
       restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        condition: any
+        delay: 2s
       resources:
         limits:
           cpus: '2.0'
