@@ -142,12 +142,29 @@ python -c "
 import spacy
 import json
 import os
+from pathlib import Path
 from sqlalchemy import create_engine, text
 
-# Get database connection
-database_url = os.getenv('DATABASE_URL')
-if not database_url:
-    print('[spaCy] ERROR: DATABASE_URL not set')
+# Get database connection (from Docker secret or environment variable)
+def read_secret(secret_name, fallback_env_var=None):
+    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+    env_suffix = '_dev' if app_env == 'development' else '_prod'
+    secret_path = Path(f'/run/secrets/{secret_name}{env_suffix}')
+
+    if secret_path.exists():
+        return secret_path.read_text().strip()
+
+    if fallback_env_var:
+        value = os.getenv(fallback_env_var)
+        if value:
+            return value
+
+    raise ValueError(f'Secret {secret_name}{env_suffix} not found')
+
+try:
+    database_url = read_secret('database_url', 'DATABASE_URL')
+except ValueError as e:
+    print(f'[spaCy] ERROR: {e}')
     exit(1)
 
 try:
