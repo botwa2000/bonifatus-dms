@@ -145,25 +145,30 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine, text
 
-# Get database connection (from Docker secret or environment variable)
-def read_secret(secret_name, fallback_env_var=None):
-    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+# Get database connection (from Docker secret)
+def read_secret(secret_name):
+    app_env = os.getenv('APP_ENVIRONMENT')
+    if not app_env:
+        raise RuntimeError('APP_ENVIRONMENT environment variable must be set')
+
     env_suffix = '_dev' if app_env == 'development' else '_prod'
     secret_path = Path(f'/run/secrets/{secret_name}{env_suffix}')
 
-    if secret_path.exists():
-        return secret_path.read_text().strip()
+    if not secret_path.exists():
+        raise ValueError(
+            f'CRITICAL: Secret file {secret_path} not found. '
+            f'Ensure Docker secret {secret_name}{env_suffix} is created and mounted.'
+        )
 
-    if fallback_env_var:
-        value = os.getenv(fallback_env_var)
-        if value:
-            return value
+    value = secret_path.read_text().strip()
+    if not value:
+        raise ValueError(f'CRITICAL: Secret file {secret_path} exists but is empty')
 
-    raise ValueError(f'Secret {secret_name}{env_suffix} not found')
+    return value
 
 try:
-    database_url = read_secret('database_url', 'DATABASE_URL')
-except ValueError as e:
+    database_url = read_secret('database_url')
+except (ValueError, RuntimeError) as e:
     print(f'[spaCy] ERROR: {e}')
     exit(1)
 

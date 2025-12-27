@@ -33,21 +33,28 @@ target_metadata = Base.metadata
 # Read database URL from Docker secret or environment variable
 from pathlib import Path
 
-def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
-    """Read secret from Docker Swarm or environment variable"""
-    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+def read_secret(secret_name: str) -> str:
+    """Read secret from Docker Swarm"""
+    app_env = os.getenv('APP_ENVIRONMENT')
+    if not app_env:
+        raise RuntimeError("APP_ENVIRONMENT environment variable must be set")
+
     env_suffix = '_dev' if app_env == 'development' else '_prod'
     secret_path = Path(f"/run/secrets/{secret_name}{env_suffix}")
 
-    if secret_path.exists():
-        return secret_path.read_text().strip()
+    if not secret_path.exists():
+        raise ValueError(
+            f"CRITICAL: Secret file '{secret_path}' not found. "
+            f"Ensure Docker secret '{secret_name}{env_suffix}' is created and mounted."
+        )
 
-    if fallback_env_var and os.getenv(fallback_env_var):
-        return os.getenv(fallback_env_var)
+    value = secret_path.read_text().strip()
+    if not value:
+        raise ValueError(f"CRITICAL: Secret file '{secret_path}' exists but is empty")
 
-    raise ValueError(f"Secret '{secret_name}{env_suffix}' not found")
+    return value
 
-database_url = read_secret("database_url", "DATABASE_URL")
+database_url = read_secret("database_url")
 config.set_main_option("sqlalchemy.url", database_url)
 
 

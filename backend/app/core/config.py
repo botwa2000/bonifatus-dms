@@ -10,61 +10,62 @@ from pydantic_settings import BaseSettings
 logger = logging.getLogger(__name__)
 
 
-def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
+def read_secret(secret_name: str) -> str:
     """
-    Read secret from Docker Swarm secret file or fall back to environment variable.
-
-    Priority:
-    1. /run/secrets/{secret_name}_{env_suffix} (Docker Swarm secret with _dev or _prod suffix)
-    2. Environment variable (fallback for migration/local dev)
-    3. Raise error if neither found
+    Read secret from Docker Swarm secret file.
 
     Args:
         secret_name: Base name of the secret (without _dev or _prod suffix)
-        fallback_env_var: Environment variable name to fall back to
 
     Returns:
         Secret value as string
 
     Raises:
-        ValueError: If secret not found in either location
+        ValueError: If secret file not found or empty
+        RuntimeError: If APP_ENVIRONMENT not set
     """
     # Determine environment suffix
-    app_env = os.getenv('APP_ENVIRONMENT', 'development')
-    env_suffix = '_dev' if app_env == 'development' else '_prod'
+    app_env = os.getenv('APP_ENVIRONMENT')
+    if not app_env:
+        raise RuntimeError(
+            "APP_ENVIRONMENT environment variable must be set to 'development' or 'production'"
+        )
 
-    # Try Docker secret with environment suffix first
+    env_suffix = '_dev' if app_env == 'development' else '_prod'
     secret_path = Path(f"/run/secrets/{secret_name}{env_suffix}")
 
-    if secret_path.exists():
-        try:
-            value = secret_path.read_text().strip()
-            if value:
-                logger.debug(f"Loaded secret '{secret_name}{env_suffix}' from Docker Swarm")
-                return value
-        except Exception as e:
-            logger.warning(f"Failed to read secret from {secret_path}: {e}")
+    # Check if secret file exists
+    if not secret_path.exists():
+        raise ValueError(
+            f"CRITICAL: Secret file '{secret_path}' not found. "
+            f"Ensure Docker secret '{secret_name}{env_suffix}' is created and mounted to this container."
+        )
 
-    # Fallback to environment variable
-    if fallback_env_var:
-        value = os.getenv(fallback_env_var)
-        if value:
-            logger.warning(f"Using environment variable for '{secret_name}' (Docker secret not found)")
-            return value
+    # Read secret file
+    try:
+        value = secret_path.read_text().strip()
+    except Exception as e:
+        raise ValueError(
+            f"CRITICAL: Failed to read secret from {secret_path}: {e}"
+        )
 
-    # Not found
-    raise ValueError(
-        f"Secret '{secret_name}{env_suffix}' not found in /run/secrets/ "
-        f"or environment variable '{fallback_env_var}'"
-    )
+    # Validate secret is not empty
+    if not value:
+        raise ValueError(
+            f"CRITICAL: Secret file '{secret_path}' exists but is empty. "
+            f"Secret '{secret_name}{env_suffix}' must contain a non-empty value."
+        )
+
+    logger.info(f"Loaded secret '{secret_name}{env_suffix}' from Docker Swarm")
+    return value
 
 
 class DatabaseSettings(BaseSettings):
     """Database configuration from environment variables"""
 
     database_url: str = Field(
-        default_factory=lambda: read_secret("database_url", "DATABASE_URL"),
-        description="Database connection URL"
+        default_factory=lambda: read_secret("database_url"),
+        description="Database connection URL (loaded from Docker Swarm secret)"
     )
     database_pool_size: int = Field(default=10, description="Connection pool size")
     database_pool_recycle: int = Field(default=60, description="Pool recycle time (60s for Supabase transaction pooler)")
@@ -81,12 +82,12 @@ class GoogleSettings(BaseSettings):
     """Google services configuration"""
 
     google_client_id: str = Field(
-        default_factory=lambda: read_secret("google_client_id", "GOOGLE_CLIENT_ID"),
-        description="Google OAuth client ID"
+        default_factory=lambda: read_secret("google_client_id"),
+        description="Google OAuth client ID (loaded from Docker Swarm secret)"
     )
     google_client_secret: str = Field(
-        default_factory=lambda: read_secret("google_client_secret", "GOOGLE_CLIENT_SECRET"),
-        description="Google OAuth client secret"
+        default_factory=lambda: read_secret("google_client_secret"),
+        description="Google OAuth client secret (loaded from Docker Swarm secret)"
     )
     google_redirect_uri: str = Field(..., env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
     google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
@@ -94,9 +95,9 @@ class GoogleSettings(BaseSettings):
     google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
     google_drive_folder_name: str = Field(default="Bonifatus_DMS", env="GOOGLE_DRIVE_FOLDER_NAME", description="Google Drive folder name for documents (use different names for dev/prod)")
     google_project_id: str = Field(
-        default_factory=lambda: read_secret("gcp_project", "GCP_PROJECT"),
+        default_factory=lambda: read_secret("gcp_project"),
         alias="GCP_PROJECT",
-        description="Google Cloud Project ID"
+        description="Google Cloud Project ID (loaded from Docker Swarm secret)"
     )
 
     class Config:
@@ -108,12 +109,12 @@ class OneDriveSettings(BaseSettings):
     """Microsoft OneDrive configuration"""
 
     onedrive_client_id: str = Field(
-        default_factory=lambda: read_secret("onedrive_client_id", "ONEDRIVE_CLIENT_ID"),
-        description="Microsoft Azure app client ID"
+        default_factory=lambda: read_secret("onedrive_client_id"),
+        description="Microsoft Azure app client ID (loaded from Docker Swarm secret)"
     )
     onedrive_client_secret: str = Field(
-        default_factory=lambda: read_secret("onedrive_client_secret", "ONEDRIVE_CLIENT_SECRET"),
-        description="Microsoft Azure app client secret"
+        default_factory=lambda: read_secret("onedrive_client_secret"),
+        description="Microsoft Azure app client secret (loaded from Docker Swarm secret)"
     )
     onedrive_redirect_uri: str = Field(..., env="ONEDRIVE_REDIRECT_URI", description="OneDrive OAuth redirect URI")
     onedrive_folder_name: str = Field(default="Bonifatus_DMS", env="ONEDRIVE_FOLDER_NAME", description="OneDrive folder name for documents (use different names for dev/prod)")
@@ -127,8 +128,8 @@ class SecuritySettings(BaseSettings):
     """Security configuration from environment variables"""
 
     security_secret_key: str = Field(
-        default_factory=lambda: read_secret("security_secret_key", "SECURITY_SECRET_KEY"),
-        description="JWT secret key"
+        default_factory=lambda: read_secret("security_secret_key"),
+        description="JWT secret key (loaded from Docker Swarm secret)"
     )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=480, description="JWT access token expiration (8 hours)")
@@ -137,17 +138,13 @@ class SecuritySettings(BaseSettings):
     default_user_tier: str = Field(default="free", description="Default user tier")
     admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")
     encryption_key: str = Field(
-        default_factory=lambda: read_secret("encryption_key", "ENCRYPTION_KEY"),
-        description="AES-256 encryption key for field-level encryption"
+        default_factory=lambda: read_secret("encryption_key"),
+        description="AES-256 encryption key for field-level encryption (loaded from Docker Swarm secret)"
     )
     turnstile_site_key: Optional[str] = Field(default=None, description="Cloudflare Turnstile site key (public)")
-    turnstile_secret_key: Optional[str] = Field(
-        default_factory=lambda: (
-            read_secret("turnstile_secret_key", "TURNSTILE_SECRET_KEY")
-            if Path("/run/secrets/turnstile_secret_key").exists() or os.getenv("TURNSTILE_SECRET_KEY")
-            else None
-        ),
-        description="Cloudflare Turnstile secret key"
+    turnstile_secret_key: str = Field(
+        default_factory=lambda: read_secret("turnstile_secret_key"),
+        description="Cloudflare Turnstile secret key (loaded from Docker Swarm secret)"
     )
 
     class Config:
@@ -183,13 +180,9 @@ class ScannerSettings(BaseSettings):
 class EmailSettings(BaseSettings):
     """Email service configuration from environment variables"""
 
-    brevo_api_key: Optional[str] = Field(
-        default_factory=lambda: (
-            read_secret("brevo_api_key", "BREVO_API_KEY")
-            if Path("/run/secrets/brevo_api_key").exists() or os.getenv("BREVO_API_KEY")
-            else None
-        ),
-        description="Brevo API key (loaded from Docker Swarm secret or environment variable)"
+    brevo_api_key: str = Field(
+        default_factory=lambda: read_secret("brevo_api_key"),
+        description="Brevo API key (loaded from Docker Swarm secret)"
     )
     email_from_info: str = Field(default="info@bonidoc.com", description="Info email address")
     email_from_noreply: str = Field(default="no-reply@bonidoc.com", description="No-reply email address")
@@ -203,29 +196,17 @@ class EmailSettings(BaseSettings):
 class StripeSettings(BaseSettings):
     """Stripe payment integration configuration from environment variables"""
 
-    stripe_secret_key: Optional[str] = Field(
-        default_factory=lambda: (
-            read_secret("stripe_secret_key", "STRIPE_SECRET_KEY")
-            if Path("/run/secrets/stripe_secret_key").exists() or os.getenv("STRIPE_SECRET_KEY")
-            else None
-        ),
-        description="Stripe secret key (loaded from Docker Swarm secret or environment variable)"
+    stripe_secret_key: str = Field(
+        default_factory=lambda: read_secret("stripe_secret_key"),
+        description="Stripe secret key (loaded from Docker Swarm secret)"
     )
-    stripe_publishable_key: Optional[str] = Field(
-        default_factory=lambda: (
-            read_secret("stripe_publishable_key", "STRIPE_PUBLISHABLE_KEY")
-            if Path("/run/secrets/stripe_publishable_key").exists() or os.getenv("STRIPE_PUBLISHABLE_KEY")
-            else None
-        ),
-        description="Stripe publishable key (loaded from Docker Swarm secret or environment variable)"
+    stripe_publishable_key: str = Field(
+        default_factory=lambda: read_secret("stripe_publishable_key"),
+        description="Stripe publishable key (loaded from Docker Swarm secret)"
     )
-    stripe_webhook_secret: Optional[str] = Field(
-        default_factory=lambda: (
-            read_secret("stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET")
-            if Path("/run/secrets/stripe_webhook_secret").exists() or os.getenv("STRIPE_WEBHOOK_SECRET")
-            else None
-        ),
-        description="Stripe webhook endpoint secret for signature verification"
+    stripe_webhook_secret: str = Field(
+        default_factory=lambda: read_secret("stripe_webhook_secret"),
+        description="Stripe webhook endpoint secret for signature verification (loaded from Docker Swarm secret)"
     )
     # Price IDs for each tier and billing cycle
     stripe_price_id_starter_monthly: Optional[str] = Field(None, description="Stripe price ID for Starter monthly")
@@ -246,8 +227,8 @@ class EmailProcessingSettings(BaseSettings):
     imap_port: int = Field(default=993, description="IMAP port (993 for SSL)")
     imap_user: str = Field(default="info@bonidoc.com", description="IMAP username")
     imap_password: str = Field(
-        default_factory=lambda: read_secret("imap_password", "IMAP_PASSWORD"),
-        description="IMAP password (loaded from Docker Swarm secret or environment variable)"
+        default_factory=lambda: read_secret("imap_password"),
+        description="IMAP password (loaded from Docker Swarm secret)"
     )
     imap_use_ssl: bool = Field(default=True, description="Use SSL for IMAP connection")
 
