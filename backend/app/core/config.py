@@ -2,6 +2,7 @@
 import logging
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
@@ -9,10 +10,58 @@ from pydantic_settings import BaseSettings
 logger = logging.getLogger(__name__)
 
 
+def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
+    """
+    Read secret from Docker Swarm secret file or fall back to environment variable.
+
+    Priority:
+    1. /run/secrets/{secret_name} (Docker Swarm secret)
+    2. Environment variable (fallback for migration/local dev)
+    3. Raise error if neither found
+
+    Args:
+        secret_name: Name of the secret file in /run/secrets/
+        fallback_env_var: Environment variable name to fall back to
+
+    Returns:
+        Secret value as string
+
+    Raises:
+        ValueError: If secret not found in either location
+    """
+    secret_path = Path(f"/run/secrets/{secret_name}")
+
+    # Try Docker secret first
+    if secret_path.exists():
+        try:
+            value = secret_path.read_text().strip()
+            if value:
+                logger.debug(f"Loaded secret '{secret_name}' from Docker Swarm")
+                return value
+        except Exception as e:
+            logger.warning(f"Failed to read secret from {secret_path}: {e}")
+
+    # Fallback to environment variable
+    if fallback_env_var:
+        value = os.getenv(fallback_env_var)
+        if value:
+            logger.warning(f"Using environment variable for '{secret_name}' (Docker secret not found)")
+            return value
+
+    # Not found
+    raise ValueError(
+        f"Secret '{secret_name}' not found in /run/secrets/ "
+        f"or environment variable '{fallback_env_var}'"
+    )
+
+
 class DatabaseSettings(BaseSettings):
     """Database configuration from environment variables"""
-    
-    database_url: str = Field(..., description="Database connection URL")
+
+    database_url: str = Field(
+        default_factory=lambda: read_secret("database_url", "DATABASE_URL"),
+        description="Database connection URL"
+    )
     database_pool_size: int = Field(default=10, description="Connection pool size")
     database_pool_recycle: int = Field(default=60, description="Pool recycle time (60s for Supabase transaction pooler)")
     database_echo: bool = Field(default=False, description="Enable SQL query logging")
@@ -22,59 +71,84 @@ class DatabaseSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class GoogleSettings(BaseSettings):
     """Google services configuration"""
-    
-    google_client_id: str = Field(..., env="GOOGLE_CLIENT_ID", description="Google OAuth client ID")
-    google_client_secret: str = Field(..., env="GOOGLE_CLIENT_SECRET", description="Google OAuth client secret")
+
+    google_client_id: str = Field(
+        default_factory=lambda: read_secret("google_client_id", "GOOGLE_CLIENT_ID"),
+        description="Google OAuth client ID"
+    )
+    google_client_secret: str = Field(
+        default_factory=lambda: read_secret("google_client_secret", "GOOGLE_CLIENT_SECRET"),
+        description="Google OAuth client secret"
+    )
     google_redirect_uri: str = Field(..., env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
     google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
     google_oauth_issuers: str = Field(default="https://accounts.google.com", description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
     google_drive_folder_name: str = Field(default="Bonifatus_DMS", env="GOOGLE_DRIVE_FOLDER_NAME", description="Google Drive folder name for documents (use different names for dev/prod)")
-    google_project_id: str = Field(..., alias="GCP_PROJECT", description="Google Cloud Project ID")
+    google_project_id: str = Field(
+        default_factory=lambda: read_secret("gcp_project", "GCP_PROJECT"),
+        alias="GCP_PROJECT",
+        description="Google Cloud Project ID"
+    )
 
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class OneDriveSettings(BaseSettings):
     """Microsoft OneDrive configuration"""
 
-    onedrive_client_id: str = Field(..., env="ONEDRIVE_CLIENT_ID", description="Microsoft Azure app client ID")
-    onedrive_client_secret: str = Field(..., env="ONEDRIVE_CLIENT_SECRET", description="Microsoft Azure app client secret")
+    onedrive_client_id: str = Field(
+        default_factory=lambda: read_secret("onedrive_client_id", "ONEDRIVE_CLIENT_ID"),
+        description="Microsoft Azure app client ID"
+    )
+    onedrive_client_secret: str = Field(
+        default_factory=lambda: read_secret("onedrive_client_secret", "ONEDRIVE_CLIENT_SECRET"),
+        description="Microsoft Azure app client secret"
+    )
     onedrive_redirect_uri: str = Field(..., env="ONEDRIVE_REDIRECT_URI", description="OneDrive OAuth redirect URI")
     onedrive_folder_name: str = Field(default="Bonifatus_DMS", env="ONEDRIVE_FOLDER_NAME", description="OneDrive folder name for documents (use different names for dev/prod)")
 
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class SecuritySettings(BaseSettings):
     """Security configuration from environment variables"""
 
-    security_secret_key: str = Field(..., description="JWT secret key")
+    security_secret_key: str = Field(
+        default_factory=lambda: read_secret("security_secret_key", "SECURITY_SECRET_KEY"),
+        description="JWT secret key"
+    )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=480, description="JWT access token expiration (8 hours)")
     inactivity_timeout_minutes: int = Field(default=60, description="Inactivity timeout - logout after 60 minutes of no API calls")
     refresh_token_expire_days: int = Field(default=30, description="Refresh token expiration (30 days for persistent login)")
     default_user_tier: str = Field(default="free", description="Default user tier")
     admin_emails: str = Field(default="bonifatus.app@gmail.com", description="Admin email list")
-    encryption_key: str = Field(..., description="AES-256 encryption key for field-level encryption")
+    encryption_key: str = Field(
+        default_factory=lambda: read_secret("encryption_key", "ENCRYPTION_KEY"),
+        description="AES-256 encryption key for field-level encryption"
+    )
     turnstile_site_key: Optional[str] = Field(default=None, description="Cloudflare Turnstile site key (public)")
-    turnstile_secret_key: Optional[str] = Field(default=None, description="Cloudflare Turnstile secret key")
+    turnstile_secret_key: Optional[str] = Field(
+        default_factory=lambda: (
+            read_secret("turnstile_secret_key", "TURNSTILE_SECRET_KEY")
+            if Path("/run/secrets/turnstile_secret_key").exists() or os.getenv("TURNSTILE_SECRET_KEY")
+            else None
+        ),
+        description="Cloudflare Turnstile secret key"
+    )
 
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class TranslationSettings(BaseSettings):
@@ -90,7 +164,6 @@ class TranslationSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class ScannerSettings(BaseSettings):
@@ -101,15 +174,18 @@ class ScannerSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class EmailSettings(BaseSettings):
     """Email service configuration from environment variables"""
 
     brevo_api_key: Optional[str] = Field(
-        None,
-        description="Brevo API key (set via system environment variable, NOT in .env file)"
+        default_factory=lambda: (
+            read_secret("brevo_api_key", "BREVO_API_KEY")
+            if Path("/run/secrets/brevo_api_key").exists() or os.getenv("BREVO_API_KEY")
+            else None
+        ),
+        description="Brevo API key (loaded from Docker Swarm secret or environment variable)"
     )
     email_from_info: str = Field(default="info@bonidoc.com", description="Info email address")
     email_from_noreply: str = Field(default="no-reply@bonidoc.com", description="No-reply email address")
@@ -118,22 +194,33 @@ class EmailSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class StripeSettings(BaseSettings):
     """Stripe payment integration configuration from environment variables"""
 
     stripe_secret_key: Optional[str] = Field(
-        None,
-        description="Stripe secret key (test keys in .env for dev, system env vars for prod)"
+        default_factory=lambda: (
+            read_secret("stripe_secret_key", "STRIPE_SECRET_KEY")
+            if Path("/run/secrets/stripe_secret_key").exists() or os.getenv("STRIPE_SECRET_KEY")
+            else None
+        ),
+        description="Stripe secret key (loaded from Docker Swarm secret or environment variable)"
     )
     stripe_publishable_key: Optional[str] = Field(
-        None,
-        description="Stripe publishable key"
+        default_factory=lambda: (
+            read_secret("stripe_publishable_key", "STRIPE_PUBLISHABLE_KEY")
+            if Path("/run/secrets/stripe_publishable_key").exists() or os.getenv("STRIPE_PUBLISHABLE_KEY")
+            else None
+        ),
+        description="Stripe publishable key (loaded from Docker Swarm secret or environment variable)"
     )
     stripe_webhook_secret: Optional[str] = Field(
-        None,
+        default_factory=lambda: (
+            read_secret("stripe_webhook_secret", "STRIPE_WEBHOOK_SECRET")
+            if Path("/run/secrets/stripe_webhook_secret").exists() or os.getenv("STRIPE_WEBHOOK_SECRET")
+            else None
+        ),
         description="Stripe webhook endpoint secret for signature verification"
     )
     # Price IDs for each tier and billing cycle
@@ -145,7 +232,6 @@ class StripeSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class EmailProcessingSettings(BaseSettings):
@@ -155,7 +241,10 @@ class EmailProcessingSettings(BaseSettings):
     imap_host: str = Field(default="imappro.zoho.eu", description="IMAP server hostname (Zoho EU)")
     imap_port: int = Field(default=993, description="IMAP port (993 for SSL)")
     imap_user: str = Field(default="info@bonidoc.com", description="IMAP username")
-    imap_password: str = Field(..., description="IMAP password (from environment)")
+    imap_password: str = Field(
+        default_factory=lambda: read_secret("imap_password", "IMAP_PASSWORD"),
+        description="IMAP password (loaded from Docker Swarm secret or environment variable)"
+    )
     imap_use_ssl: bool = Field(default=True, description="Use SSL for IMAP connection")
 
     # Email processing settings
@@ -170,7 +259,6 @@ class EmailProcessingSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class AppSettings(BaseSettings):
@@ -189,7 +277,6 @@ class AppSettings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 class Settings(BaseSettings):
@@ -240,7 +327,6 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = False
         extra = "ignore"
-        env_file = ".env"
 
 
 def get_settings() -> Settings:
