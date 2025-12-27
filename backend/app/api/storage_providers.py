@@ -568,34 +568,40 @@ async def disconnect_provider(
         if not _is_provider_connected(current_user, provider_type):
             raise HTTPException(status_code=400, detail=f"Provider {provider_type} is not connected")
 
+        # CRITICAL: Reload user from current session to ensure changes are tracked
+        # current_user from auth middleware is detached from this session
+        db_user = db.query(User).filter(User.id == current_user.id).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
         # Remove tokens based on provider type
         if provider_type == 'google_drive':
-            current_user.drive_refresh_token_encrypted = None
-            current_user.google_drive_enabled = False
-            current_user.drive_permissions_granted_at = None
+            db_user.drive_refresh_token_encrypted = None
+            db_user.google_drive_enabled = False
+            db_user.drive_permissions_granted_at = None
 
         elif provider_type == 'onedrive':
-            current_user.onedrive_refresh_token_encrypted = None
-            current_user.onedrive_enabled = False
-            current_user.onedrive_connected_at = None
+            db_user.onedrive_refresh_token_encrypted = None
+            db_user.onedrive_enabled = False
+            db_user.onedrive_connected_at = None
 
         elif provider_type == 'dropbox':
-            current_user.dropbox_refresh_token_encrypted = None
-            current_user.dropbox_enabled = False
-            current_user.dropbox_connected_at = None
+            db_user.dropbox_refresh_token_encrypted = None
+            db_user.dropbox_enabled = False
+            db_user.dropbox_connected_at = None
 
         # If this was the active provider, clear it
-        if current_user.active_storage_provider == provider_type:
-            current_user.active_storage_provider = None
+        if db_user.active_storage_provider == provider_type:
+            db_user.active_storage_provider = None
 
         db.commit()
-        logger.info(f"User {current_user.id} disconnected {provider_type}")
+        logger.info(f"User {db_user.id} disconnected {provider_type}")
 
         # Store user info before session cleanup
-        user_email = current_user.email
-        user_full_name = current_user.full_name
-        user_marketing_enabled = current_user.email_marketing_enabled
-        user_id = current_user.id
+        user_email = db_user.email
+        user_full_name = db_user.full_name
+        user_marketing_enabled = db_user.email_marketing_enabled
+        user_id = db_user.id
 
         # Cancel any in-progress upload batches
         try:
