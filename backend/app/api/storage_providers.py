@@ -445,14 +445,19 @@ async def provider_oauth_callback(
         user_marketing_enabled = current_user.email_marketing_enabled
 
         # Send email notification in a separate session to prevent rollback
+        logger.info(f"📧 [EMAIL DEBUG] Starting email notification for provider connection...")
+        logger.info(f"📧 [EMAIL DEBUG] User: {user_email}, Marketing enabled: {user_marketing_enabled}")
         try:
             from app.services.email_service import email_service
             from app.database.connection import SessionLocal
 
+            logger.info(f"📧 [EMAIL DEBUG] Imports successful, creating session...")
             # Create a new session for email operation
             email_session = SessionLocal()
+            logger.info(f"📧 [EMAIL DEBUG] Session created, preparing to send email...")
             try:
                 dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
+                logger.info(f"📧 [EMAIL DEBUG] Calling send_storage_provider_connected_notification...")
                 await email_service.send_storage_provider_connected_notification(
                     session=email_session,
                     to_email=user_email,
@@ -464,6 +469,7 @@ async def provider_oauth_callback(
                 logger.info(f"✅ Sent connection notification email to {user_email}")
             finally:
                 email_session.close()
+                logger.info(f"📧 [EMAIL DEBUG] Email session closed")
         except Exception as email_error:
             logger.error(f"⚠️ Failed to send connection email: {email_error}", exc_info=True)
             # Don't fail the connection if email fails
@@ -626,14 +632,19 @@ async def disconnect_provider(
             # Don't fail the disconnection if batch cleanup fails
 
         # Send email notification in a separate session to prevent rollback
+        logger.info(f"📧 [EMAIL DEBUG] Starting email notification for provider disconnection...")
+        logger.info(f"📧 [EMAIL DEBUG] User: {user_email}, Marketing enabled: {user_marketing_enabled}")
         try:
             from app.services.email_service import email_service
             from app.database.connection import SessionLocal
 
+            logger.info(f"📧 [EMAIL DEBUG] Imports successful, creating session...")
             # Create a new session for email operation
             email_session = SessionLocal()
+            logger.info(f"📧 [EMAIL DEBUG] Session created, preparing to send email...")
             try:
                 dashboard_url = f"{settings.app.app_frontend_url}/settings"
+                logger.info(f"📧 [EMAIL DEBUG] Calling send_storage_provider_disconnected_notification...")
                 await email_service.send_storage_provider_disconnected_notification(
                     session=email_session,
                     to_email=user_email,
@@ -645,6 +656,7 @@ async def disconnect_provider(
                 logger.info(f"✅ Sent disconnection notification email to {user_email}")
             finally:
                 email_session.close()
+                logger.info(f"📧 [EMAIL DEBUG] Email session closed")
         except Exception as email_error:
             logger.error(f"⚠️ Failed to send disconnection email: {email_error}", exc_info=True)
             # Don't fail the disconnection if email fails
