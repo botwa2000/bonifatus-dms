@@ -1,6 +1,7 @@
 services:
   backend:
     build: ./backend
+    image: bonifatus-backend:latest
     container_name: bonifatus-backend
     ports:
       - "8080:8080"
@@ -90,6 +91,7 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: https://api.bonidoc.com
+    image: bonifatus-frontend:latest
     container_name: bonifatus-frontend
     ports:
       - "3000:3000"
@@ -170,6 +172,7 @@ services:
 
   celery-worker:
     build: ./backend
+    image: bonifatus-celery-worker:latest
     container_name: bonifatus-celery-worker
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     secrets:
