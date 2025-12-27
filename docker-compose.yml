@@ -225,13 +225,21 @@ services:
       - /tmp:noexec,nosuid,size=500m
       - /app/logs:noexec,nosuid,size=200m
       - /app/temp:noexec,nosuid,size=1G
+    # Health check to prevent Docker Swarm from marking worker as "Complete"
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     # Resource limits and Swarm deployment settings
     deploy:
       mode: replicated
       replicas: 1
       restart_policy:
-        condition: any
-        delay: 2s
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '2.0'
