@@ -15,12 +15,12 @@ def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
     Read secret from Docker Swarm secret file or fall back to environment variable.
 
     Priority:
-    1. /run/secrets/{secret_name} (Docker Swarm secret)
+    1. /run/secrets/{secret_name}_{env_suffix} (Docker Swarm secret with _dev or _prod suffix)
     2. Environment variable (fallback for migration/local dev)
     3. Raise error if neither found
 
     Args:
-        secret_name: Name of the secret file in /run/secrets/
+        secret_name: Base name of the secret (without _dev or _prod suffix)
         fallback_env_var: Environment variable name to fall back to
 
     Returns:
@@ -29,14 +29,18 @@ def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
     Raises:
         ValueError: If secret not found in either location
     """
-    secret_path = Path(f"/run/secrets/{secret_name}")
+    # Determine environment suffix
+    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+    env_suffix = '_dev' if app_env == 'development' else '_prod'
 
-    # Try Docker secret first
+    # Try Docker secret with environment suffix first
+    secret_path = Path(f"/run/secrets/{secret_name}{env_suffix}")
+
     if secret_path.exists():
         try:
             value = secret_path.read_text().strip()
             if value:
-                logger.debug(f"Loaded secret '{secret_name}' from Docker Swarm")
+                logger.debug(f"Loaded secret '{secret_name}{env_suffix}' from Docker Swarm")
                 return value
         except Exception as e:
             logger.warning(f"Failed to read secret from {secret_path}: {e}")
@@ -50,7 +54,7 @@ def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
 
     # Not found
     raise ValueError(
-        f"Secret '{secret_name}' not found in /run/secrets/ "
+        f"Secret '{secret_name}{env_suffix}' not found in /run/secrets/ "
         f"or environment variable '{fallback_env_var}'"
     )
 

@@ -1969,6 +1969,310 @@ server {
 | OCR per page | <10s |
 | Page load time | <2s |
 
+### 9.8 Docker Swarm Secrets Management
+
+**Implementation:** Environment-specific secret suffixes (`_dev` and `_prod`)
+
+#### 9.8.1 Architecture Overview
+
+**Secret Storage:**
+- **Location:** `/opt/bonifatus-secrets/{dev,prod}/` on Hetzner VPS
+- **Docker Swarm:** Encrypted in Raft consensus database
+- **Containers:** Mounted at `/run/secrets/` as read-only tmpfs (in-memory, never written to disk)
+- **Permissions:** 600 (root:root) on host files
+
+**Automatic Environment Detection:**
+```python
+# backend/app/core/config.py
+def read_secret(secret_name: str, fallback_env_var: str = None) -> str:
+    app_env = os.getenv('APP_ENVIRONMENT', 'development')
+    env_suffix = '_dev' if app_env == 'development' else '_prod'
+    secret_path = Path(f"/run/secrets/{secret_name}{env_suffix}")
+    # Falls back to environment variable if Docker secret not found
+```
+
+**Key Benefits:**
+- Same codebase for dev and prod (only secret values differ)
+- Zero-downtime deployments with `docker stack deploy`
+- Encrypted at rest and in transit
+- Granular access control (each service gets only its secrets)
+- No secrets in Git repository
+
+#### 9.8.2 Complete Secret Inventory
+
+**14 Secrets Per Environment:**
+
+| Secret Name | Purpose | Sensitivity | Rotation Frequency |
+|-------------|---------|-------------|-------------------|
+| `database_url` | PostgreSQL connection string | **CRITICAL** | Quarterly |
+| `security_secret_key` | JWT token signing (HS256) | **CRITICAL** | Quarterly |
+| `encryption_key` | AES-256 OAuth token encryption | **CRITICAL** | Never (breaks existing tokens) |
+| `google_client_id` | Google OAuth | High | When compromised |
+| `google_client_secret` | Google OAuth token exchange | High | When compromised |
+| `gcp_project` | Google Cloud Vision OCR | Medium | Never (project ID) |
+| `onedrive_client_id` | Microsoft Azure OAuth | High | When compromised |
+| `onedrive_client_secret` | Microsoft OneDrive token | High | When compromised |
+| `brevo_api_key` | Email service (Brevo/Sendinblue) | High | Annually |
+| `imap_password` | Email processing (info@bonidoc.com) | High | Annually |
+| `stripe_secret_key` | Payment processing | **CRITICAL** | Never (unless compromised) |
+| `stripe_publishable_key` | Stripe public key | Low | Never |
+| `stripe_webhook_secret` | Webhook signature verification | High | When regenerating webhooks |
+| `turnstile_secret_key` | Cloudflare CAPTCHA | Medium | When compromised |
+
+**Environment-Specific Values:**
+- **DEV:** Test Stripe keys (`sk_test_*`), dev database (`bonifatus_dms_dev`), separate Turnstile site
+- **PROD:** Live Stripe keys (`sk_live_*`), prod database (`bonifatus_dms`), prod Turnstile site
+- **SHARED:** SAME `encryption_key` for both environments (required for OAuth token portability)
+
+#### 9.8.3 Initial Setup (One-Time)
+
+**1. Initialize Docker Swarm:**
+```bash
+ssh root@91.99.212.17
+docker swarm init --advertise-addr 127.0.0.1
+docker info | grep Swarm  # Verify: Swarm: active
+```
+
+**2. Create Secret Directories:**
+```bash
+sudo mkdir -p /opt/bonifatus-secrets/{dev,prod}
+sudo chmod 700 /opt/bonifatus-secrets
+```
+
+**3. Create Secret Files:**
+```bash
+# Example for one secret (repeat for all 14)
+echo -n 'secret_value_here' | sudo tee /opt/bonifatus-secrets/prod/database_url_prod > /dev/null
+sudo chmod 600 /opt/bonifatus-secrets/prod/database_url_prod
+sudo chown root:root /opt/bonifatus-secrets/prod/database_url_prod
+```
+
+**CRITICAL:** Use `echo -n` (no trailing newline) to avoid authentication failures!
+
+**4. Load Secrets into Docker Swarm:**
+```bash
+cd /opt/bonifatus-secrets/prod
+for file in *_prod; do
+  docker secret create "$file" "$file"
+done
+
+cd /opt/bonifatus-secrets/dev
+for file in *_dev; do
+  docker secret create "$file" "$file"
+done
+
+# Verify
+docker secret ls | grep -E "_dev|_prod" | wc -l  # Should show: 28 (14 dev + 14 prod)
+```
+
+#### 9.8.4 Daily Operations
+
+**View Secret Metadata (No Values Exposed):**
+```bash
+docker secret ls
+docker secret inspect database_url_prod  # Shows creation date, not the value
+```
+
+**Add New Secret:**
+```bash
+# 1. Create file
+echo -n 'new_secret_value' | sudo tee /opt/bonifatus-secrets/prod/new_secret_prod > /dev/null
+sudo chmod 600 /opt/bonifatus-secrets/prod/new_secret_prod
+
+# 2. Load into Swarm
+docker secret create new_secret_prod /opt/bonifatus-secrets/prod/new_secret_prod
+
+# 3. Update docker-compose.yml
+# Add to backend/celery-worker secrets list and global secrets section
+
+# 4. Update backend/app/core/config.py
+# Add to appropriate Settings class with read_secret()
+
+# 5. Deploy
+docker stack deploy -c docker-compose.yml bonifatus
+```
+
+**Rotate Existing Secret:**
+```bash
+# Example: Rotate database password
+
+# 1. Change password on PostgreSQL server first
+# 2. Update secret file
+echo -n 'new_password_connection_string' | sudo tee /opt/bonifatus-secrets/prod/database_url_prod > /dev/null
+
+# 3. Remove old secret
+docker secret rm database_url_prod
+
+# 4. Create new secret
+docker secret create database_url_prod /opt/bonifatus-secrets/prod/database_url_prod
+
+# 5. Redeploy (triggers rolling restart with new secret)
+cd /opt/bonifatus-dms
+docker stack deploy -c docker-compose.yml bonifatus
+
+# 6. Verify
+docker service logs bonifatus_backend --tail 50 | grep "Loaded secret"
+```
+
+**Delete Secret:**
+```bash
+# 1. Remove from docker-compose.yml (both service secrets and global secrets)
+# 2. Remove from backend config.py
+# 3. Deploy to update services
+docker stack deploy -c docker-compose.yml bonifatus
+
+# 4. Delete from Swarm
+docker secret rm old_secret_prod
+
+# 5. Delete file (optional, for cleanup)
+sudo rm /opt/bonifatus-secrets/prod/old_secret_prod
+```
+
+**Retrieve Secret Value (Emergency Only):**
+```bash
+# Secrets are encrypted in Swarm - only way to view is from the file
+sudo cat /opt/bonifatus-secrets/prod/database_url_prod
+
+# Or from running container
+docker exec bonifatus_backend cat /run/secrets/database_url_prod
+```
+
+#### 9.8.5 Backup and Recovery
+
+**Weekly Encrypted Backup (Cron: Sundays 2 AM):**
+```bash
+# Create backup script: /opt/scripts/backup-secrets.sh
+#!/bin/bash
+BACKUP_DIR="/opt/backups/secrets"
+DATE=$(date +%Y%m%d)
+
+mkdir -p "$BACKUP_DIR"
+
+# Encrypt secrets with GPG (symmetric AES256)
+tar czf - /opt/bonifatus-secrets | gpg --symmetric --cipher-algo AES256 \
+  --passphrase-file /root/.backup-passphrase \
+  > "$BACKUP_DIR/secrets-${DATE}.tar.gz.gpg"
+
+# Keep 4 weeks (28 days)
+find "$BACKUP_DIR" -name "secrets-*.tar.gz.gpg" -mtime +28 -delete
+
+echo "Secrets backup created: secrets-${DATE}.tar.gz.gpg"
+```
+
+**Add to Crontab:**
+```bash
+sudo crontab -e
+# Add:
+0 2 * * 0 /opt/scripts/backup-secrets.sh
+```
+
+**Restore from Backup:**
+```bash
+# 1. Decrypt backup
+gpg --decrypt /opt/backups/secrets/secrets-20251227.tar.gz.gpg | tar xz -C /
+
+# 2. Recreate all Docker secrets
+cd /opt/bonifatus-secrets/prod
+for file in *_prod; do
+  docker secret rm "$file" 2>/dev/null || true
+  docker secret create "$file" "$file"
+done
+
+# Same for dev
+cd /opt/bonifatus-secrets/dev
+for file in *_dev; do
+  docker secret rm "$file" 2>/dev/null || true
+  docker secret create "$file" "$file"
+done
+
+# 3. Redeploy services
+docker stack deploy -c /opt/bonifatus-dms/docker-compose.yml bonifatus
+docker stack deploy -c /opt/bonifatus-dms-dev/docker-compose.yml bonifatus-dev
+```
+
+#### 9.8.6 Security Best Practices
+
+**File Permissions:**
+```bash
+# Host secrets directory
+drwx------ (700) /opt/bonifatus-secrets/          # root:root
+-rw------- (600) /opt/bonifatus-secrets/prod/*    # root:root
+-rw------- (600) /opt/bonifatus-secrets/dev/*     # root:root
+```
+
+**Prevent Secrets in Git:**
+```bash
+# .gitignore already includes:
+.env
+.env.*
+/opt/bonifatus-secrets/
+```
+
+**Audit Logging:**
+```bash
+# Enable auditd to monitor secret file access
+sudo apt install auditd
+sudo auditctl -w /opt/bonifatus-secrets/ -p rwa -k secrets_access
+
+# View audit log
+sudo ausearch -k secrets_access
+```
+
+**Access Control:**
+- **Root:** Full access to `/opt/bonifatus-secrets/`
+- **Deploy user:** CANNOT read secret files (permission denied)
+- **Containers:** Can read assigned secrets from `/run/secrets/` (read-only tmpfs)
+
+**Rotation Schedule:**
+- **Quarterly:** `database_url`, `security_secret_key`
+- **Annually:** `brevo_api_key`, `imap_password`
+- **When compromised:** All OAuth secrets
+- **NEVER:** `encryption_key` (breaks existing OAuth tokens)
+
+#### 9.8.7 Troubleshooting
+
+**Secret Not Found Error:**
+```
+ValueError: Secret 'database_url_prod' not found in /run/secrets/
+```
+
+**Solution:**
+1. Verify secret exists in Swarm: `docker secret ls | grep database_url_prod`
+2. Check docker-compose.yml includes secret in service and global sections
+3. Verify APP_ENVIRONMENT matches secret suffix (dev → _dev, production → _prod)
+4. Redeploy: `docker stack deploy -c docker-compose.yml bonifatus`
+
+**Authentication Failures (Trailing Newline):**
+```
+psycopg2.OperationalError: FATAL: password authentication failed
+```
+
+**Solution:**
+1. Recreate secret with `echo -n` (no newline):
+   ```bash
+   echo -n 'correct_value' | sudo tee /opt/bonifatus-secrets/prod/secret_prod > /dev/null
+   docker secret rm secret_prod
+   docker secret create secret_prod /opt/bonifatus-secrets/prod/secret_prod
+   ```
+
+**Service Won't Start After Secret Rotation:**
+```bash
+# Check logs for secret-related errors
+docker service logs bonifatus_backend --tail 100 | grep -i secret
+
+# Verify secret mounted in container
+docker exec bonifatus_backend ls -la /run/secrets/
+
+# Check secret content (should not be empty or corrupted)
+docker exec bonifatus_backend wc -c /run/secrets/database_url_prod
+```
+
+**Encryption Key Mismatch (OAuth Tokens Invalid):**
+- **Symptom:** All users logged out, OAuth connections fail
+- **Cause:** Different `encryption_key` between dev and prod, or key rotated
+- **Solution:** Use SAME encryption key for both environments (stored offline)
+- **Recovery:** Restore original encryption key from offline backup
+
 ---
 
 ## 11. Feature History

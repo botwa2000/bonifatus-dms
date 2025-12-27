@@ -6,3 +6,4 @@ drive-service-key.json
 # Hetzner setup files with actual credentials (keep local only)
 HETZNER_SETUP_ACTUAL.md
 HETZNER_MIGRATION_GUIDE.md
+DEPLOYMENT_GUIDE.md

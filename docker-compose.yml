@@ -5,20 +5,20 @@ services:
     ports:
       - "8080:8080"
     secrets:
-      - database_url
-      - security_secret_key
-      - encryption_key
-      - google_client_id
-      - google_client_secret
-      - onedrive_client_id
-      - onedrive_client_secret
-      - gcp_project
-      - brevo_api_key
-      - imap_password
-      - stripe_secret_key
-      - stripe_publishable_key
-      - stripe_webhook_secret
-      - turnstile_secret_key
+      - database_url_prod
+      - security_secret_key_prod
+      - encryption_key_prod
+      - google_client_id_prod
+      - google_client_secret_prod
+      - onedrive_client_id_prod
+      - onedrive_client_secret_prod
+      - gcp_project_prod
+      - brevo_api_key_prod
+      - imap_password_prod
+      - stripe_secret_key_prod
+      - stripe_publishable_key_prod
+      - stripe_webhook_secret_prod
+      - turnstile_secret_key_prod
     environment:
       # Non-secret configuration (stays as environment variables)
       - APP_HOST=0.0.0.0
@@ -173,20 +173,20 @@ services:
     container_name: bonifatus-celery-worker
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     secrets:
-      - database_url
-      - security_secret_key
-      - encryption_key
-      - google_client_id
-      - google_client_secret
-      - onedrive_client_id
-      - onedrive_client_secret
-      - gcp_project
-      - brevo_api_key
-      - imap_password
-      - stripe_secret_key
-      - stripe_publishable_key
-      - stripe_webhook_secret
-      - turnstile_secret_key
+      - database_url_prod
+      - security_secret_key_prod
+      - encryption_key_prod
+      - google_client_id_prod
+      - google_client_secret_prod
+      - onedrive_client_id_prod
+      - onedrive_client_secret_prod
+      - gcp_project_prod
+      - brevo_api_key_prod
+      - imap_password_prod
+      - stripe_secret_key_prod
+      - stripe_publishable_key_prod
+      - stripe_webhook_secret_prod
+      - turnstile_secret_key_prod
     environment:
       # Non-secret configuration (same as backend)
       - APP_ENVIRONMENT=production
@@ -241,31 +241,31 @@ services:
 # All secrets are managed outside Docker Compose for security
 # See DEPLOYMENT_GUIDE.md §9.8 for secrets management procedures
 secrets:
-  database_url:
+  database_url_prod:
     external: true
-  security_secret_key:
+  security_secret_key_prod:
     external: true
-  encryption_key:
+  encryption_key_prod:
     external: true
-  google_client_id:
+  google_client_id_prod:
     external: true
-  google_client_secret:
+  google_client_secret_prod:
     external: true
-  onedrive_client_id:
+  onedrive_client_id_prod:
     external: true
-  onedrive_client_secret:
+  onedrive_client_secret_prod:
     external: true
-  gcp_project:
+  gcp_project_prod:
     external: true
-  brevo_api_key:
+  brevo_api_key_prod:
     external: true
-  imap_password:
+  imap_password_prod:
     external: true
-  stripe_secret_key:
+  stripe_secret_key_prod:
     external: true
-  stripe_publishable_key:
+  stripe_publishable_key_prod:
     external: true
-  stripe_webhook_secret:
+  stripe_webhook_secret_prod:
     external: true
-  turnstile_secret_key:
+  turnstile_secret_key_prod:
     external: true

@@ -1,33 +1,151 @@
-# Quick Deployment Guide
+# Quick Deployment Guide (Docker Swarm Secrets)
 
-**Last Updated:** 2025-12-20
+**Last Updated:** 2025-12-27
 **Server Access:** See `HETZNER_SETUP_ACTUAL.md` for credentials and detailed server setup
+**Secret Management:** See `DEPLOYMENT_GUIDE.md` §9.8 for comprehensive secrets documentation
 
-> **Important:** This document references configurations from `HETZNER_SETUP_ACTUAL.md`.
-> Always check both files for complete deployment context.
+> **IMPORTANT:** This application now uses Docker Swarm Secrets for production-grade secret management.
+> Secrets are encrypted at rest, in transit, and mounted as in-memory tmpfs (never written to disk).
 
 ---
 
 ## Quick Reference
 
-| Environment | Directory | URL | API URL | Ports | Config Source |
-|------------|-----------|-----|---------|-------|---------------|
-| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | 3001/8081/5001 | `.env` file |
-| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | 3000/8080/5000 | Environment variables |
+| Environment | Directory | URL | API URL | Deployment Mode |
+|------------|-----------|-----|---------|----------------|
+| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | Docker Compose (.env files) |
+| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | Docker Swarm (Secrets) |
 
 **Server IP:** 91.99.212.17 (see HETZNER_SETUP_ACTUAL.md)
 
 **Key Differences:**
-- **Dev:** Uses `.env` file, requires nginx reload after deployment, ClamAV disabled
-- **Prod:** Uses system environment variables, ClamAV enabled
+- **Dev:** Uses Docker Compose with `.env` files (traditional approach)
+- **Prod:** Uses Docker Swarm with encrypted secrets (production-grade security)
+
+---
+
+## FIRST-TIME SETUP (One-Time Only)
+
+### Prerequisites Check
+
+Before deploying for the first time after the Docker Secrets migration, run:
+
+```bash
+ssh root@91.99.212.17 'docker info | grep "Swarm: active"'
+```
+
+**If output is empty:** Swarm not initialized - follow "Initial Swarm Setup" below
+**If output shows "Swarm: active":** Skip to "Verify Secrets Exist" below
+
+### Initial Swarm Setup (One-Time)
+
+**Run this ONLY ONCE when first migrating to Docker Swarm Secrets:**
+
+```bash
+ssh root@91.99.212.17 'bash -s' << 'ENDSSH'
+set -e
+echo "=== [1/5] Initializing Docker Swarm ==="
+docker swarm init --advertise-addr 127.0.0.1 2>/dev/null || echo "Swarm already initialized"
+
+echo "=== [2/5] Generating ENCRYPTION_KEY (CRITICAL) ==="
+ENCRYPTION_KEY=$(docker run --rm python:3.11-slim python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+echo "Generated: $ENCRYPTION_KEY"
+
+echo "=== [3/5] Creating secret directories ==="
+mkdir -p /opt/bonifatus-secrets/prod /opt/bonifatus-secrets/dev
+chmod 700 /opt/bonifatus-secrets
+
+echo "=== [4/5] Reading current .env file ==="
+cd /opt/bonifatus-dms
+if [ -f .env ]; then
+    source .env
+    echo "✓ Loaded secrets from .env"
+else
+    echo "ERROR: .env file not found. Cannot extract secrets."
+    exit 1
+fi
+
+echo "=== [5/5] Creating secret files ==="
+# Database
+echo -n "$DATABASE_URL" > /opt/bonifatus-secrets/prod/database_url
+
+# Security
+echo -n "${SECURITY_SECRET_KEY}" > /opt/bonifatus-secrets/prod/security_secret_key
+echo -n "$ENCRYPTION_KEY" > /opt/bonifatus-secrets/prod/encryption_key
+echo -n "${TURNSTILE_SECRET_KEY:-}" > /opt/bonifatus-secrets/prod/turnstile_secret_key
+
+# Google
+echo -n "${GOOGLE_CLIENT_ID}" > /opt/bonifatus-secrets/prod/google_client_id
+echo -n "${GOOGLE_CLIENT_SECRET}" > /opt/bonifatus-secrets/prod/google_client_secret
+echo -n "${GCP_PROJECT}" > /opt/bonifatus-secrets/prod/gcp_project
+
+# OneDrive
+echo -n "${ONEDRIVE_CLIENT_ID:-NOT_CONFIGURED}" > /opt/bonifatus-secrets/prod/onedrive_client_id
+echo -n "${ONEDRIVE_CLIENT_SECRET:-NOT_CONFIGURED}" > /opt/bonifatus-secrets/prod/onedrive_client_secret
+
+# Email
+echo -n "${BREVO_API_KEY}" > /opt/bonifatus-secrets/prod/brevo_api_key
+echo -n "${IMAP_PASSWORD}" > /opt/bonifatus-secrets/prod/imap_password
+
+# Stripe
+echo -n "${STRIPE_SECRET_KEY}" > /opt/bonifatus-secrets/prod/stripe_secret_key
+echo -n "${STRIPE_PUBLISHABLE_KEY}" > /opt/bonifatus-secrets/prod/stripe_publishable_key
+echo -n "${STRIPE_WEBHOOK_SECRET:-}" > /opt/bonifatus-secrets/prod/stripe_webhook_secret
+
+# Set permissions
+chmod 600 /opt/bonifatus-secrets/prod/*
+chown root:root /opt/bonifatus-secrets/prod/*
+
+echo "=== Creating Docker Secrets ==="
+cd /opt/bonifatus-secrets/prod
+for secret in database_url security_secret_key encryption_key google_client_id google_client_secret onedrive_client_id onedrive_client_secret gcp_project brevo_api_key imap_password stripe_secret_key stripe_publishable_key stripe_webhook_secret turnstile_secret_key; do
+    if docker secret inspect $secret >/dev/null 2>&1; then
+        echo "Secret $secret already exists (skipping)"
+    else
+        docker secret create $secret $secret
+        echo "✓ Created secret: $secret"
+    fi
+done
+
+echo ""
+echo "=== SETUP COMPLETE ==="
+echo "Docker Swarm initialized with 14 encrypted secrets"
+echo "CRITICAL: Save this ENCRYPTION_KEY to your password manager:"
+echo "$ENCRYPTION_KEY"
+echo ""
+echo "You can now deploy using: docker stack deploy"
+ENDSSH
+```
+
+**Expected Output:**
+```
+✓ Created secret: database_url
+✓ Created secret: security_secret_key
+✓ Created secret: encryption_key
+... (14 secrets total)
+CRITICAL: Save this ENCRYPTION_KEY to your password manager:
+<long base64 string>
+```
+
+**⚠️ CRITICAL:** Copy the ENCRYPTION_KEY from the output and save it in your password manager!
+
+### Verify Secrets Exist
+
+```bash
+ssh root@91.99.212.17 'docker secret ls'
+```
+
+**Expected:** 14 secrets listed (database_url, security_secret_key, encryption_key, etc.)
+
+**If secrets are missing:** Re-run the "Initial Swarm Setup" above
 
 ---
 
 ## ONE-COMMAND DEPLOYMENT SEQUENCES
 
-### Deploy to DEV (Single Command - Recommended)
+### Deploy to DEV (Docker Compose - Traditional)
 
-**Simple, reliable deployment that works every time:**
+**DEV still uses Docker Compose with .env files (no changes):**
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
@@ -55,105 +173,61 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 
 **Expected Output:**
 - All 8 steps complete without errors
-- Containers show "Up (healthy)" status
 - Backend health returns: `{"status":"healthy","environment":"development"}`
-- No errors in backend logs
 
-**Time:** ~3-5 minutes (depending on build cache)
-
-**If you need step-by-step deployment (for debugging):**
-
-Run commands individually:
-```bash
-# 1. Pull latest code
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && git pull origin main'
-
-# 2. Build containers
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose build'
-
-# 3. Stop containers
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose down'
-
-# 4. Run migrations
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose run --rm backend alembic upgrade head'
-
-# 5. Start containers
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && docker compose up -d'
-
-# 6. Wait and reload nginx
-sleep 10
-ssh root@91.99.212.17 'nginx -t && systemctl reload nginx'
-
-# 7. Check health
-ssh root@91.99.212.17 'docker compose ps && curl -s https://api-dev.bonidoc.com/health'
-```
-
-**Common Issues:**
-
-1. **403 Forbidden on frontend/API**: Your IP is not whitelisted
-   ```bash
-   # Check current IP blocks
-   ssh root@91.99.212.17 "tail -20 /var/log/nginx/error.log | grep 'access forbidden'"
-
-   # Add your IP to whitelist
-   ssh root@91.99.212.17 "nano /etc/nginx/sites-enabled/dev.bonidoc.com"
-   # Add: allow YOUR_IP_HERE;  # Description
-
-   # Reload nginx
-   ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
-   ```
-
-2. **502 Bad Gateway**: Port mismatch (should be auto-fixed in step 7, but if not):
-   ```bash
-   ssh root@91.99.212.17 "sed -i 's|proxy_pass http://localhost:3000;|proxy_pass http://localhost:3001;|g' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
-   ```
-
-3. **Other errors**: Re-run the deployment sequence or continue manually from the failed step
+**Time:** ~3-5 minutes
 
 ---
 
-### Deploy to PROD (Single Command)
+### Deploy to PROD (Docker Swarm - Secrets)
 
-**⚠️ PRODUCTION DEPLOYMENT - Only run after successful dev testing!**
+**⚠️ PRODUCTION DEPLOYMENT - Uses Docker Swarm with encrypted secrets!**
+
+**Prerequisites:**
+- Docker Swarm initialized (see "First-Time Setup" above)
+- All 14 secrets created (verify with `docker secret ls`)
+- Dev deployment tested successfully
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
-  echo "=== [1/8] Pulling latest code ===" && \
+  echo "=== [1/9] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/8] Building containers ===" && \
+  echo "=== [2/9] Building images ===" && \
   docker compose build && \
-  echo "=== [3/8] Stopping containers ===" && \
-  docker compose down && \
-  echo "=== [4/8] Running migrations ===" && \
+  echo "=== [3/9] Verifying secrets exist ===" && \
+  docker secret ls | grep -E "database_url|security_secret_key|encryption_key" && \
+  echo "=== [4/9] Running migrations (before stack deploy) ===" && \
   docker compose run --rm backend alembic upgrade head && \
-  echo "=== [5/8] Starting containers ===" && \
-  docker compose up -d && \
-  sleep 15 && \
-  echo "=== [6/8] Reloading nginx ===" && \
-  nginx -t && systemctl reload nginx && \
-  echo "=== [7/8] Health checks ===" && \
-  docker compose ps && \
+  echo "=== [5/9] Stopping old docker-compose services ===" && \
+  docker compose down 2>/dev/null || echo "No compose services running" && \
+  echo "=== [6/9] Deploying to Docker Swarm ===" && \
+  docker stack deploy -c docker-compose.yml bonifatus && \
+  echo "=== [7/9] Waiting for services to start (30s) ===" && \
+  sleep 30 && \
+  echo "=== [8/9] Health checks ===" && \
+  docker stack ps bonifatus && \
   echo "" && \
   curl -s https://api.bonidoc.com/health && \
   echo "" && \
-  echo "=== [8/8] Backend logs ===" && \
-  docker logs bonifatus-backend --tail 20'
+  echo "=== [9/9] Service logs ===" && \
+  docker service logs bonifatus_backend --tail 20 --raw'
 ```
 
 **Expected Output:**
-- All 8 steps complete without errors
-- Containers show "Up (healthy)"
-- Backend health returns: `{"status":"healthy","environment":"production"}`
-- ClamAV shows as enabled/running
-- No errors in backend logs
+```
+✓ All 9 steps complete
+✓ Services show "Running" state in docker stack ps
+✓ Backend health: {"status":"healthy","environment":"production"}
+✓ Logs show: "Loaded secret 'database_url' from Docker Swarm"
+```
 
-**Time:** ~3-5 minutes (depending on build cache)
+**Time:** ~4-6 minutes (Swarm rolling update adds time)
 
-**⚠️ Production Safety Rules:**
-1. **ALWAYS** test in dev first
-2. **NEVER** fix directly in prod - fix in dev, test, then deploy
-3. If deployment fails, check logs and rollback if needed
-4. Monitor application for 5-10 minutes after deployment
+**What's Different from Docker Compose:**
+- `docker stack deploy` instead of `docker compose up -d`
+- Rolling updates (zero downtime)
+- Secrets loaded from `/run/secrets/` (encrypted tmpfs)
+- Services named `bonifatus_backend` instead of `bonifatus-backend`
 
 ---
 
@@ -183,11 +257,10 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
   git pull origin main && \
   docker compose build && \
-  docker compose down && \
   docker compose run --rm backend alembic upgrade head && \
-  docker compose up -d && \
-  sleep 15 && \
-  nginx -t && systemctl reload nginx'
+  docker compose down 2>/dev/null || true && \
+  docker stack deploy -c docker-compose.yml bonifatus && \
+  sleep 30'
 
 # Step 4: VERIFY PROD
 # Open https://bonidoc.com and verify deployment was successful
@@ -195,573 +268,266 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
 
 ---
 
-## Standard Deployment Workflow (Step-by-Step)
+## Docker Swarm vs Docker Compose Commands
 
-Use this when you need more control or if the one-command sequence fails.
+### Service Management
 
-### Step 1: Local - Commit and Push
+| Task | Docker Compose | Docker Swarm |
+|------|---------------|--------------|
+| Deploy | `docker compose up -d` | `docker stack deploy -c docker-compose.yml bonifatus` |
+| Stop | `docker compose down` | `docker stack rm bonifatus` |
+| Logs | `docker logs bonifatus-backend` | `docker service logs bonifatus_backend` |
+| Status | `docker compose ps` | `docker stack ps bonifatus` |
+| Restart service | `docker compose restart backend` | `docker service update --force bonifatus_backend` |
+| Scale | `docker compose up -d --scale backend=2` | `docker service scale bonifatus_backend=2` |
 
-```bash
-# Commit your changes
-git add -A
-git commit -m "Your commit message
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-
-# Push to GitHub
-git push origin main
-```
-
-### Step 2: Deploy to Dev (ALWAYS TEST FIRST!)
+### Secret Management
 
 ```bash
-# SSH to server
-ssh root@91.99.212.17
+# List secrets
+docker secret ls
 
-# Navigate to dev directory
-cd /opt/bonifatus-dms-dev
+# Inspect secret metadata (does NOT show value - secure!)
+docker secret inspect database_url
 
-# Check git status
-git status
+# Rotate a secret (example: database password)
+echo -n 'new_password' | docker secret create database_url_v2 -
+docker service update --secret-rm database_url --secret-add source=database_url_v2,target=database_url bonifatus_backend
 
-# Stash local changes (dev-specific API URL)
-git stash
-
-# Pull latest code
-git pull origin main
-
-# Restore dev configuration
-git stash pop
-
-# Handle conflicts if needed:
-# Edit docker-compose.yml and ensure: NEXT_PUBLIC_API_URL: https://api-dev.bonidoc.com
-# Then: git add docker-compose.yml && git stash drop
-
-# Rebuild containers
-docker compose build
-
-# Restart containers
-docker compose up -d
-
-# ⚠️ CRITICAL: ALWAYS RELOAD NGINX AFTER DEV DEPLOYMENT
-nginx -t && systemctl reload nginx
-echo "✓ Nginx reloaded"
-
-# Check status
-docker compose ps
-
-# Verify health
-curl https://api-dev.bonidoc.com/health
-
-# Check logs for errors
-docker logs bonifatus-backend-dev --tail 50
+# Remove old secret
+docker secret rm database_url
+docker secret rm database_url_v2  # After rotating, rename v2 to original name
 ```
-
-**Expected output:**
-```
-bonifatus-backend-dev      Up (healthy)    8081->8080
-bonifatus-frontend-dev     Up              3001->3000
-bonifatus-redis-dev        Up (healthy)    6380->6379
-bonifatus-translator-dev   Up              5001->5000
-```
-
-### Step 3: Test on Dev
-
-1. Open browser to https://dev.bonidoc.com
-2. Test all new functionality
-3. Check browser console for errors
-4. Verify database changes
-
-### Step 4: Deploy to Production (Only After Dev Testing!)
-
-```bash
-# Still on server as root@91.99.212.17
-
-# Navigate to production directory
-cd /opt/bonifatus-dms
-
-# Pull latest code
-git pull origin main
-
-# Rebuild containers
-docker compose build
-
-# Restart containers
-docker compose up -d
-
-# Run migrations
-docker exec bonifatus-backend alembic upgrade head
-
-# Check status
-docker compose ps
-
-# Verify health
-curl https://api.bonidoc.com/health
-
-# Check ClamAV (prod only)
-docker logs bonifatus-backend --tail 50 | grep -i clamav
-
-# Check for errors
-docker logs bonifatus-backend --tail 50 | grep -i error
-```
-
-**Expected output:**
-```
-bonifatus-backend      Up (healthy)    8080->8080
-bonifatus-frontend     Up              3000->3000
-bonifatus-redis        Up (healthy)    6379->6379
-bonifatus-translator   Up              5000->5000
-```
-
-### Step 5: Verify Production
-
-1. Open https://bonidoc.com
-2. Test critical functionality
-3. Monitor logs: `docker logs bonifatus-backend -f`
-
----
-
-## Error Handling During Deployment
-
-### If Build Fails
-
-```bash
-# Check which service failed
-docker compose ps
-
-# Check build logs
-docker compose logs frontend
-docker compose logs backend
-
-# Common fixes:
-# 1. Frontend memory issue:
-docker compose build frontend --no-cache
-
-# 2. Backend dependencies:
-docker compose build backend --no-cache
-
-# 3. Clear all and rebuild:
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-
-### If Container Won't Start
-
-```bash
-# Check logs for the failing container
-docker logs bonifatus-backend-dev --tail 100
-
-# Common issues:
-# - Port already in use: Check docker compose ps, stop conflicting container
-# - Memory limit: Check docker stats, increase memory in docker-compose.yml
-# - Missing env vars: Check .env file (dev) or environment variables (prod)
-
-# Restart specific container
-docker compose restart backend
-
-# Or restart all
-docker compose down && docker compose up -d
-```
-
-### If Health Check Fails
-
-```bash
-# Check what the health endpoint returns
-curl -v https://api-dev.bonidoc.com/health
-
-# Common issues:
-# - 502/504: Backend not responding - check logs
-# - 403: IP whitelist - add your IP to nginx config
-# - CORS: Wrong API URL in frontend build
-# - 500: Backend error - check logs for stack trace
-
-# Quick fixes:
-# 1. Check backend is actually running:
-docker ps | grep backend
-
-# 2. Check backend logs:
-docker logs bonifatus-backend-dev --tail 100
-
-# 3. Restart backend:
-docker compose restart backend
-```
-
-### Nginx Issues (Common After Deployment)
-
-#### Issue 1: 403 Forbidden (IP Whitelist)
-
-**Symptoms:**
-```
-HTTP/2 403
-access forbidden by rule, client: X.X.X.X
-```
-
-**Fix:**
-```bash
-# Get your current IP from nginx error logs
-ssh root@91.99.212.17 "tail -50 /var/log/nginx/error.log | grep 'access forbidden' | tail -5"
-
-# Add your IP to dev whitelist
-ssh root@91.99.212.17 "nano /etc/nginx/sites-enabled/dev.bonidoc.com"
-# Navigate to the IP whitelist section (around line 45-60)
-# Add your IP: allow YOUR_IP_HERE;  # Description
-
-# For IPv4 addresses:
-allow 1.2.3.4;  # Your description
-
-# For IPv6 addresses:
-allow 2001:db8::1;  # Your description
-
-# Test and reload
-ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
-
-# Verify access
-curl -I https://dev.bonidoc.com
-```
-
-**Permanent Fix (add server localhost to whitelist):**
-```bash
-# Add server's own IP for health checks
-ssh root@91.99.212.17 "sed -i '/allow 216.131.111.81/a \    allow 2a01:4f8:c17:bbd1::1;  # Server localhost IPv6' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
-```
-
-#### Issue 2: 502 Bad Gateway (Port Mismatch)
-
-**Symptoms:**
-```
-HTTP/2 502
-curl: (52) Empty reply from server
-```
-
-**Cause:** Nginx is proxying to wrong port (3000 instead of 3001 for dev)
-
-**Automatic Fix (recommended):**
-```bash
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
-  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
-  sed -i \"s|proxy_pass http://localhost:[0-9]*;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com && \
-  nginx -t && systemctl reload nginx && \
-  echo 'Port fixed to \$FRONTEND_PORT'"
-```
-
-**Manual Fix:**
-```bash
-# Check what port frontend is running on
-ssh root@91.99.212.17 "docker compose ps | grep frontend-dev"
-# Should show: 0.0.0.0:3001->3000/tcp
-
-# Fix nginx config to use 3001
-ssh root@91.99.212.17 "sed -i 's|proxy_pass http://localhost:3000;|proxy_pass http://localhost:3001;|g' /etc/nginx/sites-enabled/dev.bonidoc.com && nginx -t && systemctl reload nginx"
-
-# Verify
-curl -I https://dev.bonidoc.com
-```
-
-#### Issue 3: Nginx Won't Reload
-
-**Symptoms:**
-```
-nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
-```
-
-**Fix:**
-```bash
-# Check what's using port 80/443
-ssh root@91.99.212.17 "netstat -tlnp | grep ':80\|:443'"
-
-# Kill conflicting process (if safe)
-ssh root@91.99.212.17 "systemctl stop nginx && sleep 2 && systemctl start nginx"
-```
-
-#### Issue 4: Config Syntax Error
-
-**Symptoms:**
-```
-nginx: [emerg] unexpected "}" in /etc/nginx/sites-enabled/dev.bonidoc.com:123
-```
-
-**Fix:**
-```bash
-# Test config syntax
-ssh root@91.99.212.17 "nginx -t"
-
-# Check recent changes
-ssh root@91.99.212.17 "tail -50 /etc/nginx/sites-enabled/dev.bonidoc.com"
-
-# Restore from backup if needed
-ssh root@91.99.212.17 "ls -la /etc/nginx/sites-enabled/*.backup*"
-ssh root@91.99.212.17 "cp /etc/nginx/sites-enabled/dev.bonidoc.com.backup /etc/nginx/sites-enabled/dev.bonidoc.com"
-```
-
-#### Nginx Quick Diagnostic Commands
-
-```bash
-# Check nginx status
-ssh root@91.99.212.17 "systemctl status nginx"
-
-# Test config syntax
-ssh root@91.99.212.17 "nginx -t"
-
-# View error logs
-ssh root@91.99.212.17 "tail -50 /var/log/nginx/error.log"
-
-# Check access logs
-ssh root@91.99.212.17 "tail -50 /var/log/nginx/access.log"
-
-# View current port configuration
-ssh root@91.99.212.17 "grep 'proxy_pass' /etc/nginx/sites-enabled/dev.bonidoc.com"
-
-# View IP whitelist
-ssh root@91.99.212.17 "grep -A 20 'IP Whitelist' /etc/nginx/sites-enabled/dev.bonidoc.com"
-
-# Verify frontend container port
-ssh root@91.99.212.17 "docker compose ps | grep frontend"
-```
-
----
-
-## Configuration Differences: Dev vs Prod
-
-### Environment Variables
-
-**DEV:** Uses `.env` file in `/opt/bonifatus-dms-dev/backend/.env`
-```bash
-# View dev env vars
-cat /opt/bonifatus-dms-dev/backend/.env | grep -v PASSWORD
-```
-
-**PROD:** Uses system environment variables
-```bash
-# Set via systemd service or docker-compose environment section
-# Never stored in files for security
-```
-
-### Docker Compose Differences
-
-**Key differences to maintain:**
-
-| Setting | Dev | Prod |
-|---------|-----|------|
-| Container names | `*-dev` suffix | No suffix |
-| API URL | `api-dev.bonidoc.com` | `api.bonidoc.com` |
-| Ports | 3001/8081/5001 | 3000/8080/5000 |
-| ClamAV | Disabled | Enabled |
-| Memory limits | 5GB backend | 6GB backend |
-
-### Nginx Configuration Management
-
-**DEV:** Requires nginx verification and reload after deployment
-
-**Why nginx needs attention on dev:**
-1. Docker container restart can change port mappings
-2. Nginx proxy configuration may get out of sync with container ports
-3. IP whitelisting blocks unauthorized access
-
-**Automatic Fix (built into deployment sequence):**
-The enhanced dev deployment sequence (steps 7-10) now includes:
-- Automatic port verification
-- Auto-correction of port mismatches
-- Frontend accessibility verification
-- Health check validation
-
-**Manual Nginx Management:**
-```bash
-# Verify and reload nginx (always safe to run)
-ssh root@91.99.212.17 "nginx -t && systemctl reload nginx"
-
-# Check if nginx port matches container port
-ssh root@91.99.212.17 "
-  cd /opt/bonifatus-dms-dev && \
-  echo 'Container port:' && docker compose ps | grep frontend-dev | awk '{print \$NF}' && \
-  echo 'Nginx proxy port:' && grep 'proxy_pass' /etc/nginx/sites-enabled/dev.bonidoc.com | grep -v '#'
-"
-
-# Auto-fix port mismatch
-ssh root@91.99.212.17 "cd /opt/bonifatus-dms-dev && \
-  FRONTEND_PORT=\$(docker compose ps | grep frontend-dev | awk '{print \$NF}' | cut -d':' -f1 | cut -d'>' -f1) && \
-  sed -i \"s|proxy_pass http://localhost:[0-9]*;|proxy_pass http://localhost:\$FRONTEND_PORT;|g\" /etc/nginx/sites-enabled/dev.bonidoc.com && \
-  nginx -t && systemctl reload nginx"
-```
-
-**PROD:** Nginx reload not typically required (different network setup, stable port mapping)
-
-**Common Nginx Issues:**
-- See "Nginx Issues (Common After Deployment)" section for detailed troubleshooting
 
 ---
 
 ## Health Check Commands
 
 ### Backend Health
+
 ```bash
-# Dev
+# Dev (Docker Compose)
 curl https://api-dev.bonidoc.com/health
 # Should return: {"status":"healthy","environment":"development"}
 
-# Prod
+# Prod (Docker Swarm)
 curl https://api.bonidoc.com/health
 # Should return: {"status":"healthy","environment":"production"}
 ```
 
-### Frontend Health
+### Check Secret Loading
+
+```bash
+# Verify secrets are loaded from Docker Swarm (not env vars)
+ssh root@91.99.212.17 'docker service logs bonifatus_backend --tail 100 | grep "Loaded secret"'
+
+# Expected output:
+# Loaded secret 'database_url' from Docker Swarm
+# Loaded secret 'security_secret_key' from Docker Swarm
+# Loaded secret 'encryption_key' from Docker Swarm
+```
+
+### Service Status
+
 ```bash
 # Dev
-curl -I https://dev.bonidoc.com
-# Should return: HTTP/2 200
+ssh root@91.99.212.17 'docker compose -f /opt/bonifatus-dms-dev/docker-compose.yml ps'
 
-# Prod
-curl -I https://bonidoc.com
-# Should return: HTTP/2 200
+# Prod (Swarm)
+ssh root@91.99.212.17 'docker stack ps bonifatus'
+ssh root@91.99.212.17 'docker stack services bonifatus'
 ```
 
 ### Database Health
+
 ```bash
 # Dev
 docker exec bonifatus-backend-dev alembic current
-# Shows current migration version
 
-# Prod
-docker exec bonifatus-backend alembic current
-```
-
-### ClamAV Health (Prod Only)
-```bash
-# Check if ClamAV is running
-docker exec bonifatus-backend curl localhost:8080/health | grep -i clamav
-# Should show: clamav_status: "running"
-```
-
-### Full System Health
-```bash
-# Dev
-docker compose -f /opt/bonifatus-dms-dev/docker-compose.yml ps
-docker stats --no-stream
-
-# Prod
-docker compose -f /opt/bonifatus-dms/docker-compose.yml ps
-docker stats --no-stream
+# Prod (Swarm - need to find container ID)
+CONTAINER=$(docker ps | grep bonifatus_backend | awk '{print $1}' | head -1)
+docker exec $CONTAINER alembic current
 ```
 
 ---
 
 ## Rollback Procedure
 
+### Rollback Production (Docker Swarm)
+
 If deployment breaks production:
 
 ```bash
-ssh root@91.99.212.17
-cd /opt/bonifatus-dms
-
-# Find last working commit
-git log --oneline -10
-
-# Rollback code
-git reset --hard <commit-hash>
-
-# Rebuild and restart
-docker compose build
-docker compose up -d
-
-# Verify
-curl https://api.bonidoc.com/health
-docker compose ps
-
-# If database migrations need rollback:
-docker exec bonifatus-backend alembic downgrade -1
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  echo "=== Finding last working commit ===" && \
+  git log --oneline -10 && \
+  echo "" && \
+  read -p "Enter commit hash to rollback to: " COMMIT && \
+  echo "=== Rolling back code ===" && \
+  git reset --hard $COMMIT && \
+  echo "=== Rebuilding images ===" && \
+  docker compose build && \
+  echo "=== Redeploying to Swarm ===" && \
+  docker stack deploy -c docker-compose.yml bonifatus && \
+  echo "=== Waiting for rollout ===" && \
+  sleep 30 && \
+  echo "=== Verifying rollback ===" && \
+  curl https://api.bonidoc.com/health && \
+  docker stack ps bonifatus'
 ```
 
-**For dev rollback:** Same process in `/opt/bonifatus-dms-dev` + remember to reload nginx
+**For database migration rollback:**
+
+```bash
+# Find backend container
+CONTAINER=$(docker ps | grep bonifatus_backend | awk '{print $1}' | head -1)
+
+# Rollback one migration
+docker exec $CONTAINER alembic downgrade -1
+
+# Or rollback to specific version
+docker exec $CONTAINER alembic downgrade <revision>
+```
+
+### Rollback Dev
+
+Same as before (uses Docker Compose):
+
+```bash
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
+  git log --oneline -10'
+# Note the commit hash, then:
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
+  git reset --hard <commit-hash> && \
+  docker compose build && \
+  docker compose up -d && \
+  nginx -t && systemctl reload nginx'
+```
+
+---
+
+## Emergency Procedures
+
+### If Swarm Services Won't Start
+
+```bash
+# Check service errors
+ssh root@91.99.212.17 'docker service ps bonifatus_backend --no-trunc'
+
+# Check if secrets are accessible
+ssh root@91.99.212.17 'docker secret ls'
+
+# Remove stack and redeploy
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  docker stack rm bonifatus && \
+  sleep 10 && \
+  docker stack deploy -c docker-compose.yml bonifatus'
+```
+
+### If Secrets Are Missing
+
+```bash
+# List existing secrets
+ssh root@91.99.212.17 'docker secret ls'
+
+# If secrets are missing, re-run the "Initial Swarm Setup" section
+# Or manually create missing secret:
+ssh root@91.99.212.17 'echo -n "secret_value_here" | docker secret create secret_name -'
+```
+
+### Revert to Docker Compose (Emergency Only)
+
+If Docker Swarm is causing issues and you need to revert:
+
+```bash
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  echo "=== Removing Swarm stack ===" && \
+  docker stack rm bonifatus && \
+  sleep 10 && \
+  echo "=== Reverting code to pre-Swarm commit ===" && \
+  git reset --hard <commit-before-swarm> && \
+  echo "=== Starting with Docker Compose ===" && \
+  docker compose build && \
+  docker compose up -d'
+```
+
+**Note:** This will revert to loading secrets from environment variables (less secure)
 
 ---
 
 ## Common Issues and Fixes
 
-### Issue 1: CORS Errors - Frontend Calling Wrong API
+### Issue 1: "Secret not found" Error
 
 **Symptoms:**
 ```
-Access to fetch at 'https://api.bonidoc.com' from origin 'https://dev.bonidoc.com'
-has been blocked by CORS policy
+ValueError: Secret 'database_url' not found in /run/secrets/ or environment variable 'DATABASE_URL'
 ```
 
 **Fix:**
 ```bash
-cd /opt/bonifatus-dms-dev
+# Verify secret exists
+ssh root@91.99.212.17 'docker secret inspect database_url'
 
-# Verify API URL
-grep "NEXT_PUBLIC_API_URL" docker-compose.yml
-# Should show: https://api-dev.bonidoc.com
+# If not found, create it:
+ssh root@91.99.212.17 'echo -n "postgresql+psycopg2://..." | docker secret create database_url -'
 
-# If wrong, fix and rebuild frontend
-docker compose build frontend
-docker compose up -d frontend
-nginx -t && systemctl reload nginx
+# Redeploy
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && docker stack deploy -c docker-compose.yml bonifatus'
 ```
 
-### Issue 2: Dev Site Inaccessible After Deployment
-
-**Fix:**
-```bash
-# Always reload nginx after dev deployment
-nginx -t && systemctl reload nginx
-```
-
-### Issue 3: Container Name Conflicts
-
-**Fix:**
-```bash
-# Verify dev containers have -dev suffix
-cd /opt/bonifatus-dms-dev
-grep "container_name:" docker-compose.yml
-
-# Should show: bonifatus-backend-dev, etc.
-```
-
-### Issue 4: Memory Issues (libpostal)
+### Issue 2: Services Stuck in "Pending" State
 
 **Symptoms:**
 ```
-Backend logs: "Killed"
-HTTP 502/524 errors
+docker stack ps bonifatus shows "Pending" for 5+ minutes
 ```
 
 **Fix:**
 ```bash
-# Check memory usage
-docker stats bonifatus-backend-dev --no-stream
+# Check why service is pending
+ssh root@91.99.212.17 'docker service ps bonifatus_backend --no-trunc'
 
-# Increase in docker-compose.yml if needed:
-# mem_limit: 6g
+# Common causes:
+# - Image not built: Run docker compose build
+# - Secret not created: Run docker secret ls
+# - Resource limits: Check docker stats
+
+# Force recreate
+ssh root@91.99.212.17 'docker service update --force bonifatus_backend'
 ```
 
----
+### Issue 3: "Network bonifatus_default not found"
 
-## Quick Diagnostic Commands
+**Symptoms:**
+```
+Error response from daemon: network bonifatus_default not found
+```
 
+**Fix:**
 ```bash
-# Container status
-docker compose ps
+# Swarm creates networks automatically, but if missing:
+ssh root@91.99.212.17 'docker network create --driver overlay bonifatus_default'
 
-# Backend logs
-docker logs bonifatus-backend-dev --tail 100 | grep -i error
+# Then redeploy
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && docker stack deploy -c docker-compose.yml bonifatus'
+```
 
-# Frontend build verification
-docker logs bonifatus-frontend-dev | grep NEXT_PUBLIC_API_URL
+### Issue 4: CORS Errors After Swarm Deployment
 
-# Database migration status
-docker exec bonifatus-backend-dev alembic current
+**Cause:** Frontend environment variables not passed correctly
 
-# Memory usage
-docker stats --no-stream
+**Fix:**
+```bash
+# Verify frontend has correct API URL
+ssh root@91.99.212.17 'docker service inspect bonifatus_frontend | grep NEXT_PUBLIC_API_URL'
 
-# Nginx config test
-nginx -t
+# Should show: https://api.bonidoc.com
 
-# Check which API frontend is calling
-curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
+# If wrong, rebuild frontend image and redeploy
+ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
+  docker compose build frontend && \
+  docker stack deploy -c docker-compose.yml bonifatus'
 ```
 
 ---
@@ -770,41 +536,85 @@ curl -s https://dev.bonidoc.com | grep -o 'api[^"]*bonidoc.com' | head -1
 
 **Before Any Deployment:**
 - [ ] Code committed and pushed to main
-- [ ] No hardcoded values or secrets in code
+- [ ] No hardcoded secrets in code
 - [ ] Dependencies added to requirements.txt/package.json
-- [ ] Environment variables configured (dev: .env, prod: env vars)
+
+**First-Time Swarm Setup (Production):**
+- [ ] Docker Swarm initialized (`docker swarm init`)
+- [ ] All 14 secrets created (`docker secret ls`)
+- [ ] ENCRYPTION_KEY saved to password manager
+- [ ] Secret files backed up to `/opt/bonifatus-secrets/prod/`
 
 **Dev Deployment:**
-- [ ] Run consolidated dev deployment command
+- [ ] Run dev deployment command
 - [ ] Verify health check passes
 - [ ] Test on https://dev.bonidoc.com
 - [ ] Check browser console for errors
-- [ ] Verify new features work correctly
 
 **Prod Deployment (only after dev testing):**
 - [ ] Dev testing completed and passed
-- [ ] Run consolidated prod deployment command
+- [ ] Verify secrets exist (`docker secret ls`)
+- [ ] Run prod deployment command (Swarm)
 - [ ] Verify health check passes
-- [ ] Check ClamAV status (should be enabled)
+- [ ] Check logs show "Loaded secret ... from Docker Swarm"
 - [ ] Test on https://bonidoc.com
-- [ ] Monitor logs for 5-10 minutes
-- [ ] Verify critical user flows work
+- [ ] Monitor for 10-15 minutes
+
+---
+
+## Quick Diagnostic Commands
+
+### Docker Swarm Status
+
+```bash
+# Check Swarm is active
+docker info | grep Swarm
+
+# List all secrets
+docker secret ls
+
+# List all stacks
+docker stack ls
+
+# List services in stack
+docker stack services bonifatus
+
+# Detailed service status
+docker stack ps bonifatus --no-trunc
+
+# Service logs
+docker service logs bonifatus_backend --tail 100
+```
+
+### Secret Verification
+
+```bash
+# Verify backend can read secrets
+docker service logs bonifatus_backend | grep "Loaded secret"
+
+# Check which secrets a service has access to
+docker service inspect bonifatus_backend | grep -A 20 Secrets
+
+# Verify secret file exists in container (read-only check)
+CONTAINER=$(docker ps | grep bonifatus_backend | awk '{print $1}' | head -1)
+docker exec $CONTAINER ls -la /run/secrets/
+```
 
 ---
 
 ## Notes
 
-- **Always deploy to dev first, test, then prod**
-- **Use one-command sequences for consistent deployments**
-- **Deployment sequence will stop on errors - fix and retry**
-- **Dev requires nginx reload, prod does not**
-- **Dev uses .env file, prod uses environment variables**
-- **ClamAV is disabled on dev, enabled on prod**
-- **Check HETZNER_SETUP_ACTUAL.md for server access and detailed setup**
+- **Production uses Docker Swarm Secrets** (encrypted, secure)
+- **Dev still uses Docker Compose** (traditional .env files)
+- **Secrets are encrypted at rest and in transit**
+- **Zero downtime deployments** (rolling updates in Swarm)
+- **Always test in dev first, then deploy to prod**
+- **Secret rotation requires service update** (no restart needed)
+- **Swarm initialized once, persists across reboots**
 
 ---
 
 **For More Information:**
+- Comprehensive secrets guide: `DEPLOYMENT_GUIDE.md` §9.8
 - Server setup details: `HETZNER_SETUP_ACTUAL.md`
-- Dev/Prod configuration differences: `DEV_TO_PROD_MIGRATION.md`
-- Full deployment explanations: `deployment_guide.md` (if exists)
+- Migration plan: `C:\Users\Alexa\.claude\plans\memoized-prancing-iverson.md`
