@@ -7,6 +7,7 @@ Implements AES-256 encryption using Fernet for sensitive data
 import os
 import logging
 from typing import Optional
+from pathlib import Path
 from cryptography.fernet import Fernet, InvalidToken
 import base64
 import hashlib
@@ -23,27 +24,58 @@ class EncryptionService:
         
     def initialize(self, encryption_key: Optional[str] = None):
         """
-        Initialize encryption with key from environment or parameter
-        
+        Initialize encryption with key from Docker Swarm secret or parameter
+
         Args:
-            encryption_key: Optional 32-byte base64 key, reads from env if not provided
+            encryption_key: Optional 32-byte base64 key, reads from Docker Swarm secret if not provided
+
+        Raises:
+            RuntimeError: If APP_ENVIRONMENT not set
+            ValueError: If encryption key secret not found or empty
         """
         if self._initialized:
             return
-            
-        key = encryption_key or os.getenv('ENCRYPTION_KEY')
-        
+
+        key = encryption_key
+
         if not key:
-            logger.warning("No encryption key provided, generating temporary key")
-            key = Fernet.generate_key().decode()
-            logger.warning(f"Generated key (save to env): {key}")
-        
+            # Read from Docker Swarm secret (REQUIRED - no fallbacks)
+            app_env = os.getenv('APP_ENVIRONMENT')
+            if not app_env:
+                raise RuntimeError(
+                    "CRITICAL: APP_ENVIRONMENT environment variable must be set to 'development' or 'production'"
+                )
+
+            env_suffix = '_dev' if app_env == 'development' else '_prod'
+            secret_path = Path(f"/run/secrets/encryption_key{env_suffix}")
+
+            if not secret_path.exists():
+                raise ValueError(
+                    f"CRITICAL: Encryption key secret file '{secret_path}' not found. "
+                    f"Ensure Docker secret 'encryption_key{env_suffix}' is created and mounted to this container."
+                )
+
+            try:
+                key = secret_path.read_text().strip()
+            except Exception as e:
+                raise ValueError(
+                    f"CRITICAL: Failed to read encryption key from {secret_path}: {e}"
+                )
+
+            if not key:
+                raise ValueError(
+                    f"CRITICAL: Encryption key secret file '{secret_path}' exists but is empty. "
+                    f"Secret 'encryption_key{env_suffix}' must contain a valid Fernet key."
+                )
+
+            logger.info(f"Loaded encryption key from Docker Swarm secret: encryption_key{env_suffix}")
+
         try:
             self._fernet = Fernet(key.encode() if isinstance(key, str) else key)
             self._initialized = True
             logger.info("Encryption service initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize encryption: {e}")
+            logger.error(f"Failed to initialize encryption with provided key: {e}")
             raise
     
     def encrypt(self, plaintext: str) -> Optional[str]:
