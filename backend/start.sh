@@ -16,8 +16,10 @@ export PYTHONMALLOC=malloc  # Use system malloc for better memory control
 echo "[Permissions] Fixing ownership of tmpfs-mounted directories..."
 chown -R root:root /app/temp /app/logs 2>/dev/null || true
 echo "[Permissions] Fixing ClamAV directories..."
-chown -R root:root /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
-chmod -R 755 /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
+chown -R root:root /var/log/clamav /var/run/clamav 2>/dev/null || true
+chmod -R 755 /var/log/clamav /var/run/clamav 2>/dev/null || true
+# Database directory must be writable by clamav user (UID 100) for freshclam
+chmod 777 /var/lib/clamav 2>/dev/null || true
 # Create log files to prevent freshclam/clamd permission errors
 touch /var/log/clamav/freshclam.log /var/log/clamav/clamav.log 2>/dev/null || true
 chmod 666 /var/log/clamav/*.log 2>/dev/null || true
