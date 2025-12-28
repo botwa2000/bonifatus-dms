@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@91.99.212.17:*)",
+      "Bash(find:*)"
+    ]
+  }
+}

@@ -614,17 +614,13 @@ async def handle_invoice_payment_succeeded(event, session: Session):
         currency_obj = session.query(Currency).filter(Currency.code == currency).first()
         currency_symbol = currency_obj.symbol if currency_obj else '$'
 
-        # Format dates - use subscription period for accurate billing cycle dates
+        # Format dates - use invoice period dates (most accurate for billing cycle)
         invoice_date = datetime.fromtimestamp(stripe_invoice.created, tz=timezone.utc).strftime('%B %d, %Y')
 
-        # Get period dates from subscription if available (more accurate for billing cycle)
-        if subscription:
-            period_start = subscription.current_period_start.strftime('%B %d, %Y')
-            period_end = subscription.current_period_end.strftime('%B %d, %Y')
-        else:
-            # Fallback to invoice period dates
-            period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
-            period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
+        # Use invoice period dates (always accurate, especially for new subscriptions)
+        # Note: Subscription record might not be updated yet when invoice.payment_succeeded fires
+        period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
+        period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
 
         # Calculate amount
         amount = stripe_invoice.amount_paid / 100

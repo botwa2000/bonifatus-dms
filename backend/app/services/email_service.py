@@ -694,15 +694,15 @@ class EmailService:
 
         email_data = email_template_service.prepare_email(
             session=session,
-            template_name='account_deletion',
+            template_name='account_deleted',
             variables=template_variables,
             recipient_email=to_email,
             recipient_name=user_name
         )
 
         if not email_data:
-            logger.error(f"Database template 'account_deletion' not found")
-            raise Exception("Email template 'account_deletion' not found in database")
+            logger.error(f"Database template 'account_deleted' not found")
+            raise Exception("Email template 'account_deleted' not found in database")
 
         logger.info(f"Using database template for account deletion email to {to_email}")
         return await self.send_email(

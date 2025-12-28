@@ -211,6 +211,12 @@ except Exception as e:
     exit(1)
 " || { echo "[spaCy] FATAL: Model initialization failed"; exit 1; }
 
+# Fix ownership of tmpfs-mounted directories (they inherit build-time ownership)
+# The application runs as root, but tmpfs mounts preserve bonifatus:bonifatus ownership
+echo "[Permissions] Fixing ownership of tmpfs-mounted directories..."
+chown -R root:root /app/temp /app/logs 2>/dev/null || true
+echo "[Permissions] ✓ Ownership fixed"
+
 # Start the Python application (main priority)
 echo "[FastAPI] Starting application on port ${APP_PORT:-8080}..."
 echo "=== Application Ready ==="
