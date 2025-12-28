@@ -102,15 +102,20 @@ COPY alembic/ ./alembic/
 # Copy startup script
 COPY start.sh /app/start.sh
 
+# Copy healthcheck script
+COPY healthcheck.sh /app/healthcheck.sh
+
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/temp \
     && chown -R bonifatus:bonifatus /app \
     && chmod -R 755 /app \
-    && chmod +x /app/start.sh
+    && chmod +x /app/start.sh \
+    && chmod +x /app/healthcheck.sh
 
-# Health check
+# Smart health check that works for both backend and celery-worker
+# Backend: checks HTTP endpoint | Celery Worker: checks celery inspect ping
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD /app/healthcheck.sh || exit 1
 
 # Expose port 8080 for Cloud Run
 EXPOSE 8080

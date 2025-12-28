@@ -201,6 +201,7 @@ services:
       - ONEDRIVE_FOLDER_NAME=Bonifatus_DMS_Dev
       - CLAMAV_ENABLED=false
       - C_FORCE_ROOT=1  # Allow Celery to run as root
+      - CELERY_WORKER=1  # Enable celery-specific healthcheck
     depends_on:
       - redis
       - backend
@@ -217,13 +218,6 @@ services:
       - /tmp:noexec,nosuid,size=500m
       - /app/logs:noexec,nosuid,size=200m
       - /app/temp:noexec,nosuid,size=1G
-    # Health check to prevent Docker Swarm from marking worker as "Complete"
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A app.celery_app status >/dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     deploy:
       mode: replicated
       replicas: 1
