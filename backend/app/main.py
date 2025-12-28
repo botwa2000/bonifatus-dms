@@ -12,11 +12,17 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 
-# Configure basic logging
+# Configure environment-aware logging
+log_level = getattr(logging, settings.app.app_log_level.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Production hardening: Force WARNING level in production unless explicitly overridden
+if settings.is_production and settings.app.app_log_level == "INFO":
+    logging.getLogger().setLevel(logging.WARNING)
+    logger.info("Production mode: Forcing log level to WARNING to prevent sensitive data exposure")
 
 # Reduce SQLAlchemy verbosity - only show warnings and errors
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
@@ -198,9 +204,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=settings.cors_allow_methods_list,
+    allow_headers=settings.cors_allow_headers_list,
+    expose_headers=settings.cors_expose_headers_list,
 )
 
 # Import and apply middleware in correct order

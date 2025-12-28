@@ -146,6 +146,14 @@ class SecuritySettings(BaseSettings):
         default_factory=lambda: read_secret("turnstile_secret_key"),
         description="Cloudflare Turnstile secret key (loaded from Docker Swarm secret)"
     )
+    cookie_domain: str = Field(
+        default=".bonidoc.com",
+        description="Cookie domain for auth tokens (use leading dot for wildcard subdomain access)"
+    )
+    cookie_secure: bool = Field(
+        default=True,
+        description="Enable secure flag on cookies (requires HTTPS)"
+    )
 
     class Config:
         case_sensitive = False
@@ -258,6 +266,26 @@ class AppSettings(BaseSettings):
     app_description: str = Field(..., description="Application description")
     app_version: str = Field(..., description="Application version")
     app_frontend_url: str = Field(..., alias="NEXTAUTH_URL", description="Frontend URL for OAuth redirects")
+    app_log_level: str = Field(
+        default="INFO",
+        description="Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
+    )
+    app_debug_logging: bool = Field(
+        default=False,
+        description="Enable verbose debug logging with detailed data (development only)"
+    )
+    app_cors_allow_headers: str = Field(
+        default="Content-Type,Accept,Authorization,X-Acting-As-User-Id",
+        description="Comma-separated list of allowed CORS request headers"
+    )
+    app_cors_expose_headers: str = Field(
+        default="Content-Type,X-Process-Time,X-Request-ID,X-RateLimit-Remaining,X-RateLimit-Tier",
+        description="Comma-separated list of exposed CORS response headers"
+    )
+    app_cors_allow_methods: str = Field(
+        default="GET,POST,PUT,DELETE,PATCH,OPTIONS",
+        description="Comma-separated list of allowed HTTP methods"
+    )
 
     class Config:
         case_sensitive = False
@@ -308,6 +336,21 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""
         return [origin.strip() for origin in self.app.app_cors_origins.split(",")]
+
+    @property
+    def cors_allow_headers_list(self) -> List[str]:
+        """Get CORS allowed headers as list"""
+        return [header.strip() for header in self.app.app_cors_allow_headers.split(",")]
+
+    @property
+    def cors_expose_headers_list(self) -> List[str]:
+        """Get CORS exposed headers as list"""
+        return [header.strip() for header in self.app.app_cors_expose_headers.split(",")]
+
+    @property
+    def cors_allow_methods_list(self) -> List[str]:
+        """Get CORS allowed methods as list"""
+        return [method.strip() for method in self.app.app_cors_allow_methods.split(",")]
 
     class Config:
         case_sensitive = False

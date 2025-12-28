@@ -224,9 +224,9 @@ async def google_oauth_callback_redirect(
             key="access_token",
             value=auth_result["access_token"],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="lax",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
@@ -235,15 +235,15 @@ async def google_oauth_callback_redirect(
             key="refresh_token",
             value=auth_result["refresh_token"],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="strict",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=604800,  # 7 days
             path="/"
         )
 
         logger.info(f"[OAuth] User {auth_result['email']} authenticated successfully")
-        logger.info(f"[OAuth] Setting cookies: domain=.bonidoc.com, secure=True, httponly=True")
+        logger.info(f"[OAuth] Setting cookies: domain={settings.security.cookie_domain}, secure={settings.security.cookie_secure}, httponly=True")
         logger.info(f"[OAuth] Redirecting to: {redirect_url}")
 
         return redirect_response
@@ -297,16 +297,16 @@ async def google_oauth_callback_ajax(
             )
         
         # Set tokens in httpOnly cookies
-        # Domain=.bonidoc.com allows cookies to work across api.bonidoc.com and bonidoc.com
+        # Cookie domain from settings allows cross-subdomain access when configured with leading dot
         # SameSite=Lax for access token (allows navigation), Strict for refresh token (max security)
 
         response.set_cookie(
             key="access_token",
             value=auth_result["access_token"],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="lax",  # Lax allows navigation while preventing CSRF
-            domain=".bonidoc.com",  # Accessible across all *.bonidoc.com subdomains
+            domain=settings.security.cookie_domain,  # Accessible across configured domain
             max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
@@ -315,9 +315,9 @@ async def google_oauth_callback_ajax(
             key="refresh_token",
             value=auth_result["refresh_token"],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="strict",  # Strict for maximum security on refresh token
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=604800,  # 7 days
             path="/"
         )
@@ -382,9 +382,10 @@ async def refresh_token(
                     detail="Refresh token required"
                 )
 
-        logger.info(f"[REFRESH DEBUG] Starting token refresh from IP: {ip_address}")
-        logger.info(f"[REFRESH DEBUG] Refresh token source: {'body' if refresh_request.refresh_token else 'cookie'}")
-        logger.info(f"[REFRESH DEBUG] User agent: {user_agent}")
+        if settings.app.app_debug_logging:
+            logger.debug(f"[REFRESH DEBUG] Starting token refresh from IP: {ip_address}")
+            logger.debug(f"[REFRESH DEBUG] Refresh token source: {'body' if refresh_request.refresh_token else 'cookie'}")
+            logger.debug(f"[REFRESH DEBUG] User agent: {user_agent}")
 
         refresh_result = await auth_service.refresh_access_token(
             refresh_token_value,
@@ -393,28 +394,31 @@ async def refresh_token(
         )
 
         if not refresh_result:
-            logger.warning(f"[REFRESH DEBUG] ❌ Token refresh FAILED from IP: {ip_address}")
+            if settings.app.app_debug_logging:
+                logger.debug(f"[REFRESH DEBUG] ❌ Token refresh FAILED from IP: {ip_address}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired refresh token"
             )
 
-        logger.info(f"[REFRESH DEBUG] ✅ Token refresh successful for user: {refresh_result.get('email')}")
+        if settings.app.app_debug_logging:
+            logger.debug(f"[REFRESH DEBUG] ✅ Token refresh successful for user: {refresh_result.get('email')}")
 
         # Set new access token in httpOnly cookie
         response.set_cookie(
             key="access_token",
             value=refresh_result["access_token"],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="lax",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=settings.security.access_token_expire_minutes * 60,  # Match token lifetime
             path="/"
         )
 
-        logger.info(f"[REFRESH DEBUG] ✅ Access token cookie SET with domain=.bonidoc.com, max_age={settings.security.access_token_expire_minutes * 60}, httponly=True")
-        logger.info(f"[REFRESH DEBUG] Access token refreshed for user {refresh_result.get('email')} from IP: {ip_address}")
+        if settings.app.app_debug_logging:
+            logger.debug(f"[REFRESH DEBUG] ✅ Access token cookie SET with domain={settings.security.cookie_domain}, max_age={settings.security.access_token_expire_minutes * 60}, httponly=True")
+            logger.debug(f"[REFRESH DEBUG] Access token refreshed for user {refresh_result.get('email')} from IP: {ip_address}")
 
         return RefreshTokenResponse(**refresh_result)
         
@@ -515,9 +519,9 @@ async def logout(
             key="access_token",
             value="",
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="lax",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=0,
             path="/"
         )
@@ -526,9 +530,9 @@ async def logout(
             key="refresh_token",
             value="",
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="strict",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=0,
             path="/"
         )
@@ -894,9 +898,9 @@ async def login_email(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
+        secure=settings.security.cookie_secure,
         samesite="lax",
-        domain=".bonidoc.com",
+        domain=settings.security.cookie_domain,
         max_age=settings.security.access_token_expire_minutes * 60,
         path="/"
     )
@@ -905,9 +909,9 @@ async def login_email(
         key="refresh_token",
         value=session_result['refresh_token'],
         httponly=True,
-        secure=True,
+        secure=settings.security.cookie_secure,
         samesite="strict",
-        domain=".bonidoc.com",
+        domain=settings.security.cookie_domain,
         max_age=604800,  # 7 days
         path="/"
     )
@@ -1011,9 +1015,9 @@ async def verify_email(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="lax",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=settings.security.access_token_expire_minutes * 60,
             path="/"
         )
@@ -1022,9 +1026,9 @@ async def verify_email(
             key="refresh_token",
             value=session_result['refresh_token'],
             httponly=True,
-            secure=True,
+            secure=settings.security.cookie_secure,
             samesite="strict",
-            domain=".bonidoc.com",
+            domain=settings.security.cookie_domain,
             max_age=604800,
             path="/"
         )
@@ -1034,7 +1038,7 @@ async def verify_email(
         # Send welcome email to new user
         try:
             import asyncio
-            dashboard_url = f"https://{'dev.' if settings.is_development else ''}bonidoc.com/dashboard"
+            dashboard_url = f"{settings.app.app_frontend_url}/dashboard"
             asyncio.create_task(
                 email_service.send_user_created_notification(
                     session=db,
