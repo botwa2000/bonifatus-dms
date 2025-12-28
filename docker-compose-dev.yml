@@ -65,10 +65,11 @@ services:
       - SETUID
       - SETGID
       - CHOWN
+    volumes:
+      - batch_temp_dev:/app/temp
     tmpfs:
       - /tmp:noexec,nosuid,size=500m
       - /app/logs:noexec,nosuid,size=200m
-      - /app/temp:noexec,nosuid,size=1G
       - /var/log/clamav:size=50m,mode=777
     deploy:
       mode: replicated
@@ -216,6 +217,8 @@ services:
       - APP_CORS_ALLOW_HEADERS=Content-Type,Accept,Authorization,X-Acting-As-User-Id
       - APP_CORS_EXPOSE_HEADERS=Content-Type,X-Process-Time,X-Request-ID,X-RateLimit-Remaining,X-RateLimit-Tier
       - APP_CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,PATCH,OPTIONS
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
       - backend
@@ -228,10 +231,13 @@ services:
       - SETUID
       - SETGID
       - CHOWN
+    volumes:
+      - batch_temp_dev:/app/temp
     tmpfs:
       - /tmp:noexec,nosuid,size=500m
       - /app/logs:noexec,nosuid,size=200m
-      - /app/temp:noexec,nosuid,size=1G
+    healthcheck:
+      disable: true
     deploy:
       mode: replicated
       replicas: 1
@@ -276,3 +282,6 @@ secrets:
     external: true
   turnstile_secret_key_dev:
     external: true
+
+volumes:
+  batch_temp_dev:

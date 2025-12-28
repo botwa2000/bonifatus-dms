@@ -89,7 +89,7 @@ class GoogleSettings(BaseSettings):
         default_factory=lambda: read_secret("google_client_secret"),
         description="Google OAuth client secret (loaded from Docker Swarm secret)"
     )
-    google_redirect_uri: str = Field(..., env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
+    google_redirect_uri: str = Field(default="", env="GOOGLE_REDIRECT_URI", description="OAuth redirect URI")
     google_vision_enabled: bool = Field(default=True, description="Enable Google Vision OCR")
     google_oauth_issuers: str = Field(default="https://accounts.google.com", description="Valid OAuth issuers")
     google_drive_service_account_key: str = Field(default="/secrets/google-drive-key", description="Google Drive service account key file path")
@@ -116,7 +116,7 @@ class OneDriveSettings(BaseSettings):
         default_factory=lambda: read_secret("onedrive_client_secret"),
         description="Microsoft Azure app client secret (loaded from Docker Swarm secret)"
     )
-    onedrive_redirect_uri: str = Field(..., env="ONEDRIVE_REDIRECT_URI", description="OneDrive OAuth redirect URI")
+    onedrive_redirect_uri: str = Field(default="", env="ONEDRIVE_REDIRECT_URI", description="OneDrive OAuth redirect URI")
     onedrive_folder_name: str = Field(default="Bonifatus_DMS", env="ONEDRIVE_FOLDER_NAME", description="OneDrive folder name for documents (use different names for dev/prod)")
 
     class Config:
@@ -163,12 +163,12 @@ class SecuritySettings(BaseSettings):
 class TranslationSettings(BaseSettings):
     """Translation service configuration from environment variables"""
 
-    translation_provider: str = Field(..., description="Translation provider: libretranslate or deepl")
-    translation_libretranslate_url: str = Field(..., description="LibreTranslate API URL")
+    translation_provider: str = Field(default="libretranslate", description="Translation provider: libretranslate or deepl")
+    translation_libretranslate_url: str = Field(default="http://libretranslate:5000", description="LibreTranslate API URL")
     translation_deepl_api_key: Optional[str] = Field(default=None, description="DeepL API key (for paid tier)")
-    translation_deepl_url: str = Field(..., description="DeepL API URL")
+    translation_deepl_url: str = Field(default="https://api-free.deepl.com/v2/translate", description="DeepL API URL")
     translation_force_provider: Optional[str] = Field(default=None, description="Force specific provider (dev/test only)")
-    translation_timeout: int = Field(..., description="Translation request timeout in seconds")
+    translation_timeout: int = Field(default=30, description="Translation request timeout in seconds")
 
     class Config:
         case_sensitive = False
@@ -259,13 +259,13 @@ class AppSettings(BaseSettings):
 
     app_environment: str = Field(..., description="Environment")
     app_debug_mode: bool = Field(..., description="Enable debug mode")
-    app_cors_origins: str = Field(..., description="CORS origins")
-    app_host: str = Field(..., description="Application host")
-    app_port: int = Field(..., description="Application port")
-    app_title: str = Field(..., description="Application title")
-    app_description: str = Field(..., description="Application description")
-    app_version: str = Field(..., description="Application version")
-    app_frontend_url: str = Field(..., alias="NEXTAUTH_URL", description="Frontend URL for OAuth redirects")
+    app_cors_origins: str = Field(default="", description="CORS origins (comma-separated)")
+    app_host: str = Field(default="0.0.0.0", description="Application host")
+    app_port: int = Field(default=8080, description="Application port")
+    app_title: str = Field(default="Bonifatus DMS", description="Application title")
+    app_description: str = Field(default="Document Management System", description="Application description")
+    app_version: str = Field(default="1.0.0", description="Application version")
+    app_frontend_url: str = Field(default="", alias="NEXTAUTH_URL", description="Frontend URL for OAuth redirects")
     app_log_level: str = Field(
         default="INFO",
         description="Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
