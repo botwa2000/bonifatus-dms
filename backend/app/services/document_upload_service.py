@@ -164,14 +164,40 @@ class DocumentUploadService:
                 if not cat_exists:
                     raise ValueError(f"Category {cat_id} not found or access denied")
             
-            # Get user's Google Drive refresh token using ORM
+            # Get user and determine active storage provider
             user = session.query(User).filter(User.id == user_id).first()
 
-            if not user or not user.drive_refresh_token_encrypted:
-                logger.error(f"User {user_email} has not connected Google Drive")
-                raise ValueError("Please connect your Google Drive account in Settings before uploading documents")
+            if not user:
+                logger.error(f"User {user_id} not found")
+                raise ValueError("User not found")
 
-            refresh_token_encrypted = user.drive_refresh_token_encrypted
+            # Determine storage provider (use active_storage_provider or default to google_drive)
+            storage_provider = user.active_storage_provider or 'google_drive'
+
+            # Provider-agnostic token field mapping (add new providers here)
+            provider_token_fields = {
+                'google_drive': 'drive_refresh_token_encrypted',
+                'onedrive': 'onedrive_refresh_token_encrypted',
+                'dropbox': 'dropbox_refresh_token_encrypted',
+                'box': 'box_refresh_token_encrypted'
+            }
+
+            # Get the appropriate refresh token based on provider
+            token_field = provider_token_fields.get(storage_provider)
+            if not token_field:
+                raise ValueError(f"Unsupported storage provider: {storage_provider}")
+
+            refresh_token_encrypted = getattr(user, token_field, None)
+            if not refresh_token_encrypted:
+                provider_display_names = {
+                    'google_drive': 'Google Drive',
+                    'onedrive': 'OneDrive',
+                    'dropbox': 'Dropbox',
+                    'box': 'Box'
+                }
+                provider_name = provider_display_names.get(storage_provider, storage_provider)
+                logger.error(f"User {user_email} has not connected {provider_name}")
+                raise ValueError(f"Please connect your {provider_name} account in Settings before uploading documents")
 
             # Get category info for folder structure
             category_translation = session.query(CategoryTranslation).filter(
@@ -242,7 +268,8 @@ class DocumentUploadService:
                 file_size=len(file_content),
                 mime_type=mime_type,
                 file_hash=file_hash,
-                google_drive_file_id=drive_result['drive_file_id'],
+                storage_file_id=drive_result['drive_file_id'],
+                storage_provider_type=storage_provider,
                 web_view_link=drive_result.get('web_view_link'),
                 primary_language=language_code,
                 extracted_text=analysis_result.get('extracted_text'),
