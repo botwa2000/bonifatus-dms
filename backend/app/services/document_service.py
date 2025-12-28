@@ -328,7 +328,8 @@ class DocumentService:
                 file_name=standardized_filename,
                 file_size=file_size,
                 mime_type=mime_type,
-                google_drive_file_id=drive_result['drive_file_id'],
+                storage_file_id=drive_result['drive_file_id'],
+                storage_provider_type='google_drive',
                 processing_status="uploaded",
                 user_id=user_id,
                 category_id=category_ids[0]  # Primary category for backward compatibility
@@ -367,7 +368,7 @@ class DocumentService:
                 file_name=standardized_filename,
                 file_size=document.file_size,
                 mime_type=document.mime_type,
-                google_drive_file_id=document.google_drive_file_id,
+                google_drive_file_id=document.storage_file_id,
                 processing_status=document.processing_status,
                 web_view_link=drive_result.get('web_view_link'),
                 created_at=document.created_at
@@ -521,7 +522,7 @@ class DocumentService:
                 file_name=document.file_name,
                 file_size=document.file_size,
                 mime_type=document.mime_type,
-                google_drive_file_id=document.google_drive_file_id,
+                google_drive_file_id=document.storage_file_id,
                 processing_status=document.processing_status,
                 extracted_text=document.extracted_text,
                 keywords=parsed_keywords,
@@ -654,7 +655,7 @@ class DocumentService:
                                     # Move file to new category folder
                                     success = drive_service.move_document_to_folder(
                                         user.google_refresh_token,
-                                        document.google_drive_file_id,
+                                        document.storage_file_id,
                                         new_folder_id
                                     )
 
@@ -751,18 +752,18 @@ class DocumentService:
                 refresh_token_encrypted = user_result[0]
                 drive_success = drive_service.delete_document(
                     refresh_token_encrypted=refresh_token_encrypted,
-                    drive_file_id=document.google_drive_file_id
+                    drive_file_id=document.storage_file_id
                 )
                 if not drive_success:
-                    logger.warning(f"[DELETE DEBUG] ⚠️  Failed to delete from Google Drive: {document.google_drive_file_id}")
+                    logger.warning(f"[DELETE DEBUG] ⚠️  Failed to delete from Google Drive: {document.storage_file_id}")
                 else:
-                    logger.info(f"[DELETE DEBUG] ✅ Deleted from Google Drive: {document.google_drive_file_id}")
+                    logger.info(f"[DELETE DEBUG] ✅ Deleted from Google Drive: {document.storage_file_id}")
             else:
                 logger.warning(f"[DELETE DEBUG] ⚠️  User {user_id} has no Google Drive connection, skipping Drive deletion")
 
             old_values = {
                 "title": document.title,
-                "google_drive_file_id": document.google_drive_file_id
+                "storage_file_id": document.storage_file_id
             }
 
             # Store file size before deletion for quota update
@@ -902,7 +903,7 @@ class DocumentService:
                     file_name=document.file_name,
                     file_size=document.file_size,
                     mime_type=document.mime_type,
-                    google_drive_file_id=document.google_drive_file_id,
+                    google_drive_file_id=document.storage_file_id,
                     processing_status=document.processing_status,
                     extracted_text=document.extracted_text,
                     keywords=self._parse_keywords_to_list(document.keywords),
