@@ -10,6 +10,16 @@ echo "=== Bonifatus DMS Backend - Production Startup ==="
 export MALLOC_ARENA_MAX=2  # Reduce memory fragmentation
 export PYTHONMALLOC=malloc  # Use system malloc for better memory control
 
+# Fix ownership of tmpfs-mounted directories BEFORE any services start
+# tmpfs mounts are created when container starts and preserve permissions from mount time
+# This must run before ClamAV initialization to ensure log directories are writable
+echo "[Permissions] Fixing ownership of tmpfs-mounted directories..."
+chown -R root:root /app/temp /app/logs 2>/dev/null || true
+echo "[Permissions] Fixing ClamAV directories..."
+chown -R root:root /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
+chmod -R 755 /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
+echo "[Permissions] ✓ Ownership fixed"
+
 # Function to start ClamAV with keepalive monitoring
 start_clamav_lazy() {
     echo "[ClamAV] Initializing in background (lazy mode with keepalive)..."
@@ -210,15 +220,6 @@ except Exception as e:
     print(f'[spaCy] ERROR loading models from database: {e}')
     exit(1)
 " || { echo "[spaCy] FATAL: Model initialization failed"; exit 1; }
-
-# Fix ownership of tmpfs-mounted directories (they inherit build-time ownership)
-# The application runs as root, but tmpfs mounts preserve bonifatus:bonifatus ownership
-echo "[Permissions] Fixing ownership of tmpfs-mounted directories..."
-chown -R root:root /app/temp /app/logs 2>/dev/null || true
-echo "[Permissions] Fixing ClamAV directories..."
-chown -R root:root /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
-chmod -R 755 /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
-echo "[Permissions] ✓ Ownership fixed"
 
 # Start the Python application (main priority)
 echo "[FastAPI] Starting application on port ${APP_PORT:-8080}..."
