@@ -258,6 +258,9 @@ class DocumentUploadService:
             # Prepare keywords for storage (as JSON array of strings)
             keywords_json = json.dumps(confirmed_keywords) if confirmed_keywords else None
 
+            # Get primary category ID for backward compatibility
+            primary_category_id = uuid_lib.UUID(category_ids_ordered[0])
+
             # Create document record using ORM
             document = Document(
                 user_id=uuid_lib.UUID(user_id),
@@ -281,7 +284,8 @@ class DocumentUploadService:
                 is_duplicate=False,
                 duplicate_of_document_id=None,
                 batch_id=uuid_lib.UUID(batch_id) if batch_id else None,
-                is_deleted=False
+                is_deleted=False,
+                category_id=primary_category_id  # Backward compatibility field
             )
 
             session.add(document)
@@ -305,7 +309,6 @@ class DocumentUploadService:
             
             # Smart ML learning with multi-category support
             suggested_category_id = analysis_result.get('suggested_category_id')
-            primary_category_id = uuid_lib.UUID(category_ids_ordered[0])
             secondary_category_ids = [uuid_lib.UUID(cid) for cid in category_ids_ordered[1:]]  # Categories 2-5
             document_keywords = [kw['word'] for kw in analysis_result.get('keywords', [])]
 
