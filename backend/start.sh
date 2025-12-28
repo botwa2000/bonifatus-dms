@@ -215,6 +215,9 @@ except Exception as e:
 # The application runs as root, but tmpfs mounts preserve bonifatus:bonifatus ownership
 echo "[Permissions] Fixing ownership of tmpfs-mounted directories..."
 chown -R root:root /app/temp /app/logs 2>/dev/null || true
+echo "[Permissions] Fixing ClamAV directories..."
+chown -R root:root /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
+chmod -R 755 /var/log/clamav /var/run/clamav /var/lib/clamav 2>/dev/null || true
 echo "[Permissions] ✓ Ownership fixed"
 
 # Start the Python application (main priority)
