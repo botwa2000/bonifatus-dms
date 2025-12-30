@@ -7,10 +7,12 @@ different cloud storage providers (Google Drive, OneDrive, etc.).
 
 import logging
 from typing import Optional, Dict, BinaryIO
+from sqlalchemy.orm import Session
 
 from app.services.storage.provider_factory import ProviderFactory
 from app.services.storage.base_provider import UploadResult
 from app.database.models import User
+from app.services.provider_manager import ProviderManager
 
 logger = logging.getLogger(__name__)
 
@@ -32,31 +34,22 @@ class DocumentStorageService:
         """Initialize the document storage service."""
         pass
 
-    def _get_refresh_token(self, user: User, provider_type: str) -> Optional[str]:
+    def _get_refresh_token(self, user: User, provider_type: str, db: Session) -> Optional[str]:
         """
-        Get the encrypted refresh token for a specific provider from user model.
+        Get the encrypted refresh token for a specific provider using ProviderManager.
 
         Args:
             user: User model instance
             provider_type: Provider identifier (e.g., 'google_drive', 'onedrive')
+            db: Database session
 
         Returns:
             Encrypted refresh token, or None if not available
 
         Raises:
-            ValueError: If provider type is unknown
+            ValueError: If provider type is unknown or user hasn't connected the provider
         """
-        token_map = {
-            'google_drive': user.drive_refresh_token_encrypted,
-            'onedrive': getattr(user, 'onedrive_refresh_token_encrypted', None),
-            'dropbox': getattr(user, 'dropbox_refresh_token_encrypted', None),
-            'box': getattr(user, 'box_refresh_token_encrypted', None),
-        }
-
-        if provider_type not in token_map:
-            raise ValueError(f"Unknown provider type: {provider_type}")
-
-        token = token_map.get(provider_type)
+        token = ProviderManager.get_token(db, user, provider_type)
         if not token:
             raise ValueError(f"User has not connected {provider_type}")
 
@@ -68,6 +61,7 @@ class DocumentStorageService:
         file_content: BinaryIO,
         filename: str,
         mime_type: str,
+        db: Session,
         folder_id: Optional[str] = None,
         provider_type: Optional[str] = None
     ) -> UploadResult:
@@ -79,6 +73,7 @@ class DocumentStorageService:
             file_content: Binary file content stream
             filename: Name for the uploaded file
             mime_type: MIME type of the file
+            db: Database session
             folder_id: Optional folder ID to upload into
             provider_type: Optional override for provider (uses active_storage_provider if None)
 
@@ -94,8 +89,8 @@ class DocumentStorageService:
         if not target_provider:
             raise ValueError("User has no active storage provider configured")
 
-        # Get refresh token for the provider
-        refresh_token = self._get_refresh_token(user, target_provider)
+        # Get refresh token for the provider using ProviderManager
+        refresh_token = self._get_refresh_token(user, target_provider, db)
 
         # Create provider instance and upload
         provider = ProviderFactory.create(target_provider)
@@ -114,6 +109,7 @@ class DocumentStorageService:
         self,
         user: User,
         file_id: str,
+        db: Session,
         provider_type: Optional[str] = None
     ) -> bytes:
         """
@@ -122,6 +118,7 @@ class DocumentStorageService:
         Args:
             user: User model instance
             file_id: Provider-specific file identifier
+            db: Database session
             provider_type: Optional override for provider (uses active_storage_provider if None)
 
         Returns:
@@ -135,7 +132,7 @@ class DocumentStorageService:
         if not target_provider:
             raise ValueError("User has no active storage provider configured")
 
-        refresh_token = self._get_refresh_token(user, target_provider)
+        refresh_token = self._get_refresh_token(user, target_provider, db)
 
         provider = ProviderFactory.create(target_provider)
         content = provider.download_document(
@@ -150,6 +147,7 @@ class DocumentStorageService:
         self,
         user: User,
         file_id: str,
+        db: Session,
         provider_type: Optional[str] = None
     ) -> bool:
         """
@@ -158,6 +156,7 @@ class DocumentStorageService:
         Args:
             user: User model instance
             file_id: Provider-specific file identifier
+            db: Database session
             provider_type: Optional override for provider (uses active_storage_provider if None)
 
         Returns:
@@ -171,7 +170,7 @@ class DocumentStorageService:
         if not target_provider:
             raise ValueError("User has no active storage provider configured")
 
-        refresh_token = self._get_refresh_token(user, target_provider)
+        refresh_token = self._get_refresh_token(user, target_provider, db)
 
         provider = ProviderFactory.create(target_provider)
         success = provider.delete_document(
@@ -190,6 +189,7 @@ class DocumentStorageService:
         self,
         user: User,
         folder_names: list[str],
+        db: Session,
         provider_type: Optional[str] = None
     ) -> Dict[str, str]:
         """
@@ -198,6 +198,7 @@ class DocumentStorageService:
         Args:
             user: User model instance
             folder_names: List of folder names to create
+            db: Database session
             provider_type: Optional override for provider (uses active_storage_provider if None)
 
         Returns:
@@ -211,7 +212,7 @@ class DocumentStorageService:
         if not target_provider:
             raise ValueError("User has no active storage provider configured")
 
-        refresh_token = self._get_refresh_token(user, target_provider)
+        refresh_token = self._get_refresh_token(user, target_provider, db)
 
         provider = ProviderFactory.create(target_provider)
         folder_map = provider.initialize_folder_structure(
@@ -275,22 +276,19 @@ class DocumentStorageService:
         logger.info(f"Successfully exchanged code for tokens: {provider_type}")
         return tokens
 
-    def is_provider_connected(self, user: User, provider_type: str) -> bool:
+    def is_provider_connected(self, user: User, provider_type: str, db: Session) -> bool:
         """
         Check if user has connected a specific storage provider.
 
         Args:
             user: User model instance
             provider_type: Provider identifier
+            db: Database session
 
         Returns:
             True if provider is connected (has refresh token), False otherwise
         """
-        try:
-            token = self._get_refresh_token(user, provider_type)
-            return token is not None
-        except (ValueError, AttributeError):
-            return False
+        return ProviderManager.is_connected(db, user, provider_type)
 
     def get_active_provider(self, user: User) -> Optional[str]:
         """

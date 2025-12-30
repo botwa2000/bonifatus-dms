@@ -11,7 +11,12 @@
       "Bash(git commit:*)",
       "Bash(cat:*)",
       "Bash(tar:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(alembic current:*)",
+      "Bash(alembic history:*)",
+      "Bash(ls:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker ps:*)"
     ]
   }
 }

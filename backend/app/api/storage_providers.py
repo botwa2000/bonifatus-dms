@@ -17,6 +17,8 @@ from app.services.document_storage_service import document_storage_service
 from app.services.storage.provider_factory import ProviderFactory
 from app.core.config import settings
 from app.core.security import encrypt_token
+from app.core.provider_registry import ProviderRegistry
+from app.services.provider_manager import ProviderManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +26,13 @@ router = APIRouter(prefix="/api/v1/storage", tags=["storage_providers"])
 
 
 def _format_provider_name(provider_type: str) -> str:
-    """Format provider type to display name."""
-    name_map = {
-        'google_drive': 'Google Drive',
-        'onedrive': 'OneDrive',
-        'dropbox': 'Dropbox',
-        'box': 'Box'
-    }
-    return name_map.get(provider_type, provider_type.title())
+    """Format provider type to display name using ProviderRegistry."""
+    return ProviderRegistry.get_display_name(provider_type)
 
 
-def _is_provider_connected(user: User, provider_type: str) -> bool:
+def _is_provider_connected(user: User, provider_type: str, db: Session) -> bool:
     """Check if user has connected a specific provider."""
-    is_connected = document_storage_service.is_provider_connected(user, provider_type)
+    is_connected = document_storage_service.is_provider_connected(user, provider_type, db)
     logger.debug(f"🔍 Provider connection check - User: {user.id}, Provider: {provider_type}, Connected: {is_connected}")
 
     # Debug: Log the actual token status
@@ -85,7 +81,7 @@ async def get_available_providers(
             provider_info = {
                 'type': provider_type,
                 'name': _format_provider_name(provider_type),
-                'connected': _is_provider_connected(fresh_user, provider_type),
+                'connected': _is_provider_connected(fresh_user, provider_type, db),
                 'is_active': fresh_user.active_storage_provider == provider_type,
                 'enabled': True  # Will be tier-based later
             }
@@ -98,6 +94,50 @@ async def get_available_providers(
     except Exception as e:
         logger.error(f"Failed to get available providers: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve provider list")
+
+
+@router.get("/providers/metadata")
+async def get_providers_metadata(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get metadata for all storage providers.
+
+    Returns provider metadata from the ProviderRegistry including:
+    - key: Provider identifier
+    - display_name: User-facing name
+    - icon: Icon identifier
+    - description: Provider description
+    - color: Brand color
+    - capabilities: List of supported features
+    - min_tier_id: Minimum tier required
+    - is_active: Whether provider is available
+    - is_connected: Whether current user has connected this provider
+    - is_active_for_user: Whether this is user's active provider
+    """
+    try:
+        # Get all active providers from registry
+        providers = ProviderRegistry.get_active()
+
+        # Enrich with user-specific connection status
+        provider_list = []
+        for provider in providers:
+            # Get connection info for this provider
+            connection_info = ProviderManager.get_connection_info(db, current_user, provider.provider_key)
+
+            # Build metadata response
+            metadata = provider.to_dict()
+            metadata['is_connected'] = connection_info is not None if connection_info else False
+            metadata['is_active_for_user'] = connection_info['is_active'] if connection_info else False
+
+            provider_list.append(metadata)
+
+        return {'providers': provider_list}
+
+    except Exception as e:
+        logger.error(f"Failed to get providers metadata: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve provider metadata")
 
 
 @router.get("/providers/{provider_type}/connect-intent")
@@ -131,12 +171,8 @@ async def check_provider_connect_intent(
                 detail=f"Unknown provider: {provider_type}"
             )
 
-        # Check if user has another provider enabled
-        current_provider = None
-        if current_user.google_drive_enabled and provider_type != 'google_drive':
-            current_provider = 'google_drive'
-        elif current_user.onedrive_enabled and provider_type != 'onedrive':
-            current_provider = 'onedrive'
+        # Check if user has another provider enabled (dynamic check using ProviderManager)
+        current_provider = ProviderManager.get_other_enabled_provider(db, current_user, provider_type)
 
         if not current_provider:
             return {
@@ -284,52 +320,24 @@ async def provider_oauth_callback(
         refresh_token_encrypted = encrypt_token(tokens['refresh_token'])
         logger.debug(f"✅ Refresh token encrypted - Length: {len(refresh_token_encrypted)}")
 
-        # Store tokens in database based on provider type
-        logger.info(f"💾 Storing tokens for {provider_type} in database...")
-        if provider_type == 'google_drive':
-            current_user.drive_refresh_token_encrypted = refresh_token_encrypted
-            current_user.google_drive_enabled = True
-            current_user.drive_permissions_granted_at = datetime.utcnow()
-            if not current_user.active_storage_provider:
-                current_user.active_storage_provider = 'google_drive'
-            logger.debug(f"✅ Google Drive fields updated - Enabled: {current_user.google_drive_enabled}, Active: {current_user.active_storage_provider}")
+        # Store tokens in database using ProviderManager (provider-agnostic)
+        logger.info(f"💾 Storing tokens for {provider_type} using ProviderManager...")
 
-        elif provider_type == 'onedrive':
-            logger.debug(f"💾 Setting OneDrive fields for user {current_user.id}...")
-            logger.debug(f"🔍 Before - onedrive_enabled: {current_user.onedrive_enabled}, active_storage_provider: {current_user.active_storage_provider}")
+        # Determine if this should be set as active (only if user has no active provider)
+        set_as_active = not current_user.active_storage_provider
 
-            current_user.onedrive_refresh_token_encrypted = refresh_token_encrypted
-            current_user.onedrive_enabled = True
-            current_user.onedrive_connected_at = datetime.utcnow()
-            if not current_user.active_storage_provider:
-                current_user.active_storage_provider = 'onedrive'
-                logger.debug(f"✅ Set active_storage_provider to 'onedrive' (was None)")
-            else:
-                logger.debug(f"ℹ️ active_storage_provider already set to: {current_user.active_storage_provider}")
+        # Connect provider using centralized manager
+        connection = ProviderManager.connect_provider(
+            db=db,
+            user=current_user,
+            provider_key=provider_type,
+            refresh_token_encrypted=refresh_token_encrypted,
+            access_token_encrypted=tokens.get('access_token'),  # Some providers store access token
+            set_as_active=set_as_active
+        )
 
-            logger.debug(f"✅ OneDrive fields updated - Enabled: {current_user.onedrive_enabled}, Active: {current_user.active_storage_provider}")
-            logger.debug(f"🔍 Token length: {len(refresh_token_encrypted)} chars")
-
-        elif provider_type == 'dropbox':
-            current_user.dropbox_refresh_token_encrypted = refresh_token_encrypted
-            current_user.dropbox_enabled = True
-            current_user.dropbox_connected_at = datetime.utcnow()
-            if not current_user.active_storage_provider:
-                current_user.active_storage_provider = 'dropbox'
-            logger.debug(f"✅ Dropbox fields updated - Enabled: {current_user.dropbox_enabled}, Active: {current_user.active_storage_provider}")
-
-        logger.info(f"💾 Committing database transaction...")
-        db.commit()
-        db.refresh(current_user)  # Refresh to get the latest state from database
-        logger.info(f"✅ Database committed and refreshed")
-
-        # Verify the data was actually saved
-        if provider_type == 'onedrive':
-            logger.debug(f"🔍 Post-commit verification:")
-            logger.debug(f"  - onedrive_enabled: {current_user.onedrive_enabled}")
-            logger.debug(f"  - onedrive_refresh_token_encrypted exists: {bool(current_user.onedrive_refresh_token_encrypted)}")
-            logger.debug(f"  - onedrive_connected_at: {current_user.onedrive_connected_at}")
-            logger.debug(f"  - active_storage_provider: {current_user.active_storage_provider}")
+        logger.info(f"✅ Provider connection created/updated - ID: {connection.id}, Enabled: {connection.is_enabled}, Active: {connection.is_active}")
+        logger.debug(f"🔍 Token stored successfully - Length: {len(refresh_token_encrypted)} chars")
 
         # Initialize categories and folder structure if this is user's first storage provider
         try:
@@ -367,6 +375,7 @@ async def provider_oauth_callback(
             folder_map = document_storage_service.initialize_folder_structure(
                 user=current_user,
                 folder_names=category_codes,
+                db=db,
                 provider_type=provider_type
             )
             logger.info(f"✅ Initialized {len(folder_map)} folders in {provider_type}")
@@ -381,12 +390,8 @@ async def provider_oauth_callback(
         if migration_choice:
             logger.info(f"🔄 Migration choice: {migration_choice}")
 
-            # Determine the old provider (the one being replaced)
-            old_provider = None
-            if current_user.google_drive_enabled and provider_type != 'google_drive':
-                old_provider = 'google_drive'
-            elif current_user.onedrive_enabled and provider_type != 'onedrive':
-                old_provider = 'onedrive'
+            # Determine the old provider (the one being replaced) using ProviderManager
+            old_provider = ProviderManager.get_other_enabled_provider(db, current_user, provider_type)
 
             if migration_choice == 'migrate' and old_provider:
                 # Create migration task
@@ -421,21 +426,14 @@ async def provider_oauth_callback(
                     # Don't fail the connection if migration creation fails
 
             elif migration_choice == 'fresh' and old_provider:
-                # Disconnect old provider
+                # Disconnect old provider using ProviderManager
                 logger.info(f"🗑️ Disconnecting old provider: {old_provider}")
                 try:
-                    if old_provider == 'google_drive':
-                        current_user.google_drive_enabled = False
-                        current_user.drive_refresh_token_encrypted = None
-                        current_user.google_drive_access_token_encrypted = None
-                    elif old_provider == 'onedrive':
-                        current_user.onedrive_enabled = False
-                        current_user.onedrive_refresh_token_encrypted = None
-
-                    # Update active provider to the new one
-                    current_user.active_storage_provider = provider_type
-                    db.commit()
-                    logger.info(f"✅ Disconnected old provider: {old_provider}")
+                    success = ProviderManager.disconnect_provider(db, current_user, old_provider)
+                    if success:
+                        logger.info(f"✅ Disconnected old provider: {old_provider}")
+                    else:
+                        logger.warning(f"⚠️ Old provider {old_provider} was not connected")
                 except Exception as disconnect_error:
                     logger.error(f"⚠️ Failed to disconnect old provider: {disconnect_error}", exc_info=True)
 
@@ -520,7 +518,7 @@ async def activate_provider(
             raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_type}")
 
         # Check if provider is connected
-        if not _is_provider_connected(current_user, provider_type):
+        if not _is_provider_connected(current_user, provider_type, db):
             raise HTTPException(
                 status_code=400,
                 detail=f"Please connect {_format_provider_name(provider_type)} before activating it"
@@ -571,7 +569,7 @@ async def disconnect_provider(
             raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_type}")
 
         # Check if provider is connected
-        if not _is_provider_connected(current_user, provider_type):
+        if not _is_provider_connected(current_user, provider_type, db):
             raise HTTPException(status_code=400, detail=f"Provider {provider_type} is not connected")
 
         # CRITICAL: Reload user from current session to ensure changes are tracked
@@ -580,27 +578,11 @@ async def disconnect_provider(
         if not db_user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Remove tokens based on provider type
-        if provider_type == 'google_drive':
-            db_user.drive_refresh_token_encrypted = None
-            db_user.google_drive_enabled = False
-            db_user.drive_permissions_granted_at = None
+        # Disconnect provider using ProviderManager (provider-agnostic)
+        success = ProviderManager.disconnect_provider(db, db_user, provider_type)
+        if not success:
+            raise HTTPException(status_code=400, detail=f"Provider {provider_type} was not connected")
 
-        elif provider_type == 'onedrive':
-            db_user.onedrive_refresh_token_encrypted = None
-            db_user.onedrive_enabled = False
-            db_user.onedrive_connected_at = None
-
-        elif provider_type == 'dropbox':
-            db_user.dropbox_refresh_token_encrypted = None
-            db_user.dropbox_enabled = False
-            db_user.dropbox_connected_at = None
-
-        # If this was the active provider, clear it
-        if db_user.active_storage_provider == provider_type:
-            db_user.active_storage_provider = None
-
-        db.commit()
         logger.info(f"User {db_user.id} disconnected {provider_type}")
 
         # Store user info before session cleanup

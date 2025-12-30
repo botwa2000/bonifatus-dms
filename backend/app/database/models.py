@@ -179,6 +179,7 @@ class User(Base, TimestampMixin):
     payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="user", cascade="all, delete-orphan")
+    provider_connections = relationship("ProviderConnection", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_user_google_id', 'google_id'),
@@ -1603,6 +1604,60 @@ class MigrationTask(Base, TimestampMixin):
         sa.CheckConstraint(
             "status IN ('pending', 'processing', 'completed', 'partial', 'failed')",
             name='check_migration_status'
+        ),
+    )
+
+
+class ProviderConnection(Base, TimestampMixin):
+    """
+    Storage provider connections for users.
+
+    This table replaces provider-specific columns in the User table,
+    providing a scalable, normalized schema for multi-cloud storage.
+
+    Design: One row per user-provider connection. Fully extensible - adding
+    new providers requires no schema changes, just configuration in ProviderRegistry.
+    """
+
+    __tablename__ = "provider_connections"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider_key = Column(String(50), nullable=False, index=True)  # 'google_drive', 'onedrive', etc.
+
+    # Credentials (encrypted)
+    refresh_token_encrypted = Column(Text, nullable=False)
+    access_token_encrypted = Column(Text, nullable=True)  # Optional, some providers only use refresh tokens
+
+    # Status
+    is_enabled = Column(Boolean, nullable=False, default=True, server_default='true')
+    is_active = Column(Boolean, nullable=False, default=False, server_default='false')  # Only one active per user
+
+    # Metadata
+    connected_at = Column(DateTime(timezone=True), nullable=False, server_default=sa.text('now()'))
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Extensible provider-specific metadata
+    metadata_json = Column('metadata', JSONB, nullable=True)
+
+    # Relationship
+    user = relationship("User", back_populates="provider_connections")
+
+    __table_args__ = (
+        # One connection per provider per user
+        sa.UniqueConstraint('user_id', 'provider_key', name='uq_user_provider'),
+
+        # Only one active provider per user
+        # Note: PostgreSQL partial unique index would be ideal, but handled in application logic
+        Index('idx_provider_connections_user_enabled', 'user_id', 'is_enabled'),
+        Index('idx_provider_connections_active', 'user_id', 'is_active', postgresql_where=sa.text('is_active = true')),
+        Index('idx_provider_connections_provider', 'provider_key'),
+
+        # Validate provider_key against known providers
+        # Updated as new providers are added to ProviderRegistry
+        sa.CheckConstraint(
+            "provider_key IN ('google_drive', 'onedrive', 'dropbox', 'box')",
+            name='check_provider_key'
         ),
     )
 

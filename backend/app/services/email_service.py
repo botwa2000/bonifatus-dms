@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.email_template_service import email_template_service
+from app.core.provider_registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -616,17 +617,9 @@ class EmailService:
             logger.info(f"Skipping migration notification email to {to_email} - marketing emails disabled")
             return False
 
-        # Format provider names for display
-        def format_provider_name(provider_type: str) -> str:
-            if provider_type == 'google_drive':
-                return 'Google Drive'
-            elif provider_type == 'onedrive':
-                return 'OneDrive'
-            else:
-                return provider_type.replace('_', ' ').title()
-
-        from_provider_name = format_provider_name(from_provider)
-        to_provider_name = format_provider_name(to_provider)
+        # Format provider names for display using ProviderRegistry
+        from_provider_name = ProviderRegistry.get_display_name(from_provider)
+        to_provider_name = ProviderRegistry.get_display_name(to_provider)
 
         # Load template from database
         template_variables = {

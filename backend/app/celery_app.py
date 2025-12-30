@@ -200,8 +200,8 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
     from io import BytesIO
     from app.database.connection import SessionLocal
     from app.database.models import MigrationTask, Document, User, Category
-    from app.services.storage.google_drive_provider import GoogleDriveProvider
-    from app.services.storage.onedrive_provider import OneDriveProvider
+    from app.services.storage.provider_factory import ProviderFactory
+    from app.services.provider_manager import ProviderManager
 
     logger.info(f"[Migration] Starting migration task {migration_id} for user {user_id}")
 
@@ -226,27 +226,22 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         migration.celery_task_id = self.request.id
         db.commit()
 
-        # Initialize providers
+        # Initialize providers dynamically using ProviderFactory and ProviderManager
         from_provider_type = migration.from_provider
         to_provider_type = migration.to_provider
 
-        if from_provider_type == 'google_drive':
-            from_provider = GoogleDriveProvider()
-            from_token = user.google_drive_refresh_token_encrypted
-        elif from_provider_type == 'onedrive':
-            from_provider = OneDriveProvider()
-            from_token = user.onedrive_refresh_token_encrypted
-        else:
-            raise ValueError(f"Unsupported source provider: {from_provider_type}")
+        # Create provider instances using factory (provider-agnostic)
+        from_provider = ProviderFactory.create(from_provider_type)
+        to_provider = ProviderFactory.create(to_provider_type)
 
-        if to_provider_type == 'google_drive':
-            to_provider = GoogleDriveProvider()
-            to_token = user.google_drive_refresh_token_encrypted
-        elif to_provider_type == 'onedrive':
-            to_provider = OneDriveProvider()
-            to_token = user.onedrive_refresh_token_encrypted
-        else:
-            raise ValueError(f"Unsupported target provider: {to_provider_type}")
+        # Get tokens using ProviderManager (provider-agnostic)
+        from_token = ProviderManager.get_token(db, user, from_provider_type)
+        to_token = ProviderManager.get_token(db, user, to_provider_type)
+
+        if not from_token:
+            raise ValueError(f"User has not connected source provider: {from_provider_type}")
+        if not to_token:
+            raise ValueError(f"User has not connected target provider: {to_provider_type}")
 
         # Query all documents from the old provider
         documents = db.query(Document).filter(
@@ -375,14 +370,12 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                 migration.folder_deletion_error = str(e)
                 logger.error(f"[Migration] Folder deletion failed: {e}")
 
-            # Disconnect old provider
-            if from_provider_type == 'google_drive':
-                user.google_drive_enabled = False
-                user.google_drive_refresh_token_encrypted = None
-                user.google_drive_access_token_encrypted = None
-            elif from_provider_type == 'onedrive':
-                user.onedrive_enabled = False
-                user.onedrive_refresh_token_encrypted = None
+            # Disconnect old provider using ProviderManager (provider-agnostic)
+            success = ProviderManager.disconnect_provider(db, user, from_provider_type)
+            if success:
+                logger.info(f"[Migration] Disconnected old provider: {from_provider_type}")
+            else:
+                logger.warning(f"[Migration] Old provider {from_provider_type} was already disconnected")
 
         elif failed_count == len(documents):
             # All failed

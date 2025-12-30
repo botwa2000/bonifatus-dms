@@ -2,11 +2,14 @@
 Provider factory for creating storage provider instances.
 
 This factory pattern allows for easy addition of new storage providers
-without modifying core application logic.
+without modifying core application logic. Providers are automatically
+loaded from the ProviderRegistry using dynamic imports.
 """
 
 from typing import Type, Dict
+import importlib
 from app.services.storage.base_provider import StorageProvider
+from app.core.provider_registry import ProviderRegistry
 
 
 class ProviderFactory:
@@ -94,42 +97,41 @@ class ProviderFactory:
         return provider_type in cls._providers
 
 
-# Auto-registration of available providers
-# Providers are imported and registered here to avoid circular imports
+# Auto-registration of available providers from registry
 def _register_available_providers():
     """
-    Register all available storage providers.
+    Register all available storage providers from ProviderRegistry.
 
-    This function is called automatically when the module is imported.
-    As new providers are implemented, add their imports and registration here.
+    This function dynamically loads provider classes using importlib based on
+    the provider_class_path stored in the ProviderRegistry. New providers are
+    automatically registered when added to the registry - no code changes needed here.
+
+    Example registry entry:
+        ProviderRegistry.register(ProviderMetadata(
+            provider_key='google_drive',
+            provider_class_path='app.services.storage.google_drive_provider.GoogleDriveProvider',
+            ...
+        ))
     """
-    try:
-        from app.services.storage.google_drive_provider import GoogleDriveProvider
-        ProviderFactory.register_provider('google_drive', GoogleDriveProvider)
-    except ImportError:
-        # Google Drive provider not yet implemented
-        pass
+    # Get all active providers from the registry
+    for provider_metadata in ProviderRegistry.get_active():
+        try:
+            # Parse the class path (e.g., 'app.services.storage.google_drive_provider.GoogleDriveProvider')
+            module_path, class_name = provider_metadata.provider_class_path.rsplit('.', 1)
 
-    try:
-        from app.services.storage.onedrive_provider import OneDriveProvider
-        ProviderFactory.register_provider('onedrive', OneDriveProvider)
-    except ImportError:
-        # OneDrive provider not yet implemented
-        pass
+            # Dynamically import the module
+            module = importlib.import_module(module_path)
 
-    try:
-        from app.services.storage.dropbox_provider import DropboxProvider
-        ProviderFactory.register_provider('dropbox', DropboxProvider)
-    except ImportError:
-        # Dropbox provider not yet implemented (future)
-        pass
+            # Get the class from the module
+            provider_class = getattr(module, class_name)
 
-    try:
-        from app.services.storage.box_provider import BoxProvider
-        ProviderFactory.register_provider('box', BoxProvider)
-    except ImportError:
-        # Box provider not yet implemented (future)
-        pass
+            # Register the provider
+            ProviderFactory.register_provider(provider_metadata.provider_key, provider_class)
+
+        except (ImportError, AttributeError) as e:
+            # Provider class not yet implemented or import error
+            # This is expected for future providers (Dropbox, Box)
+            pass
 
 
 # Register providers on module import
