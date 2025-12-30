@@ -24,6 +24,7 @@ from app.database.models import (
     AuditLog
 )
 from app.services.drive_service import drive_service
+from app.services.document_storage_service import document_storage_service
 from app.services.ml_learning_service import ml_learning_service
 from app.services.config_service import config_service
 
@@ -210,36 +211,27 @@ class DocumentUploadService:
             category_name = category_translation.name if category_translation else primary_category.reference_key
             category_code_for_folder = primary_category.category_code
 
-            # Get or create category folder in Google Drive
-            service = drive_service._get_drive_service(refresh_token_encrypted)
-            main_folder_id = drive_service._find_folder(service, drive_service.app_folder_name)
-            if not main_folder_id:
-                main_folder_id = drive_service._create_folder(service, drive_service.app_folder_name)
+            # Upload using centralized document storage service (provider-agnostic)
+            logger.info(f"Uploading to {storage_provider}: {standardized_filename} -> {category_name} ({category_code_for_folder})")
 
-            category_folder_id = drive_service.get_or_create_category_folder(
-                refresh_token_encrypted=refresh_token_encrypted,
-                category_name=category_name,
-                category_code=category_code_for_folder,
-                main_folder_id=main_folder_id
-            )
-
-            logger.info(f"Uploading to Google Drive: {standardized_filename} -> {category_name} ({category_code_for_folder})")
-
-            # Convert bytes to BytesIO for Google Drive API
+            # Convert bytes to BytesIO for upload
             from io import BytesIO
             file_io = BytesIO(file_content)
 
-            drive_result = drive_service.upload_document(
-                refresh_token_encrypted=refresh_token_encrypted,
+            # Use document_storage_service for provider-agnostic upload
+            # Note: Folder management is currently not provider-agnostic, uploading to root for now
+            # TODO: Implement provider-agnostic folder structure management
+            upload_result = document_storage_service.upload_document(
+                user=user,
                 file_content=file_io,
                 filename=standardized_filename,
                 mime_type=mime_type,
-                folder_id=category_folder_id
+                db=session
             )
 
-            if not drive_result:
-                logger.error(f"Google Drive upload failed: No result returned")
-                raise Exception(f"Google Drive upload failed")
+            if not upload_result:
+                logger.error(f"{storage_provider} upload failed: No result returned")
+                raise Exception(f"{storage_provider} upload failed")
             
             # Extract document date information
             doc_date = analysis_result.get('document_date')  # ISO string
@@ -268,9 +260,9 @@ class DocumentUploadService:
                 file_size=len(file_content),
                 mime_type=mime_type,
                 file_hash=file_hash,
-                storage_file_id=drive_result['drive_file_id'],
+                storage_file_id=upload_result.file_id,
                 storage_provider_type=storage_provider,
-                web_view_link=drive_result.get('web_view_link'),
+                web_view_link=getattr(upload_result, 'web_view_link', None),
                 primary_language=language_code,
                 extracted_text=analysis_result.get('extracted_text'),
                 keywords=keywords_json,
