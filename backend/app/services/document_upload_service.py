@@ -394,8 +394,8 @@ class DocumentUploadService:
                 'category_ids': category_ids_ordered,
                 'category_names': category_names,
                 'primary_category_id': category_ids_ordered[0],
-                'google_drive_file_id': drive_result['drive_file_id'],
-                'web_view_link': drive_result.get('web_view_link'),
+                'storage_file_id': upload_result.file_id,
+                'web_view_link': getattr(upload_result, 'web_view_link', None),
                 'keywords_count': len(confirmed_keywords),
                 'language': language_code,
                 'created_at': document.created_at.isoformat()
