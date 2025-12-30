@@ -211,6 +211,18 @@ class DocumentUploadService:
             category_name = category_translation.name if category_translation else primary_category.reference_key
             category_code_for_folder = primary_category.category_code
 
+            # Get or create category folder using provider-agnostic folder management
+            logger.info(f"Ensuring category folder exists: {category_name}")
+            folder_map = document_storage_service.initialize_folder_structure(
+                user=user,
+                folder_names=[category_name],
+                db=session
+            )
+
+            category_folder_id = folder_map.get(category_name)
+            if not category_folder_id:
+                logger.warning(f"Failed to get folder ID for category: {category_name}, uploading to root")
+
             # Upload using centralized document storage service (provider-agnostic)
             logger.info(f"Uploading to {storage_provider}: {standardized_filename} -> {category_name} ({category_code_for_folder})")
 
@@ -218,15 +230,14 @@ class DocumentUploadService:
             from io import BytesIO
             file_io = BytesIO(file_content)
 
-            # Use document_storage_service for provider-agnostic upload
-            # Note: Folder management is currently not provider-agnostic, uploading to root for now
-            # TODO: Implement provider-agnostic folder structure management
+            # Use document_storage_service for provider-agnostic upload with category folder
             upload_result = document_storage_service.upload_document(
                 user=user,
                 file_content=file_io,
                 filename=standardized_filename,
                 mime_type=mime_type,
-                db=session
+                db=session,
+                folder_id=category_folder_id
             )
 
             if not upload_result:
