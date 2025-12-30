@@ -5,6 +5,7 @@ Monitors ClamAV daemon status and provides auto-restart capabilities
 """
 
 import logging
+import os
 import subprocess
 import time
 from typing import Dict, Optional
@@ -32,6 +33,10 @@ class ClamAVHealthService:
         self._max_restart_attempts = 3
         self._restart_cooldown = timedelta(minutes=5)
         self._last_restart_attempt: Optional[datetime] = None
+
+    def _is_clamav_enabled(self) -> bool:
+        """Check if ClamAV is enabled via environment variable"""
+        return os.getenv('CLAMAV_ENABLED', 'true').lower() != 'false'
 
     async def check_health(self) -> Dict:
         """
@@ -291,6 +296,14 @@ class ClamAVHealthService:
         This is called periodically by a background task.
         Returns health status and restart action taken.
         """
+        # Skip auto-restart if ClamAV is disabled
+        if not self._is_clamav_enabled():
+            return {
+                'health': {'status': 'disabled', 'available': False},
+                'auto_restart_attempted': False,
+                'reason': 'clamav_disabled'
+            }
+
         health = await self.check_health()
 
         if not health['available'] and health['status'] == 'unavailable':
