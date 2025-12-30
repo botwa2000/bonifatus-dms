@@ -83,11 +83,15 @@ class DocumentUploadService:
             mime_type = temp_data['mime_type']
             analysis_result = temp_data['analysis_result']
 
-            # Use detected language from analysis result (more accurate than user preference)
+            # IMPORTANT: Save user's preferred language for folder names BEFORE overriding
+            user_language_code = language_code  # User's preferred language for UI elements (folder names)
+
+            # Use detected language from analysis result (for document content metadata)
             detected_language = analysis_result.get('detected_language', language_code)
             if detected_language:
-                language_code = detected_language
-                logger.info(f"[UPLOAD DEBUG] Using detected language: {language_code}")
+                language_code = detected_language  # This is for document metadata only
+                logger.info(f"[UPLOAD DEBUG] Using detected language for document: {language_code}")
+                logger.info(f"[UPLOAD DEBUG] Using user language for folders: {user_language_code}")
 
             # Determine primary category first to get category code for filename
             if primary_category_id:
@@ -200,11 +204,12 @@ class DocumentUploadService:
                 logger.error(f"User {user_email} has not connected {provider_name}")
                 raise ValueError(f"Please connect your {provider_name} account in Settings before uploading documents")
 
-            # Get category info for folder structure
+            # Get category info for folder structure using USER'S preferred language
+            # NOT the document's detected language - folders should be in user's language!
             category_translation = session.query(CategoryTranslation).filter(
                 and_(
                     CategoryTranslation.category_id == primary_cat_id,
-                    CategoryTranslation.language_code == language_code
+                    CategoryTranslation.language_code == user_language_code  # Use user's language, not document's
                 )
             ).first()
 

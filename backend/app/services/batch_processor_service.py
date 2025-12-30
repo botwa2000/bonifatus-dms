@@ -163,6 +163,12 @@ class BatchProcessorService:
                         })
                         batch.failed_files += 1
                         batch.processed_files += 1
+
+                        # CRITICAL: Update batch.results immediately so duplicate info is saved
+                        batch.results = results
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(batch, 'results')  # Mark JSONB field as modified
+
                         session.commit()
                         # Explicit cleanup
                         del file_content
