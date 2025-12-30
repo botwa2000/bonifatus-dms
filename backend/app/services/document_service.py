@@ -17,6 +17,7 @@ from sqlalchemy import select, func, text, and_, or_
 from app.database.models import Document, Category, DocumentCategory, CategoryTranslation, User, AuditLog, SystemSetting, UserSetting
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
+from app.services.document_storage_service import document_storage_service
 from app.services.tier_service import tier_service
 from app.core.config import settings
 from app.schemas.document_schemas import (
@@ -299,37 +300,36 @@ class DocumentService:
                 primary_category.translations[0].name if primary_category.translations else "Other"
             )
 
-            # Get user's Google Drive refresh token
-            user_result = session.execute(
-                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
-                {'user_id': user_id}
-            ).first()
+            # Get user object for provider-agnostic upload
+            user = session.get(User, uuid.UUID(user_id))
+            if not user:
+                raise ValueError("User not found")
 
-            if not user_result or not user_result[0]:
-                raise ValueError("Please connect your Google Drive account in Settings before uploading documents")
+            if not user.active_storage_provider:
+                raise ValueError("Please connect a storage provider in Settings before uploading documents")
 
-            refresh_token_encrypted = user_result[0]
-
-            drive_result = drive_service.upload_document(
-                refresh_token_encrypted=refresh_token_encrypted,
+            # Upload using centralized document storage service (provider-agnostic)
+            upload_result = document_storage_service.upload_document(
+                user=user,
                 file_content=file_content,
                 filename=standardized_filename,
-                mime_type=mime_type
+                mime_type=mime_type,
+                db=session
             )
 
-            if not drive_result:
-                raise Exception("Failed to upload to Google Drive")
+            if not upload_result:
+                raise Exception(f"Failed to upload to {user.active_storage_provider}")
 
             document_title = title or filename.rsplit('.', 1)[0]
-            
+
             document = Document(
                 title=document_title,
                 description=description,
                 file_name=standardized_filename,
                 file_size=file_size,
                 mime_type=mime_type,
-                storage_file_id=drive_result['drive_file_id'],
-                storage_provider_type='google_drive',
+                storage_file_id=upload_result.file_id,
+                storage_provider_type=user.active_storage_provider,
                 processing_status="uploaded",
                 user_id=user_id,
                 category_id=category_ids[0]  # Primary category for backward compatibility
@@ -370,7 +370,7 @@ class DocumentService:
                 mime_type=document.mime_type,
                 google_drive_file_id=document.storage_file_id,
                 processing_status=document.processing_status,
-                web_view_link=drive_result.get('web_view_link'),
+                web_view_link=getattr(upload_result, 'web_view_link', None),
                 created_at=document.created_at
             )
 
@@ -740,26 +740,27 @@ class DocumentService:
 
             logger.info(f"[DELETE DEBUG] ✅ User ID matches, proceeding with deletion")
 
-            # Get user's Google Drive refresh token
-            logger.info(f"[DELETE DEBUG] Fetching user's Google Drive token...")
-            user_result = session.execute(
-                text("SELECT drive_refresh_token_encrypted FROM users WHERE id = :user_id"),
-                {'user_id': user_id}
-            ).first()
+            # Get user object for provider-agnostic deletion
+            logger.info(f"[DELETE DEBUG] Fetching user object...")
+            user = session.get(User, user_uuid)
 
-            if user_result and user_result[0]:
-                logger.info(f"[DELETE DEBUG] User has Google Drive token, deleting from Drive...")
-                refresh_token_encrypted = user_result[0]
-                drive_success = drive_service.delete_document(
-                    refresh_token_encrypted=refresh_token_encrypted,
-                    drive_file_id=document.storage_file_id
-                )
-                if not drive_success:
-                    logger.warning(f"[DELETE DEBUG] ⚠️  Failed to delete from Google Drive: {document.storage_file_id}")
-                else:
-                    logger.info(f"[DELETE DEBUG] ✅ Deleted from Google Drive: {document.storage_file_id}")
+            if user and user.active_storage_provider:
+                logger.info(f"[DELETE DEBUG] User has active storage provider ({user.active_storage_provider}), deleting from storage...")
+                try:
+                    storage_success = document_storage_service.delete_document(
+                        user=user,
+                        file_id=document.storage_file_id,
+                        db=session,
+                        provider_type=document.storage_provider_type
+                    )
+                    if not storage_success:
+                        logger.warning(f"[DELETE DEBUG] ⚠️  Failed to delete from {document.storage_provider_type}: {document.storage_file_id}")
+                    else:
+                        logger.info(f"[DELETE DEBUG] ✅ Deleted from {document.storage_provider_type}: {document.storage_file_id}")
+                except Exception as e:
+                    logger.warning(f"[DELETE DEBUG] ⚠️  Error deleting from storage: {e}")
             else:
-                logger.warning(f"[DELETE DEBUG] ⚠️  User {user_id} has no Google Drive connection, skipping Drive deletion")
+                logger.warning(f"[DELETE DEBUG] ⚠️  User {user_id} has no active storage provider, skipping storage deletion")
 
             old_values = {
                 "title": document.title,
