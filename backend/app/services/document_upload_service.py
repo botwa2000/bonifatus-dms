@@ -27,6 +27,7 @@ from app.services.drive_service import drive_service
 from app.services.document_storage_service import document_storage_service
 from app.services.ml_learning_service import ml_learning_service
 from app.services.config_service import config_service
+from app.services.provider_manager import ProviderManager
 
 logger = logging.getLogger(__name__)
 
@@ -176,33 +177,26 @@ class DocumentUploadService:
                 logger.error(f"User {user_id} not found")
                 raise ValueError("User not found")
 
-            # Determine storage provider (use active_storage_provider or default to google_drive)
-            storage_provider = user.active_storage_provider or 'google_drive'
+            # Use new ProviderConnection system to get active provider
+            active_provider_conn = ProviderManager.get_active_provider(session, user)
 
-            # Provider-agnostic token field mapping (add new providers here)
-            provider_token_fields = {
-                'google_drive': 'drive_refresh_token_encrypted',
-                'onedrive': 'onedrive_refresh_token_encrypted',
-                'dropbox': 'dropbox_refresh_token_encrypted',
-                'box': 'box_refresh_token_encrypted'
-            }
+            # If no active provider, try to find ANY enabled provider
+            if not active_provider_conn:
+                enabled_providers = ProviderManager.get_enabled_providers(session, user)
+                if enabled_providers:
+                    # Use the first enabled provider
+                    storage_provider = enabled_providers[0]
+                    logger.info(f"No active provider set, using first enabled provider: {storage_provider}")
+                    # Set it as active for future uploads
+                    ProviderManager.set_active_provider(session, user, storage_provider)
+                    active_provider_conn = ProviderManager.get_active_provider(session, user)
+                else:
+                    # No providers connected at all
+                    logger.error(f"User {user_email} has no cloud storage providers connected")
+                    raise ValueError("Please connect a cloud storage provider (Google Drive, OneDrive, Dropbox, or Box) in Settings before uploading documents")
 
-            # Get the appropriate refresh token based on provider
-            token_field = provider_token_fields.get(storage_provider)
-            if not token_field:
-                raise ValueError(f"Unsupported storage provider: {storage_provider}")
-
-            refresh_token_encrypted = getattr(user, token_field, None)
-            if not refresh_token_encrypted:
-                provider_display_names = {
-                    'google_drive': 'Google Drive',
-                    'onedrive': 'OneDrive',
-                    'dropbox': 'Dropbox',
-                    'box': 'Box'
-                }
-                provider_name = provider_display_names.get(storage_provider, storage_provider)
-                logger.error(f"User {user_email} has not connected {provider_name}")
-                raise ValueError(f"Please connect your {provider_name} account in Settings before uploading documents")
+            storage_provider = active_provider_conn.provider_key
+            logger.info(f"Using storage provider: {storage_provider}")
 
             # Get category info for folder structure using USER'S preferred language
             # NOT the document's detected language - folders should be in user's language!
