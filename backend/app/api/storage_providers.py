@@ -419,11 +419,22 @@ async def provider_oauth_callback(
                         migration_id=migration_id,
                         user_id=str(current_user.id)
                     )
+
+                    # Save Celery task ID to migration record
+                    migration.celery_task_id = task.id
+                    db.commit()
                     logger.info(f"✅ Queued migration task: {task.id}")
 
                 except Exception as migration_error:
                     logger.error(f"⚠️ Failed to create migration task: {migration_error}", exc_info=True)
-                    # Don't fail the connection if migration creation fails
+                    # Update migration status to failed if Celery task couldn't be queued
+                    try:
+                        if 'migration' in locals() and migration:
+                            migration.status = 'failed'
+                            migration.error_message = f"Failed to queue migration task: {str(migration_error)}"
+                            db.commit()
+                    except:
+                        pass  # Best effort - don't fail the connection if this fails
 
             elif migration_choice == 'fresh' and old_provider:
                 # Disconnect old provider using ProviderManager
