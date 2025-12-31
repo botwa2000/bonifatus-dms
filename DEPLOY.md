@@ -150,29 +150,34 @@ ssh root@91.99.212.17 'docker secret ls'
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
-  echo "=== [1/7] Pulling latest code ===" && \
+  echo "=== [1/8] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/7] Building images ===" && \
+  echo "=== [2/8] Building images ===" && \
   docker compose -f docker-compose-dev.yml build && \
-  echo "=== [3/7] Deploying to Docker Swarm ===" && \
+  echo "=== [3/8] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
-  echo "=== [4/7] Waiting for services to start (30s) ===" && \
+  echo "=== [4/8] Forcing celery-worker update ===" && \
+  docker service update --force bonifatus-dev_celery-worker && \
+  echo "=== [5/8] Waiting for services to start (30s) ===" && \
   sleep 30 && \
-  echo "=== [5/7] Running migrations ===" && \
+  echo "=== [6/8] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [6/7] Health check ===" && \
+  echo "=== [7/8] Health check ===" && \
   curl -s https://api-dev.bonidoc.com/health && echo "" && \
-  echo "=== [7/7] Service status ===" && \
+  echo "=== [8/8] Service status ===" && \
   docker stack ps bonifatus-dev --no-trunc | head -10'
 ```
 
 **Expected Output:**
-- All 7 steps complete without errors
+- All 8 steps complete without errors
 - Backend health returns: `{"status":"healthy","environment":"development"}`
 - Services show "Running" state
+- Celery worker updated with latest code
 
 **Time:** ~3-5 minutes
+
+**CRITICAL:** Always force-update celery-worker service to ensure it has the latest code changes!
 
 **Note:** If the new container hasn't started yet after 30 seconds, wait an additional 10-20 seconds before running migrations.
 
@@ -189,29 +194,32 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
-  echo "=== [1/7] Pulling latest code ===" && \
+  echo "=== [1/8] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/7] Building images ===" && \
+  echo "=== [2/8] Building images ===" && \
   docker compose build && \
-  echo "=== [3/7] Verifying secrets exist ===" && \
+  echo "=== [3/8] Verifying secrets exist ===" && \
   docker secret ls | grep -E "database_url_prod|security_secret_key_prod|encryption_key_prod" && \
-  echo "=== [4/7] Deploying to Docker Swarm ===" && \
+  echo "=== [4/8] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose.yml bonifatus && \
-  echo "=== [5/7] Waiting for services to start (40s) ===" && \
+  echo "=== [5/8] Forcing celery-worker update ===" && \
+  docker service update --force bonifatus_celery-worker && \
+  echo "=== [6/8] Waiting for services to start (40s) ===" && \
   sleep 40 && \
-  echo "=== [6/7] Running migrations ===" && \
+  echo "=== [7/8] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [7/7] Health check ===" && \
+  echo "=== [8/8] Health check ===" && \
   curl -s https://api.bonidoc.com/health && echo "" && \
   docker stack ps bonifatus --no-trunc | head -10'
 ```
 
 **Expected Output:**
 ```
-✓ All 7 steps complete
+✓ All 8 steps complete
 ✓ Services show "Running" state in docker stack ps
 ✓ Backend health: {"status":"healthy","environment":"production"}
+✓ Celery worker updated with latest code
 ✓ No migration errors
 ```
 
@@ -237,6 +245,7 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
   git pull origin main && \
   docker compose -f docker-compose-dev.yml build && \
   docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
+  docker service update --force bonifatus-dev_celery-worker && \
   sleep 30 && \
   CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
@@ -245,7 +254,7 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 # Step 2: TEST ON DEV
 # Open https://dev.bonidoc.com and verify:
 # - Login works
-# - Document upload works
+# - Document upload works (tests celery-worker)
 # - All new features work as expected
 # - Check browser console for errors
 
@@ -254,6 +263,7 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
   git pull origin main && \
   docker compose build && \
   docker stack deploy -c docker-compose.yml bonifatus && \
+  docker service update --force bonifatus_celery-worker && \
   sleep 40 && \
   CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
