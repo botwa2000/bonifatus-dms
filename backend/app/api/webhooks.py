@@ -375,6 +375,7 @@ async def handle_subscription_created(event, session: Session):
             success, processing_email, error = email_processing_service.auto_enable_email_processing_for_pro_user(str(user.id))
 
             if success:
+                session.commit()  # Commit email processing changes
                 logger.info(f"[WEBHOOK] ✓ Auto-enabled email processing for Pro user {user.email}: {processing_email}")
             else:
                 logger.error(f"[WEBHOOK] Failed to auto-enable email processing for user {user.email}: {error}")
