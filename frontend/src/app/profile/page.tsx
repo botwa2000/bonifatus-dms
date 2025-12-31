@@ -617,7 +617,7 @@ export default function ProfilePage() {
                     const tierSupportsEmailProcessing = userTier?.email_to_process_enabled
 
                     if (tierSupportsEmailProcessing && profile.email_processing_enabled && profile.email_processing_address) {
-                      // Pro/Premium user with email processing enabled - show processing email
+                      // User with email processing enabled - show processing email
                       return (
                         <InfoRow label="Document Processing Email" value={
                           <>
@@ -631,6 +631,29 @@ export default function ProfilePage() {
                               Only emails from your registered account email are accepted.
                             </p>
                           </>
+                        } />
+                      )
+                    } else if (!tierSupportsEmailProcessing) {
+                      // User's tier doesn't support email processing - show upgrade prompt
+                      return (
+                        <InfoRow label="Email-to-Process" value={
+                          <div className="opacity-60">
+                            <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                              <span>Feature locked</span>
+                            </div>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
+                              Email documents directly for automatic processing
+                            </p>
+                            <button
+                              onClick={() => router.push('/billing')}
+                              className="mt-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                            >
+                              Upgrade to unlock
+                            </button>
+                          </div>
                         } />
                       )
                     }
