@@ -1,2 +1,3 @@
 - add to memory
 - avoid hard coded elements in the code. any definitions are to be made either in centralized config files or environmental variables
+- NEVER apply fixes or changes to individual user accounts or records. Always fix issues at the system/code level so the solution works for ALL users automatically. Manual user account modifications are prohibited except when explicitly requested by the user for testing/debugging purposes
