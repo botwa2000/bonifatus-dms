@@ -13,14 +13,15 @@
 
 | Environment | Directory | URL | API URL | Deployment Mode |
 |------------|-----------|-----|---------|----------------|
-| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | Docker Compose (.env files) |
-| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | Docker Swarm (Secrets) |
+| **Dev** | `/opt/bonifatus-dms-dev` | https://dev.bonidoc.com | https://api-dev.bonidoc.com | Docker Swarm (dev secrets) |
+| **Prod** | `/opt/bonifatus-dms` | https://bonidoc.com | https://api.bonidoc.com | Docker Swarm (prod secrets) |
 
 **Server IP:** 91.99.212.17 (see HETZNER_SETUP_ACTUAL.md)
 
 **Key Differences:**
-- **Dev:** Uses Docker Compose with `.env` files (traditional approach)
-- **Prod:** Uses Docker Swarm with encrypted secrets (production-grade security)
+- **Dev:** Uses Docker Swarm with `_dev` suffixed secrets (e.g., `database_url_dev`)
+- **Prod:** Uses Docker Swarm with `_prod` suffixed secrets (e.g., `database_url_prod`)
+- **Both:** Deploy using `docker stack deploy`, run migrations inside running containers
 
 ---
 
@@ -143,91 +144,86 @@ ssh root@91.99.212.17 'docker secret ls'
 
 ## ONE-COMMAND DEPLOYMENT SEQUENCES
 
-### Deploy to DEV (Docker Compose - Traditional)
+### Deploy to DEV (Docker Swarm)
 
-**DEV still uses Docker Compose with .env files (no changes):**
+**DEV uses Docker Swarm with _dev suffixed secrets:**
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
-  echo "=== [1/8] Pulling latest code ===" && \
+  echo "=== [1/7] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/8] Building containers ===" && \
-  docker compose build && \
-  echo "=== [3/8] Stopping containers ===" && \
-  docker compose down && \
-  echo "=== [4/8] Running migrations ===" && \
-  docker compose run --rm backend alembic upgrade head && \
-  echo "=== [5/8] Starting containers ===" && \
-  docker compose up -d && \
-  sleep 10 && \
-  echo "=== [6/8] Reloading nginx ===" && \
-  nginx -t && systemctl reload nginx && \
-  echo "=== [7/8] Health checks ===" && \
-  docker compose ps && \
-  echo "" && \
-  curl -s https://api-dev.bonidoc.com/health && \
-  echo "" && \
-  echo "=== [8/8] Backend logs ===" && \
-  docker logs bonifatus-backend-dev --tail 20'
+  echo "=== [2/7] Building images ===" && \
+  docker compose -f docker-compose-dev.yml build && \
+  echo "=== [3/7] Deploying to Docker Swarm ===" && \
+  docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
+  echo "=== [4/7] Waiting for services to start (30s) ===" && \
+  sleep 30 && \
+  echo "=== [5/7] Running migrations ===" && \
+  CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
+  docker exec $CONTAINER alembic upgrade head && \
+  echo "=== [6/7] Health check ===" && \
+  curl -s https://api-dev.bonidoc.com/health && echo "" && \
+  echo "=== [7/7] Service status ===" && \
+  docker stack ps bonifatus-dev --no-trunc | head -10'
 ```
 
 **Expected Output:**
-- All 8 steps complete without errors
+- All 7 steps complete without errors
 - Backend health returns: `{"status":"healthy","environment":"development"}`
+- Services show "Running" state
 
 **Time:** ~3-5 minutes
 
+**Note:** If the new container hasn't started yet after 30 seconds, wait an additional 10-20 seconds before running migrations.
+
 ---
 
-### Deploy to PROD (Docker Swarm - Secrets)
+### Deploy to PROD (Docker Swarm)
 
 **⚠️ PRODUCTION DEPLOYMENT - Uses Docker Swarm with encrypted secrets!**
 
 **Prerequisites:**
 - Docker Swarm initialized (see "First-Time Setup" above)
-- All 14 secrets created (verify with `docker secret ls`)
+- All 14 `_prod` suffixed secrets created (verify with `docker secret ls`)
 - Dev deployment tested successfully
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
-  echo "=== [1/9] Pulling latest code ===" && \
+  echo "=== [1/7] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/9] Building images ===" && \
+  echo "=== [2/7] Building images ===" && \
   docker compose build && \
-  echo "=== [3/9] Verifying secrets exist ===" && \
-  docker secret ls | grep -E "database_url|security_secret_key|encryption_key" && \
-  echo "=== [4/9] Running migrations (before stack deploy) ===" && \
-  docker compose run --rm backend alembic upgrade head && \
-  echo "=== [5/9] Stopping old docker-compose services ===" && \
-  docker compose down 2>/dev/null || echo "No compose services running" && \
-  echo "=== [6/9] Deploying to Docker Swarm ===" && \
+  echo "=== [3/7] Verifying secrets exist ===" && \
+  docker secret ls | grep -E "database_url_prod|security_secret_key_prod|encryption_key_prod" && \
+  echo "=== [4/7] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose.yml bonifatus && \
-  echo "=== [7/9] Waiting for services to start (30s) ===" && \
-  sleep 30 && \
-  echo "=== [8/9] Health checks ===" && \
-  docker stack ps bonifatus && \
-  echo "" && \
-  curl -s https://api.bonidoc.com/health && \
-  echo "" && \
-  echo "=== [9/9] Service logs ===" && \
-  docker service logs bonifatus_backend --tail 20 --raw'
+  echo "=== [5/7] Waiting for services to start (40s) ===" && \
+  sleep 40 && \
+  echo "=== [6/7] Running migrations ===" && \
+  CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
+  docker exec $CONTAINER alembic upgrade head && \
+  echo "=== [7/7] Health check ===" && \
+  curl -s https://api.bonidoc.com/health && echo "" && \
+  docker stack ps bonifatus --no-trunc | head -10'
 ```
 
 **Expected Output:**
 ```
-✓ All 9 steps complete
+✓ All 7 steps complete
 ✓ Services show "Running" state in docker stack ps
 ✓ Backend health: {"status":"healthy","environment":"production"}
-✓ Logs show: "Loaded secret 'database_url' from Docker Swarm"
+✓ No migration errors
 ```
 
 **Time:** ~4-6 minutes (Swarm rolling update adds time)
 
-**What's Different from Docker Compose:**
-- `docker stack deploy` instead of `docker compose up -d`
-- Rolling updates (zero downtime)
+**Key Points:**
+- `docker stack deploy` for zero-downtime rolling updates
+- Migrations run AFTER deployment in running container
 - Secrets loaded from `/run/secrets/` (encrypted tmpfs)
-- Services named `bonifatus_backend` instead of `bonifatus-backend`
+- Services named `bonifatus_backend` (underscore, not dash)
+
+**Note:** If health check returns 502, wait an additional 10-20 seconds for the new container to finish starting, then re-check.
 
 ---
 
@@ -239,12 +235,12 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
 # Step 1: Deploy to DEV
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
   git pull origin main && \
-  docker compose build && \
-  docker compose down && \
-  docker compose run --rm backend alembic upgrade head && \
-  docker compose up -d && \
-  sleep 10 && \
-  nginx -t && systemctl reload nginx'
+  docker compose -f docker-compose-dev.yml build && \
+  docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
+  sleep 30 && \
+  CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
+  docker exec $CONTAINER alembic upgrade head && \
+  curl -s https://api-dev.bonidoc.com/health'
 
 # Step 2: TEST ON DEV
 # Open https://dev.bonidoc.com and verify:
@@ -257,10 +253,11 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
   git pull origin main && \
   docker compose build && \
-  docker compose run --rm backend alembic upgrade head && \
-  docker compose down 2>/dev/null || true && \
   docker stack deploy -c docker-compose.yml bonifatus && \
-  sleep 30'
+  sleep 40 && \
+  CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
+  docker exec $CONTAINER alembic upgrade head && \
+  curl -s https://api.bonidoc.com/health'
 
 # Step 4: VERIFY PROD
 # Open https://bonidoc.com and verify deployment was successful
@@ -268,18 +265,19 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
 
 ---
 
-## Docker Swarm vs Docker Compose Commands
+## Docker Swarm Commands Reference
 
 ### Service Management
 
-| Task | Docker Compose | Docker Swarm |
-|------|---------------|--------------|
-| Deploy | `docker compose up -d` | `docker stack deploy -c docker-compose.yml bonifatus` |
-| Stop | `docker compose down` | `docker stack rm bonifatus` |
-| Logs | `docker logs bonifatus-backend` | `docker service logs bonifatus_backend` |
-| Status | `docker compose ps` | `docker stack ps bonifatus` |
-| Restart service | `docker compose restart backend` | `docker service update --force bonifatus_backend` |
-| Scale | `docker compose up -d --scale backend=2` | `docker service scale bonifatus_backend=2` |
+| Task | Dev (bonifatus-dev) | Prod (bonifatus) |
+|------|---------------------|------------------|
+| Deploy | `docker stack deploy -c docker-compose-dev.yml bonifatus-dev` | `docker stack deploy -c docker-compose.yml bonifatus` |
+| Stop | `docker stack rm bonifatus-dev` | `docker stack rm bonifatus` |
+| Logs | `docker service logs bonifatus-dev_backend` | `docker service logs bonifatus_backend` |
+| Status | `docker stack ps bonifatus-dev` | `docker stack ps bonifatus` |
+| Restart service | `docker service update --force bonifatus-dev_backend` | `docker service update --force bonifatus_backend` |
+| Scale | `docker service scale bonifatus-dev_backend=2` | `docker service scale bonifatus_backend=2` |
+| List services | `docker stack services bonifatus-dev` | `docker stack services bonifatus` |
 
 ### Secret Management
 
@@ -330,8 +328,9 @@ ssh root@91.99.212.17 'docker service logs bonifatus_backend --tail 100 | grep "
 ### Service Status
 
 ```bash
-# Dev
-ssh root@91.99.212.17 'docker compose -f /opt/bonifatus-dms-dev/docker-compose.yml ps'
+# Dev (Swarm)
+ssh root@91.99.212.17 'docker stack ps bonifatus-dev'
+ssh root@91.99.212.17 'docker stack services bonifatus-dev'
 
 # Prod (Swarm)
 ssh root@91.99.212.17 'docker stack ps bonifatus'
@@ -341,11 +340,12 @@ ssh root@91.99.212.17 'docker stack services bonifatus'
 ### Database Health
 
 ```bash
-# Dev
-docker exec bonifatus-backend-dev alembic current
+# Dev (Swarm - find container ID)
+CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1)
+docker exec $CONTAINER alembic current
 
-# Prod (Swarm - need to find container ID)
-CONTAINER=$(docker ps | grep bonifatus_backend | awk '{print $1}' | head -1)
+# Prod (Swarm - find container ID)
+CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1)
 docker exec $CONTAINER alembic current
 ```
 
@@ -391,17 +391,25 @@ docker exec $CONTAINER alembic downgrade <revision>
 
 ### Rollback Dev
 
-Same as before (uses Docker Compose):
+Uses Docker Swarm (same as prod):
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
-  git log --oneline -10'
-# Note the commit hash, then:
-ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
-  git reset --hard <commit-hash> && \
-  docker compose build && \
-  docker compose up -d && \
-  nginx -t && systemctl reload nginx'
+  echo "=== Finding last working commit ===" && \
+  git log --oneline -10 && \
+  echo "" && \
+  read -p "Enter commit hash to rollback to: " COMMIT && \
+  echo "=== Rolling back code ===" && \
+  git reset --hard $COMMIT && \
+  echo "=== Rebuilding images ===" && \
+  docker compose -f docker-compose-dev.yml build && \
+  echo "=== Redeploying to Swarm ===" && \
+  docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
+  echo "=== Waiting for rollout ===" && \
+  sleep 30 && \
+  echo "=== Verifying rollback ===" && \
+  curl https://api-dev.bonidoc.com/health && \
+  docker stack ps bonifatus-dev'
 ```
 
 ---
@@ -604,13 +612,16 @@ docker exec $CONTAINER ls -la /run/secrets/
 
 ## Notes
 
-- **Production uses Docker Swarm Secrets** (encrypted, secure)
-- **Dev still uses Docker Compose** (traditional .env files)
+- **Both Dev and Prod use Docker Swarm** (encrypted secrets, rolling updates)
+- **Dev uses `_dev` suffixed secrets** (e.g., `database_url_dev`)
+- **Prod uses `_prod` suffixed secrets** (e.g., `database_url_prod`)
 - **Secrets are encrypted at rest and in transit**
 - **Zero downtime deployments** (rolling updates in Swarm)
 - **Always test in dev first, then deploy to prod**
 - **Secret rotation requires service update** (no restart needed)
 - **Swarm initialized once, persists across reboots**
+- **Migrations run AFTER deployment** in running containers (not before)
+- **Use `-f docker-compose-dev.yml` for dev** to avoid using prod config
 
 ---
 
