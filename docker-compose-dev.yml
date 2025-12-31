@@ -176,7 +176,7 @@ services:
     build: ./backend
     image: bonifatus-celery-worker-dev:latest
     container_name: bonifatus-celery-worker-dev
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 -Q document_processing,storage_migration
     secrets:
       - database_url_dev
       - security_secret_key_dev
