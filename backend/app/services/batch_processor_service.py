@@ -166,7 +166,6 @@ class BatchProcessorService:
 
                         # CRITICAL: Update batch.results immediately so duplicate info is saved
                         batch.results = results
-                        from sqlalchemy.orm.attributes import flag_modified
                         flag_modified(batch, 'results')  # Mark JSONB field as modified
 
                         session.commit()
