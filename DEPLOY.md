@@ -150,30 +150,32 @@ ssh root@91.99.212.17 'docker secret ls'
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
-  echo "=== [1/8] Pulling latest code ===" && \
+  echo "=== [1/9] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/8] Building images ===" && \
+  echo "=== [2/9] Building images ===" && \
   docker compose -f docker-compose-dev.yml build && \
-  echo "=== [3/8] Deploying to Docker Swarm ===" && \
+  echo "=== [3/9] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
-  echo "=== [4/8] Forcing celery-worker update ===" && \
+  echo "=== [4/9] Forcing backend update ===" && \
+  docker service update --force bonifatus-dev_backend && \
+  echo "=== [5/9] Forcing celery-worker update ===" && \
   docker service update --force bonifatus-dev_celery-worker && \
-  echo "=== [5/8] Waiting for services to start (30s) ===" && \
+  echo "=== [6/9] Waiting for services to start (30s) ===" && \
   sleep 30 && \
-  echo "=== [6/8] Running migrations ===" && \
+  echo "=== [7/9] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [7/8] Health check ===" && \
+  echo "=== [8/9] Health check ===" && \
   curl -s https://api-dev.bonidoc.com/health && echo "" && \
-  echo "=== [8/8] Service status ===" && \
+  echo "=== [9/9] Service status ===" && \
   docker stack ps bonifatus-dev --no-trunc | head -10'
 ```
 
 **Expected Output:**
-- All 8 steps complete without errors
+- All 9 steps complete without errors
 - Backend health returns: `{"status":"healthy","environment":"development"}`
 - Services show "Running" state
-- Celery worker updated with latest code
+- Backend and celery worker updated with latest code
 
 **Time:** ~3-5 minutes
 
@@ -194,32 +196,34 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
 
 ```bash
 ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
-  echo "=== [1/8] Pulling latest code ===" && \
+  echo "=== [1/9] Pulling latest code ===" && \
   git pull origin main && \
-  echo "=== [2/8] Building images ===" && \
+  echo "=== [2/9] Building images ===" && \
   docker compose build && \
-  echo "=== [3/8] Verifying secrets exist ===" && \
+  echo "=== [3/9] Verifying secrets exist ===" && \
   docker secret ls | grep -E "database_url_prod|security_secret_key_prod|encryption_key_prod" && \
-  echo "=== [4/8] Deploying to Docker Swarm ===" && \
+  echo "=== [4/9] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose.yml bonifatus && \
-  echo "=== [5/8] Forcing celery-worker update ===" && \
+  echo "=== [5/9] Forcing backend update ===" && \
+  docker service update --force bonifatus_backend && \
+  echo "=== [6/9] Forcing celery-worker update ===" && \
   docker service update --force bonifatus_celery-worker && \
-  echo "=== [6/8] Waiting for services to start (40s) ===" && \
+  echo "=== [7/9] Waiting for services to start (40s) ===" && \
   sleep 40 && \
-  echo "=== [7/8] Running migrations ===" && \
+  echo "=== [8/9] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [8/8] Health check ===" && \
+  echo "=== [9/9] Health check ===" && \
   curl -s https://api.bonidoc.com/health && echo "" && \
   docker stack ps bonifatus --no-trunc | head -10'
 ```
 
 **Expected Output:**
 ```
-✓ All 8 steps complete
+✓ All 9 steps complete
 ✓ Services show "Running" state in docker stack ps
 ✓ Backend health: {"status":"healthy","environment":"production"}
-✓ Celery worker updated with latest code
+✓ Backend and celery worker updated with latest code
 ✓ No migration errors
 ```
 
