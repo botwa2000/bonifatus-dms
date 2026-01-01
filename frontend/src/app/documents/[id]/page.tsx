@@ -73,6 +73,7 @@ export default function DocumentDetailPage() {
   const [newEntityType, setNewEntityType] = useState('ORGANIZATION')
   const [isSaving, setIsSaving] = useState(false)
   const [deletingDocument, setDeletingDocument] = useState(false)
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
   useEffect(() => {
     loadUser()
@@ -272,6 +273,39 @@ export default function DocumentDetailPage() {
     setEditedEntities(editedEntities.filter(e =>
       !(e.type === entity.type && e.value === entity.value)
     ))
+  }
+
+  const handlePreview = async () => {
+    if (!document) return
+
+    try {
+      setLoadingPreview(true)
+      setError(null)
+
+      // Fetch document content with proper error handling
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/content`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to load document preview' }))
+        throw new Error(errorData.detail || 'Failed to load document preview')
+      }
+
+      // Create blob and open in new tab
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      window.open(blobUrl, '_blank')
+    } catch (err: any) {
+      setError(err.message || 'Failed to load document preview')
+      logger.error('Preview error:', err)
+    } finally {
+      setLoadingPreview(false)
+    }
   }
 
   const handleDeleteDocument = async () => {
@@ -868,13 +902,14 @@ export default function DocumentDetailPage() {
                 <Button
                   variant="primary"
                   className="w-full space-x-2"
-                  onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${documentId}/content`, '_blank')}
+                  onClick={handlePreview}
+                  disabled={loadingPreview}
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  <span>Preview</span>
+                  <span>{loadingPreview ? 'Loading...' : 'Preview'}</span>
                 </Button>
 
                 <Button

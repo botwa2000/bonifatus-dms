@@ -529,9 +529,10 @@ async def download_document(
                 detail="Document not found"
             )
 
-        # Get document owner's Google Drive credentials (for delegate access)
+        # Get document owner's storage provider credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
         from app.database.models import Document as DocumentModel
+        from app.services.document_storage_service import document_storage_service
         from sqlalchemy import select
         db_session = next(get_db_direct())
 
@@ -551,15 +552,24 @@ async def download_document(
             select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
-        if not owner or not owner.drive_refresh_token_encrypted:
+        if not owner:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document owner not found"
             )
 
-        file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
-            drive_file_id=document.google_drive_file_id
+        # Check if owner has any active storage provider using ProviderConnection
+        if not document_storage_service.get_active_provider(owner):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The document owner has not connected a cloud storage provider. Please contact the document owner."
+            )
+
+        # Use provider-agnostic download service
+        file_content_bytes = document_storage_service.download_document(
+            user=owner,
+            file_id=document.google_drive_file_id,
+            db=db_session
         )
 
         if not file_content_bytes:
@@ -615,9 +625,10 @@ async def get_document_content(
                 detail="Document not found"
             )
 
-        # Get document owner's Google Drive credentials (for delegate access)
+        # Get document owner's storage provider credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
         from app.database.models import Document as DocumentModel
+        from app.services.document_storage_service import document_storage_service
         from sqlalchemy import select
         db_session = next(get_db_direct())
 
@@ -637,15 +648,24 @@ async def get_document_content(
             select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
-        if not owner or not owner.drive_refresh_token_encrypted:
+        if not owner:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document owner not found"
             )
 
-        file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
-            drive_file_id=document.google_drive_file_id
+        # Check if owner has any active storage provider using ProviderConnection
+        if not document_storage_service.get_active_provider(owner):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The document owner has not connected a cloud storage provider. Please contact the document owner."
+            )
+
+        # Use provider-agnostic download service
+        file_content_bytes = document_storage_service.download_document(
+            user=owner,
+            file_id=document.google_drive_file_id,
+            db=db_session
         )
 
         if not file_content_bytes:
@@ -747,9 +767,10 @@ async def reprocess_document(
                 detail="Document not found"
             )
 
-        # Get document owner's Google Drive credentials (for delegate access)
+        # Get document owner's storage provider credentials (for delegate access)
         from app.database.connection import get_db as get_db_direct
         from app.database.models import Document as DocumentModel
+        from app.services.document_storage_service import document_storage_service
         from sqlalchemy import select
         db_session = next(get_db_direct())
 
@@ -769,16 +790,24 @@ async def reprocess_document(
             select(User).where(User.id == doc_model.user_id)
         ).scalar_one_or_none()
 
-        if not owner or not owner.drive_refresh_token_encrypted:
+        if not owner:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="The document owner has not connected their Google Drive account. Please contact the document owner."
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document owner not found"
             )
 
-        # Download document content
-        file_content_bytes = drive_service.download_document(
-            refresh_token_encrypted=owner.drive_refresh_token_encrypted,
-            drive_file_id=document.google_drive_file_id
+        # Check if owner has any active storage provider using ProviderConnection
+        if not document_storage_service.get_active_provider(owner):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The document owner has not connected a cloud storage provider. Please contact the document owner."
+            )
+
+        # Download document content using provider-agnostic service
+        file_content_bytes = document_storage_service.download_document(
+            user=owner,
+            file_id=document.google_drive_file_id,
+            db=db_session
         )
 
         if not file_content_bytes:
