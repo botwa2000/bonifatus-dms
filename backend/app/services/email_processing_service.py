@@ -78,10 +78,15 @@ class EmailProcessingService:
             if not user:
                 return False, None, "User not found"
 
-            # Check if already enabled
+            # Check if already enabled AND has valid format
             if user.email_processing_enabled and user.email_processing_address:
-                logger.info(f"Email processing already enabled for user {user_id}")
-                return True, user.email_processing_address, None
+                # Validate email format - must be {token}@doc.bonidoc.com
+                if self.is_doc_email(user.email_processing_address):
+                    logger.info(f"Email processing already enabled for user {user_id}")
+                    return True, user.email_processing_address, None
+                else:
+                    # Invalid format detected - regenerate
+                    logger.warning(f"Invalid email format detected for user {user_id}: {user.email_processing_address}. Regenerating...")
 
             # Generate unique processing email address
             max_attempts = 10
