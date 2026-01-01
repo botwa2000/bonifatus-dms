@@ -120,6 +120,10 @@ class OneDriveProvider(StorageProvider):
             tokens = response.json()
             return tokens['access_token']
 
+        except RuntimeError as e:
+            # Token decryption failed
+            logger.error(f"Token decryption failed for OneDrive: {e}")
+            raise ValueError("Cloud storage connection is invalid. Please disconnect and reconnect your cloud storage in Settings")
         except Exception as e:
             logger.error(f"Failed to refresh OneDrive access token: {e}")
             raise

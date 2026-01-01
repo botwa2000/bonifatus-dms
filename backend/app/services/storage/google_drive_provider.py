@@ -64,6 +64,10 @@ class GoogleDriveProvider(StorageProvider):
             service = build('drive', 'v3', credentials=credentials)
             return service
 
+        except RuntimeError as e:
+            # Token decryption failed - likely encryption key mismatch or corrupted data
+            logger.error(f"Token decryption failed for Google Drive: {e}")
+            raise ValueError("Cloud storage connection is invalid. Please disconnect and reconnect your cloud storage in Settings")
         except Exception as e:
             logger.error(f"Failed to create Drive service: {e}")
             raise
@@ -153,6 +157,10 @@ class GoogleDriveProvider(StorageProvider):
             tokens = response.json()
             return tokens['access_token']
 
+        except RuntimeError as e:
+            # Token decryption failed
+            logger.error(f"Token decryption failed during refresh: {e}")
+            raise ValueError("Cloud storage connection is invalid. Please disconnect and reconnect your cloud storage in Settings")
         except Exception as e:
             logger.error(f"Failed to refresh access token: {e}")
             raise
