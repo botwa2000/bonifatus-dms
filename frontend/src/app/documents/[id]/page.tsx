@@ -300,8 +300,9 @@ export default function DocumentDetailPage() {
       const blob = await response.blob()
       const blobUrl = URL.createObjectURL(blob)
       window.open(blobUrl, '_blank')
-    } catch (err: any) {
-      setError(err.message || 'Failed to load document preview')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load document preview'
+      setError(errorMessage)
       logger.error('Preview error:', err)
     } finally {
       setLoadingPreview(false)
