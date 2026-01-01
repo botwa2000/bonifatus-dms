@@ -51,7 +51,8 @@ class DocumentStorageService:
         """
         token = ProviderManager.get_token(db, user, provider_type)
         if not token:
-            raise ValueError(f"User has not connected {provider_type}")
+            # Generic error message - don't mention specific provider
+            raise ValueError("Cloud storage provider connection not found. Please reconnect your cloud storage in Settings")
 
         return token
 

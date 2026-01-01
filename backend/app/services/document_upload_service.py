@@ -236,7 +236,8 @@ class DocumentUploadService:
                 filename=standardized_filename,
                 mime_type=mime_type,
                 db=session,
-                folder_id=category_folder_id
+                folder_id=category_folder_id,
+                provider_type=storage_provider  # Pass determined provider explicitly
             )
 
             if not upload_result:

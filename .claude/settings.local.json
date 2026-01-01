@@ -16,7 +16,9 @@
       "Bash(alembic history:*)",
       "Bash(ls:*)",
       "Bash(docker exec:*)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(grep:*)",
+      "Bash(curl:*)"
     ]
   }
 }
