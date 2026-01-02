@@ -6,6 +6,7 @@ Email service using Brevo (Sendinblue) API for transactional emails
 import logging
 import httpx
 from typing import Optional, Dict, Any
+from datetime import datetime
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.email_template_service import email_template_service
@@ -1307,6 +1308,77 @@ class EmailService:
             from_email=email_data.get('from_email', settings.email.email_from_noreply),
             reply_to=settings.email.email_from_noreply
         )
+
+    async def send_system_alert_email(
+        self,
+        to_email: str,
+        to_name: str,
+        subject: str,
+        message: str
+    ) -> bool:
+        """
+        Send system alert email to admin
+
+        Args:
+            to_email: Admin email address
+            to_name: Admin name
+            subject: Alert subject
+            message: Alert message body
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
+                    .content {{ background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }}
+                    .alert-box {{ background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0; }}
+                    .footer {{ text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0;">🚨 System Alert</h1>
+                    </div>
+                    <div class="content">
+                        <h2>{subject}</h2>
+                        <div class="alert-box">
+                            <p><strong>Alert Details:</strong></p>
+                            <p>{message}</p>
+                        </div>
+                        <p><strong>Time:</strong> {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC</p>
+                        <p>Please check the admin panel → System Health tab for more details and take appropriate action.</p>
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated system alert from BoniDoc DMS</p>
+                        <p>Do not reply to this email</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            return await self.send_email(
+                to_email=to_email,
+                to_name=to_name,
+                subject=f"[SYSTEM ALERT] {subject}",
+                html_content=html_content,
+                from_email=settings.email.email_from_noreply,
+                from_name="BoniDoc System Monitor"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send system alert email: {e}")
+            return False
 
 
 # Global email service instance

@@ -17,6 +17,7 @@ from app.database.models import User, TierPlan, UserStorageQuota, UserMonthlyUsa
 from app.database.connection import db_manager
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
+from app.services.email_poller_health_service import email_poller_health_service
 from app.services.tier_service import tier_service
 
 logger = logging.getLogger(__name__)
@@ -750,6 +751,65 @@ async def restart_clamav(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restart ClamAV: {str(e)}"
+        )
+
+
+@router.get("/health/email-poller")
+async def get_email_poller_health(
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Get email poller service health status
+
+    Admin only endpoint to monitor email polling service.
+    Checks IMAP connectivity, recent activity, and polling status.
+    """
+    try:
+        health = await email_poller_health_service.check_health()
+
+        logger.info(f"Admin {current_user.email} checked email poller health: {health['status']}")
+
+        return health
+
+    except Exception as e:
+        logger.error(f"Error checking email poller health: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to check email poller health"
+        )
+
+
+@router.post("/health/email-poller/poll-now")
+async def trigger_email_poll(
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Manually trigger email polling immediately
+
+    Admin only endpoint to force an immediate email poll.
+    Useful for debugging or when urgent email processing is needed.
+    """
+    try:
+        result = await email_poller_health_service.trigger_manual_poll()
+
+        logger.warning(f"Admin {current_user.email} triggered manual email poll: {result}")
+
+        if result['success']:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=result
+            )
+        else:
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content=result
+            )
+
+    except Exception as e:
+        logger.error(f"Error triggering email poll: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger email poll: {str(e)}"
         )
 
 

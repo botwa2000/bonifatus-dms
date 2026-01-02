@@ -347,3 +347,116 @@ async def get_processing_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch processing history"
         )
+
+
+@router.post("/poll-now")
+async def poll_inbox_now(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger email inbox polling immediately
+    Useful for debugging or when user wants immediate processing
+    """
+    try:
+        from app.tasks.email_poller import run_poll_now
+
+        logger.info(f"Manual email poll triggered by user {current_user.email}")
+
+        # Run poll task asynchronously
+        await run_poll_now()
+
+        return {
+            "success": True,
+            "message": "Email polling completed. Check processing history for results.",
+            "timestamp": "now"
+        }
+
+    except Exception as e:
+        logger.error(f"Error during manual email poll: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Email polling failed: {str(e)}"
+        )
+
+
+@router.get("/diagnostics")
+async def get_email_diagnostics(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get diagnostic information about email processing setup
+    Helps debug email ingestion issues
+    """
+    try:
+        from app.core.config import settings
+        from app.database.auth_models import EmailSettings, AllowedSender
+
+        # Get user's email settings
+        email_settings = db.query(EmailSettings).filter(
+            EmailSettings.user_id == current_user.id
+        ).first()
+
+        # Get allowed senders
+        allowed_senders = db.query(AllowedSender).filter(
+            AllowedSender.user_id == current_user.id,
+            AllowedSender.is_active == True
+        ).all()
+
+        # Get recent processing logs
+        recent_logs = db.query(EmailProcessingLog).filter(
+            EmailProcessingLog.user_id == current_user.id
+        ).order_by(EmailProcessingLog.received_at.desc()).limit(5).all()
+
+        # Get latest log entry
+        latest_log = recent_logs[0] if recent_logs else None
+
+        diagnostics = {
+            "user_info": {
+                "user_id": str(current_user.id),
+                "email": current_user.email,
+                "tier": current_user.tier.name if current_user.tier else "Unknown",
+                "email_processing_enabled": current_user.email_processing_enabled,
+                "email_processing_address": current_user.email_processing_address
+            },
+            "settings": {
+                "polling_interval_seconds": settings.email_processing.polling_interval_seconds,
+                "max_attachment_size_mb": settings.email_processing.max_attachment_size_mb,
+                "max_attachments_per_email": settings.email_processing.max_attachments_per_email,
+                "imap_host": settings.email_processing.imap_host,
+                "imap_port": settings.email_processing.imap_port,
+                "doc_domain": settings.email_processing.doc_domain
+            },
+            "user_settings": {
+                "exists": email_settings is not None,
+                "is_enabled": email_settings.is_enabled if email_settings else False,
+                "daily_limit": email_settings.daily_email_limit if email_settings else 0,
+                "auto_categorize": email_settings.auto_categorize if email_settings else False
+            },
+            "allowed_senders": {
+                "count": len(allowed_senders),
+                "senders": [s.sender_email for s in allowed_senders]
+            },
+            "recent_activity": {
+                "total_logs": len(recent_logs),
+                "latest_email_received": latest_log.received_at.isoformat() if latest_log else None,
+                "latest_status": latest_log.status if latest_log else None,
+                "latest_rejection_reason": latest_log.rejection_reason if latest_log else None,
+                "recent_statuses": [log.status for log in recent_logs]
+            },
+            "instructions": {
+                "send_emails_to": current_user.email_processing_address,
+                "allowed_senders": [s.sender_email for s in allowed_senders] if allowed_senders else ["No allowed senders configured!"],
+                "polling_interval": f"Emails are checked every {settings.email_processing.polling_interval_seconds} seconds"
+            }
+        }
+
+        return diagnostics
+
+    except Exception as e:
+        logger.error(f"Error generating email diagnostics: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate diagnostics: {str(e)}"
+        )

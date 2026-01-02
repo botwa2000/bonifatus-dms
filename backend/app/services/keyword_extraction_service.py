@@ -180,15 +180,17 @@ class KeywordExtractionService:
         min_frequency: int = 2,
         user_id: str = None,
         stopwords: set = None,
+        excluded_entities: set = None,
         rejected_entities: List[Dict] = None
     ) -> List[Tuple[str, int, float]]:
         """
         Extract keywords using HYBRID approach with TF-IDF scoring:
         1. Load category keywords FIRST (these must NEVER be filtered)
         2. Filter stopwords BUT preserve category keywords
-        3. Extract keywords with TF-IDF relevance scoring
-        4. Convert rejected entities to keywords (if provided)
-        5. Update corpus statistics for ML learning
+        3. Filter entity values to prevent duplication with entities
+        4. Extract keywords with TF-IDF relevance scoring
+        5. Convert rejected entities to keywords (if provided)
+        6. Update corpus statistics for ML learning
 
         This ensures important classification terms like "rechnung", "invoice" are
         ALWAYS extracted even if they appear only once or in stopwords.
@@ -201,6 +203,7 @@ class KeywordExtractionService:
             min_frequency: Minimum frequency for a keyword
             user_id: User ID to get their category keywords and personalized IDF scores
             stopwords: Optional pre-loaded stopwords set (if None, loads from db for language)
+            excluded_entities: Set of entity values to exclude from keywords (prevents duplication)
             rejected_entities: List of entities rejected by quality service (e.g., low-confidence ORGs)
                               Format: [{'entity_value': 'PATIENT', 'entity_type': 'ORGANIZATION', 'confidence': 0.65}, ...]
 
@@ -264,6 +267,25 @@ class KeywordExtractionService:
             logger.info(f"[KEYWORD EXTRACTION] After stopword filtering: {len(filtered_tokens)} tokens (preserved {len(preserved_category_keywords)} category keywords)")
             if preserved_category_keywords:
                 logger.info(f"[KEYWORD EXTRACTION] Preserved category keywords found in text: {', '.join(preserved_category_keywords)}")
+
+            # STEP 3.5: Filter entity values to prevent duplication with entities
+            # Entities (emails, addresses, company names) should NOT appear in keywords
+            if excluded_entities:
+                entity_filtered_tokens = []
+                filtered_out_entities = []
+
+                for token in filtered_tokens:
+                    if token in excluded_entities:
+                        # Skip tokens that are already extracted as entities
+                        filtered_out_entities.append(token)
+                    else:
+                        entity_filtered_tokens.append(token)
+
+                if filtered_out_entities:
+                    logger.info(f"[KEYWORD EXTRACTION] Filtered out {len(filtered_out_entities)} entity values: {filtered_out_entities[:20]}")
+
+                filtered_tokens = entity_filtered_tokens
+                logger.info(f"[KEYWORD EXTRACTION] After entity filtering: {len(filtered_tokens)} tokens")
 
             # STEP 3.5: Spell check filter (preserve category keywords)
             # Remove obvious OCR garbage that aren't real words

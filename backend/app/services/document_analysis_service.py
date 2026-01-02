@@ -117,25 +117,14 @@ class DocumentAnalysisService:
                             f"preferred document languages. You can add it in Settings."
                         )
 
-            # MULTI-LANGUAGE CLASSIFICATION FIX:
-            # PHASE 1: Conservative multi-language stopword filtering
-            # Load stopwords from ALL user preferred languages to catch errors in language detection
-            user_preferred_languages = [detected_language]
-            if user_id:
-                from app.database.models import User
-                user = db.get(User, UUID(user_id))
-                if user and user.preferred_doc_languages:
-                    user_preferred_languages = user.preferred_doc_languages
-                    logger.info(f"[STOPWORD DEBUG] User preferred languages: {user_preferred_languages}")
+            # STOPWORD FILTERING:
+            # Use detected document language for stop word filtering, not user's preferred languages
+            # User preferences are for UI/OCR hints, not for filtering keywords in an already-detected document
+            logger.info(f"[STOPWORD DEBUG] Loading stopwords for detected document language: {detected_language}")
 
-            # Combine stopwords from all preferred languages
-            combined_stopwords = set()
-            for lang in user_preferred_languages:
-                lang_stopwords = keyword_extraction_service.get_stop_words(db, lang)
-                combined_stopwords.update(lang_stopwords)
-                logger.info(f"[STOPWORD DEBUG] Loaded {len(lang_stopwords)} stopwords for {lang}")
-
-            logger.info(f"[STOPWORD DEBUG] Combined {len(combined_stopwords)} stopwords from {len(user_preferred_languages)} languages")
+            # Load stopwords for the detected document language
+            combined_stopwords = keyword_extraction_service.get_stop_words(db, detected_language)
+            logger.info(f"[STOPWORD DEBUG] Loaded {len(combined_stopwords)} stopwords for language '{detected_language}'")
 
             # Extract named entities FIRST (people, organizations, addresses)
             # Request both accepted and rejected entities for keyword conversion
@@ -158,12 +147,26 @@ class DocumentAnalysisService:
             for ent in extracted_entities[:5]:  # Log first 5 entities
                 logger.info(f"[ENTITY DEBUG]   - {ent.entity_type}: {ent.entity_value} (confidence: {ent.confidence})")
 
-            # Extract keywords AFTER entity extraction to convert rejected entities
+            # Build exclusion set from accepted entities to prevent duplication in keywords
+            # Normalize entity values to match keyword tokenization (lowercase, split multi-word entities)
+            entity_exclusion_set = set()
+            for entity in extracted_entities:
+                # Add full entity value (for single-word entities like emails)
+                entity_exclusion_set.add(entity.entity_value.lower())
+
+                # Also add individual words from multi-word entities (e.g., "Acme Corp" → "acme", "corp")
+                entity_words = re.findall(r'\b[a-zа-яäöüß]{3,}\b', entity.entity_value.lower(), re.IGNORECASE)
+                entity_exclusion_set.update(entity_words)
+
+            logger.info(f"[ENTITY EXCLUSION] Built exclusion set with {len(entity_exclusion_set)} entity-based tokens to prevent keyword duplication")
+
+            # Extract keywords AFTER entity extraction, excluding entity values
             keywords = keyword_extraction_service.extract_keywords(
                 text=extracted_text,
                 db=db,
                 language=detected_language,
                 stopwords=combined_stopwords,
+                excluded_entities=entity_exclusion_set,  # NEW: Exclude entity values from keywords
                 max_keywords=50,  # Reasonable limit to prevent OCR garbage overload
                 min_frequency=2,  # Filter out rare OCR errors that appear only once
                 user_id=user_id,

@@ -243,7 +243,7 @@ class EmailProcessingSettings(BaseSettings):
     # Email processing settings
     doc_domain: str = Field(default="doc.bonidoc.com", description="Document processing email domain")
     temp_storage_path: str = Field(default="/tmp/email_attachments", description="Temporary file storage path")
-    polling_interval_seconds: int = Field(default=300, description="How often to poll for new emails (5 minutes)")
+    polling_interval_seconds: int = Field(default=60, description="How often to poll for new emails (1 minute)")
 
     # Processing limits (defaults, overridden by tier settings)
     max_attachment_size_mb: int = Field(default=20, description="Default max attachment size in MB")

@@ -108,6 +108,31 @@ interface ClamAVHealth {
   error?: string
 }
 
+interface EmailPollerHealth {
+  timestamp: string
+  service: string
+  status: string
+  imap_available: boolean
+  imap_host: string
+  imap_port: number
+  polling_interval_seconds: number
+  last_successful_poll: string | null
+  last_poll_error: string | null
+  consecutive_failures: number
+  total_emails_processed_today: number
+  unread_emails?: number
+  recent_activity: Array<{
+    received_at: string
+    status: string
+    sender_email: string
+    documents_created: number
+    rejection_reason: string | null
+  }>
+  error?: string
+  imap_error?: string
+  warning?: string
+}
+
 interface Currency {
   code: string
   symbol: string
@@ -137,6 +162,7 @@ export default function AdminDashboard() {
   const [tiers, setTiers] = useState<TierPlan[]>([])
   const [currencies, setCurrencies] = useState<Currency[]>([])
   const [clamavHealth, setClamavHealth] = useState<ClamAVHealth | null>(null)
+  const [emailPollerHealth, setEmailPollerHealth] = useState<EmailPollerHealth | null>(null)
   const [entityQualityConfigs, setEntityQualityConfigs] = useState<EntityQualityConfig[]>([])
   const [editingConfig, setEditingConfig] = useState<{key: string, value: string} | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates' | 'entity-quality'>('overview')
@@ -153,6 +179,7 @@ export default function AdminDashboard() {
     sort_order: 0
   })
   const [restartingClamav, setRestartingClamav] = useState(false)
+  const [pollingEmail, setPollingEmail] = useState(false)
 
   // User search and sorting
   const [userSearch, setUserSearch] = useState('')
@@ -220,6 +247,10 @@ export default function AdminDashboard() {
       const healthData = await apiClient.get<ClamAVHealth>('/api/v1/admin/health/clamav')
       setClamavHealth(healthData)
 
+      // Load Email Poller health
+      const emailHealthData = await apiClient.get<EmailPollerHealth>('/api/v1/admin/health/email-poller')
+      setEmailPollerHealth(emailHealthData)
+
       // Load Entity Quality configs
       const entityQualityData = await apiClient.get<{ configs: EntityQualityConfig[] }>('/api/v1/entity-quality/config')
       setEntityQualityConfigs(entityQualityData.configs)
@@ -258,6 +289,37 @@ export default function AdminDashboard() {
       alert('Failed to restart ClamAV service')
     } finally {
       setRestartingClamav(false)
+    }
+  }
+
+  const checkEmailPollerHealth = async () => {
+    try {
+      const healthData = await apiClient.get<EmailPollerHealth>('/api/v1/admin/health/email-poller')
+      setEmailPollerHealth(healthData)
+    } catch (error) {
+      logger.error('Failed to check Email Poller health:', error)
+    }
+  }
+
+  const triggerEmailPoll = async () => {
+    try {
+      setPollingEmail(true)
+
+      const result = await apiClient.post<{ success: boolean; error?: string }>('/api/v1/admin/health/email-poller/poll-now', {})
+
+      if (result.success) {
+        alert('Email poll triggered successfully! Check processing history for results.')
+      } else {
+        alert(`Poll failed: ${result.error}`)
+      }
+
+      // Refresh health status
+      await checkEmailPollerHealth()
+    } catch (error) {
+      logger.error('Failed to trigger email poll:', error)
+      alert('Failed to trigger email poll')
+    } finally {
+      setPollingEmail(false)
     }
   }
 
@@ -1453,6 +1515,169 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Email Poller Service */}
+            {emailPollerHealth && (
+              <Card>
+                <CardHeader
+                  title="Email Poller Service"
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={checkEmailPollerHealth}
+                      disabled={pollingEmail}
+                    >
+                      Refresh Status
+                    </Button>
+                  }
+                />
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Status Banner */}
+                    <div className={`p-4 rounded-lg ${
+                      emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
+                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-3 w-3 rounded-full ${
+                            emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy' ? 'bg-green-500' : 'bg-red-500'
+                          } animate-pulse`}></div>
+                          <div>
+                            <div className={`text-lg font-semibold ${
+                              emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
+                                ? 'text-green-800 dark:text-green-300'
+                                : 'text-red-800 dark:text-red-300'
+                            }`}>
+                              {emailPollerHealth.status === 'healthy' ? 'Service Healthy' :
+                               emailPollerHealth.status === 'unhealthy' ? 'Service Unhealthy' :
+                               emailPollerHealth.status === 'degraded' ? 'Service Degraded' : 'Service Error'}
+                            </div>
+                            <div className={`text-sm ${
+                              emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {emailPollerHealth.imap_available
+                                ? `Email processing is active - ${emailPollerHealth.unread_emails || 0} unread emails`
+                                : 'Email processing is DOWN - cannot connect to IMAP server'}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={triggerEmailPoll}
+                          disabled={pollingEmail}
+                        >
+                          {pollingEmail ? 'Polling...' : 'Poll Now'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Service Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Status</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.status}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">IMAP Server</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.imap_host}:{emailPollerHealth.imap_port}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Polling Interval</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          Every {emailPollerHealth.polling_interval_seconds}s
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Emails Today</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.total_emails_processed_today}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Consecutive Failures</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.consecutive_failures}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Last Successful Poll</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.last_successful_poll
+                            ? new Date(emailPollerHealth.last_successful_poll).toLocaleString()
+                            : 'Never'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Error Details */}
+                    {(emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error) && (
+                      <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded">
+                        <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Error Details:</div>
+                        <div className="text-sm text-red-600 dark:text-red-400 font-mono">
+                          {emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Warning */}
+                    {emailPollerHealth.warning && (
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded">
+                        <div className="text-sm text-yellow-800 dark:text-yellow-300">
+                          ⚠️ {emailPollerHealth.warning}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent Activity */}
+                    {emailPollerHealth.recent_activity && emailPollerHealth.recent_activity.length > 0 && (
+                      <div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white mb-2">Recent Activity</div>
+                        <div className="space-y-2">
+                          {emailPollerHealth.recent_activity.map((activity, idx) => (
+                            <div key={idx} className="bg-neutral-50 dark:bg-neutral-800 p-2 rounded text-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="text-neutral-600 dark:text-neutral-400">
+                                  {new Date(activity.received_at).toLocaleString()}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded ${
+                                  activity.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                  activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {activity.status}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-neutral-700 dark:text-neutral-300">
+                                From: {activity.sender_email} | Documents: {activity.documents_created}
+                                {activity.rejection_reason && ` | Reason: ${activity.rejection_reason}`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Information Box */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <div className="text-sm text-neutral-700 dark:text-neutral-300">
+                        <strong>Note:</strong> The email poller checks for new emails every {emailPollerHealth.polling_interval_seconds} seconds.
+                        Use the "Poll Now" button to manually trigger an immediate poll. If the service is unhealthy, check IMAP credentials and network connectivity.
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
