@@ -1399,8 +1399,10 @@ export default function AdminDashboard() {
         )}
 
         {/* Health Tab */}
-        {activeTab === 'health' && clamavHealth && (
+        {activeTab === 'health' && (
           <div className="space-y-6">
+            {/* ClamAV Service */}
+            {clamavHealth && (
             <Card>
               <CardHeader
                 title="ClamAV Antivirus Service"
@@ -1515,6 +1517,7 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {/* Email Poller Service */}
             {emailPollerHealth && (
