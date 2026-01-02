@@ -259,20 +259,32 @@ export default function MigrationProgress({
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3">
                   {canClose && (
                     <button
                       type="button"
-                      className="flex-1 inline-flex justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      className="w-full inline-flex justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                       onClick={onClose}
                     >
                       Close
                     </button>
                   )}
                   {!canClose && (
-                    <div className="flex-1 text-center text-sm text-gray-500">
-                      Please wait while migration is in progress...
-                    </div>
+                    <>
+                      <p className="text-center text-sm text-gray-500">
+                        Migration is running in the background
+                      </p>
+                      <button
+                        type="button"
+                        className="w-full inline-flex justify-center rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                        onClick={onClose}
+                      >
+                        Proceed in Background
+                      </button>
+                      <p className="text-xs text-center text-gray-400">
+                        You can close this window and continue using the app. Migration will complete automatically.
+                      </p>
+                    </>
                   )}
                 </div>
               </Dialog.Panel>
