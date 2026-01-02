@@ -661,7 +661,7 @@ export default function SettingsPage() {
   }
 
   const handleResetCategories = async () => {
-    if (!confirm('Are you sure you want to reset to default categories? This will DELETE ALL your custom categories and restore only the system default categories. This action cannot be undone.')) {
+    if (!confirm('Reset categories and recreate cloud folder structure?\n\nThis will:\n✓ Add any missing default categories\n✓ Preserve all your custom categories\n✓ Recreate folder structure on your active cloud storage provider\n\nYour custom categories and documents will NOT be deleted.')) {
       return
     }
 
