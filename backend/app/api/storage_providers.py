@@ -535,8 +535,16 @@ async def activate_provider(
                 detail=f"Please connect {_format_provider_name(provider_type)} before activating it"
             )
 
-        # Set as active
-        current_user.active_storage_provider = provider_type
+        # Set as active using ProviderManager (provider-agnostic)
+        from app.services.provider_manager import ProviderManager
+        success = ProviderManager.set_active_provider(db, current_user, provider_type)
+
+        if not success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to activate {_format_provider_name(provider_type)}. Provider not connected."
+            )
+
         db.commit()
 
         logger.info(f"User {current_user.id} activated {provider_type}")

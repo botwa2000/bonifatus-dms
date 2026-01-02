@@ -392,9 +392,16 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                 logger.warning(f"[Migration] Old provider {from_provider_type} was already disconnected")
 
         elif failed_count == len(documents):
-            # All failed
+            # All failed - disconnect the new provider (rollback connection)
             migration.status = 'failed'
             migration.error_message = "All documents failed to migrate"
+
+            logger.warning(f"[Migration] All documents failed - disconnecting new provider: {to_provider_type}")
+            success = ProviderManager.disconnect_provider(db, user, to_provider_type)
+            if success:
+                logger.info(f"[Migration] Disconnected new provider {to_provider_type} after migration failure")
+            else:
+                logger.warning(f"[Migration] Failed to disconnect new provider {to_provider_type}")
         else:
             # Partial success
             migration.status = 'partial'
@@ -422,12 +429,20 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
     except Exception as e:
         logger.error(f"[Migration] Migration {migration_id} failed: {str(e)}")
 
-        # Update migration status to failed
+        # Update migration status to failed and disconnect new provider (rollback)
         try:
             migration.status = 'failed'
             migration.error_message = str(e)
             migration.completed_at = datetime.utcnow()
             db.commit()
+
+            # Disconnect new provider since migration failed
+            logger.warning(f"[Migration] Migration failed - disconnecting new provider: {to_provider_type}")
+            success = ProviderManager.disconnect_provider(db, user, to_provider_type)
+            if success:
+                logger.info(f"[Migration] Disconnected new provider {to_provider_type} after migration exception")
+            else:
+                logger.warning(f"[Migration] Failed to disconnect new provider {to_provider_type}")
         except Exception as db_error:
             logger.error(f"[Migration] Failed to update migration status: {str(db_error)}")
 
