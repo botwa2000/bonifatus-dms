@@ -183,7 +183,7 @@ class StorageProviderService {
     logger.debug('[StorageProviderService] Getting document counts')
 
     return await apiClient.get(
-      '/api/v1/storage/providers/document-counts',
+      '/api/v1/storage/document-counts',
       true
     )
   }
@@ -202,7 +202,7 @@ class StorageProviderService {
     logger.debug('[StorageProviderService] Initiating migration:', { fromProvider, toProvider })
 
     return await apiClient.post(
-      '/api/v1/storage/providers/migrate',
+      '/api/v1/storage/migrate',
       { from_provider: fromProvider, to_provider: toProvider },
       true
     )
