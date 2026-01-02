@@ -116,6 +116,9 @@ interface EmailPollerHealth {
   imap_host: string
   imap_port: number
   polling_interval_seconds: number
+  polling_task_running: boolean
+  scheduler_running: boolean
+  next_poll_time: string | null
   last_successful_poll: string | null
   last_poll_error: string | null
   consecutive_failures: number
@@ -1568,9 +1571,11 @@ export default function AdminDashboard() {
                                 ? 'text-green-600 dark:text-green-400'
                                 : 'text-red-600 dark:text-red-400'
                             }`}>
-                              {emailPollerHealth.imap_available
-                                ? `Email processing is active - ${emailPollerHealth.unread_emails || 0} unread emails`
-                                : 'Email processing is DOWN - cannot connect to IMAP server'}
+                              {!emailPollerHealth.polling_task_running
+                                ? 'CRITICAL: Polling task is not running - emails will not be processed'
+                                : emailPollerHealth.imap_available
+                                  ? `Email processing is active - ${emailPollerHealth.unread_emails || 0} unread emails`
+                                  : 'Email processing is DOWN - cannot connect to IMAP server'}
                             </div>
                           </div>
                         </div>
@@ -1623,6 +1628,34 @@ export default function AdminDashboard() {
                           {emailPollerHealth.last_successful_poll
                             ? new Date(emailPollerHealth.last_successful_poll).toLocaleString()
                             : 'Never'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Polling Task</div>
+                        <div className={`text-sm font-medium ${
+                          emailPollerHealth.polling_task_running
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {emailPollerHealth.polling_task_running ? '✓ Running' : '✗ Stopped'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Next Poll</div>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-white">
+                          {emailPollerHealth.next_poll_time
+                            ? new Date(emailPollerHealth.next_poll_time).toLocaleTimeString()
+                            : 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">Scheduler</div>
+                        <div className={`text-sm font-medium ${
+                          emailPollerHealth.scheduler_running
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {emailPollerHealth.scheduler_running ? '✓ Active' : '✗ Inactive'}
                         </div>
                       </div>
                     </div>

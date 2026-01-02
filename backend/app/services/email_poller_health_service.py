@@ -51,12 +51,36 @@ class EmailPollerHealthService:
             'imap_host': settings.email_processing.imap_host,
             'imap_port': settings.email_processing.imap_port,
             'polling_interval_seconds': settings.email_processing.polling_interval_seconds,
+            'polling_task_running': False,
+            'scheduler_running': False,
+            'next_poll_time': None,
             'last_successful_poll': None,
             'last_poll_error': self._last_poll_error,
             'consecutive_failures': self._consecutive_failures,
             'total_emails_processed_today': 0,
             'recent_activity': []
         }
+
+        # Check if polling task is actually running
+        try:
+            from app.tasks.email_poller import scheduler
+            status['scheduler_running'] = scheduler.running
+
+            if scheduler.running:
+                # Get the email_poller job
+                job = scheduler.get_job('email_poller')
+                if job:
+                    status['polling_task_running'] = True
+                    if job.next_run_time:
+                        status['next_poll_time'] = job.next_run_time.isoformat()
+                else:
+                    status['polling_task_running'] = False
+                    status['warning'] = 'Scheduler is running but email_poller job not found'
+            else:
+                status['warning'] = 'Email polling scheduler is not running'
+        except Exception as e:
+            logger.error(f"Error checking scheduler status: {e}")
+            status['warning'] = f'Could not check scheduler status: {str(e)}'
 
         try:
             # Test IMAP connection
@@ -145,10 +169,16 @@ class EmailPollerHealthService:
                 db.close()
 
             # Determine overall status
-            if status['imap_available']:
+            # CRITICAL: Polling task must be running for service to be healthy
+            if not status['polling_task_running']:
+                status['status'] = 'unhealthy'
+                if not status.get('warning'):
+                    status['warning'] = 'Email polling task is not running'
+            elif status['imap_available']:
                 if self._consecutive_failures > 0:
                     status['status'] = 'degraded'
-                    status['warning'] = f'{self._consecutive_failures} recent poll failures'
+                    if not status.get('warning'):
+                        status['warning'] = f'{self._consecutive_failures} recent poll failures'
                 else:
                     status['status'] = 'healthy'
             else:
