@@ -180,6 +180,7 @@ export default function AdminDashboard() {
   })
   const [restartingClamav, setRestartingClamav] = useState(false)
   const [pollingEmail, setPollingEmail] = useState(false)
+  const [refreshingEmailHealth, setRefreshingEmailHealth] = useState(false)
 
   // User search and sorting
   const [userSearch, setUserSearch] = useState('')
@@ -294,10 +295,14 @@ export default function AdminDashboard() {
 
   const checkEmailPollerHealth = async () => {
     try {
+      setRefreshingEmailHealth(true)
       const healthData = await apiClient.get<EmailPollerHealth>('/api/v1/admin/health/email-poller')
       setEmailPollerHealth(healthData)
     } catch (error) {
       logger.error('Failed to check Email Poller health:', error)
+      alert('Failed to refresh Email Poller status')
+    } finally {
+      setRefreshingEmailHealth(false)
     }
   }
 
@@ -1529,9 +1534,9 @@ export default function AdminDashboard() {
                       variant="secondary"
                       size="sm"
                       onClick={checkEmailPollerHealth}
-                      disabled={pollingEmail}
+                      disabled={refreshingEmailHealth}
                     >
-                      Refresh Status
+                      {refreshingEmailHealth ? 'Refreshing...' : 'Refresh Status'}
                     </Button>
                   }
                 />
