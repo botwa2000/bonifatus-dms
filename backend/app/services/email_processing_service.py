@@ -823,24 +823,11 @@ class EmailProcessingService:
                     sender_email = self.extract_email_address(sender_raw)
                     subject = self.decode_email_header(subject_raw)
 
-                    logger.info(f"Processing email: {sender_email} -> {recipient_email} (original recipient)")
+                    logger.info(f"Processing email: {sender_email} -> {recipient_email}")
 
-                    # CRITICAL FILTER: Only process @doc.bonidoc.com emails
-                    logger.debug(f"[EMAIL] Checking if {recipient_email} is doc email")
-                    if not self.is_doc_email(recipient_email):
-                        logger.warning(f"[EMAIL DEBUG] REJECTED - Not a doc email: {recipient_email}")
-                        continue
-                    logger.debug(f"[EMAIL] ✓ Passed doc email check")
-
-                    # Extract attachments
-                    logger.debug(f"[EMAIL] Extracting attachments")
-                    attachments = self.extract_attachments(email_message)
-                    attachment_count = len(attachments)
-                    total_size = sum(att['size'] for att in attachments)
-                    logger.debug(f"[EMAIL] Found {attachment_count} attachments, total size: {total_size} bytes")
-
-                    # SECURITY GATE #1: Find user by email address
-                    logger.debug(f"[EMAIL] Looking up user by email address: {recipient_email}")
+                    # SECURITY GATE #1: Find user by unique email processing address (1:1 relationship)
+                    # This is the definitive check - if processing address exists in DB, it's valid
+                    logger.debug(f"[EMAIL] Looking up user by processing address: {recipient_email}")
                     user = self.find_user_by_email_address(recipient_email)
                     if not user:
                         logger.error(f"[EMAIL DEBUG] REJECTED - No user found for address: {recipient_email}")
