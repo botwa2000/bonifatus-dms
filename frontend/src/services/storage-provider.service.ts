@@ -202,7 +202,7 @@ class StorageProviderService {
     logger.debug('[StorageProviderService] Initiating migration:', { fromProvider, toProvider })
 
     return await apiClient.post(
-      '/api/v1/storage/migrate',
+      '/api/v1/storage/providers/migrate',
       { from_provider: fromProvider, to_provider: toProvider },
       true
     )
