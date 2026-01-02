@@ -199,7 +199,7 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
     from datetime import datetime
     from io import BytesIO
     from app.database.connection import SessionLocal
-    from app.database.models import MigrationTask, Document, User, Category
+    from app.database.models import MigrationTask, Document, User, Category, CategoryTranslation
     from app.services.storage.provider_factory import ProviderFactory
     from app.services.provider_manager import ProviderManager
 
@@ -255,8 +255,22 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         logger.info(f"[Migration] Found {len(documents)} documents to migrate")
 
         # Initialize folder structure on new provider
+        # Helper function to get category name from translations
+        def get_category_name(category):
+            """Get category name from translations, preferring English"""
+            if not category.translations:
+                return category.reference_key  # Fallback to reference_key
+
+            # Try to find English translation first
+            for trans in category.translations:
+                if trans.language_code == 'en':
+                    return trans.name
+
+            # If no English translation, use first available
+            return category.translations[0].name if category.translations else category.reference_key
+
         categories = db.query(Category).filter(Category.user_id == uuid.UUID(user_id)).all()
-        folder_names = [cat.name for cat in categories]
+        folder_names = [get_category_name(cat) for cat in categories]
 
         try:
             folder_map = to_provider.initialize_folder_structure(to_token, folder_names)
@@ -301,7 +315,7 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                 if doc.category_id:
                     category = db.query(Category).filter(Category.id == doc.category_id).first()
                     if category:
-                        category_folder_id = folder_map.get(category.name)
+                        category_folder_id = folder_map.get(get_category_name(category))
 
                 logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
                 file_stream = BytesIO(file_content)
