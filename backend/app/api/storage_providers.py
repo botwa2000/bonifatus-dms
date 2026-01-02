@@ -562,6 +562,108 @@ async def activate_provider(
         raise HTTPException(status_code=500, detail="Failed to activate provider")
 
 
+@router.post("/providers/migrate")
+async def initiate_provider_migration(
+    from_provider: str,
+    to_provider: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Initiate migration between two already-connected storage providers.
+
+    Args:
+        from_provider: Source provider key
+        to_provider: Target provider key
+
+    Returns:
+        migration_id: UUID of the migration task
+        status: Migration status
+    """
+    logger.info(f"Migration request - From: {from_provider}, To: {to_provider}, User: {current_user.id}")
+
+    try:
+        # Validate both providers are connected
+        if not _is_provider_connected(current_user, from_provider, db):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Source provider {_format_provider_name(from_provider)} is not connected"
+            )
+
+        if not _is_provider_connected(current_user, to_provider, db):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Target provider {_format_provider_name(to_provider)} is not connected"
+            )
+
+        # Check if there are documents to migrate
+        from app.database.models import Document
+        doc_count = db.query(Document).filter(
+            Document.user_id == current_user.id,
+            Document.storage_provider_type == from_provider
+        ).count()
+
+        if doc_count == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No documents found on {_format_provider_name(from_provider)}"
+            )
+
+        # Create migration task
+        from app.database.models import MigrationTask
+        import uuid
+
+        migration = MigrationTask(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            from_provider=from_provider,
+            to_provider=to_provider,
+            status='pending'
+        )
+        db.add(migration)
+        db.commit()
+        db.refresh(migration)
+
+        migration_id = str(migration.id)
+        logger.info(f"✅ Created migration task: {migration_id}")
+
+        # Queue Celery task for async migration
+        from app.celery_app import migrate_provider_documents_task
+        task = migrate_provider_documents_task.delay(
+            migration_id=migration_id,
+            user_id=str(current_user.id)
+        )
+
+        # Save Celery task ID to migration record
+        migration.celery_task_id = task.id
+        db.commit()
+        logger.info(f"✅ Queued migration task: {task.id}")
+
+        # Set target provider as active
+        from app.services.provider_manager import ProviderManager
+        try:
+            ProviderManager.set_active_provider(db, current_user, to_provider)
+            logger.info(f"Set {to_provider} as active provider")
+        except ValueError as e:
+            logger.warning(f"Could not set active provider: {e}")
+
+        return {
+            'success': True,
+            'migration_id': migration_id,
+            'status': 'pending',
+            'from_provider': from_provider,
+            'to_provider': to_provider,
+            'document_count': doc_count
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initiate migration: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to initiate migration")
+
+
 @router.post("/providers/{provider_type}/disconnect")
 async def disconnect_provider(
     provider_type: str,
@@ -690,6 +792,41 @@ async def get_active_provider(
     return {
         'active_provider': active,
         'provider_name': _format_provider_name(active) if active else None
+    }
+
+
+@router.get("/document-counts")
+async def get_document_counts_by_provider(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get document counts for each storage provider.
+
+    Returns:
+        Dictionary with provider keys and document counts
+    """
+    from app.database.models import Document
+    from sqlalchemy import func
+
+    # Query document counts grouped by storage_provider_type
+    counts = db.query(
+        Document.storage_provider_type,
+        func.count(Document.id).label('count')
+    ).filter(
+        Document.user_id == current_user.id
+    ).group_by(
+        Document.storage_provider_type
+    ).all()
+
+    # Convert to dictionary
+    result = {provider: count for provider, count in counts}
+
+    logger.debug(f"Document counts for user {current_user.id}: {result}")
+
+    return {
+        'document_counts': result,
+        'total_documents': sum(result.values())
     }
 
 
