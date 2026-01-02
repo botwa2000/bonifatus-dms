@@ -175,6 +175,38 @@ class StorageProviderService {
       true
     )
   }
+
+  /**
+   * Get document counts by storage provider
+   */
+  async getDocumentCounts(): Promise<{ document_counts: Record<string, number>, total_documents: number }> {
+    logger.debug('[StorageProviderService] Getting document counts')
+
+    return await apiClient.get(
+      '/api/v1/storage/providers/document-counts',
+      true
+    )
+  }
+
+  /**
+   * Initiate migration between already-connected providers
+   */
+  async initiateMigration(fromProvider: string, toProvider: string): Promise<{
+    success: boolean
+    migration_id: string
+    status: string
+    from_provider: string
+    to_provider: string
+    document_count: number
+  }> {
+    logger.debug('[StorageProviderService] Initiating migration:', { fromProvider, toProvider })
+
+    return await apiClient.post(
+      '/api/v1/storage/providers/migrate',
+      { from_provider: fromProvider, to_provider: toProvider },
+      true
+    )
+  }
 }
 
 export const storageProviderService = new StorageProviderService()

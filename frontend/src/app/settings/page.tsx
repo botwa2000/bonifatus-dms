@@ -82,6 +82,7 @@ export default function SettingsPage() {
     newProvider: string
     documentCount: number
     migrationId?: string
+    isActivationFlow?: boolean
   } | null>(null)
 
   useEffect(() => {
@@ -515,18 +516,65 @@ export default function SettingsPage() {
     }
   }
 
-  const handleMigrationChoice = async (choice: 'migrate' | 'fresh') => {
+  const handleMigrationChoice = async (choice: 'migrate' | 'fresh' | 'switch_only') => {
     if (!migrationData) return
 
     logger.debug(`[SETTINGS] User chose: ${choice}`)
 
+    // Close modal
+    setShowMigrationChoice(false)
+
+    // Handle activation flow (switching between already-connected providers)
+    if (migrationData.isActivationFlow) {
+      setProvidersLoading(true)
+
+      try {
+        if (choice === 'migrate') {
+          // Initiate migration from current to new provider
+          logger.debug(`[SETTINGS] Initiating migration from ${migrationData.currentProvider} to ${migrationData.newProvider}`)
+
+          const migrationResponse = await storageProviderService.initiateMigration(
+            migrationData.currentProvider,
+            migrationData.newProvider
+          )
+
+          logger.debug(`[SETTINGS] Migration initiated:`, migrationResponse)
+
+          // Store migration ID and show progress
+          setMigrationData({
+            ...migrationData,
+            migrationId: migrationResponse.migration_id
+          })
+          setShowMigrationProgress(true)
+          setMessage({ type: 'success', text: `Migration started! Copying ${migrationResponse.document_count} documents...` })
+
+        } else if (choice === 'switch_only') {
+          // Just switch active provider without migration
+          logger.debug(`[SETTINGS] Switching to ${migrationData.newProvider} without migration`)
+
+          const response = await storageProviderService.activateProvider(migrationData.newProvider)
+          setMessage({ type: 'success', text: response.message })
+          setActiveProviderId(migrationData.newProvider)
+        }
+
+        // Reload providers to get updated status
+        await loadStorageProviders()
+
+      } catch (error) {
+        logger.error(`[SETTINGS] Failed to handle activation choice:`, error)
+        setMessage({ type: 'error', text: 'Failed to switch provider. Please try again.' })
+      } finally {
+        setProvidersLoading(false)
+      }
+
+      return
+    }
+
+    // Handle OAuth flow (connecting new provider)
     // Store migration choice in sessionStorage for callback
     sessionStorage.setItem('migration_choice', choice)
     sessionStorage.setItem('migration_new_provider', migrationData.newProvider)
     sessionStorage.setItem('migration_from_provider', migrationData.currentProvider)
-
-    // Close modal and proceed to OAuth
-    setShowMigrationChoice(false)
 
     try {
       const response = await storageProviderService.getAuthorizationUrl(migrationData.newProvider)
@@ -570,8 +618,34 @@ export default function SettingsPage() {
 
     try {
       logger.debug(`[SETTINGS] Activating ${providerType}...`)
-      const response = await storageProviderService.activateProvider(providerType)
 
+      // Get current active provider
+      const currentActive = storageProviders.find(p => p.is_active)
+
+      // If switching from a different provider, check for documents
+      if (currentActive && currentActive.type !== providerType) {
+        // Fetch document counts
+        const countsResponse = await storageProviderService.getDocumentCounts()
+        const currentProviderDocCount = countsResponse.document_counts[currentActive.type] || 0
+
+        // If current provider has documents, show migration dialog
+        if (currentProviderDocCount > 0) {
+          logger.debug(`[SETTINGS] Current provider ${currentActive.type} has ${currentProviderDocCount} documents, showing migration dialog`)
+
+          setMigrationData({
+            currentProvider: currentActive.type,
+            newProvider: providerType,
+            documentCount: currentProviderDocCount,
+            isActivationFlow: true
+          })
+          setShowMigrationChoice(true)
+          setProvidersLoading(false)
+          return
+        }
+      }
+
+      // No documents on current provider or same provider, just activate
+      const response = await storageProviderService.activateProvider(providerType)
       setMessage({ type: 'success', text: response.message })
       setActiveProviderId(providerType)
 
@@ -1162,6 +1236,7 @@ export default function SettingsPage() {
               currentProvider={migrationData.currentProvider}
               newProvider={migrationData.newProvider}
               documentCount={migrationData.documentCount}
+              isActivationFlow={migrationData.isActivationFlow || false}
             />
           )}
 
