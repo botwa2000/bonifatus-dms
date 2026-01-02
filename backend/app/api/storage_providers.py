@@ -537,17 +537,16 @@ async def activate_provider(
 
         # Set as active using ProviderManager (provider-agnostic)
         from app.services.provider_manager import ProviderManager
-        success = ProviderManager.set_active_provider(db, current_user, provider_type)
 
-        if not success:
+        try:
+            ProviderManager.set_active_provider(db, current_user, provider_type)
+            logger.info(f"User {current_user.id} activated {provider_type}")
+        except ValueError as e:
+            # Provider not connected or invalid
             raise HTTPException(
                 status_code=400,
-                detail=f"Failed to activate {_format_provider_name(provider_type)}. Provider not connected."
+                detail=f"Failed to activate {_format_provider_name(provider_type)}. {str(e)}"
             )
-
-        db.commit()
-
-        logger.info(f"User {current_user.id} activated {provider_type}")
 
         return {
             'success': True,
