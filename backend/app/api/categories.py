@@ -292,28 +292,83 @@ async def restore_default_categories(
     current_user: User = Depends(get_current_active_user)
 ) -> RestoreDefaultsResponse:
     """
-    Restore default system categories
-    
-    Recreates the 5 default categories (Insurance, Legal, Real Estate, Banking, Other).
-    Only creates missing categories - existing categories are not affected.
+    Restore default system categories and reinitialize cloud folder structure
+
+    1. Recreates missing default categories (Insurance, Legal, Real Estate, Banking, Other, Invoices, Taxes)
+    2. Preserves all existing categories (custom categories are not affected)
+    3. Reinitializes folder structure on active cloud storage provider
+    4. Creates folders for ALL categories (defaults + customs)
     """
+    session = db_manager.session_local()
     try:
         ip_address = get_client_ip(request)
-        
+
+        # Step 1: Restore default categories in database
         result = await category_service.restore_default_categories(
             user_id=str(current_user.id),
             ip_address=ip_address
         )
-        
-        logger.info(f"Default categories restored by user: {current_user.email}")
+
+        logger.info(f"Default categories restored in DB for user: {current_user.email}")
+
+        # Step 2: Reinitialize folder structure on active cloud provider
+        from app.services.provider_manager import ProviderManager
+        from app.services.storage.provider_factory import ProviderFactory
+        from app.database.models import Category, CategoryTranslation
+        from sqlalchemy.orm import joinedload
+        import uuid
+
+        # Get active provider
+        active_connection = ProviderManager.get_active_provider(session, current_user)
+
+        if active_connection:
+            provider_key = active_connection.provider_key
+            logger.info(f"Reinitializing folder structure on {provider_key}")
+
+            # Get provider instance
+            provider = ProviderFactory.get_provider(provider_key)
+
+            # Get provider token
+            token = ProviderManager.get_token(session, current_user, provider_key)
+
+            # Get all categories with translations
+            categories = session.query(Category).options(
+                joinedload(Category.translations)
+            ).filter(Category.user_id == uuid.UUID(str(current_user.id))).all()
+
+            # Helper to get category name
+            def get_category_name(category):
+                if not category.translations:
+                    return category.reference_key
+                for trans in category.translations:
+                    if trans.language_code == 'en':
+                        return trans.name
+                return category.translations[0].name if category.translations else category.reference_key
+
+            folder_names = [get_category_name(cat) for cat in categories]
+            logger.info(f"Creating folders for {len(folder_names)} categories: {folder_names}")
+
+            # Initialize folder structure
+            folder_map = provider.initialize_folder_structure(token, folder_names)
+            logger.info(f"✅ Folder structure initialized on {provider_key}: {len(folder_map)} folders created")
+
+            result['folder_structure_initialized'] = True
+            result['provider'] = provider_key
+            result['folders_created'] = len(folder_map)
+        else:
+            logger.warning(f"No active provider for user {current_user.email}, skipping folder initialization")
+            result['folder_structure_initialized'] = False
+
         return result
 
     except Exception as e:
-        logger.error(f"Restore defaults error: {e}")
+        logger.error(f"Restore defaults error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to restore default categories"
         )
+    finally:
+        session.close()
 
 
 @router.get(
