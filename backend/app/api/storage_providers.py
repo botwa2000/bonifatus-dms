@@ -66,7 +66,11 @@ async def get_available_providers(
             raise HTTPException(status_code=404, detail="User not found")
 
         logger.info(f"🔵 Getting available providers for user {fresh_user.id}")
-        logger.debug(f"🔍 User active_storage_provider: {fresh_user.active_storage_provider}")
+
+        # Get active provider from ProviderConnection table
+        active_connection = ProviderManager.get_active_provider(db, fresh_user)
+        active_provider_type = active_connection.provider_key if active_connection else None
+        logger.debug(f"🔍 Active provider from ProviderConnection: {active_provider_type}")
 
         # Get all registered providers
         all_providers = ProviderFactory.get_available_providers()
@@ -82,7 +86,7 @@ async def get_available_providers(
                 'type': provider_type,
                 'name': _format_provider_name(provider_type),
                 'connected': _is_provider_connected(fresh_user, provider_type, db),
-                'is_active': fresh_user.active_storage_provider == provider_type,
+                'is_active': provider_type == active_provider_type,
                 'enabled': True  # Will be tier-based later
             }
             logger.debug(f"📋 Provider info: {provider_info}")
