@@ -200,6 +200,7 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
     from io import BytesIO
     from app.database.connection import SessionLocal
     from app.database.models import MigrationTask, Document, User, Category, CategoryTranslation
+    from sqlalchemy.orm import joinedload
     from app.services.storage.provider_factory import ProviderFactory
     from app.services.provider_manager import ProviderManager
 
@@ -269,7 +270,7 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
             # If no English translation, use first available
             return category.translations[0].name if category.translations else category.reference_key
 
-        categories = db.query(Category).filter(Category.user_id == uuid.UUID(user_id)).all()
+        categories = db.query(Category).options(joinedload(Category.translations)).filter(Category.user_id == uuid.UUID(user_id)).all()
         folder_names = [get_category_name(cat) for cat in categories]
 
         try:
@@ -313,9 +314,11 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                 # Upload to new provider (get folder ID for category)
                 category_folder_id = None
                 if doc.category_id:
-                    category = db.query(Category).filter(Category.id == doc.category_id).first()
+                    category = db.query(Category).options(joinedload(Category.translations)).filter(Category.id == doc.category_id).first()
                     if category:
-                        category_folder_id = folder_map.get(get_category_name(category))
+                        category_name = get_category_name(category)
+                        category_folder_id = folder_map.get(category_name)
+                        logger.info(f"[Migration] Category '{category_name}' -> folder_id: {category_folder_id}")
 
                 logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
                 file_stream = BytesIO(file_content)
