@@ -203,8 +203,9 @@ class StorageProviderService {
 
     return await apiClient.post(
       '/api/v1/storage/providers/migrate',
-      { from_provider: fromProvider, to_provider: toProvider },
-      true
+      {},
+      true,
+      { params: { from_provider: fromProvider, to_provider: toProvider } }
     )
   }
 }
