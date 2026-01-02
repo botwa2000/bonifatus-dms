@@ -352,14 +352,17 @@ async def restore_default_categories(
             folder_map = provider.initialize_folder_structure(token, folder_names)
             logger.info(f"✅ Folder structure initialized on {provider_key}: {len(folder_map)} folders created")
 
-            result['folder_structure_initialized'] = True
-            result['provider'] = provider_key
-            result['folders_created'] = len(folder_map)
+            # Convert result to dict and add folder initialization info
+            result_dict = result.model_dump()
+            result_dict['folder_structure_initialized'] = True
+            result_dict['provider'] = provider_key
+            result_dict['folders_created'] = len(folder_map)
+            return RestoreDefaultsResponse(**result_dict)
         else:
             logger.warning(f"No active provider for user {current_user.email}, skipping folder initialization")
-            result['folder_structure_initialized'] = False
-
-        return result
+            result_dict = result.model_dump()
+            result_dict['folder_structure_initialized'] = False
+            return RestoreDefaultsResponse(**result_dict)
 
     except Exception as e:
         logger.error(f"Restore defaults error: {e}", exc_info=True)

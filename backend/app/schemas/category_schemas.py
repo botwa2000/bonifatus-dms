@@ -106,6 +106,9 @@ class RestoreDefaultsResponse(BaseModel):
     created: List[str] = Field(..., description="List of created category names")
     skipped: List[str] = Field(..., description="List of already existing category names")
     message: str = Field(..., description="Summary message")
+    folder_structure_initialized: bool = Field(False, description="Whether cloud folder structure was initialized")
+    provider: Optional[str] = Field(None, description="Cloud provider where folders were created")
+    folders_created: Optional[int] = Field(None, description="Number of folders created on cloud provider")
 
 
 class ErrorResponse(BaseModel):
