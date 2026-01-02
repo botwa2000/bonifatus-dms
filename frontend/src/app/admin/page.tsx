@@ -1671,7 +1671,7 @@ export default function AdminDashboard() {
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <div className="text-sm text-neutral-700 dark:text-neutral-300">
                         <strong>Note:</strong> The email poller checks for new emails every {emailPollerHealth.polling_interval_seconds} seconds.
-                        Use the "Poll Now" button to manually trigger an immediate poll. If the service is unhealthy, check IMAP credentials and network connectivity.
+                        Use the &quot;Poll Now&quot; button to manually trigger an immediate poll. If the service is unhealthy, check IMAP credentials and network connectivity.
                       </div>
                     </div>
                   </div>
