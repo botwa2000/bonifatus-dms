@@ -7,10 +7,11 @@ import { ExclamationTriangleIcon, ArrowPathIcon, TrashIcon } from '@heroicons/re
 interface MigrationChoiceModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (choice: 'migrate' | 'fresh') => void
+  onConfirm: (choice: 'migrate' | 'fresh' | 'switch_only') => void
   currentProvider: string
   newProvider: string
   documentCount: number
+  isActivationFlow?: boolean  // True when switching between already-connected providers
 }
 
 export default function MigrationChoiceModal({
@@ -19,9 +20,12 @@ export default function MigrationChoiceModal({
   onConfirm,
   currentProvider,
   newProvider,
-  documentCount
+  documentCount,
+  isActivationFlow = false
 }: MigrationChoiceModalProps) {
-  const [selectedChoice, setSelectedChoice] = useState<'migrate' | 'fresh'>('migrate')
+  const [selectedChoice, setSelectedChoice] = useState<'migrate' | 'fresh' | 'switch_only'>(
+    isActivationFlow ? 'migrate' : 'migrate'
+  )
 
   const formatProviderName = (provider: string) => {
     if (provider === 'google_drive') return 'Google Drive'
@@ -144,9 +148,78 @@ export default function MigrationChoiceModal({
                         )}
                       </RadioGroup.Option>
 
-                      {/* Option 2: Start Fresh */}
-                      <RadioGroup.Option
-                        value="fresh"
+                      {/* Option 2: Switch Only (activation flow only) */}
+                      {isActivationFlow && (
+                        <RadioGroup.Option
+                          value="switch_only"
+                          className={({ active, checked }) =>
+                            `${
+                              active
+                                ? 'ring-2 ring-white ring-opacity-60 ring-offset-2 ring-offset-blue-300'
+                                : ''
+                            }
+                            ${
+                              checked ? 'bg-gray-50 border-gray-500' : 'bg-white border-gray-200'
+                            }
+                              relative flex cursor-pointer rounded-lg border-2 px-5 py-4 focus:outline-none`
+                          }
+                        >
+                          {({ checked }) => (
+                            <>
+                              <div className="flex w-full items-start justify-between">
+                                <div className="flex items-start">
+                                  <svg className="h-5 w-5 text-gray-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                  </svg>
+                                  <div className="text-sm">
+                                    <RadioGroup.Label
+                                      as="p"
+                                      className={`font-medium ${
+                                        checked ? 'text-gray-900' : 'text-gray-900'
+                                      }`}
+                                    >
+                                      Just Switch Provider
+                                    </RadioGroup.Label>
+                                    <RadioGroup.Description
+                                      as="span"
+                                      className={`inline ${
+                                        checked ? 'text-gray-700' : 'text-gray-500'
+                                      }`}
+                                    >
+                                      <span className="block mt-1">
+                                        Switch active provider to {newProviderName} without moving documents. Documents stay on {currentProviderName}.
+                                      </span>
+                                      <span className="block mt-2 text-xs">
+                                        ℹ Documents remain on {currentProviderName}<br />
+                                        ℹ Both providers stay connected<br />
+                                        ℹ You can migrate later
+                                      </span>
+                                    </RadioGroup.Description>
+                                  </div>
+                                </div>
+                                <div className="shrink-0 text-white">
+                                  <div
+                                    className={`h-5 w-5 rounded-full ${
+                                      checked ? 'bg-gray-600' : 'bg-white border-2 border-gray-300'
+                                    } flex items-center justify-center`}
+                                  >
+                                    {checked && (
+                                      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 12 12">
+                                        <path d="M3.707 5.293a1 1 0 00-1.414 1.414l1.414-1.414zM5 8l-.707.707a1 1 0 001.414 0L5 8zm4.707-3.293a1 1 0 00-1.414-1.414l1.414 1.414zm-7.414 2l2 2 1.414-1.414-2-2-1.414 1.414zm3.414 2l4-4-1.414-1.414-4 4 1.414 1.414z" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </RadioGroup.Option>
+                      )}
+
+                      {/* Option 3: Start Fresh (OAuth flow only) */}
+                      {!isActivationFlow && (
+                        <RadioGroup.Option
+                          value="fresh"
                         className={({ active, checked }) =>
                           `${
                             active
@@ -207,6 +280,7 @@ export default function MigrationChoiceModal({
                           </>
                         )}
                       </RadioGroup.Option>
+                      )}
                     </div>
                   </RadioGroup>
                 </div>
