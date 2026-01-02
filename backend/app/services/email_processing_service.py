@@ -803,20 +803,27 @@ class EmailProcessingService:
                     email_body = msg_data[0][1]
                     email_message = email.message_from_bytes(email_body)
 
-                    # Extract headers
-                    recipient_raw = email_message.get('To', '')
+                    # Extract headers - check multiple headers to find original recipient
+                    # When emails are forwarded, the original recipient may be in different headers
+                    recipient_raw = (
+                        email_message.get('Delivered-To') or  # Original recipient (most reliable)
+                        email_message.get('X-Original-To') or  # Forwarding header
+                        email_message.get('X-Forwarded-To') or  # Alternative forwarding header
+                        email_message.get('Envelope-To') or  # SMTP envelope recipient
+                        email_message.get('To', '')  # Standard To header (may be modified)
+                    )
                     sender_raw = email_message.get('From', '')
                     subject_raw = email_message.get('Subject', '')
                     message_id = email_message.get('Message-ID', '')
 
-                    logger.debug(f"[EMAIL] From: {sender_raw} | To: {recipient_raw} | Subject: {subject_raw}")
+                    logger.debug(f"[EMAIL] Headers - From: {sender_raw} | To: {email_message.get('To', '')} | Delivered-To: {email_message.get('Delivered-To', 'N/A')} | Subject: {subject_raw}")
 
                     # Decode
                     recipient_email = self.extract_email_address(recipient_raw)
                     sender_email = self.extract_email_address(sender_raw)
                     subject = self.decode_email_header(subject_raw)
 
-                    logger.info(f"Processing email: {sender_email} -> {recipient_email}")
+                    logger.info(f"Processing email: {sender_email} -> {recipient_email} (original recipient)")
 
                     # CRITICAL FILTER: Only process @doc.bonidoc.com emails
                     logger.debug(f"[EMAIL] Checking if {recipient_email} is doc email")
