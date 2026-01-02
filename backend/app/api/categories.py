@@ -326,7 +326,7 @@ async def restore_default_categories(
             logger.info(f"Reinitializing folder structure on {provider_key}")
 
             # Get provider instance
-            provider = ProviderFactory.get_provider(provider_key)
+            provider = ProviderFactory.create(provider_key)
 
             # Get provider token
             token = ProviderManager.get_token(session, current_user, provider_key)
