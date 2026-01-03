@@ -786,17 +786,21 @@ class EmailProcessingService:
                 return 0
 
             email_ids = messages[0].split()
-            logger.debug(f"[EMAIL] Found {len(email_ids)} unread emails")
-            logger.debug(f"[EMAIL] Email IDs: {email_ids}")
+            logger.info(f"[EMAIL POLL] ========================================")
+            logger.info(f"[EMAIL POLL] Found {len(email_ids)} UNSEEN emails in inbox")
+            logger.info(f"[EMAIL POLL] Email IDs: {email_ids}")
+            logger.info(f"[EMAIL POLL] ========================================")
 
             for email_id in email_ids:
                 try:
-                    logger.debug(f"[EMAIL] Processing email ID: {email_id}")
+                    logger.info(f"[EMAIL START] ========================================")
+                    logger.info(f"[EMAIL START] Processing email ID: {email_id}")
+                    logger.info(f"[EMAIL START] ========================================")
 
                     # Fetch email
                     status, msg_data = imap.fetch(email_id, '(RFC822)')
                     if status != 'OK':
-                        logger.error(f"[EMAIL DEBUG] Failed to fetch email {email_id}. Status: {status}")
+                        logger.error(f"[EMAIL] ❌ Failed to fetch email {email_id}. Status: {status}")
                         continue
 
                     # Parse email
@@ -832,56 +836,83 @@ class EmailProcessingService:
 
                     # SECURITY GATE #1: Find user by unique email processing address (1:1 relationship)
                     # This is the definitive check - if processing address exists in DB, it's valid
-                    logger.debug(f"[EMAIL] Looking up user by processing address: {recipient_email}")
+                    logger.debug(f"[EMAIL] GATE #1: Looking up user by processing address: {recipient_email}")
                     user = self.find_user_by_email_address(recipient_email)
                     if not user:
-                        logger.error(f"[EMAIL DEBUG] REJECTED - No user found for address: {recipient_email}")
-                        logger.error(f"[EMAIL DEBUG] Deleting email {email_id}")
-                        # Delete email and continue
-                        self.delete_email_from_inbox(imap, email_id)
+                        logger.error(f"[EMAIL REJECTION] ❌ GATE #1 FAILED - No user found")
+                        logger.error(f"[EMAIL REJECTION] Recipient address: {recipient_email}")
+                        logger.error(f"[EMAIL REJECTION] Sender: {sender_email}")
+                        logger.error(f"[EMAIL REJECTION] Subject: {subject}")
+                        logger.error(f"[EMAIL REJECTION] This email address is not registered in the system")
+                        logger.error(f"[EMAIL REJECTION] Deleting email {email_id} from inbox")
+                        try:
+                            self.delete_email_from_inbox(imap, email_id)
+                            logger.error(f"[EMAIL REJECTION] ✓ Email {email_id} deleted successfully")
+                        except Exception as del_error:
+                            logger.error(f"[EMAIL REJECTION] ❌ FAILED to delete email {email_id}: {str(del_error)}", exc_info=True)
                         continue
-                    logger.debug(f"[EMAIL] ✓ User found: {user.email} (ID: {user.id})")
+                    logger.debug(f"[EMAIL] ✓ GATE #1 PASSED - User found: {user.email} (ID: {user.id})")
 
                     # SECURITY GATE #2 & #3: Check sender is allowed and active
                     logger.debug(f"[EMAIL] Checking if sender {sender_email} is allowed for user {user.id}")
                     is_allowed, allowed_sender = self.is_sender_allowed(str(user.id), sender_email)
+                    logger.debug(f"[EMAIL] is_sender_allowed returned: is_allowed={is_allowed}, allowed_sender={allowed_sender}")
+
                     if not is_allowed:
                         rejection_reason = f"Sender {sender_email} not in whitelist"
-                        logger.error(f"[EMAIL DEBUG] REJECTED - Sender not whitelisted: {sender_email} for user {user.id}")
-                        logger.error(f"[EMAIL DEBUG] Creating rejection log and sending notification")
+                        logger.error(f"[EMAIL REJECTION] ❌ GATE #2 FAILED - Sender not whitelisted")
+                        logger.error(f"[EMAIL REJECTION] User: {user.email} (ID: {user.id})")
+                        logger.error(f"[EMAIL REJECTION] Sender: {sender_email}")
+                        logger.error(f"[EMAIL REJECTION] Recipient: {recipient_email}")
+                        logger.error(f"[EMAIL REJECTION] Subject: {subject}")
+                        logger.error(f"[EMAIL REJECTION] Creating rejection log and sending notification")
 
                         # Create log
-                        self.create_processing_log(
-                            user_id=str(user.id),
-                            sender_email=sender_email,
-                            recipient_email=recipient_email,
-                            subject=subject,
-                            message_id=message_id,
-                            uid=str(email_id),
-                            attachment_count=attachment_count,
-                            total_size_bytes=total_size,
-                            status='rejected',
-                            rejection_reason=rejection_reason
-                        )
+                        try:
+                            log = self.create_processing_log(
+                                user_id=str(user.id),
+                                sender_email=sender_email,
+                                recipient_email=recipient_email,
+                                subject=subject,
+                                message_id=message_id,
+                                uid=str(email_id),
+                                attachment_count=attachment_count,
+                                total_size_bytes=total_size,
+                                status='rejected',
+                                rejection_reason=rejection_reason
+                            )
+                            logger.error(f"[EMAIL REJECTION] ✓ Rejection log created successfully: {log.id if log else 'FAILED'}")
+                        except Exception as log_error:
+                            logger.error(f"[EMAIL REJECTION] ❌ FAILED to create rejection log: {str(log_error)}", exc_info=True)
 
                         # Send notification
-                        await self.send_rejection_notification(
-                            user, sender_email, subject, rejection_reason
-                        )
+                        try:
+                            await self.send_rejection_notification(
+                                user, sender_email, subject, rejection_reason
+                            )
+                            logger.error(f"[EMAIL REJECTION] ✓ Rejection notification sent to {user.email}")
+                        except Exception as notif_error:
+                            logger.error(f"[EMAIL REJECTION] ❌ FAILED to send rejection notification: {str(notif_error)}", exc_info=True)
 
-                        logger.error(f"[EMAIL DEBUG] Deleting email {email_id}")
-                        # Delete email
-                        self.delete_email_from_inbox(imap, email_id)
+                        logger.error(f"[EMAIL REJECTION] Deleting email {email_id} from inbox")
+                        try:
+                            self.delete_email_from_inbox(imap, email_id)
+                            logger.error(f"[EMAIL REJECTION] ✓ Email {email_id} deleted successfully")
+                        except Exception as del_error:
+                            logger.error(f"[EMAIL REJECTION] ❌ FAILED to delete email {email_id}: {str(del_error)}", exc_info=True)
                         continue
-                    logger.debug(f"[EMAIL] ✓ Sender is whitelisted: {sender_email}")
+                    logger.debug(f"[EMAIL] ✓ GATE #2 PASSED - Sender is whitelisted: {sender_email}")
 
                     # SECURITY GATE #4 & #5: Quota check removed (Pro tier has unlimited email processing)
                     # Future: Add quota check here for Free tier if needed
 
                     # SECURITY GATE #6: Check attachment count
-                    logger.debug(f"[EMAIL] Checking attachment count: {attachment_count}")
+                    logger.debug(f"[EMAIL] GATE #6: Checking attachment count: {attachment_count}")
                     if attachment_count == 0:
-                        logger.error(f"[EMAIL DEBUG] REJECTED - No attachments in email from {sender_email}")
+                        logger.error(f"[EMAIL REJECTION] ❌ GATE #6 FAILED - No attachments")
+                        logger.error(f"[EMAIL REJECTION] Sender: {sender_email}")
+                        logger.error(f"[EMAIL REJECTION] Recipient: {recipient_email}")
+                        logger.error(f"[EMAIL REJECTION] Subject: {subject}")
                         rejection_reason = "No attachments found in email"
 
                         self.create_processing_log(
@@ -1096,21 +1127,44 @@ class EmailProcessingService:
                     )
 
                     # CRITICAL CLEANUP: Delete email and temp files
-                    logger.debug(f"[EMAIL] Cleaning up temp files and deleting email {email_id}")
+                    logger.info(f"[EMAIL SUCCESS] ========================================")
+                    logger.info(f"[EMAIL SUCCESS] ✓✓✓ EMAIL PROCESSED SUCCESSFULLY ✓✓✓")
+                    logger.info(f"[EMAIL SUCCESS] ========================================")
+                    logger.info(f"[EMAIL SUCCESS] From: {sender_email}")
+                    logger.info(f"[EMAIL SUCCESS] To: {recipient_email}")
+                    logger.info(f"[EMAIL SUCCESS] User: {user.email}")
+                    logger.info(f"[EMAIL SUCCESS] Documents created: {documents_created}")
+                    logger.info(f"[EMAIL SUCCESS] Cleaning up temp files and deleting email {email_id}")
                     self.cleanup_temp_files(temp_files)
-                    self.delete_email_from_inbox(imap, email_id)
-                    logger.debug(f"[EMAIL] ✓ Cleanup complete")
+                    try:
+                        self.delete_email_from_inbox(imap, email_id)
+                        logger.info(f"[EMAIL SUCCESS] ✓ Email {email_id} deleted from inbox")
+                    except Exception as del_error:
+                        logger.error(f"[EMAIL SUCCESS] ❌ FAILED to delete email {email_id}: {str(del_error)}", exc_info=True)
+                    logger.info(f"[EMAIL SUCCESS] ✓ Cleanup complete")
 
                     processed_count += 1
-                    logger.debug(f"[EMAIL] Email processing complete! Total processed in this batch: {processed_count}")
-                    logger.info(f"Successfully processed email from {sender_email}: {documents_created} documents created")
+                    logger.info(f"[EMAIL SUCCESS] Total emails processed in this batch: {processed_count}")
+                    logger.info(f"[EMAIL SUCCESS] ========================================")
 
                 except Exception as e:
-                    logger.error(f"Error processing email {email_id}: {str(e)}")
+                    logger.error(f"[EMAIL CRITICAL] Exception during email processing for ID {email_id}")
+                    logger.error(f"[EMAIL CRITICAL] Exception type: {type(e).__name__}")
+                    logger.error(f"[EMAIL CRITICAL] Exception message: {str(e)}", exc_info=True)
+                    logger.error(f"[EMAIL CRITICAL] Email details - From: {sender_email if 'sender_email' in locals() else 'UNKNOWN'} | To: {recipient_email if 'recipient_email' in locals() else 'UNKNOWN'}")
+                    logger.error(f"[EMAIL CRITICAL] Email will NOT be deleted - will retry on next poll")
                     # Cleanup any temp files
                     if 'temp_files' in locals():
                         self.cleanup_temp_files(temp_files)
                     continue
+
+            # Poll summary
+            logger.info(f"[EMAIL POLL COMPLETE] ========================================")
+            logger.info(f"[EMAIL POLL COMPLETE] Polling cycle finished")
+            logger.info(f"[EMAIL POLL COMPLETE] Total UNSEEN emails found: {len(email_ids)}")
+            logger.info(f"[EMAIL POLL COMPLETE] Successfully processed: {processed_count}")
+            logger.info(f"[EMAIL POLL COMPLETE] Rejected/Failed: {len(email_ids) - processed_count}")
+            logger.info(f"[EMAIL POLL COMPLETE] ========================================")
 
             return processed_count
 
