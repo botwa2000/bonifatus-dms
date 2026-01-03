@@ -823,6 +823,11 @@ class EmailProcessingService:
                     sender_email = self.extract_email_address(sender_raw)
                     subject = self.decode_email_header(subject_raw)
 
+                    # Extract attachments to get count and size for validation
+                    attachments = self.extract_attachments(email_message)
+                    attachment_count = len(attachments)
+                    total_size = sum(att['size'] for att in attachments)
+
                     logger.info(f"Processing email: {sender_email} -> {recipient_email}")
 
                     # SECURITY GATE #1: Find user by unique email processing address (1:1 relationship)
