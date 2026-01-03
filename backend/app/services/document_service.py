@@ -18,6 +18,7 @@ from app.database.models import Document, Category, DocumentCategory, CategoryTr
 from app.database.connection import db_manager
 from app.services.drive_service import drive_service
 from app.services.document_storage_service import document_storage_service
+from app.services.provider_manager import ProviderManager
 from app.services.tier_service import tier_service
 from app.core.config import settings
 from app.schemas.document_schemas import (
@@ -305,7 +306,9 @@ class DocumentService:
             if not user:
                 raise ValueError("User not found")
 
-            if not user.active_storage_provider:
+            # Check if any storage provider is connected
+            # Uses ProviderManager to ensure consistency with provider_connections table
+            if not ProviderManager.get_active_provider(session, user):
                 raise ValueError("Please connect a storage provider in Settings before uploading documents")
 
             # Upload using centralized document storage service (provider-agnostic)

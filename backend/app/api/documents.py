@@ -9,6 +9,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 import io
 
 from app.schemas.document_schemas import (
@@ -20,6 +21,7 @@ from app.schemas.document_schemas import (
 from app.services.document_service import document_service
 from app.services.drive_service import drive_service
 from app.services.document_analysis_service import DocumentAnalysisService
+from app.services.provider_manager import ProviderManager
 from app.middleware.auth_middleware import (
     get_current_active_user,
     get_client_ip,
@@ -27,6 +29,7 @@ from app.middleware.auth_middleware import (
     DelegateContext
 )
 from app.database.models import User
+from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +67,8 @@ async def upload_document(
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     current_user: User = Depends(get_current_active_user),
-    delegate_ctx: DelegateContext = Depends(get_delegate_context)
+    delegate_ctx: DelegateContext = Depends(get_delegate_context),
+    db: Session = Depends(get_db)
 ) -> DocumentUploadResponse:
     """
     Upload document to Google Drive and process metadata
@@ -83,7 +87,8 @@ async def upload_document(
         ip_address = get_client_ip(request)
 
         # Check if any storage provider is connected
-        if not current_user.active_storage_provider:
+        # Uses ProviderManager to ensure consistency with provider_connections table
+        if not ProviderManager.get_active_provider(db, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="STORAGE_PROVIDER_NOT_CONNECTED"  # Special code for frontend to handle

@@ -9,12 +9,12 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, func, and_, or_, desc
+from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.database.models import User, TierPlan, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency
-from app.database.connection import db_manager
+from app.database.connection import db_manager, get_db
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
 from app.services.email_poller_health_service import email_poller_health_service
@@ -810,6 +810,69 @@ async def trigger_email_poll(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger email poll: {str(e)}"
+        )
+
+
+@router.get("/provider-consistency-check")
+async def check_provider_consistency(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Check for users with desynchronized cloud provider fields
+
+    Admin only endpoint to detect inconsistencies between:
+    - provider_connections.is_active (new schema)
+    - users.active_storage_provider (legacy schema)
+
+    These fields should always be in sync. This endpoint identifies
+    users where they differ, which causes upload failures.
+
+    Returns:
+        - total_mismatches: Count of users with inconsistent fields
+        - users: List of affected users with details
+    """
+    try:
+        # Query for users with mismatched active provider fields
+        mismatched_users = db.execute(text("""
+            SELECT
+                u.id,
+                u.email,
+                u.active_storage_provider,
+                pc.provider_key as active_provider_connection,
+                pc.is_active
+            FROM users u
+            LEFT JOIN provider_connections pc
+                ON pc.user_id = u.id AND pc.is_active = TRUE
+            WHERE u.active_storage_provider IS DISTINCT FROM pc.provider_key
+            ORDER BY u.email
+        """)).fetchall()
+
+        result = {
+            "total_mismatches": len(mismatched_users),
+            "users": [
+                {
+                    "user_id": str(row.id),
+                    "email": row.email,
+                    "user_table_value": row.active_storage_provider,
+                    "provider_connection_value": row.active_provider_connection
+                }
+                for row in mismatched_users
+            ]
+        }
+
+        logger.info(
+            f"Admin {current_user.email} checked provider consistency: "
+            f"{result['total_mismatches']} mismatches found"
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error checking provider consistency: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check provider consistency: {str(e)}"
         )
 
 

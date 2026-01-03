@@ -17,6 +17,7 @@ from app.database.models import User
 from app.services.document_analysis_service import document_analysis_service
 from app.services.document_upload_service import document_upload_service
 from app.services.auth_service import auth_service
+from app.services.provider_manager import ProviderManager
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
 from app.services.category_service import category_service
 from app.services.config_service import config_service
@@ -59,7 +60,8 @@ async def analyze_document(
     """
     try:
         # Check if any storage provider is connected
-        if not current_user.active_storage_provider:
+        # Uses ProviderManager to ensure consistency with provider_connections table
+        if not ProviderManager.get_active_provider(session, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="STORAGE_PROVIDER_NOT_CONNECTED"
@@ -429,7 +431,8 @@ async def analyze_batch(
         ip_address = get_client_ip(request)
 
         # Check if any storage provider is connected
-        if not current_user.active_storage_provider:
+        # Uses ProviderManager to ensure consistency with provider_connections table
+        if not ProviderManager.get_active_provider(session, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="STORAGE_PROVIDER_NOT_CONNECTED"
@@ -766,7 +769,8 @@ async def analyze_batch_async(
         ip_address = get_client_ip(request)
 
         # Check if any storage provider is connected
-        if not current_user.active_storage_provider:
+        # Uses ProviderManager to ensure consistency with provider_connections table
+        if not ProviderManager.get_active_provider(session, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="STORAGE_PROVIDER_NOT_CONNECTED"

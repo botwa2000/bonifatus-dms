@@ -328,7 +328,8 @@ async def provider_oauth_callback(
         logger.info(f"💾 Storing tokens for {provider_type} using ProviderManager...")
 
         # Determine if this should be set as active (only if user has no active provider)
-        set_as_active = not current_user.active_storage_provider
+        # Uses ProviderManager to ensure consistency with provider_connections table
+        set_as_active = not ProviderManager.get_active_provider(db, current_user)
 
         # Connect provider using centralized manager
         connection = ProviderManager.connect_provider(
