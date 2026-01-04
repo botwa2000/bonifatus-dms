@@ -816,8 +816,8 @@ class EmailProcessingService:
                             status, flag_data = imap.fetch(email_id, '(FLAGS)')
                             flags = flag_data[0].decode() if flag_data and flag_data[0] else 'N/A'
 
-                            # Fetch headers
-                            status, header_data = imap.fetch(email_id, '(BODY[HEADER.FIELDS (FROM TO DELIVERED-TO SUBJECT DATE)])')
+                            # Fetch headers - CRITICAL: Use BODY.PEEK to avoid marking emails as \Seen
+                            status, header_data = imap.fetch(email_id, '(BODY.PEEK[HEADER.FIELDS (FROM TO DELIVERED-TO SUBJECT DATE)])')
                             headers = header_data[0][1].decode('utf-8', errors='ignore') if header_data and len(header_data[0]) > 1 else 'N/A'
 
                             logger.info(f"[INBOX ALL EMAILS] Email #{idx+1} (ID: {email_id.decode()}):")
@@ -879,8 +879,8 @@ class EmailProcessingService:
 
                     # Fetch email
                     status, msg_data = imap.fetch(email_id, '(RFC822)')
-                    if status != 'OK':
-                        logger.error(f"[EMAIL] ❌ Failed to fetch email {email_id}. Status: {status}")
+                    if status != 'OK' or not msg_data or not msg_data[0]:
+                        logger.error(f"[EMAIL] ❌ Failed to fetch email {email_id}. Status: {status}, Data: {msg_data}")
                         continue
 
                     # Parse email
