@@ -29,7 +29,7 @@ def upgrade() -> None:
     The User model now has an @property that returns the active provider
     from the ProviderConnection table.
     """
-    op.drop_index('ix_users_active_storage_provider', table_name='users')
+    op.drop_index('idx_users_active_storage_provider', table_name='users')
     op.drop_column('users', 'active_storage_provider')
 
 
@@ -39,7 +39,7 @@ def downgrade() -> None:
     """
     # Recreate column
     op.add_column('users', sa.Column('active_storage_provider', sa.String(50), nullable=True))
-    op.create_index('ix_users_active_storage_provider', 'users', ['active_storage_provider'])
+    op.create_index('idx_users_active_storage_provider', 'users', ['active_storage_provider'])
 
     # Sync data from ProviderConnection back to User table
     op.execute("""
