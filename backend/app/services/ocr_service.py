@@ -544,9 +544,8 @@ class OCRService:
                 if len(full_text.strip()) > 50:
                     quality_score, metrics = self.assess_text_quality(full_text)
                     logger.info(f"PyMuPDF extraction quality: {quality_score:.2f} "
-                              f"(valid_ratio={metrics['valid_char_ratio']:.2f}, "
-                              f"alpha_ratio={metrics['alpha_ratio']:.2f}, "
-                              f"spelling_score={metrics['spelling_score']:.2f})")
+                              f"(valid_ratio={metrics.get('valid_char_ratio', 0):.2f}, "
+                              f"spelling_score={metrics.get('spelling_score', 0):.2f})")
 
                     if quality_score >= 0.6:
                         # Good quality embedded text extracted successfully
