@@ -501,9 +501,10 @@ class OCRService:
         max_pages: Optional[int] = None
     ) -> Tuple[str, float]:
         """
-        Extract text from PDF using optimal two-tier approach:
-        1. Try pdftotext (fastest, most reliable for text PDFs)
-        2. Fallback to Tesseract OCR (for truly scanned documents)
+        Extract text from PDF using detection-first approach:
+        1. Detect if PDF is scanned or native using is_scanned_pdf()
+        2. If NATIVE: Extract embedded text with PyMuPDF (handles custom fonts)
+        3. If SCANNED or extraction fails: Use Tesseract OCR
 
         Args:
             pdf_file: PDF file as bytes
@@ -515,19 +516,48 @@ class OCRService:
             Tuple of (extracted_text, confidence_score)
         """
         try:
-            # STEP 1: Try pdftotext (5-20ms, handles 99% of PDFs)
-            text, success = self.extract_text_with_pdftotext(pdf_file)
+            # STEP 1: Detect PDF type (scanned vs native)
+            is_scanned, confidence = self.is_scanned_pdf(pdf_file)
+            logger.info(f"PDF detection: is_scanned={is_scanned}, confidence={confidence:.2f}")
 
-            if success:
-                # Got usable text - we're done!
-                logger.info(f"Text extracted via pdftotext: {len(text)} chars")
-                return text, 0.95  # High confidence for pdftotext extraction
+            # STEP 2: If NATIVE PDF, extract embedded text with PyMuPDF
+            if not is_scanned:
+                logger.info("PDF identified as NATIVE - extracting embedded text with PyMuPDF")
 
-            # STEP 2: Fallback to OCR for truly scanned PDFs
-            logger.info("pdftotext returned no text, falling back to OCR")
+                doc = fitz.open(stream=pdf_file, filetype="pdf")
+                pages_to_process = len(doc) if max_pages is None else min(max_pages, len(doc))
 
-            # Use Tesseract OCR for scanned PDFs
-            # Use PyMuPDF to render pages to images
+                # Extract text from all pages
+                text_parts = []
+                for i in range(pages_to_process):
+                    page = doc[i]
+                    page_text = page.get_text()
+                    if page_text and len(page_text.strip()) > 0:
+                        text_parts.append(page_text)
+
+                full_text = "\n\n".join(text_parts)
+                doc.close()
+
+                # Validate text quality to detect extraction issues
+                if len(full_text.strip()) > 50:
+                    quality_score, metrics = self.evaluate_text_quality(full_text)
+                    logger.info(f"PyMuPDF extraction quality: {quality_score:.2f} "
+                              f"(valid_ratio={metrics['valid_char_ratio']:.2f}, "
+                              f"alpha_ratio={metrics['alpha_ratio']:.2f}, "
+                              f"spelling_score={metrics['spelling_score']:.2f})")
+
+                    if quality_score >= 0.6:
+                        # Good quality embedded text extracted successfully
+                        logger.info(f"Native text extraction successful: {len(full_text)} chars")
+                        return full_text, 0.95
+                    else:
+                        # Quality too low - likely extraction issue, fallback to OCR
+                        logger.warning(f"Native text quality too low ({quality_score:.2f}), falling back to OCR")
+                else:
+                    logger.warning("PyMuPDF extracted insufficient text, falling back to OCR")
+
+            # STEP 3: Use OCR for scanned PDFs or when native extraction fails
+            logger.info("Using OCR for text extraction")
             doc = fitz.open(stream=pdf_file, filetype="pdf")
             pages_to_process = len(doc) if max_pages is None else min(max_pages, len(doc))
 
