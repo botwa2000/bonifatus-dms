@@ -29,7 +29,7 @@ from app.middleware.auth_middleware import (
     DelegateContext
 )
 from app.database.models import User
-from app.db.session import get_db
+from app.database.connection import get_db
 
 logger = logging.getLogger(__name__)
 
