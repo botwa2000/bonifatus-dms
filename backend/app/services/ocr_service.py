@@ -515,10 +515,12 @@ class OCRService:
         Returns:
             Tuple of (extracted_text, confidence_score)
         """
+        logger.info(f"[PDF EXTRACTION DEBUG] extract_text_from_pdf called with {len(pdf_file)} bytes, language={language}")
         try:
             # STEP 1: Detect PDF type (scanned vs native)
+            logger.info("[PDF EXTRACTION DEBUG] Calling is_scanned_pdf()...")
             is_scanned, confidence = self.is_scanned_pdf(pdf_file)
-            logger.info(f"PDF detection: is_scanned={is_scanned}, confidence={confidence:.2f}")
+            logger.info(f"[PDF EXTRACTION DEBUG] PDF detection: is_scanned={is_scanned}, confidence={confidence:.2f}")
 
             # STEP 2: If NATIVE PDF, extract embedded text with PyMuPDF
             if not is_scanned:
