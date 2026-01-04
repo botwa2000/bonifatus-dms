@@ -600,21 +600,41 @@ class OCRService:
                     logger.info(f"[OCR DEBUG]   - Format: {base_image['ext']}")
                     logger.info(f"[OCR DEBUG]   - Size: {len(base_image['image']) / 1024:.1f} KB")
 
-                    # Quality-based extraction decision
-                    if dpi_x >= 200 and dpi_y >= 200:
-                        # High-quality scan - extract directly without preprocessing
-                        logger.info(f"[OCR DEBUG] ✅ HIGH QUALITY ({dpi_x:.0f} DPI) - Extracting image directly (no preprocessing)")
-                        import io
-                        image = Image.open(io.BytesIO(base_image['image']))
-                        page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=False)
-                        logger.info(f"[OCR DEBUG] Direct extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                    # Smart quality and format-based extraction decision
+                    # JPEG/compressed formats need preprocessing even at good DPI due to compression artifacts
+                    # Clean formats (PNG, TIFF) can skip preprocessing at 200+ DPI
+                    image_format = base_image['ext'].lower()
+                    is_compressed_format = image_format in ['jpeg', 'jpg']
+
+                    # Determine preprocessing strategy
+                    if dpi_x >= 300 and dpi_y >= 300:
+                        # Very high quality - no preprocessing regardless of format
+                        apply_preprocess = False
+                        quality_reason = f"HIGH QUALITY ({dpi_x:.0f} DPI)"
+                    elif dpi_x >= 200 and dpi_y >= 200 and not is_compressed_format:
+                        # Good quality clean format (PNG, TIFF, etc.) - no preprocessing needed
+                        apply_preprocess = False
+                        quality_reason = f"CLEAN FORMAT ({image_format.upper()}, {dpi_x:.0f} DPI)"
                     else:
-                        # Low-quality scan - render and preprocess
-                        logger.info(f"[OCR DEBUG] ⚠️ LOW QUALITY ({dpi_x:.0f} DPI) - Rendering page with preprocessing")
-                        pix = page.get_pixmap(matrix=mat)
-                        image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        # Low quality OR compressed format - apply preprocessing
+                        apply_preprocess = True
+                        if is_compressed_format:
+                            quality_reason = f"COMPRESSED FORMAT ({image_format.upper()}, {dpi_x:.0f} DPI)"
+                        else:
+                            quality_reason = f"LOW QUALITY ({dpi_x:.0f} DPI)"
+
+                    # Extract image and apply appropriate processing
+                    import io
+                    image = Image.open(io.BytesIO(base_image['image']))
+
+                    if apply_preprocess:
+                        logger.info(f"[OCR DEBUG] ⚠️ {quality_reason} - Applying preprocessing to improve OCR")
                         page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=True)
                         logger.info(f"[OCR DEBUG] Preprocessed extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
+                    else:
+                        logger.info(f"[OCR DEBUG] ✅ {quality_reason} - Direct extraction (no preprocessing)")
+                        page_text, confidence = self.ocr_image_with_rotation_detection(image, db, language, preprocess=False)
+                        logger.info(f"[OCR DEBUG] Direct extraction result: {len(page_text)} chars, {confidence*100:.1f}% confidence")
                 else:
                     # No embedded images - render page
                     logger.info(f"[OCR DEBUG] No embedded images - rendering page at 300 DPI")
