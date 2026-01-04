@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database.connection import get_db
-from app.database.models import User
+from app.database.models import User, Category, CategoryTranslation
 from app.middleware.auth_middleware import get_current_active_user
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select
 from app.services.document_storage_service import document_storage_service
 from app.services.storage.provider_factory import ProviderFactory
 from app.core.config import settings
@@ -327,9 +329,26 @@ async def provider_oauth_callback(
         # Store tokens in database using ProviderManager (provider-agnostic)
         logger.info(f"💾 Storing tokens for {provider_type} using ProviderManager...")
 
-        # Determine if this should be set as active (only if user has no active provider)
-        # Uses ProviderManager to ensure consistency with provider_connections table
-        set_as_active = not ProviderManager.get_active_provider(db, current_user)
+        # Determine if this should be set as active
+        # Migration-aware logic to handle provider transitions correctly
+        active_provider_conn = ProviderManager.get_active_provider(db, current_user)
+
+        if migration_choice == 'migrate':
+            # Migration in progress - new provider will become active after migration completes
+            # Don't set as active yet; migration task will handle it
+            set_as_active = False
+            logger.info(f"📦 Migration mode: New provider will be set as active after migration completes")
+        elif migration_choice == 'fresh':
+            # Fresh start - set as active immediately (old provider will be disconnected)
+            set_as_active = True
+            logger.info(f"🆕 Fresh start mode: Setting new provider as active immediately")
+        else:
+            # Normal connection - set as active only if no active provider exists
+            set_as_active = not active_provider_conn
+            if set_as_active:
+                logger.info(f"✅ No active provider found: Setting {provider_type} as active")
+            else:
+                logger.info(f"ℹ️ Active provider already exists ({active_provider_conn.provider_key}): New provider will not be set as active")
 
         # Connect provider using centralized manager
         connection = ProviderManager.connect_provider(
@@ -365,21 +384,36 @@ async def provider_oauth_callback(
                 )
                 logger.info(f"✅ Default categories created")
 
-            # Get category codes for folder initialization
-            categories = db.execute(
-                select(Category.category_code).where(
-                    Category.user_id == current_user.id,
-                    Category.is_active == True
-                )
-            ).scalars().all()
+            # Get category names (translations) for folder initialization
+            # Use English as default for consistency across migrations
+            categories = db.query(Category).options(
+                joinedload(Category.translations)
+            ).filter(
+                Category.user_id == current_user.id,
+                Category.is_active == True
+            ).all()
 
-            category_codes = [cat for cat in categories if cat]
-            logger.info(f"📂 Initializing {len(category_codes)} folders in {provider_type}...")
+            # Helper function to get category name from translations
+            def get_category_name(category):
+                """Get category name from translations, preferring English"""
+                if not category.translations:
+                    return category.reference_key  # Fallback to reference_key
+
+                # Try to find English translation first
+                for trans in category.translations:
+                    if trans.language_code == 'en':
+                        return trans.name
+
+                # If no English translation, use first available
+                return category.translations[0].name if category.translations else category.reference_key
+
+            folder_names = [get_category_name(cat) for cat in categories]
+            logger.info(f"📂 Initializing {len(folder_names)} folders in {provider_type}: {folder_names}...")
 
             # Initialize folder structure in the cloud storage
             folder_map = document_storage_service.initialize_folder_structure(
                 user=current_user,
-                folder_names=category_codes,
+                folder_names=folder_names,
                 db=db,
                 provider_type=provider_type
             )

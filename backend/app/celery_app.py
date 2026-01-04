@@ -377,6 +377,14 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
             migration.status = 'completed'
             migration.folder_deletion_attempted = True
 
+            # Set new provider as active BEFORE deleting old one
+            try:
+                ProviderManager.set_active_provider(db, user, to_provider_type)
+                logger.info(f"[Migration] ✅ Set {to_provider_type} as active provider")
+            except Exception as e:
+                logger.error(f"[Migration] ❌ Failed to set active provider: {e}")
+                # Continue anyway - not critical for migration success
+
             try:
                 deletion_result = from_provider.delete_app_folder(from_token)
                 migration.folder_deleted = deletion_result['success']
