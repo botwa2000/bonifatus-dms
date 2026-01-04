@@ -1,7 +1,7 @@
 """Add missing email templates for complete admin control
 
 Revision ID: 044_add_missing_email_templates
-Revises: 298165871595
+Revises: 043_add_user_delegates
 Create Date: 2025-01-22 10:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = '044_add_missing_email_templates'
-down_revision = '298165871595'
+down_revision = '043_add_user_delegates'
 branch_labels = None
 depends_on = None
 

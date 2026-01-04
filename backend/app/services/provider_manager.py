@@ -200,11 +200,9 @@ class ProviderManager:
         if not connection:
             return False
 
-        # If this was the active provider, clear active status
-        if connection.is_active:
-            user.active_storage_provider = None
-
         # Delete the connection
+        # Note: active_storage_provider property will automatically return None
+        # after this connection is deleted
         db.delete(connection)
         db.commit()
         return True
@@ -307,8 +305,8 @@ class ProviderManager:
             )
         ).update({ProviderConnection.is_active: True})
 
-        # Update User table for backward compatibility
-        user.active_storage_provider = provider_key
+        # Note: User.active_storage_provider property will automatically
+        # return the correct value from the active ProviderConnection
 
     @staticmethod
     def update_last_used(

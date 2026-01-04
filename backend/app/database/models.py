@@ -142,9 +142,7 @@ class User(Base, TimestampMixin):
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)
 
-    # Multi-cloud storage provider fields
-    active_storage_provider = Column(String(50), nullable=True, index=True)
-
+    # Legacy provider-specific fields (being phased out in favor of provider_connections table)
     # OneDrive storage
     onedrive_refresh_token_encrypted = Column(Text, nullable=True)
     onedrive_enabled = Column(Boolean, default=False, nullable=False)
@@ -186,6 +184,21 @@ class User(Base, TimestampMixin):
         Index('idx_user_email', 'email'),
         Index('idx_user_tier_id', 'tier_id'),
     )
+
+    @property
+    def active_storage_provider(self) -> str | None:
+        """
+        Get the active storage provider key for this user.
+
+        Returns the provider_key from the active ProviderConnection,
+        or None if no provider is active.
+
+        This replaces the legacy active_storage_provider column.
+        """
+        for conn in self.provider_connections:
+            if conn.is_active:
+                return conn.provider_key
+        return None
 
 
 class Category(Base, TimestampMixin):
