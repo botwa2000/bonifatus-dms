@@ -540,7 +540,7 @@ class OCRService:
 
                 # Validate text quality to detect extraction issues
                 if len(full_text.strip()) > 50:
-                    quality_score, metrics = self.evaluate_text_quality(full_text)
+                    quality_score, metrics = self.assess_text_quality(full_text)
                     logger.info(f"PyMuPDF extraction quality: {quality_score:.2f} "
                               f"(valid_ratio={metrics['valid_char_ratio']:.2f}, "
                               f"alpha_ratio={metrics['alpha_ratio']:.2f}, "
