@@ -176,6 +176,25 @@ class DocumentAnalysisService:
             keyword_strings = [kw[0] for kw in keywords]
             logger.info(f"[KEYWORD DEBUG] Extracted {len(keyword_strings)} keywords using combined stopwords, top 10: {keyword_strings[:10]}")
 
+            # Post-filter: Remove keywords that match entity values exactly (case-insensitive)
+            # This catches edge cases where tokenization differences allow entities through
+            entity_values_lower = {ent.entity_value.lower() for ent in extracted_entities}
+            filtered_keywords = []
+            removed_entity_keywords = []
+            for kw in keywords:
+                kw_value = kw[0]
+                if kw_value.lower() not in entity_values_lower:
+                    filtered_keywords.append(kw)
+                else:
+                    removed_entity_keywords.append(kw_value)
+
+            if removed_entity_keywords:
+                logger.info(f"[KEYWORD CLEANUP] Removed {len(removed_entity_keywords)} keywords matching entities: {removed_entity_keywords[:10]}")
+
+            keywords = filtered_keywords
+            keyword_strings = [kw[0] for kw in keywords]
+            logger.info(f"[KEYWORD DEBUG] After entity cleanup: {len(keyword_strings)} keywords remain")
+
             primary_date_result = date_extraction_service.extract_primary_date(
                 text=extracted_text,
                 db=db,
