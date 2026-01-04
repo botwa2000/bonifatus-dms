@@ -384,6 +384,12 @@ async def provider_oauth_callback(
                 )
                 logger.info(f"✅ Default categories created")
 
+                # Refresh session to see newly created categories
+                # restore_default_categories uses its own session, so we need to refresh
+                # the current session to see all the new categories
+                db.expire_all()
+                logger.info(f"🔄 Session refreshed to load new categories")
+
             # Get category names (translations) for folder initialization
             # Use English as default for consistency across migrations
             categories = db.query(Category).options(

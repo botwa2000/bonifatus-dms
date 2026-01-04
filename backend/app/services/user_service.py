@@ -650,6 +650,13 @@ class UserService:
             ).delete(synchronize_session=False)
             logger.info(f"Deleted delegate relationships for {user_email}")
 
+            # 3c. Delete cloud storage provider connections and migration tasks
+            from app.database.models import ProviderConnection, MigrationTask
+
+            session.query(MigrationTask).filter(MigrationTask.user_id == user_id).delete()
+            session.query(ProviderConnection).filter(ProviderConnection.user_id == user_id).delete()
+            logger.info(f"Deleted provider connections and migration tasks for {user_email}")
+
             # 4. Delete audit logs for this user (not cascade)
             session.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
             logger.info(f"Deleted audit logs for {user_email}")

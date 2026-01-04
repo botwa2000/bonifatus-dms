@@ -169,6 +169,11 @@ class ProviderManager:
             )
             db.add(connection)
 
+        # Flush to ensure connection is written to database before setting as active
+        # This is critical: _set_active_internal uses bulk UPDATE queries that won't
+        # see uncommitted objects still in the session
+        db.flush()
+
         # Set as active if requested
         if set_as_active:
             ProviderManager._set_active_internal(db, user, provider_key)
