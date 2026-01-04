@@ -547,13 +547,15 @@ class OCRService:
                               f"(valid_ratio={metrics.get('valid_char_ratio', 0):.2f}, "
                               f"spelling_score={metrics.get('spelling_score', 0):.2f})")
 
-                    if quality_score >= 0.6:
+                    # Require higher quality (0.75) to accept native text extraction
+                    # This prevents font substitution garbage from passing through
+                    if quality_score >= 0.75:
                         # Good quality embedded text extracted successfully
                         logger.info(f"Native text extraction successful: {len(full_text)} chars")
                         return full_text, 0.95
                     else:
-                        # Quality too low - likely extraction issue, fallback to OCR
-                        logger.warning(f"Native text quality too low ({quality_score:.2f}), falling back to OCR")
+                        # Quality too low - likely font substitution issue, fallback to OCR
+                        logger.warning(f"Native text quality too low ({quality_score:.2f} < 0.75), falling back to OCR for better accuracy")
                 else:
                     logger.warning("PyMuPDF extracted insufficient text, falling back to OCR")
 
