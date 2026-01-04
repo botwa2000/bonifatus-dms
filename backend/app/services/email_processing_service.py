@@ -765,29 +765,109 @@ class EmailProcessingService:
 
         try:
             # Connect to IMAP
-            logger.debug(f"[EMAIL] Connecting to IMAP server: {self.imap_host}:{self.imap_port}")
+            logger.info(f"[EMAIL POLL START] ========================================")
+            logger.info(f"[EMAIL POLL START] IMAP CONFIGURATION:")
+            logger.info(f"[EMAIL POLL START]   Host: {self.imap_host}:{self.imap_port}")
+            logger.info(f"[EMAIL POLL START]   User: {self.imap_user}")
+            logger.info(f"[EMAIL POLL START]   SSL: {self.imap_use_ssl}")
+            logger.info(f"[EMAIL POLL START]   Domain: {self.doc_domain}")
+            logger.info(f"[EMAIL POLL START] ========================================")
+
             imap = self.connect_to_imap()
             if not imap:
                 logger.error("[EMAIL DEBUG] Failed to connect to IMAP")
                 return 0
 
-            logger.info("[EMAIL DEBUG] IMAP connection successful")
+            logger.info("[EMAIL DEBUG] ✓ IMAP connection successful")
+
+            # COMPREHENSIVE DEBUG: List ALL folders
+            logger.info("[IMAP FOLDERS] ========================================")
+            logger.info("[IMAP FOLDERS] Listing ALL available folders:")
+            try:
+                status, folder_list = imap.list()
+                if status == 'OK':
+                    for folder in folder_list:
+                        logger.info(f"[IMAP FOLDERS]   - {folder.decode()}")
+                else:
+                    logger.error(f"[IMAP FOLDERS] Failed to list folders. Status: {status}")
+            except Exception as folder_error:
+                logger.error(f"[IMAP FOLDERS] Error listing folders: {str(folder_error)}")
+            logger.info("[IMAP FOLDERS] ========================================")
 
             # Select inbox
             logger.info("[EMAIL DEBUG] Selecting INBOX folder")
             status, data = imap.select('INBOX')
-            logger.debug(f"[EMAIL] INBOX selected. Status: {status}, Messages: {data}")
+            logger.info(f"[EMAIL DEBUG] INBOX selected. Status: {status}, Message count: {data[0].decode() if data and data[0] else 'N/A'}")
+
+            # COMPREHENSIVE DEBUG: Show ALL emails in INBOX (not just UNSEEN)
+            logger.info("[INBOX ALL EMAILS] ========================================")
+            logger.info("[INBOX ALL EMAILS] Searching for ALL emails in INBOX:")
+            try:
+                status, all_messages = imap.search(None, 'ALL')
+                if status == 'OK':
+                    all_email_ids = all_messages[0].split()
+                    logger.info(f"[INBOX ALL EMAILS] Total emails in INBOX: {len(all_email_ids)}")
+                    logger.info(f"[INBOX ALL EMAILS] Email IDs: {all_email_ids}")
+
+                    # Show flags and basic info for each email
+                    for idx, email_id in enumerate(all_email_ids[:10]):  # Show first 10
+                        try:
+                            # Fetch flags
+                            status, flag_data = imap.fetch(email_id, '(FLAGS)')
+                            flags = flag_data[0].decode() if flag_data and flag_data[0] else 'N/A'
+
+                            # Fetch headers
+                            status, header_data = imap.fetch(email_id, '(BODY[HEADER.FIELDS (FROM TO DELIVERED-TO SUBJECT DATE)])')
+                            headers = header_data[0][1].decode('utf-8', errors='ignore') if header_data and len(header_data[0]) > 1 else 'N/A'
+
+                            logger.info(f"[INBOX ALL EMAILS] Email #{idx+1} (ID: {email_id.decode()}):")
+                            logger.info(f"[INBOX ALL EMAILS]   Flags: {flags}")
+                            logger.info(f"[INBOX ALL EMAILS]   Headers:\n{headers}")
+                        except Exception as email_error:
+                            logger.error(f"[INBOX ALL EMAILS] Error fetching details for email {email_id}: {str(email_error)}")
+
+                    if len(all_email_ids) > 10:
+                        logger.info(f"[INBOX ALL EMAILS] ... and {len(all_email_ids) - 10} more emails (showing first 10 only)")
+                else:
+                    logger.error(f"[INBOX ALL EMAILS] Failed to search ALL emails. Status: {status}")
+            except Exception as all_error:
+                logger.error(f"[INBOX ALL EMAILS] Error searching ALL emails: {str(all_error)}")
+            logger.info("[INBOX ALL EMAILS] ========================================")
+
+            # COMPREHENSIVE DEBUG: Check Spam/Junk folders
+            for folder_name in ['Spam', 'Junk', 'SPAM', 'JUNK', '[Gmail]/Spam', 'Trash', 'TRASH']:
+                logger.info(f"[FOLDER CHECK] Checking folder: {folder_name}")
+                try:
+                    status, data = imap.select(folder_name)
+                    if status == 'OK':
+                        logger.info(f"[FOLDER CHECK] ✓ Folder '{folder_name}' exists, messages: {data[0].decode() if data and data[0] else 'N/A'}")
+
+                        # Search for UNSEEN in this folder
+                        status, messages = imap.search(None, 'UNSEEN')
+                        if status == 'OK':
+                            spam_email_ids = messages[0].split()
+                            logger.info(f"[FOLDER CHECK]   UNSEEN emails in {folder_name}: {len(spam_email_ids)}")
+                            if spam_email_ids:
+                                logger.warning(f"[FOLDER CHECK]   ⚠️  UNSEEN emails found in {folder_name}: {spam_email_ids}")
+                    else:
+                        logger.info(f"[FOLDER CHECK] Folder '{folder_name}' not found or not accessible")
+                except Exception as folder_error:
+                    logger.info(f"[FOLDER CHECK] Folder '{folder_name}' does not exist or error: {str(folder_error)}")
+
+            # Re-select INBOX for actual processing
+            logger.info("[EMAIL DEBUG] Re-selecting INBOX for processing")
+            status, data = imap.select('INBOX')
 
             # Search for unread emails
-            logger.info("[EMAIL DEBUG] Searching for UNSEEN emails")
+            logger.info("[EMAIL DEBUG] Searching for UNSEEN emails in INBOX")
             status, messages = imap.search(None, 'UNSEEN')
             if status != 'OK':
-                logger.error(f"[EMAIL DEBUG] Failed to search for emails. Status: {status}")
+                logger.error(f"[EMAIL DEBUG] Failed to search for UNSEEN emails. Status: {status}")
                 return 0
 
             email_ids = messages[0].split()
             logger.info(f"[EMAIL POLL] ========================================")
-            logger.info(f"[EMAIL POLL] Found {len(email_ids)} UNSEEN emails in inbox")
+            logger.info(f"[EMAIL POLL] Found {len(email_ids)} UNSEEN emails in INBOX")
             logger.info(f"[EMAIL POLL] Email IDs: {email_ids}")
             logger.info(f"[EMAIL POLL] ========================================")
 
