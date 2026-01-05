@@ -344,16 +344,21 @@ class OCRService:
         """
         try:
             # Step 1: Detect rotation using Tesseract OSD
+            logger.info(f"[ROTATION] Running OSD on image size: {image.size}")
             osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
             detected_rotation = osd.get('rotate', 0)
             orientation_conf = osd.get('orientation_conf', 0)
+            script = osd.get('script', 'Unknown')
+            script_conf = osd.get('script_conf', 0)
 
-            logger.info(f"[ROTATION] OSD detected: {detected_rotation}° rotation (confidence: {orientation_conf:.2f})")
+            logger.info(f"[ROTATION] OSD detected: {detected_rotation}° rotation (confidence: {orientation_conf:.2f}), script: {script} (conf: {script_conf:.2f})")
 
             # Step 2: Rotate image if needed (with high confidence)
             if detected_rotation != 0 and orientation_conf > 2.0:
                 logger.info(f"[ROTATION] ✅ Rotating image by {-detected_rotation}° before OCR")
                 image = image.rotate(-detected_rotation, expand=True)  # PIL rotates counter-clockwise
+            else:
+                logger.info(f"[ROTATION] No rotation needed (rotation={detected_rotation}°, conf={orientation_conf:.2f})")
         except Exception as e:
             # OSD can fail on pages with very little text or complex layouts
             logger.warning(f"[ROTATION] OSD failed: {e}, proceeding without rotation correction")
@@ -382,18 +387,31 @@ class OCRService:
         """
         try:
             supported_languages = self.get_supported_languages(db)
-            tesseract_lang = supported_languages.get(language, 'eng')
+
+            # Handle multilingual OCR (e.g., "eng+deu+rus") - use directly without lookup
+            if '+' in language:
+                tesseract_lang = language
+                logger.info(f"[OCR LANG] Using multilingual Tesseract: {tesseract_lang}")
+            else:
+                tesseract_lang = supported_languages.get(language, 'eng')
+                logger.info(f"[OCR LANG] Mapped {language} -> {tesseract_lang}")
+
+            # Log image dimensions before preprocessing
+            logger.info(f"[OCR IMAGE] Original image size: {image.size} (width x height)")
 
             if preprocess:
                 image = self.preprocess_image(image)
+                logger.info(f"[OCR IMAGE] After preprocessing: {image.size} (width x height)")
 
             custom_config = r'--oem 3 --psm 3'
 
+            logger.info(f"[OCR EXEC] Starting Tesseract with lang={tesseract_lang}, config={custom_config}")
             text = pytesseract.image_to_string(
                 image,
                 lang=tesseract_lang,
                 config=custom_config
             )
+            logger.info(f"[OCR EXEC] Tesseract completed, extracted {len(text)} characters")
 
             data = pytesseract.image_to_data(
                 image,
