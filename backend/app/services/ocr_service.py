@@ -595,9 +595,12 @@ class OCRService:
                 page = doc[i]
 
                 # Check for embedded images (direct extraction preserves quality)
+                # CRITICAL: Only use embedded image extraction for SCANNED PDFs
+                # For NATIVE PDFs with font encoding issues, embedded images are just logos/graphics
+                # We must render the full page to get the actual text content
                 images = page.get_images()
 
-                if images:
+                if images and is_scanned:
                     # PDF has embedded image - analyze quality
                     xref = images[0][0]
                     base_image = doc.extract_image(xref)
