@@ -25,11 +25,11 @@ touch /var/log/clamav/freshclam.log /var/log/clamav/clamav.log 2>/dev/null || tr
 chmod 666 /var/log/clamav/*.log 2>/dev/null || true
 echo "[Permissions] ✓ Ownership fixed"
 
-# Function to start ClamAV with keepalive monitoring
+# Function to start ClamAV in background without keepalive
 start_clamav_lazy() {
-    echo "[ClamAV] Initializing in background (lazy mode with keepalive)..."
+    echo "[ClamAV] Initializing in background (lazy mode)..."
 
-    # Always start in a single background process with keepalive loop
+    # Start in a single background process - no keepalive to avoid conflicts
     echo "[ClamAV] Starting initialization in background..."
     (
         # Log directory created by tmpfs with root:root ownership (uid=0, gid=0)
@@ -48,16 +48,13 @@ start_clamav_lazy() {
             echo "[ClamAV] Database exists."
         fi
 
-        # Keepalive loop - restart clamd if it dies
-        while true; do
-            echo "[ClamAV] Starting daemon..."
-            # Start daemon in foreground, will daemonize itself
-            clamd --config-file=/etc/clamav/clamd.conf
+        # Start daemon once - will daemonize itself and stay running
+        echo "[ClamAV] Starting daemon..."
+        clamd --config-file=/etc/clamav/clamd.conf
 
-            # Give daemon time to start
-            sleep 5
-
-            # Check if daemon is running
+        # Wait for daemon to start and verify it's responsive
+        for i in {1..10}; do
+            sleep 1
             if clamdscan --ping 2>/dev/null; then
                 echo "[ClamAV] Daemon started successfully and is responsive"
 
@@ -67,24 +64,14 @@ start_clamav_lazy() {
                     touch /var/lib/clamav/.updated
                 fi
 
-                # Monitor loop - check every 30 seconds if daemon is still alive
-                while true; do
-                    sleep 30
-                    if ! clamdscan --ping 2>/dev/null; then
-                        echo "[ClamAV] Daemon stopped responding - restarting..."
-                        pkill -9 clamd 2>/dev/null || true
-                        sleep 2
-                        break  # Break inner loop to restart daemon
-                    fi
-                done
-            else
-                echo "[ClamAV] Warning: Daemon failed to start, retrying in 10 seconds..."
-                sleep 10
+                exit 0
             fi
         done
+
+        echo "[ClamAV] Warning: Daemon may not have started properly, but continuing..."
     ) &
 
-    echo "[ClamAV] Background initialization started with keepalive monitoring"
+    echo "[ClamAV] Background initialization started"
 }
 
 # Function to check if we should use lazy loading
