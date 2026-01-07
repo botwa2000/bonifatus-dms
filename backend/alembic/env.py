@@ -54,7 +54,7 @@ def read_secret(secret_name: str) -> str:
 
     return value
 
-database_url = read_secret("database_url")
+database_url = read_secret("database_url_v2")
 config.set_main_option("sqlalchemy.url", database_url)
 
 

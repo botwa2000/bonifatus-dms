@@ -64,7 +64,7 @@ class DatabaseSettings(BaseSettings):
     """Database configuration from environment variables"""
 
     database_url: str = Field(
-        default_factory=lambda: read_secret("database_url"),
+        default_factory=lambda: read_secret("database_url_v2"),
         description="Database connection URL (loaded from Docker Swarm secret)"
     )
     database_pool_size: int = Field(default=10, description="Connection pool size")

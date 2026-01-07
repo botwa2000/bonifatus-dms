@@ -182,7 +182,7 @@ def read_secret(secret_name):
     return value
 
 try:
-    database_url = read_secret('database_url')
+    database_url = read_secret('database_url_v2')
 except (ValueError, RuntimeError) as e:
     print(f'[spaCy] ERROR: {e}')
     exit(1)

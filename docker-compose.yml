@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     secrets:
-      - database_url_prod
+      - database_url_v2_prod
       - security_secret_key_prod
       - encryption_key_prod
       - google_client_id_prod
@@ -185,7 +185,7 @@ services:
     container_name: bonifatus-celery-worker
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2 -Q document_processing,storage_migration
     secrets:
-      - database_url_prod
+      - database_url_v2_prod
       - security_secret_key_prod
       - encryption_key_prod
       - google_client_id_prod
@@ -267,7 +267,7 @@ services:
 # All secrets are managed outside Docker Compose for security
 # See DEPLOYMENT_GUIDE.md §9.8 for secrets management procedures
 secrets:
-  database_url_prod:
+  database_url_v2_prod:
     external: true
   security_secret_key_prod:
     external: true
