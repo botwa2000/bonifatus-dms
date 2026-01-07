@@ -6,7 +6,7 @@ services:
     ports:
       - "8081:8080"
     secrets:
-      - database_url_dev
+      - database_url_v2_dev
       - security_secret_key_dev
       - encryption_key_dev
       - google_client_id_dev
@@ -178,7 +178,7 @@ services:
     container_name: bonifatus-celery-worker-dev
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2 -Q document_processing,storage_migration
     secrets:
-      - database_url_dev
+      - database_url_v2_dev
       - security_secret_key_dev
       - encryption_key_dev
       - google_client_id_dev
@@ -254,7 +254,7 @@ services:
 
 # Docker Swarm Secrets (external - created via docker secret create)
 secrets:
-  database_url_dev:
+  database_url_v2_dev:
     external: true
   security_secret_key_dev:
     external: true
