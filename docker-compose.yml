@@ -26,7 +26,7 @@ services:
       - APP_PORT=8080
       - APP_ENVIRONMENT=production
       - APP_DEBUG_MODE=false
-      - APP_CORS_ORIGINS=https://bonidoc.com
+      - APP_CORS_ORIGINS=https://bonidoc.com,https://www.bonidoc.com
       - APP_TITLE=BoniDoc DMS API
       - APP_DESCRIPTION=Document Management System API
       - APP_VERSION=1.0.0
