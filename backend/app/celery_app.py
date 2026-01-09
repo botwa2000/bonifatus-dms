@@ -330,8 +330,6 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                         # If category exists but folder lookup fails, use main folder as fallback
                         if category_folder_id is None:
                             logger.error(f"[Migration] Category '{category_name}' not found in folder map")
-
-                            # Use main folder as fallback instead of root
                             main_folder_id = folder_map.get('main')
                             if main_folder_id:
                                 category_folder_id = main_folder_id
@@ -339,6 +337,22 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                             else:
                                 logger.critical(f"[Migration] Main folder missing, cannot migrate: {doc.original_filename}")
                                 raise ValueError(f"Folder structure corrupted: Category '{category_name}' and main folder both missing from folder_map")
+                        else:
+                            logger.info(f"[Migration] Document '{doc.original_filename}' -> Category '{category_name}' -> Folder ID: {category_folder_id}")
+                    else:
+                        logger.warning(f"[Migration] Document '{doc.original_filename}' has category_id {doc.category_id} but category not found in database")
+                else:
+                    logger.warning(f"[Migration] Document '{doc.original_filename}' has no category_id")
+
+                # CRITICAL: If category_folder_id is still None, use main folder instead of root
+                if category_folder_id is None:
+                    main_folder_id = folder_map.get('main')
+                    if main_folder_id:
+                        category_folder_id = main_folder_id
+                        logger.warning(f"[Migration] No category for '{doc.original_filename}', using main folder")
+                    else:
+                        logger.critical(f"[Migration] Cannot upload '{doc.original_filename}' - no category and no main folder!")
+                        raise ValueError(f"Cannot migrate document without category folder or main folder")
 
                 logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
                 file_stream = BytesIO(file_content)
