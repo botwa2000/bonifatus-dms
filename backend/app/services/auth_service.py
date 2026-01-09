@@ -389,11 +389,17 @@ class AuthService:
             Authenticate user with Google authorization code
             Exchanges code for ID token, verifies it, and creates/updates user
             """
+            import time
+            start_time = time.time()
+            logger.info(f"[OAUTH DEBUG] 1. Starting OAuth flow from IP: {ip_address}, code length: {len(authorization_code)}")
+
             try:
                 import httpx
                 from google.oauth2 import id_token
                 from google.auth.transport import requests as google_requests
-                
+
+                logger.info(f"[OAUTH DEBUG] 2. Imported dependencies ({time.time() - start_time:.2f}s)")
+
                 # Exchange authorization code for tokens
                 token_url = "https://oauth2.googleapis.com/token"
                 token_data = {
@@ -403,54 +409,75 @@ class AuthService:
                     "redirect_uri": settings.google.google_redirect_uri,
                     "grant_type": "authorization_code"
                 }
-                
+
+                logger.info(f"[OAUTH DEBUG] 3. Prepared token exchange data, redirect_uri: {settings.google.google_redirect_uri} ({time.time() - start_time:.2f}s)")
+
                 async with httpx.AsyncClient() as client:
+                    logger.info(f"[OAUTH DEBUG] 4. Created httpx client, calling Google token endpoint ({time.time() - start_time:.2f}s)")
                     token_response = await client.post(token_url, data=token_data)
+                    logger.info(f"[OAUTH DEBUG] 5. Received Google response, status: {token_response.status_code} ({time.time() - start_time:.2f}s)")
                     
                     if token_response.status_code != 200:
+                        logger.error(f"[OAUTH DEBUG] 6. Token exchange FAILED: {token_response.text}")
                         logger.error(f"Token exchange failed: {token_response.text}")
                         return None
-                    
+
+                    logger.info(f"[OAUTH DEBUG] 6. Token exchange successful ({time.time() - start_time:.2f}s)")
                     tokens = token_response.json()
                     google_id_token = tokens.get("id_token")
-                    
+
                     if not google_id_token:
+                        logger.error(f"[OAUTH DEBUG] 7. No ID token in response")
                         logger.error("No ID token in response")
                         return None
-                
+
+                logger.info(f"[OAUTH DEBUG] 7. Got ID token ({time.time() - start_time:.2f}s)")
+
                 # Verify ID token
                 try:
+                    logger.info(f"[OAUTH DEBUG] 8. Verifying ID token with Google ({time.time() - start_time:.2f}s)")
                     id_info = id_token.verify_oauth2_token(
                         google_id_token,
                         google_requests.Request(),
                         settings.google.google_client_id
                     )
-                    
+                    logger.info(f"[OAUTH DEBUG] 9. ID token verified successfully ({time.time() - start_time:.2f}s)")
+
                     if id_info.get("iss") not in settings.google.google_oauth_issuers:
+                        logger.error(f"[OAUTH DEBUG] 10. Invalid token issuer: {id_info.get('iss')}")
                         logger.error(f"Invalid token issuer: {id_info.get('iss')}")
                         return None
-                        
+
                 except ValueError as e:
+                    logger.error(f"[OAUTH DEBUG] 10. Token verification FAILED: {e}")
                     logger.error(f"Token verification failed: {e}")
                     return None
-                
+
                 # Extract user information
                 google_id = id_info.get("sub")
                 email = id_info.get("email")
                 full_name = id_info.get("name", email.split("@")[0])
                 profile_picture = id_info.get("picture")
-                
+
+                logger.info(f"[OAUTH DEBUG] 10. Extracted user info: {email} ({time.time() - start_time:.2f}s)")
+
                 if not email or not google_id:
+                    logger.error(f"[OAUTH DEBUG] 11. Missing required user information")
                     logger.error("Missing required user information")
                     return None
-                
+
                 # Get or create user
+                logger.info(f"[OAUTH DEBUG] 11. Getting database session ({time.time() - start_time:.2f}s)")
                 db = next(get_db())
+                logger.info(f"[OAUTH DEBUG] 12. Got database session ({time.time() - start_time:.2f}s)")
                 try:
+                    logger.info(f"[OAUTH DEBUG] 13. Querying for user: {email} ({time.time() - start_time:.2f}s)")
                     user = db.query(User).filter(User.email == email).first()
-                    
+                    logger.info(f"[OAUTH DEBUG] 14. User query complete, exists: {user is not None} ({time.time() - start_time:.2f}s)")
+
                     is_new_user = False
                     if not user:
+                        logger.info(f"[OAUTH DEBUG] 15. Creating new user ({time.time() - start_time:.2f}s)")
                         # Determine tier based on admin status or user selection
                         is_admin = email in settings.security.admin_emails
 
@@ -492,15 +519,20 @@ class AuthService:
                     user.last_login_at = datetime.now(timezone.utc)
                     user.last_login_ip = ip_address
 
+                    logger.info(f"[OAUTH DEBUG] 16. Committing user to database ({time.time() - start_time:.2f}s)")
                     db.commit()
                     db.refresh(user)
+                    logger.info(f"[OAUTH DEBUG] 17. User committed and refreshed ({time.time() - start_time:.2f}s)")
 
                     # Copy template categories to new user's workspace
                     if is_new_user:
+                        logger.info(f"[OAUTH DEBUG] 18. Copying template categories for new user ({time.time() - start_time:.2f}s)")
                         self._copy_template_categories_to_user(user.id, db)
+                        logger.info(f"[OAUTH DEBUG] 19. Template categories copied ({time.time() - start_time:.2f}s)")
 
                         # Send welcome email to new user
                         try:
+                            logger.info(f"[OAUTH DEBUG] 20. Sending welcome email ({time.time() - start_time:.2f}s)")
                             from app.services.email_service import email_service
                             dashboard_url = settings.app.app_frontend_url  # Homepage/dashboard, not login page
                             await email_service.send_user_created_notification(
@@ -510,27 +542,34 @@ class AuthService:
                                 dashboard_url=dashboard_url,
                                 user_can_receive_marketing=user.email_marketing_enabled
                             )
+                            logger.info(f"[OAUTH DEBUG] 21. Welcome email sent ({time.time() - start_time:.2f}s)")
                             logger.info(f"Welcome email sent to new user: {user.email}")
                         except Exception as email_error:
                             # Don't fail user creation if email fails
+                            logger.error(f"[OAUTH DEBUG] 21. Failed to send welcome email: {email_error}")
                             logger.error(f"Failed to send welcome email to {user.email}: {email_error}")
 
                     # Create session with refresh token
+                    logger.info(f"[OAUTH DEBUG] 22. Creating session ({time.time() - start_time:.2f}s)")
                     session_info = await session_service.create_session(
                         user_id=str(user.id),
                         ip_address=ip_address,
                         user_agent=user_agent,
                         session=db
                     )
+                    logger.info(f"[OAUTH DEBUG] 23. Session created ({time.time() - start_time:.2f}s)")
 
                     # Note: Google Drive connection is separate from authentication
                     # Users must explicitly connect Drive from Settings page
                     # Authentication OAuth only grants openid+email+profile scopes
 
                     # Generate JWT tokens
+                    logger.info(f"[OAUTH DEBUG] 24. Generating JWT tokens ({time.time() - start_time:.2f}s)")
                     access_token = self.create_access_token(data={"sub": str(user.id)})
                     refresh_token = self.create_refresh_token(data={"sub": str(user.id)})
+                    logger.info(f"[OAUTH DEBUG] 25. JWT tokens generated ({time.time() - start_time:.2f}s)")
 
+                    logger.info(f"[OAUTH DEBUG] 26. OAuth flow complete, total time: {time.time() - start_time:.2f}s")
                     return {
                         "access_token": access_token,
                         "refresh_token": session_info['refresh_token'],
