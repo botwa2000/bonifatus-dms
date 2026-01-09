@@ -106,7 +106,10 @@ services:
     image: bonifatus-frontend:latest
     container_name: bonifatus-frontend
     ports:
-      - "3000:3000"
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host  # Use host mode instead of ingress to fix routing
     restart: unless-stopped
     depends_on:
       - backend
