@@ -146,54 +146,41 @@ async def google_oauth_callback_redirect(
     3. Tokens stored in httpOnly cookies
     4. User redirected to dashboard with cookies set
     """
-    import time
-    callback_start = time.time()
-    logger.info(f"[OAUTH CALLBACK DEBUG] 1. Received OAuth callback request, has_code: {code is not None}, has_state: {state is not None}, has_error: {error is not None}")
-
     try:
         # Handle OAuth cancellation or errors from Google
         if error or not code:
-            logger.info(f"[OAUTH CALLBACK DEBUG] 2. OAuth cancelled/failed: error={error}, code_present={bool(code)}")
             logger.info(f"OAuth flow cancelled or failed: error={error}, code_present={bool(code)}")
             # Redirect to homepage instead of showing error
             redirect_url = f"{settings.app.app_frontend_url}/"
             return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
-        logger.info(f"[OAUTH CALLBACK DEBUG] 2. OAuth code received, length: {len(code) if code else 0}")
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "unknown")
-        logger.info(f"[OAUTH CALLBACK DEBUG] 3. Client info - IP: {ip_address}, UA: {user_agent[:50] if user_agent else 'unknown'}")
 
         # Extract tier selection from OAuth state parameter
         tier_id = None
         billing_cycle = None
         if state:
             try:
-                logger.info(f"[OAUTH CALLBACK DEBUG] 4. Decoding OAuth state parameter ({time.time() - callback_start:.2f}s)")
                 import json
                 import base64
                 state_data = json.loads(base64.b64decode(state).decode('utf-8'))
                 tier_id = state_data.get('tier_id')
                 billing_cycle = state_data.get('billing_cycle')
-                logger.info(f"[OAUTH CALLBACK DEBUG] 5. State decoded - tier_id: {tier_id}, billing_cycle: {billing_cycle} ({time.time() - callback_start:.2f}s)")
                 logger.info(f"OAuth state decoded - tier_id: {tier_id}, billing_cycle: {billing_cycle}")
             except Exception as e:
-                logger.warning(f"[OAUTH CALLBACK DEBUG] 5. Failed to decode state: {e} ({time.time() - callback_start:.2f}s)")
                 logger.warning(f"Failed to decode OAuth state: {e}")
                 # Continue without tier selection - user will get free tier
 
         # Exchange authorization code for tokens
-        logger.info(f"[OAUTH CALLBACK DEBUG] 6. Calling auth_service.authenticate_with_google_code ({time.time() - callback_start:.2f}s)")
         auth_result = await auth_service.authenticate_with_google_code(
             code,
             ip_address,
             user_agent,
             tier_id=tier_id
         )
-        logger.info(f"[OAUTH CALLBACK DEBUG] 7. Auth service returned, success: {auth_result is not None} ({time.time() - callback_start:.2f}s)")
 
         if not auth_result:
-            logger.warning(f"[OAUTH CALLBACK DEBUG] 8. Authentication failed, redirecting to login ({time.time() - callback_start:.2f}s)")
             logger.warning(f"Google authentication failed from IP: {ip_address}")
             error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
@@ -230,11 +217,9 @@ async def google_oauth_callback_redirect(
             redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
             logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
 
-        logger.info(f"[OAUTH CALLBACK DEBUG] 9. Creating redirect response to: {redirect_url} ({time.time() - callback_start:.2f}s)")
         redirect_response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 
         # Set tokens in httpOnly cookies before redirect
-        logger.info(f"[OAUTH CALLBACK DEBUG] 10. Setting cookies ({time.time() - callback_start:.2f}s)")
         redirect_response.set_cookie(
             key="access_token",
             value=auth_result["access_token"],
@@ -257,16 +242,13 @@ async def google_oauth_callback_redirect(
             path="/"
         )
 
-        logger.info(f"[OAUTH CALLBACK DEBUG] 11. Cookies set, returning redirect response ({time.time() - callback_start:.2f}s)")
         logger.info(f"[OAuth] User {auth_result['email']} authenticated successfully")
         logger.info(f"[OAuth] Setting cookies: domain={settings.security.cookie_domain}, secure={settings.security.cookie_secure}, httponly=True")
         logger.info(f"[OAuth] Redirecting to: {redirect_url}")
-        logger.info(f"[OAUTH CALLBACK DEBUG] 12. Total callback time: {time.time() - callback_start:.2f}s")
 
         return redirect_response
 
     except Exception as e:
-        logger.error(f"[OAUTH CALLBACK DEBUG] EXCEPTION at {time.time() - callback_start:.2f}s: {e}")
         logger.error(f"Google OAuth callback error: {e}")
         error_url = f"{settings.app.app_frontend_url}/login?error=server_error"
         return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
