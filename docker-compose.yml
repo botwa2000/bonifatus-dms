@@ -4,7 +4,10 @@ services:
     image: bonifatus-backend:latest
     container_name: bonifatus-backend
     ports:
-      - "8080:8080"
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host  # Use host mode instead of ingress to fix OPTIONS routing
     secrets:
       - database_url_v2_prod
       - security_secret_key_prod
