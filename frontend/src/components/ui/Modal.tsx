@@ -14,11 +14,11 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-60 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-lg ${maxWidth} w-full max-h-[90vh] flex flex-col`}
+        className={`bg-white dark:bg-neutral-800 rounded-lg ${maxWidth} w-full max-h-[90vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -36,9 +36,9 @@ export function ModalHeader({
 }) {
   return (
     <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
-      <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+      <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{title}</h3>
       {onClose && (
-        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600">
+        <button onClick={onClose} className="text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300">
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -61,5 +61,5 @@ export function ModalFooter({
 }: {
   children: React.ReactNode
 }) {
-  return <div className="flex space-x-3 px-6 pb-6 pt-4 flex-shrink-0 border-t border-neutral-200">{children}</div>
+  return <div className="flex space-x-3 px-6 pb-6 pt-4 flex-shrink-0 border-t border-neutral-200 dark:border-neutral-700">{children}</div>
 }

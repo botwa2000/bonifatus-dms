@@ -11,10 +11,10 @@ export function Alert({
   message: string | ReactNode
 }) {
   const styles = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800'
+    success: 'bg-semantic-success-bg dark:bg-green-900/20 border-semantic-success-border dark:border-green-800 text-semantic-success-text dark:text-green-300',
+    error: 'bg-semantic-error-bg dark:bg-red-900/20 border-semantic-error-border dark:border-red-800 text-semantic-error-text dark:text-red-300',
+    warning: 'bg-semantic-warning-bg dark:bg-yellow-900/20 border-semantic-warning-border dark:border-yellow-800 text-semantic-warning-text dark:text-yellow-300',
+    info: 'bg-semantic-info-bg dark:bg-blue-900/20 border-semantic-info-border dark:border-blue-800 text-semantic-info-text dark:text-blue-300'
   }
 
   return (
