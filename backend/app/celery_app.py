@@ -273,18 +273,16 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         categories = db.query(Category).options(joinedload(Category.translations)).filter(Category.user_id == uuid.UUID(user_id)).all()
         folder_names = [get_category_name(cat) for cat in categories]
 
-        logger.info(f"[Migration] Initializing folder structure with {len(folder_names)} categories: {folder_names}")
+        logger.info(f"[Migration] Initializing folder structure with {len(folder_names)} categories")
 
         try:
             folder_map = to_provider.initialize_folder_structure(to_token, folder_names)
-            logger.info(f"[Migration] ✅ Folder structure initialized. Created folders: {list(folder_map.keys())}")
+            logger.info(f"[Migration] Folder structure initialized successfully")
 
             # Verify all requested categories have corresponding folders
             missing_folders = [name for name in folder_names if name not in folder_map and name != 'main']
             if missing_folders:
-                logger.warning(f"[Migration] ⚠️ Some category folders were not created: {missing_folders}")
-                logger.warning(f"[Migration] Requested: {folder_names}")
-                logger.warning(f"[Migration] Created: {list(folder_map.keys())}")
+                logger.warning(f"[Migration] Some category folders missing: {missing_folders}")
         except Exception as e:
             logger.error(f"[Migration] Failed to initialize folder structure: {e}")
             migration.status = 'failed'
@@ -329,25 +327,20 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                         category_name = get_category_name(category)
                         category_folder_id = folder_map.get(category_name)
 
-                        # CRITICAL: If category exists but folder lookup fails, use main folder as fallback
+                        # If category exists but folder lookup fails, use main folder as fallback
                         if category_folder_id is None:
-                            logger.error(f"[Migration] ❌ Category '{category_name}' NOT found in folder_map!")
-                            logger.error(f"[Migration] Document: {doc.original_filename}, Category ID: {doc.category_id}")
-                            logger.error(f"[Migration] Available folders in map: {list(folder_map.keys())}")
+                            logger.error(f"[Migration] Category '{category_name}' not found in folder map")
 
                             # Use main folder as fallback instead of root
                             main_folder_id = folder_map.get('main')
                             if main_folder_id:
                                 category_folder_id = main_folder_id
-                                logger.warning(f"[Migration] ⚠️ Using MAIN folder as fallback for: {doc.original_filename}")
+                                logger.warning(f"[Migration] Using main folder as fallback for: {doc.original_filename}")
                             else:
-                                logger.critical(f"[Migration] 🔥 CRITICAL: Main folder also missing! Document will upload to ROOT: {doc.original_filename}")
-                                # Raise exception instead of silently uploading to root
+                                logger.critical(f"[Migration] Main folder missing, cannot migrate: {doc.original_filename}")
                                 raise ValueError(f"Folder structure corrupted: Category '{category_name}' and main folder both missing from folder_map")
-                        else:
-                            logger.info(f"[Migration] ✅ Category '{category_name}' -> folder_id: {category_folder_id}")
 
-                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename} (folder_id: {category_folder_id or 'ROOT'})")
+                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
                 file_stream = BytesIO(file_content)
                 upload_result = to_provider.upload_document(
                     to_token,
@@ -407,9 +400,9 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
             # Set new provider as active BEFORE deleting old one
             try:
                 ProviderManager.set_active_provider(db, user, to_provider_type)
-                logger.info(f"[Migration] ✅ Set {to_provider_type} as active provider")
+                logger.info(f"[Migration] Set {to_provider_type} as active provider")
             except Exception as e:
-                logger.error(f"[Migration] ❌ Failed to set active provider: {e}")
+                logger.error(f"[Migration] Failed to set active provider: {e}")
                 # Continue anyway - not critical for migration success
 
             try:
