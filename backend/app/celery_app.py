@@ -273,8 +273,18 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         categories = db.query(Category).options(joinedload(Category.translations)).filter(Category.user_id == uuid.UUID(user_id)).all()
         folder_names = [get_category_name(cat) for cat in categories]
 
+        logger.info(f"[Migration] Initializing folder structure with {len(folder_names)} categories: {folder_names}")
+
         try:
             folder_map = to_provider.initialize_folder_structure(to_token, folder_names)
+            logger.info(f"[Migration] ✅ Folder structure initialized. Created folders: {list(folder_map.keys())}")
+
+            # Verify all requested categories have corresponding folders
+            missing_folders = [name for name in folder_names if name not in folder_map and name != 'main']
+            if missing_folders:
+                logger.warning(f"[Migration] ⚠️ Some category folders were not created: {missing_folders}")
+                logger.warning(f"[Migration] Requested: {folder_names}")
+                logger.warning(f"[Migration] Created: {list(folder_map.keys())}")
         except Exception as e:
             logger.error(f"[Migration] Failed to initialize folder structure: {e}")
             migration.status = 'failed'
@@ -318,9 +328,26 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                     if category:
                         category_name = get_category_name(category)
                         category_folder_id = folder_map.get(category_name)
-                        logger.info(f"[Migration] Category '{category_name}' -> folder_id: {category_folder_id}")
 
-                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
+                        # CRITICAL: If category exists but folder lookup fails, use main folder as fallback
+                        if category_folder_id is None:
+                            logger.error(f"[Migration] ❌ Category '{category_name}' NOT found in folder_map!")
+                            logger.error(f"[Migration] Document: {doc.original_filename}, Category ID: {doc.category_id}")
+                            logger.error(f"[Migration] Available folders in map: {list(folder_map.keys())}")
+
+                            # Use main folder as fallback instead of root
+                            main_folder_id = folder_map.get('main')
+                            if main_folder_id:
+                                category_folder_id = main_folder_id
+                                logger.warning(f"[Migration] ⚠️ Using MAIN folder as fallback for: {doc.original_filename}")
+                            else:
+                                logger.critical(f"[Migration] 🔥 CRITICAL: Main folder also missing! Document will upload to ROOT: {doc.original_filename}")
+                                # Raise exception instead of silently uploading to root
+                                raise ValueError(f"Folder structure corrupted: Category '{category_name}' and main folder both missing from folder_map")
+                        else:
+                            logger.info(f"[Migration] ✅ Category '{category_name}' -> folder_id: {category_folder_id}")
+
+                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename} (folder_id: {category_folder_id or 'ROOT'})")
                 file_stream = BytesIO(file_content)
                 upload_result = to_provider.upload_document(
                     to_token,
