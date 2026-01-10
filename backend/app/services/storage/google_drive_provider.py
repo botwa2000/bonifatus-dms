@@ -190,18 +190,27 @@ class GoogleDriveProvider(StorageProvider):
             Exception: If upload fails
         """
         try:
+            logger.info(f"[GoogleDrive] DEBUG: upload_document called for '{filename}'")
+            logger.info(f"[GoogleDrive] DEBUG: folder_id parameter = {folder_id}")
+
             service = self._get_drive_service(refresh_token_encrypted)
 
             # If no folder specified, find/create main app folder
             if not folder_id:
+                logger.warning(f"[GoogleDrive] DEBUG: No folder_id provided, finding/creating app folder")
                 folder_id = self._find_folder(service, self.app_folder_name)
                 if not folder_id:
+                    logger.info(f"[GoogleDrive] DEBUG: App folder not found, creating: '{self.app_folder_name}'")
                     folder_id = self._create_folder(service, self.app_folder_name)
+                logger.info(f"[GoogleDrive] DEBUG: Using app folder_id: {folder_id}")
+            else:
+                logger.info(f"[GoogleDrive] DEBUG: Using specified folder_id: {folder_id}")
 
             file_metadata = {
                 'name': filename,
                 'parents': [folder_id]
             }
+            logger.info(f"[GoogleDrive] DEBUG: file_metadata: {file_metadata}")
 
             file_content.seek(0)
             media = MediaIoBaseUpload(
@@ -210,12 +219,14 @@ class GoogleDriveProvider(StorageProvider):
                 resumable=True
             )
 
+            logger.info(f"[GoogleDrive] DEBUG: Calling Google Drive API files().create()")
             file_result = service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id,name,size,mimeType,webViewLink'
+                fields='id,name,size,mimeType,webViewLink,parents'
             ).execute()
 
+            logger.info(f"[GoogleDrive] DEBUG: Upload response - file_id: {file_result['id']}, parents: {file_result.get('parents', [])}")
             logger.info(f"Document uploaded successfully: {file_result['id']}")
 
             return UploadResult(
@@ -327,26 +338,36 @@ class GoogleDriveProvider(StorageProvider):
             Exception: If folder creation fails
         """
         try:
+            logger.info(f"[GoogleDrive] DEBUG: initialize_folder_structure called")
+            logger.info(f"[GoogleDrive] DEBUG: folder_names to create: {folder_names}")
+
             service = self._get_drive_service(refresh_token_encrypted)
             folder_map = {}
 
             # Create or find main app folder
+            logger.info(f"[GoogleDrive] DEBUG: Finding/creating main app folder: '{self.app_folder_name}'")
             main_folder_id = self._find_folder(service, self.app_folder_name)
             if not main_folder_id:
+                logger.info(f"[GoogleDrive] DEBUG: Main folder not found, creating: '{self.app_folder_name}'")
                 main_folder_id = self._create_folder(service, self.app_folder_name)
+            logger.info(f"[GoogleDrive] DEBUG: Main folder '{self.app_folder_name}' ID: {main_folder_id}")
 
             folder_map['main'] = main_folder_id
             logger.info(f"Main folder '{self.app_folder_name}' ready: {main_folder_id}")
 
             # Create category folders
             for folder_name in folder_names:
+                logger.info(f"[GoogleDrive] DEBUG: Finding/creating category folder '{folder_name}' under parent {main_folder_id}")
                 folder_id = self._find_folder(service, folder_name, main_folder_id)
                 if not folder_id:
+                    logger.info(f"[GoogleDrive] DEBUG: Folder '{folder_name}' not found, creating under parent {main_folder_id}")
                     folder_id = self._create_folder(service, folder_name, main_folder_id)
+                logger.info(f"[GoogleDrive] DEBUG: Folder '{folder_name}' ID: {folder_id}")
 
                 folder_map[folder_name] = folder_id
                 logger.info(f"Folder '{folder_name}' ready: {folder_id}")
 
+            logger.info(f"[GoogleDrive] DEBUG: Final folder_map: {folder_map}")
             logger.info(f"Folder structure initialized with {len(folder_map)} folders")
             return folder_map
 

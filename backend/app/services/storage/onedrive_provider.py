@@ -153,6 +153,9 @@ class OneDriveProvider(StorageProvider):
             Exception: If upload fails
         """
         try:
+            logger.info(f"[OneDrive] DEBUG: upload_document called for '{filename}'")
+            logger.info(f"[OneDrive] DEBUG: folder_id parameter = {folder_id}")
+
             access_token = self.refresh_access_token(refresh_token_encrypted)
             headers = {
                 'Authorization': f'Bearer {access_token}',
@@ -162,18 +165,25 @@ class OneDriveProvider(StorageProvider):
             # Build upload URL
             if folder_id:
                 upload_url = f"{self.graph_base_url}/me/drive/items/{folder_id}:/{filename}:/content"
+                logger.info(f"[OneDrive] DEBUG: Uploading to specified folder_id: {folder_id}")
+                logger.info(f"[OneDrive] DEBUG: Upload URL: {upload_url}")
             else:
                 # Upload to app folder (create if doesn't exist)
+                logger.warning(f"[OneDrive] DEBUG: No folder_id provided, using app folder")
                 app_folder_id = self._get_or_create_app_folder(access_token)
                 upload_url = f"{self.graph_base_url}/me/drive/items/{app_folder_id}:/{filename}:/content"
                 folder_id = app_folder_id
+                logger.info(f"[OneDrive] DEBUG: Using app folder_id: {app_folder_id}")
+                logger.info(f"[OneDrive] DEBUG: Upload URL: {upload_url}")
 
             # Upload file
             file_content.seek(0)
+            logger.info(f"[OneDrive] DEBUG: Sending PUT request to OneDrive API")
             response = requests.put(upload_url, headers=headers, data=file_content)
             response.raise_for_status()
 
             result = response.json()
+            logger.info(f"[OneDrive] DEBUG: Upload response - file_id: {result['id']}, parentReference: {result.get('parentReference', {})}")
             logger.info(f"Document uploaded successfully to OneDrive: {result['id']}")
 
             return UploadResult(
@@ -286,20 +296,28 @@ class OneDriveProvider(StorageProvider):
             Exception: If folder creation fails
         """
         try:
+            logger.info(f"[OneDrive] DEBUG: initialize_folder_structure called")
+            logger.info(f"[OneDrive] DEBUG: folder_names to create: {folder_names}")
+
             access_token = self.refresh_access_token(refresh_token_encrypted)
             folder_map = {}
 
             # Create or get main app folder
+            logger.info(f"[OneDrive] DEBUG: Getting/creating main app folder: '{self.app_folder_name}'")
             main_folder_id = self._get_or_create_app_folder(access_token)
             folder_map['main'] = main_folder_id
+            logger.info(f"[OneDrive] DEBUG: Main folder '{self.app_folder_name}' ID: {main_folder_id}")
             logger.info(f"Main folder '{self.app_folder_name}' ready: {main_folder_id}")
 
             # Create category folders
             for folder_name in folder_names:
+                logger.info(f"[OneDrive] DEBUG: Creating category folder '{folder_name}' under parent {main_folder_id}")
                 folder_id = self._create_folder(access_token, folder_name, main_folder_id)
                 folder_map[folder_name] = folder_id
+                logger.info(f"[OneDrive] DEBUG: Folder '{folder_name}' created with ID: {folder_id}")
                 logger.info(f"Folder '{folder_name}' ready: {folder_id}")
 
+            logger.info(f"[OneDrive] DEBUG: Final folder_map: {folder_map}")
             logger.info(f"Folder structure initialized in OneDrive with {len(folder_map)} folders")
             return folder_map
 

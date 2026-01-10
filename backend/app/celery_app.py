@@ -274,15 +274,24 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
         folder_names = [get_category_name(cat) for cat in categories]
 
         logger.info(f"[Migration] Initializing folder structure with {len(folder_names)} categories")
+        logger.info(f"[Migration] DEBUG: Category names to create: {folder_names}")
 
         try:
             folder_map = to_provider.initialize_folder_structure(to_token, folder_names)
             logger.info(f"[Migration] Folder structure initialized successfully")
+            logger.info(f"[Migration] DEBUG: folder_map contents: {folder_map}")
+            logger.info(f"[Migration] DEBUG: folder_map keys: {list(folder_map.keys())}")
+            logger.info(f"[Migration] DEBUG: folder_map values: {list(folder_map.values())}")
 
             # Verify all requested categories have corresponding folders
             missing_folders = [name for name in folder_names if name not in folder_map and name != 'main']
             if missing_folders:
                 logger.warning(f"[Migration] Some category folders missing: {missing_folders}")
+
+            # Log each folder mapping for verification
+            for fname in folder_names:
+                fid = folder_map.get(fname)
+                logger.info(f"[Migration] DEBUG: Folder '{fname}' maps to ID: {fid}")
         except Exception as e:
             logger.error(f"[Migration] Failed to initialize folder structure: {e}")
             migration.status = 'failed'
@@ -321,19 +330,25 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
 
                 # Upload to new provider (get folder ID for category)
                 category_folder_id = None
+                logger.info(f"[Migration] DEBUG: Processing document '{doc.original_filename}' (ID: {doc.id}, category_id: {doc.category_id})")
+
                 if doc.category_id:
                     category = db.query(Category).options(joinedload(Category.translations)).filter(Category.id == doc.category_id).first()
                     if category:
                         category_name = get_category_name(category)
+                        logger.info(f"[Migration] DEBUG: Document has category '{category_name}' (ID: {doc.category_id})")
                         category_folder_id = folder_map.get(category_name)
+                        logger.info(f"[Migration] DEBUG: Looked up folder_map['{category_name}'] = {category_folder_id}")
 
                         # If category exists but folder lookup fails, use main folder as fallback
                         if category_folder_id is None:
                             logger.error(f"[Migration] Category '{category_name}' not found in folder map")
+                            logger.error(f"[Migration] DEBUG: Available keys in folder_map: {list(folder_map.keys())}")
                             main_folder_id = folder_map.get('main')
                             if main_folder_id:
                                 category_folder_id = main_folder_id
                                 logger.warning(f"[Migration] Using main folder as fallback for: {doc.original_filename}")
+                                logger.info(f"[Migration] DEBUG: Using main folder ID: {main_folder_id}")
                             else:
                                 logger.critical(f"[Migration] Main folder missing, cannot migrate: {doc.original_filename}")
                                 raise ValueError(f"Folder structure corrupted: Category '{category_name}' and main folder both missing from folder_map")
@@ -346,16 +361,21 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
 
                 # CRITICAL: If category_folder_id is still None, use main folder instead of root
                 if category_folder_id is None:
+                    logger.warning(f"[Migration] DEBUG: category_folder_id is still None, looking for main folder")
                     main_folder_id = folder_map.get('main')
+                    logger.info(f"[Migration] DEBUG: folder_map.get('main') returned: {main_folder_id}")
                     if main_folder_id:
                         category_folder_id = main_folder_id
-                        logger.warning(f"[Migration] No category for '{doc.original_filename}', using main folder")
+                        logger.warning(f"[Migration] No category for '{doc.original_filename}', using main folder (ID: {main_folder_id})")
                     else:
                         logger.critical(f"[Migration] Cannot upload '{doc.original_filename}' - no category and no main folder!")
+                        logger.critical(f"[Migration] DEBUG: folder_map contents: {folder_map}")
                         raise ValueError(f"Cannot migrate document without category folder or main folder")
 
-                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename}")
+                logger.info(f"[Migration] DEBUG: FINAL category_folder_id for upload: {category_folder_id}")
+                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.original_filename} to folder ID: {category_folder_id}")
                 file_stream = BytesIO(file_content)
+                logger.info(f"[Migration] DEBUG: Calling to_provider.upload_document with folder_id={category_folder_id}")
                 upload_result = to_provider.upload_document(
                     to_token,
                     file_stream,
@@ -363,6 +383,8 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                     doc.mime_type,
                     category_folder_id
                 )
+                logger.info(f"[Migration] DEBUG: Upload completed. Result file_id: {upload_result.file_id}")
+                logger.info(f"[Migration] DEBUG: Upload result type: {type(upload_result)}, attributes: {dir(upload_result)}")
 
                 # Update document in database
                 old_file_id = doc.storage_file_id
@@ -376,10 +398,11 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                     'filename': doc.original_filename,
                     'success': True,
                     'old_file_id': old_file_id,
-                    'new_file_id': upload_result.file_id
+                    'new_file_id': upload_result.file_id,
+                    'folder_id_used': category_folder_id
                 })
 
-                logger.info(f"[Migration] Successfully migrated: {doc.original_filename}")
+                logger.info(f"[Migration] Successfully migrated: {doc.original_filename} from {old_file_id} to {upload_result.file_id} in folder {category_folder_id}")
 
                 # Memory cleanup
                 del file_content
