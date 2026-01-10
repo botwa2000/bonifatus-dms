@@ -284,13 +284,14 @@ class DocumentUploadService:
                 is_duplicate=False,
                 duplicate_of_document_id=None,
                 batch_id=uuid_lib.UUID(batch_id) if batch_id else None,
-                is_deleted=False
+                is_deleted=False,
+                category_id=uuid_lib.UUID(primary_cat_id)  # CRITICAL FIX: Set primary category for migrations
             )
 
             session.add(document)
             session.flush()  # Flush to get the document ID for relationships
 
-            logger.info(f"Creating document record: {document.id}")
+            logger.info(f"Creating document record: {document.id} with primary category: {primary_cat_id}")
             
             # Link categories (with primary designation) using ORM
             logger.info(f"Linking {len(category_ids_ordered)} categories")
