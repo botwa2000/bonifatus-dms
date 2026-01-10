@@ -718,7 +718,7 @@ export default function SettingsPage() {
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-neutral-900 dark:text-white">{label}</p>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">{description}</p>
+        <p className="text-xs text-neutral-600 dark:text-neutral-300">{description}</p>
       </div>
       <button
         type="button"
@@ -831,14 +831,14 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium text-neutral-900 dark:text-blue-100 mb-2">
                         Your documents are automatically recognized in all supported languages
                       </p>
-                      <p className="text-xs text-neutral-700 dark:text-neutral-300 dark:text-blue-200 mb-3">
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 mb-3">
                         The system will detect and process documents in any of the following languages:
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {systemSettings.available_languages.map(langCode => (
                           <span
                             key={langCode}
-                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white dark:bg-blue-900/40 text-neutral-900 dark:text-blue-100 border border-neutral-300 dark:border-blue-700"
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-600"
                           >
                             {getLanguageName(langCode)}
                           </span>
@@ -891,7 +891,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-neutral-900 dark:text-white">Reset Categories</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Delete all custom categories and restore system defaults</p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-300">Delete all custom categories and restore system defaults</p>
                   </div>
                   <Button
                     variant="secondary"
