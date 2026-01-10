@@ -140,8 +140,9 @@ export default function HomePage() {
               <div className="md:hidden">
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-white p-2"
+                  className="text-neutral-600 dark:text-white hover:text-neutral-900 dark:hover:text-neutral-300 p-2 focus:outline-none focus:ring-2 focus:ring-admin-primary rounded-md"
                   aria-label="Toggle mobile menu"
+                  type="button"
                 >
                   {mobileMenuOpen ? (
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,27 +1,82 @@
 // frontend/src/app/security/page.tsx
+'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 
 export default function SecurityPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
-      <header className="bg-white border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Link href="/" className="text-2xl font-bold text-admin-primary">
-            Bonifatus DMS
-          </Link>
-          <nav className="flex gap-6">
-            <Link href="/features" className="text-neutral-600 hover:text-admin-primary">
-              Features
+      <header className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="text-2xl font-bold text-admin-primary">
+              Bonifatus DMS
             </Link>
-            <Link href="/pricing" className="text-neutral-600 hover:text-admin-primary">
-              Pricing
-            </Link>
-            <Link href="/login" className="text-neutral-600 hover:text-admin-primary">
-              Sign In
-            </Link>
-          </nav>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex gap-6">
+              <Link href="/features" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">
+                Features
+              </Link>
+              <Link href="/pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">
+                Pricing
+              </Link>
+              <Link href="/login" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">
+                Sign In
+              </Link>
+            </nav>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden text-neutral-600 dark:text-white hover:text-neutral-900 dark:hover:text-neutral-300 p-2 focus:outline-none focus:ring-2 focus:ring-admin-primary rounded-md"
+              aria-label="Toggle mobile menu"
+              type="button"
+            >
+              {mobileMenuOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-neutral-200 dark:border-neutral-800 mt-4 pt-4">
+              <nav className="flex flex-col space-y-2">
+                <Link
+                  href="/features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                >
+                  Features
+                </Link>
+                <Link
+                  href="/pricing"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                >
+                  Pricing
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                >
+                  Sign In
+                </Link>
+              </nav>
+            </div>
+          )}
         </div>
       </header>
 
