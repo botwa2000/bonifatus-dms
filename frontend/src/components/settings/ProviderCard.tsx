@@ -51,10 +51,10 @@ export function ProviderCard({
 
   // Determine card styling based on connection status
   const cardBgColor = provider.connected
-    ? 'bg-semantic-success-bg dark:bg-green-900/20'
+    ? 'bg-semantic-success-bg dark:bg-neutral-800'
     : 'bg-white dark:bg-neutral-800'
   const cardBorderColor = provider.connected
-    ? 'border-semantic-success-border dark:border-green-800'
+    ? 'border-semantic-success-border dark:border-green-600'
     : 'border-neutral-200 dark:border-neutral-700'
   const iconColor = provider.connected
     ? 'text-admin-success dark:text-green-400'
@@ -81,7 +81,7 @@ export function ProviderCard({
                 <Badge variant="warning">Upgrade Required</Badge>
               )}
             </div>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
+            <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
               {provider.connected ? 'Connected' : description}
             </p>
           </div>
@@ -120,13 +120,13 @@ export function ProviderCard({
       </div>
 
       {provider.connected && !provider.is_active && (
-        <p className="text-xs text-neutral-600 dark:text-neutral-400 px-1">
+        <p className="text-xs text-neutral-600 dark:text-neutral-300 px-1">
           This provider is connected but not active. Set it as active to use it for new document uploads.
         </p>
       )}
 
       {provider.is_active && (
-        <p className="text-xs text-neutral-600 dark:text-neutral-400 px-1">
+        <p className="text-xs text-neutral-600 dark:text-neutral-300 px-1">
           Your documents are automatically saved to {provider.name} with full version history and sharing capabilities.
         </p>
       )}

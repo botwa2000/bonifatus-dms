@@ -23,7 +23,9 @@
       "Bash(docker compose restart:*)",
       "Bash(docker compose:*)",
       "Bash(python -m json.tool:*)",
-      "Bash(alembic revision:*)"
+      "Bash(alembic revision:*)",
+      "Bash(python:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
