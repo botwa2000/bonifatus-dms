@@ -140,7 +140,7 @@ export default function HomePage() {
               <div className="md:hidden">
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-2"
+                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-white p-2"
                   aria-label="Toggle mobile menu"
                 >
                   {mobileMenuOpen ? (
@@ -447,7 +447,7 @@ export default function HomePage() {
                   className={`px-6 py-2 rounded-lg font-medium transition-all ${
                     billingCycle === 'monthly'
                       ? 'bg-admin-primary text-white shadow-md'
-                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
                   }`}
                 >
                   Monthly
@@ -457,7 +457,7 @@ export default function HomePage() {
                   className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
                     billingCycle === 'yearly'
                       ? 'bg-admin-primary text-white shadow-md'
-                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
+                      : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-600'
                   }`}
                 >
                   Annual
@@ -540,7 +540,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           <strong>{pagesDisplay}</strong>
                         </span>
                       </li>
@@ -549,7 +549,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           <strong>{storageDisplay}</strong> storage{storageDisplay !== 'Unlimited' ? ' limit' : ''}
                         </span>
                       </li>
@@ -558,7 +558,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           {isPro ? 'Unlimited users' : '1 user'}
                         </span>
                       </li>
@@ -567,7 +567,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           {tier.bulk_operations_enabled ? <strong>✨ Bulk processing</strong> : 'AI-powered categorization'}
                         </span>
                       </li>
@@ -576,7 +576,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           Multilingual {tier.bulk_operations_enabled ? 'analysis' : 'document analysis'}
                         </span>
                       </li>
@@ -586,7 +586,7 @@ export default function HomePage() {
                           <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          <span className="text-neutral-700 dark:text-neutral-300">One-by-one processing</span>
+                          <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">One-by-one processing</span>
                         </li>
                       )}
 
@@ -594,7 +594,7 @@ export default function HomePage() {
                         <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-neutral-700 dark:text-neutral-300">
+                        <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           {isPro ? <strong>✨ Email-to-process</strong> : 'Your Google Drive'}
                         </span>
                       </li>
@@ -604,7 +604,7 @@ export default function HomePage() {
                           <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          <span className="text-neutral-700 dark:text-neutral-300">
+                          <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                             <strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box
                           </span>
                         </li>
@@ -620,7 +620,7 @@ export default function HomePage() {
                       </Button>
                     </Link>
 
-                    <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 mt-4">
+                    <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 mt-4">
                       Risk-free • Cancel anytime
                     </p>
                   </div>
@@ -631,7 +631,7 @@ export default function HomePage() {
 
           <div className="mt-12 text-center space-y-3">
             <div className="inline-block bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800 rounded-lg px-6 py-3">
-              <p className="text-sm text-neutral-700 dark:text-neutral-300">
+              <p className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                 <svg className="inline h-5 w-5 text-admin-success mr-2 -mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>

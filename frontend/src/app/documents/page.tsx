@@ -295,7 +295,7 @@ export default function DocumentsPage() {
     }
 
     return (
-      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded bg-neutral-100 text-neutral-700 dark:text-neutral-300 dark:bg-neutral-700 dark:text-neutral-200">
         {type}
       </span>
     )
@@ -340,7 +340,7 @@ export default function DocumentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-600">{label}</p>
-          <p className="text-2xl font-bold text-neutral-900 mt-1">{value}</p>
+          <p className="text-2xl font-bold text-neutral-900 dark:text-white mt-1">{value}</p>
         </div>
         <div className={`${color} p-3 rounded-lg`}>
           {icon}
@@ -471,7 +471,7 @@ export default function DocumentsPage() {
               <svg className="h-16 w-16 text-neutral-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="text-lg font-medium text-neutral-900 mb-2">No documents yet</h3>
+              <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">No documents yet</h3>
               <p className="text-neutral-600 mb-4">Upload your first document to get started</p>
               <Link href="/documents/upload">
                 <Button>Upload Document</Button>
@@ -493,9 +493,9 @@ export default function DocumentsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="font-medium text-neutral-900 truncate">{doc.title}</h3>
+                          <h3 className="font-medium text-neutral-900 dark:text-white truncate">{doc.title}</h3>
                           {doc.owner_type === 'own' && (
-                            <svg className="h-4 w-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="My Document">
+                            <svg className="h-4 w-4 text-neutral-500 dark:text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="My Document">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                           )}
@@ -506,7 +506,7 @@ export default function DocumentsPage() {
                           )}
                         </div>
                         <div className="flex items-center space-x-2">
-                          <p className="text-xs text-neutral-500">{formatFileSize(doc.file_size)}</p>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400">{formatFileSize(doc.file_size)}</p>
                           {doc.owner_type === 'shared' && doc.owner_name && (
                             <span className="text-xs bg-semantic-info-bg-strong dark:bg-blue-900/30 text-semantic-info-text dark:text-blue-300 px-2 py-0.5 rounded">
                               {doc.owner_name}
@@ -530,14 +530,14 @@ export default function DocumentsPage() {
                             className={`text-xs px-2 py-1 rounded ${
                               cat.is_primary
                                 ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
-                                : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+                                : 'bg-neutral-100 text-neutral-700 dark:text-neutral-300 dark:bg-neutral-700 dark:text-neutral-200'
                             }`}
                           >
                             {cat.name}
                           </span>
                         ))
                       ) : doc.category_name ? (
-                        <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                        <span className="text-xs px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:text-neutral-300 dark:bg-neutral-700 dark:text-neutral-200">
                           {doc.category_name}
                         </span>
                       ) : null}
@@ -546,7 +546,7 @@ export default function DocumentsPage() {
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
-                    <span className="text-xs text-neutral-500">{formatDate(doc.created_at)}</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{formatDate(doc.created_at)}</span>
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${doc.id}/content`, '_blank')}
@@ -608,7 +608,7 @@ export default function DocumentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort('title')}
-                        className="flex items-center space-x-1 hover:text-neutral-900"
+                        className="flex items-center space-x-1 hover:text-neutral-900 dark:text-white"
                       >
                         <span>Document</span>
                         {sortField === 'title' && (
@@ -621,7 +621,7 @@ export default function DocumentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort('category_name')}
-                        className="flex items-center space-x-1 hover:text-neutral-900"
+                        className="flex items-center space-x-1 hover:text-neutral-900 dark:text-white"
                       >
                         <span>Category</span>
                         {sortField === 'category_name' && (
@@ -634,7 +634,7 @@ export default function DocumentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort('file_size')}
-                        className="flex items-center space-x-1 hover:text-neutral-900"
+                        className="flex items-center space-x-1 hover:text-neutral-900 dark:text-white"
                       >
                         <span>Size</span>
                         {sortField === 'file_size' && (
@@ -647,7 +647,7 @@ export default function DocumentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort('mime_type')}
-                        className="flex items-center space-x-1 hover:text-neutral-900"
+                        className="flex items-center space-x-1 hover:text-neutral-900 dark:text-white"
                       >
                         <span>Type</span>
                         {sortField === 'mime_type' && (
@@ -660,7 +660,7 @@ export default function DocumentsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort('created_at')}
-                        className="flex items-center space-x-1 hover:text-neutral-900"
+                        className="flex items-center space-x-1 hover:text-neutral-900 dark:text-white"
                       >
                         <span>Date</span>
                         {sortField === 'created_at' && (
@@ -690,9 +690,9 @@ export default function DocumentsPage() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
-                              <div className="font-medium text-neutral-900">{doc.title}</div>
+                              <div className="font-medium text-neutral-900 dark:text-white">{doc.title}</div>
                               {doc.owner_type === 'own' && (
-                                <svg className="h-4 w-4 text-neutral-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="My Document">
+                                <svg className="h-4 w-4 text-neutral-500 dark:text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="My Document">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                               )}
@@ -709,7 +709,7 @@ export default function DocumentsPage() {
                                 </>
                               )}
                             </div>
-                            <div className="text-sm text-neutral-500">{doc.file_name}</div>
+                            <div className="text-sm text-neutral-500 dark:text-neutral-400">{doc.file_name}</div>
                           </div>
                         </div>
                       </td>
@@ -722,14 +722,14 @@ export default function DocumentsPage() {
                                 className={`text-sm px-2 py-1 rounded ${
                                   cat.is_primary
                                     ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
-                                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200'
+                                    : 'bg-neutral-100 text-neutral-700 dark:text-neutral-300 dark:bg-neutral-700 dark:text-neutral-200'
                                 }`}
                               >
                                 {cat.name}
                               </span>
                             ))
                           ) : doc.category_name ? (
-                            <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                            <span className="text-sm px-2 py-1 rounded bg-neutral-100 text-neutral-700 dark:text-neutral-300 dark:bg-neutral-700 dark:text-neutral-200">
                               {doc.category_name}
                             </span>
                           ) : (
@@ -836,7 +836,7 @@ export default function DocumentsPage() {
       {deletingDocument && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-neutral-900 mb-2">Delete Document</h3>
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">Delete Document</h3>
             <p className="text-sm text-neutral-600 mb-4">
               Are you sure you want to delete &quot;{deletingDocument.title}&quot;? This action cannot be undone.
             </p>

@@ -82,7 +82,7 @@ function CheckoutContent() {
             </div>
             <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Checkout Error</h2>
             <p className="text-neutral-600 dark:text-neutral-400 mb-4">{error}</p>
-            <p className="text-sm text-neutral-500">Redirecting you back...</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Redirecting you back...</p>
           </div>
         ) : (
           <div className="text-center">
@@ -91,7 +91,7 @@ function CheckoutContent() {
             </div>
             <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Setting Up Your Subscription</h2>
             <p className="text-neutral-600 dark:text-neutral-400">{status}</p>
-            <p className="text-sm text-neutral-500 mt-4">Please wait while we redirect you to secure payment...</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-4">Please wait while we redirect you to secure payment...</p>
           </div>
         )}
       </div>

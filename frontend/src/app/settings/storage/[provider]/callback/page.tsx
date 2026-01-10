@@ -142,7 +142,7 @@ function StorageCallbackContent() {
         {status === 'processing' && (
           <>
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
               Connecting {providerName}
             </h2>
             <p className="text-sm text-neutral-600">{message}</p>
@@ -161,9 +161,9 @@ function StorageCallbackContent() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-neutral-900 mb-2">Success!</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Success!</h2>
             <p className="text-sm text-neutral-600">{message}</p>
-            <p className="text-xs text-neutral-500 mt-2">Redirecting to settings...</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">Redirecting to settings...</p>
           </>
         )}
 
@@ -179,9 +179,9 @@ function StorageCallbackContent() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-neutral-900 mb-2">Connection Failed</h2>
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Connection Failed</h2>
             <p className="text-sm text-neutral-600">{message}</p>
-            <p className="text-xs text-neutral-500 mt-2">Redirecting to settings...</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">Redirecting to settings...</p>
           </>
         )}
       </div>

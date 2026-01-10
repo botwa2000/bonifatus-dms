@@ -44,7 +44,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">AI-Powered Categorization</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">AI-Powered Categorization</h3>
               <p className="text-neutral-600">
                 Automatically categorize documents using advanced machine learning. The system learns from your corrections to improve accuracy over time.
               </p>
@@ -57,7 +57,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">OCR & Text Extraction</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">OCR & Text Extraction</h3>
               <p className="text-neutral-600">
                 Extract text from scanned documents and images with Google Vision API. Make all your documents searchable, even handwritten notes.
               </p>
@@ -70,7 +70,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Intelligent Search</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Intelligent Search</h3>
               <p className="text-neutral-600">
                 Full-text search across all documents. Filter by category, date, language, or custom keywords to find exactly what you need instantly.
               </p>
@@ -83,7 +83,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Google Drive Storage</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Google Drive Storage</h3>
               <p className="text-neutral-600">
                 Documents stored securely on your own Google Drive. You maintain full ownership and control. No storage limits from us!
               </p>
@@ -96,7 +96,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Multi-Language Support</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Multi-Language Support</h3>
               <p className="text-neutral-600">
                 Support for English, German, Dutch, and more. Automatic language detection and categorization in multiple languages.
               </p>
@@ -109,7 +109,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Standardized File Naming</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Standardized File Naming</h3>
               <p className="text-neutral-600">
                 Automatic file renaming with date, category code, and original name. Keep your documents organized with consistent naming conventions.
               </p>
@@ -122,7 +122,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Duplicate Detection</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Duplicate Detection</h3>
               <p className="text-neutral-600">
                 SHA-256 hash-based duplicate detection prevents uploading the same document twice. Save storage and avoid confusion.
               </p>
@@ -135,7 +135,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Complete Audit Trail</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Complete Audit Trail</h3>
               <p className="text-neutral-600">
                 Track every action with comprehensive audit logs. Know who uploaded, modified, or deleted documents and when.
               </p>
@@ -148,7 +148,7 @@ export default function FeaturesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 mb-3">Multi-User Access (Pro)</h3>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Multi-User Access (Pro)</h3>
               <p className="text-neutral-600">
                 Share access with up to 3 delegates on the Professional plan. Collaborate with your team while maintaining security.
               </p>

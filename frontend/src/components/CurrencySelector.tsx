@@ -19,11 +19,11 @@ export default function CurrencySelector() {
             setSelectedCurrency(currency)
           }
         }}
-        className="appearance-none bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-1.5 pr-8 text-sm text-neutral-900 dark:text-neutral-100 hover:border-neutral-400 dark:hover:border-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors cursor-pointer"
+        className="appearance-none bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-md px-3 py-1.5 pr-8 text-sm text-neutral-900 dark:text-white dark:text-neutral-100 hover:border-neutral-400 dark:hover:border-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors cursor-pointer"
         aria-label="Select currency"
       >
         {availableCurrencies.map((currency) => (
-          <option key={currency.code} value={currency.code} className="bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+          <option key={currency.code} value={currency.code} className="bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white dark:text-neutral-100">
             {currency.code}
           </option>
         ))}

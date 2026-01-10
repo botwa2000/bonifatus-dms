@@ -448,7 +448,7 @@ export default function DocumentDetailPage() {
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+                  <h1 className="text-2xl font-bold text-neutral-900 dark:text-white dark:text-neutral-100 mb-2">
                     {document.title}
                   </h1>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">{document.file_name}</p>
@@ -460,28 +460,28 @@ export default function DocumentDetailPage() {
 
               {document.description && (
                 <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Description</h2>
-                  <p className="text-neutral-900 dark:text-neutral-100">{document.description}</p>
+                  <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">Description</h2>
+                  <p className="text-neutral-900 dark:text-white dark:text-neutral-100">{document.description}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-neutral-600 dark:text-neutral-400">File Size:</span>
-                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatFileSize(document.file_size)}</span>
+                  <span className="ml-2 text-neutral-900 dark:text-white dark:text-neutral-100 font-medium">{formatFileSize(document.file_size)}</span>
                 </div>
                 <div>
                   <span className="text-neutral-600 dark:text-neutral-400">File Type:</span>
-                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{document.mime_type}</span>
+                  <span className="ml-2 text-neutral-900 dark:text-white dark:text-neutral-100 font-medium">{document.mime_type}</span>
                 </div>
                 <div>
                   <span className="text-neutral-600 dark:text-neutral-400">Uploaded:</span>
-                  <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatDate(document.created_at)}</span>
+                  <span className="ml-2 text-neutral-900 dark:text-white dark:text-neutral-100 font-medium">{formatDate(document.created_at)}</span>
                 </div>
                 {document.document_date && (
                   <div>
                     <span className="text-neutral-600 dark:text-neutral-400">Document Date:</span>
-                    <span className="ml-2 text-neutral-900 dark:text-neutral-100 font-medium">{formatDate(document.document_date)}</span>
+                    <span className="ml-2 text-neutral-900 dark:text-white dark:text-neutral-100 font-medium">{formatDate(document.document_date)}</span>
                   </div>
                 )}
               </div>
@@ -490,7 +490,7 @@ export default function DocumentDetailPage() {
             {/* Category Section */}
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Category</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white dark:text-neutral-100">Category</h2>
                 {!isEditingCategory && (
                   <button
                     onClick={() => setIsEditingCategory(true)}
@@ -508,7 +508,7 @@ export default function DocumentDetailPage() {
                       Select one or more categories. Click the radio button to set the primary category.
                     </p>
                     {categories.length === 0 ? (
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">No categories available</p>
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">No categories available</p>
                     ) : (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {categories.map(cat => {
@@ -534,7 +534,7 @@ export default function DocumentDetailPage() {
                                 />
                                 <label
                                   htmlFor={`cat-${cat.id}`}
-                                  className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100 cursor-pointer"
+                                  className="flex-1 text-sm font-medium text-neutral-900 dark:text-white dark:text-neutral-100 cursor-pointer"
                                 >
                                   {cat.name}
                                 </label>
@@ -602,7 +602,7 @@ export default function DocumentDetailPage() {
                         className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
                           cat.is_primary
                             ? 'bg-admin-primary/10 text-admin-primary border border-admin-primary/20'
-                            : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100'
+                            : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-white dark:text-neutral-100'
                         }`}
                       >
                         {cat.name}
@@ -610,7 +610,7 @@ export default function DocumentDetailPage() {
                       </span>
                     ))
                   ) : document.category_name ? (
-                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100">
+                    <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-white dark:text-neutral-100">
                       {document.category_name}
                     </span>
                   ) : (
@@ -625,7 +625,7 @@ export default function DocumentDetailPage() {
             {/* Keywords Section */}
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Keywords</h2>
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white dark:text-neutral-100">Keywords</h2>
                 {!isEditingKeywords && (
                   <button
                     onClick={() => setIsEditingKeywords(true)}
@@ -692,13 +692,13 @@ export default function DocumentDetailPage() {
                     document.keywords.map((kw, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 px-3 py-1 rounded-full text-sm"
+                        className="inline-flex items-center bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 px-3 py-1 rounded-full text-sm"
                       >
                         {kw.keyword}
                       </span>
                     ))
                   ) : (
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">No keywords assigned</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">No keywords assigned</p>
                   )}
                 </div>
               )}
@@ -707,7 +707,7 @@ export default function DocumentDetailPage() {
             {/* Entities Section */}
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white dark:text-neutral-100">
                   Extracted Information
                 </h2>
                 {!isEditingEntities && (
@@ -755,7 +755,7 @@ export default function DocumentDetailPage() {
                       }, {} as Record<string, Entity[]>)
                     ).map(([type, entities]) => (
                       <div key={type}>
-                        <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
+                        <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                           {type.replace(/_/g, ' ')}
                         </h3>
                         <div className="flex flex-wrap gap-2">
@@ -840,7 +840,7 @@ export default function DocumentDetailPage() {
 
                       return (
                         <div key={type}>
-                          <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center">
+                          <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2 flex items-center">
                             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.icon} />
                             </svg>
@@ -887,7 +887,7 @@ export default function DocumentDetailPage() {
                   })()}
                 </div>
                 ) : (
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">No entities extracted</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">No entities extracted</p>
                 )}
                 </>
               )}
@@ -898,7 +898,7 @@ export default function DocumentDetailPage() {
           <div className="space-y-6">
             {/* Actions */}
             <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Actions</h2>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white dark:text-neutral-100 mb-4">Actions</h2>
               <div className="space-y-3">
                 <Button
                   variant="primary"

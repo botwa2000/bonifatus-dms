@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function ImpressumPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-neutral-900">
       <div className="max-w-4xl mx-auto px-4 py-16">
         <div className="mb-8">
           <Link 
@@ -21,12 +21,12 @@ export default function ImpressumPage() {
           </Link>
         </div>
 
-        <h1 className="text-4xl font-bold text-neutral-900 mb-8">Impressum</h1>
+        <h1 className="text-4xl font-bold text-neutral-900 dark:text-white mb-8">Impressum</h1>
         
         <div className="prose prose-lg max-w-none">
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-4">Company Information</h2>
-            <div className="text-neutral-700 space-y-2">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Company Information</h2>
+            <div className="text-neutral-700 dark:text-neutral-300 space-y-2">
               <p><strong>Company Name:</strong> Bonifatus DMS GmbH</p>
               <p><strong>Address:</strong> Business District<br />12345 Berlin, Germany</p>
               <p><strong>Email:</strong> info@bonifatus-dms.com</p>
@@ -35,8 +35,8 @@ export default function ImpressumPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-4">Legal Information</h2>
-            <div className="text-neutral-700 space-y-2">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Legal Information</h2>
+            <div className="text-neutral-700 dark:text-neutral-300 space-y-2">
               <p><strong>Managing Director:</strong> [Director Name]</p>
               <p><strong>Commercial Register:</strong> HRB [Number] Berlin</p>
               <p><strong>VAT ID:</strong> DE[Number]</p>
@@ -45,8 +45,8 @@ export default function ImpressumPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-4">Responsible for Content</h2>
-            <div className="text-neutral-700">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Responsible for Content</h2>
+            <div className="text-neutral-700 dark:text-neutral-300">
               <p>According to § 55 Abs. 2 RStV:</p>
               <p>
                 [Director Name]<br />
@@ -57,8 +57,8 @@ export default function ImpressumPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-4">Disclaimer</h2>
-            <p className="text-neutral-700 mb-4">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Disclaimer</h2>
+            <p className="text-neutral-700 dark:text-neutral-300 mb-4">
               The contents of our pages have been created with the utmost care. However, we cannot guarantee 
               the contents&apos; accuracy, completeness or topicality. According to statutory provisions, we are 
               furthermore responsible for our own content on these web pages.
@@ -66,8 +66,8 @@ export default function ImpressumPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-4">Contact</h2>
-            <p className="text-neutral-700">
+            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Contact</h2>
+            <p className="text-neutral-700 dark:text-neutral-300">
               For questions regarding this legal notice, please contact us at{' '}
               <Link href="/contact" className="text-admin-primary hover:underline">
                 legal@bonifatus-dms.com

@@ -717,8 +717,8 @@ export default function SettingsPage() {
   }) => (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm font-medium text-neutral-900">{label}</p>
-        <p className="text-xs text-neutral-500">{description}</p>
+        <p className="text-sm font-medium text-neutral-900 dark:text-white">{label}</p>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">{description}</p>
       </div>
       <button
         type="button"
@@ -819,7 +819,7 @@ export default function SettingsPage() {
               />
 
               <div className="mt-6">
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Document Language Recognition
                 </label>
                 <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
@@ -828,17 +828,17 @@ export default function SettingsPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-semantic-info-text dark:text-blue-100 dark:text-blue-200 dark:text-blue-300 mb-2">
+                      <p className="text-sm font-medium text-neutral-900 dark:text-blue-100 mb-2">
                         Your documents are automatically recognized in all supported languages
                       </p>
-                      <p className="text-xs text-semantic-info-text dark:text-blue-300 mb-3">
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 dark:text-blue-200 mb-3">
                         The system will detect and process documents in any of the following languages:
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {systemSettings.available_languages.map(langCode => (
                           <span
                             key={langCode}
-                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-semantic-info-text dark:text-blue-100 dark:text-blue-200 dark:text-blue-300 border border-semantic-info-border dark:border-blue-700"
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white dark:bg-blue-900/40 text-neutral-900 dark:text-blue-100 border border-neutral-300 dark:border-blue-700"
                           >
                             {getLanguageName(langCode)}
                           </span>
@@ -890,8 +890,8 @@ export default function SettingsPage() {
               <div className="mt-6 pt-6 border-t border-neutral-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-neutral-900">Reset Categories</p>
-                    <p className="text-xs text-neutral-500">Delete all custom categories and restore system defaults</p>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">Reset Categories</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Delete all custom categories and restore system defaults</p>
                   </div>
                   <Button
                     variant="secondary"
@@ -945,7 +945,7 @@ export default function SettingsPage() {
                   {pendingInvitations.length > 0 && (
                     <div>
                       <div className="flex items-center space-x-2 mb-4">
-                        <h3 className="text-sm font-medium text-neutral-900">Pending Invitations</h3>
+                        <h3 className="text-sm font-medium text-neutral-900 dark:text-white">Pending Invitations</h3>
                         <Badge variant="warning">{pendingInvitations.length}</Badge>
                       </div>
                       <div className="space-y-3">
@@ -956,13 +956,13 @@ export default function SettingsPage() {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <p className="text-sm font-medium text-neutral-900">
+                                <p className="text-sm font-medium text-neutral-900 dark:text-white">
                                   {invitation.owner_name}
                                 </p>
-                                <p className="text-xs text-neutral-500 mt-1">
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                                   {invitation.owner_email} • Role: {invitation.role}
                                 </p>
-                                <p className="text-xs text-neutral-500 mt-1">
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                                   Invited {invitation.invitation_sent_at ? new Date(invitation.invitation_sent_at).toLocaleDateString() : '—'}
                                   {invitation.invitation_expires_at && ` • Expires ${new Date(invitation.invitation_expires_at).toLocaleDateString()}`}
                                 </p>
@@ -993,21 +993,21 @@ export default function SettingsPage() {
                   {/* Active Shared Access */}
                   {grantedAccess.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-medium text-neutral-900 mb-4">Active Shared Access</h3>
+                      <h3 className="text-sm font-medium text-neutral-900 dark:text-white mb-4">Active Shared Access</h3>
                       <div className="overflow-hidden border border-neutral-200 rounded-lg">
                         <table className="min-w-full divide-y divide-neutral-200">
                           <thead className="bg-neutral-50">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Owner
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Role
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Status
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Last Accessed
                               </th>
                             </tr>
@@ -1019,17 +1019,17 @@ export default function SettingsPage() {
                                 <tr key={access.id}>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <div>
-                                      <p className="text-sm font-medium text-neutral-900">{access.owner_name}</p>
-                                      <p className="text-xs text-neutral-500">{access.owner_email}</p>
+                                      <p className="text-sm font-medium text-neutral-900 dark:text-white">{access.owner_name}</p>
+                                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{access.owner_email}</p>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900 dark:text-white">
                                     {access.role}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <Badge variant={badge.variant}>{badge.label}</Badge>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400">
                                     {access.last_accessed_at
                                       ? new Date(access.last_accessed_at).toLocaleDateString()
                                       : 'Never'}
@@ -1060,7 +1060,7 @@ export default function SettingsPage() {
                         />
                       </svg>
                       <p className="mt-2 text-sm text-neutral-600">No shared access yet</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
                         When someone shares their documents with you, they will appear here
                       </p>
                     </div>
@@ -1078,8 +1078,8 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-neutral-900">Delegate Access</p>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white">Delegate Access</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
                         Share read-only access to your documents with team members or assistants
                       </p>
                     </div>
@@ -1102,16 +1102,16 @@ export default function SettingsPage() {
                         <table className="min-w-full divide-y divide-neutral-200">
                           <thead className="bg-neutral-50">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Email
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Status
                               </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Invited
                               </th>
-                              <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-right text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                                 Actions
                               </th>
                             </tr>
@@ -1121,13 +1121,13 @@ export default function SettingsPage() {
                               const badge = getStatusBadge(delegate.status)
                               return (
                                 <tr key={delegate.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900 dark:text-white">
                                     {delegate.delegate_email}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <Badge variant={badge.variant}>{badge.label}</Badge>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500 dark:text-neutral-400">
                                     {delegate.invitation_sent_at ? new Date(delegate.invitation_sent_at).toLocaleDateString() : '—'}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -1165,11 +1165,11 @@ export default function SettingsPage() {
                         />
                       </svg>
                       <p className="mt-2 text-sm text-neutral-600">No delegates yet</p>
-                      <p className="text-xs text-neutral-500">Invite team members to share access to your documents</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">Invite team members to share access to your documents</p>
                     </div>
                   )}
 
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     Delegates have read-only access to all your documents. They can view and download but cannot upload, edit, or delete.
                   </p>
                 </div>

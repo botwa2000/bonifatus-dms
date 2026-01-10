@@ -270,7 +270,7 @@ export default function CategoriesPage() {
 
         <div className="bg-white rounded-lg border border-neutral-200 mb-6">
           <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-neutral-900">
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
               {categories.length} {categories.length === 1 ? 'Category' : 'Categories'}
             </h2>
             <ViewModeToggle />
@@ -281,7 +281,7 @@ export default function CategoriesPage() {
               <svg className="h-16 w-16 text-neutral-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <h3 className="text-lg font-medium text-neutral-900 mb-2">No categories yet</h3>
+              <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">No categories yet</h3>
               <p className="text-neutral-600 mb-4">Create your first category to organize documents</p>
               <Button onClick={() => setShowCreateModal(true)}>
                 Create Category
@@ -306,7 +306,7 @@ export default function CategoriesPage() {
                     <th className="px-6 py-3 text-left">
                       <button
                         onClick={() => handleSort('name')}
-                        className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900"
+                        className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900 dark:text-white"
                       >
                         <span>Category</span>
                         {sortField === 'name' && (
@@ -325,7 +325,7 @@ export default function CategoriesPage() {
                     <th className="px-6 py-3 text-center">
                       <button
                         onClick={() => handleSort('documents')}
-                        className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900"
+                        className="flex items-center space-x-1 text-xs font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-900 dark:text-white"
                       >
                         <span>Documents</span>
                         {sortField === 'documents' && (
@@ -354,7 +354,7 @@ export default function CategoriesPage() {
                               style={{ backgroundColor: category.color_hex }}
                             />
                           </div>
-                          <div className="font-medium text-neutral-900">{category.name}</div>
+                          <div className="font-medium text-neutral-900 dark:text-white">{category.name}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -370,7 +370,7 @@ export default function CategoriesPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-sm font-medium text-neutral-900">
+                        <span className="text-sm font-medium text-neutral-900 dark:text-white">
                           {category.documents_count || 0}
                         </span>
                       </td>

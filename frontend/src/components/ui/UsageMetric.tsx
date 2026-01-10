@@ -23,7 +23,7 @@ export function UsageMetric({
       <p className="text-sm text-neutral-600 mb-2">{label}</p>
       <div className="space-y-2">
         <div className="flex justify-between items-baseline">
-          <span className="text-2xl font-bold text-neutral-900">
+          <span className="text-2xl font-bold text-neutral-900 dark:text-white">
             {value} {unit}
           </span>
           <span className="text-sm text-neutral-600">

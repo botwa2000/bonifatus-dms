@@ -685,7 +685,7 @@ export default function BatchUploadPage() {
                             </svg>
                           </div>
                         </div>
-                        <p className="font-semibold text-lg text-neutral-900 dark:text-neutral-100">{selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} selected</p>
+                        <p className="font-semibold text-lg text-neutral-900 dark:text-white dark:text-neutral-100">{selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} selected</p>
                         <div className="flex flex-wrap gap-2 justify-center max-w-2xl mx-auto">
                           {selectedFiles.map((file, i) => (
                             <Badge key={i} variant="default" className="text-sm py-1.5 px-3">
@@ -693,7 +693,7 @@ export default function BatchUploadPage() {
                             </Badge>
                           ))}
                         </div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-4">Click to select different files</p>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 mt-4">Click to select different files</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -705,13 +705,13 @@ export default function BatchUploadPage() {
                           </div>
                         </div>
                         <div className="text-center">
-                          <p className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+                          <p className="text-xl font-semibold text-neutral-900 dark:text-white dark:text-neutral-100 mb-2">
                             Drop your files here
                           </p>
                           <p className="text-neutral-600 dark:text-neutral-400 mb-4">
                             or click to browse from your computer
                           </p>
-                          <p className="text-sm text-neutral-500 dark:text-neutral-500">
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-500">
                             Supported formats: PDF, DOC, DOCX, JPG, PNG • Max 50MB per file
                           </p>
                         </div>
@@ -744,7 +744,7 @@ export default function BatchUploadPage() {
                         {/* Header */}
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{state.original_filename}</h3>
+                            <h3 className="font-semibold text-neutral-900 dark:text-white dark:text-neutral-100">{state.original_filename}</h3>
                             <p className="text-sm text-neutral-600 dark:text-neutral-400">
                               {state.analysis?.detected_language?.toUpperCase() || 'Unknown'} •
                               {(state.analysis?.keywords && Array.isArray(state.analysis.keywords)) ? state.analysis.keywords.length : 0} keywords
@@ -805,7 +805,7 @@ export default function BatchUploadPage() {
                                 <p className="text-xs text-neutral-600 dark:text-neutral-400">
                                   Original: {state.original_filename}
                                 </p>
-                                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                                   {(state.custom_filename || '').length}/{maxFilenameLength}
                                 </p>
                               </div>
@@ -815,7 +815,7 @@ export default function BatchUploadPage() {
 
                         {/* Categories multiple selection */}
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                             Categories (select at least 1)
                           </label>
                           {state.selected_categories.length === 0 && (
@@ -904,7 +904,7 @@ export default function BatchUploadPage() {
                                         />
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                            <span className="text-sm font-medium text-neutral-900 dark:text-white dark:text-neutral-100">
                                               {category.name}
                                             </span>
                                             {isPrimary && (
@@ -940,7 +940,7 @@ export default function BatchUploadPage() {
 
                         {/* Keywords */}
                         <div className="space-y-2">
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                             Keywords
                           </label>
                           {(state.confirmed_keywords && Array.isArray(state.confirmed_keywords) && state.confirmed_keywords.length > 0) ? (
@@ -967,7 +967,7 @@ export default function BatchUploadPage() {
                                 ))}
                             </div>
                           ) : (
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                               No keywords extracted
                             </p>
                           )}
@@ -986,7 +986,7 @@ export default function BatchUploadPage() {
 
                           return (
                             <div className="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                                 Extracted Information
                               </label>
                               {Object.entries(groupedEntities).map(([type, entities]) => {

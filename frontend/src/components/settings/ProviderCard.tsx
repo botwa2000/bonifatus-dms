@@ -50,9 +50,15 @@ export function ProviderCard({
   const description = PROVIDER_DESCRIPTIONS[provider.type] || 'Cloud storage provider'
 
   // Determine card styling based on connection status
-  const cardBgColor = provider.connected ? 'bg-green-50' : 'bg-neutral-50'
-  const cardBorderColor = provider.connected ? 'border-green-200' : 'border-neutral-200'
-  const iconColor = provider.connected ? 'text-green-600' : 'text-neutral-400'
+  const cardBgColor = provider.connected
+    ? 'bg-semantic-success-bg dark:bg-green-900/20'
+    : 'bg-white dark:bg-neutral-800'
+  const cardBorderColor = provider.connected
+    ? 'border-semantic-success-border dark:border-green-800'
+    : 'border-neutral-200 dark:border-neutral-700'
+  const iconColor = provider.connected
+    ? 'text-admin-success dark:text-green-400'
+    : 'text-neutral-400 dark:text-neutral-500'
 
   return (
     <div className="space-y-3">
@@ -65,7 +71,7 @@ export function ProviderCard({
           </div>
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <p className="text-sm font-medium text-neutral-900">
+              <p className="text-sm font-medium text-neutral-900 dark:text-white">
                 {provider.name}
               </p>
               {provider.is_active && (
@@ -75,7 +81,7 @@ export function ProviderCard({
                 <Badge variant="warning">Upgrade Required</Badge>
               )}
             </div>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
               {provider.connected ? 'Connected' : description}
             </p>
           </div>
@@ -114,13 +120,13 @@ export function ProviderCard({
       </div>
 
       {provider.connected && !provider.is_active && (
-        <p className="text-xs text-neutral-500 px-1">
+        <p className="text-xs text-neutral-600 dark:text-neutral-400 px-1">
           This provider is connected but not active. Set it as active to use it for new document uploads.
         </p>
       )}
 
       {provider.is_active && (
-        <p className="text-xs text-neutral-500 px-1">
+        <p className="text-xs text-neutral-600 dark:text-neutral-400 px-1">
           Your documents are automatically saved to {provider.name} with full version history and sharing capabilities.
         </p>
       )}

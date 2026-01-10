@@ -186,7 +186,7 @@ export function KeywordsManager({ categoryId, languageCode }: KeywordsManagerPro
                   <tr key={kw.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3">
                       <div>
-                        <div className="font-medium text-neutral-900">{kw.keyword}</div>
+                        <div className="font-medium text-neutral-900 dark:text-white">{kw.keyword}</div>
                         {overlap && (
                           <div className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs border ${getSeverityColor(overlap.severity)}`}>
                             ⚠ Used in {overlap.category_count} categories ({overlap.severity} risk)

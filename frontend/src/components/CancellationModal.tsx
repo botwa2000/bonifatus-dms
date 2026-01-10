@@ -218,7 +218,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
                     className="mt-1 mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-neutral-900">Cancel immediately</div>
+                    <div className="font-medium text-neutral-900 dark:text-white">Cancel immediately</div>
                     <div className="text-sm text-neutral-600 mt-1">
                       Full refund of {subscription.currency_symbol || '$'}{(subscription.amount / 100).toFixed(2)}. Access ends immediately.
                     </div>
@@ -236,7 +236,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
                   className="mt-1 mr-3"
                 />
                 <div className="flex-1">
-                  <div className="font-medium text-neutral-900">Cancel at period end</div>
+                  <div className="font-medium text-neutral-900 dark:text-white">Cancel at period end</div>
                   <div className="text-sm text-neutral-600 mt-1">
                     Keep access until {new Date(subscription.current_period_end).toLocaleDateString()}. No refund.
                   </div>
@@ -319,7 +319,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
           <div className="bg-neutral-50 rounded-lg p-4 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-neutral-600">Cancellation type:</span>
-              <span className="font-medium text-neutral-900">
+              <span className="font-medium text-neutral-900 dark:text-white">
                 {cancelType === 'immediate' ? 'Immediate' : 'At period end'}
               </span>
             </div>
@@ -333,7 +333,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
             )}
             <div className="flex justify-between">
               <span className="text-neutral-600">Access until:</span>
-              <span className="font-medium text-neutral-900">
+              <span className="font-medium text-neutral-900 dark:text-white">
                 {cancelType === 'immediate'
                   ? 'Immediately'
                   : new Date(subscription.current_period_end).toLocaleDateString()
@@ -371,7 +371,7 @@ export default function CancellationModal({ isOpen, onClose, subscription, onSuc
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-lg font-medium text-neutral-900 mb-2">
+            <p className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
               {result?.message}
             </p>
           </div>

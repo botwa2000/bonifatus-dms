@@ -64,7 +64,7 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
               </div>
               {title && title !== 'Bonifatus DMS' && (
                 <div className="border-l border-neutral-300 pl-4">
-                  <h1 className="text-xl font-bold text-neutral-900">{title}</h1>
+                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white">{title}</h1>
                   {subtitle && <p className="text-sm text-neutral-600">{subtitle}</p>}
                 </div>
               )}

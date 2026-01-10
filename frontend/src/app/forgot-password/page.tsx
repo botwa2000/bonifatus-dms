@@ -116,7 +116,7 @@ export default function ForgotPasswordPage() {
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                     Email Address
                   </label>
                   <input
@@ -205,7 +205,7 @@ export default function ForgotPasswordPage() {
         {/* Help Text */}
         {!success && (
           <div className="mt-8 text-center">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
               Need help? <Link href="/contact" className="text-admin-primary hover:underline">Contact support</Link>
             </p>
           </div>

@@ -150,7 +150,7 @@ export default function LoginPageContent() {
                   <div className="w-full border-t border-neutral-300 dark:border-neutral-600"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+                  <span className="px-4 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                     or
                   </span>
                 </div>
@@ -176,7 +176,7 @@ export default function LoginPageContent() {
             <form onSubmit={handleEmailLogin} className="space-y-4">
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                   Email Address
                 </label>
                 <input
@@ -192,7 +192,7 @@ export default function LoginPageContent() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -209,7 +209,7 @@ export default function LoginPageContent() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -267,7 +267,7 @@ export default function LoginPageContent() {
 
           {/* Trust Signals */}
           <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-            <div className="flex flex-wrap justify-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+            <div className="flex flex-wrap justify-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
               <div className="flex items-center gap-1">
                 <svg className="w-4 h-4 text-admin-success dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

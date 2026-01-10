@@ -568,7 +568,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'overview'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Overview
@@ -578,7 +578,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'users'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Users
@@ -588,7 +588,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'tiers'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Tier Configuration
@@ -598,7 +598,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'currencies'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Currencies
@@ -608,7 +608,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'health'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             System Health
@@ -621,7 +621,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'email-templates'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Email Templates
@@ -631,7 +631,7 @@ export default function AdminDashboard() {
             className={`px-4 py-2 font-medium ${
               activeTab === 'entity-quality'
                 ? 'text-admin-primary border-b-2 border-admin-primary'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
             }`}
           >
             Entity Quality
@@ -649,7 +649,7 @@ export default function AdminDashboard() {
                   <div className="text-3xl font-bold text-neutral-900 dark:text-white mt-2">
                     {stats.total_users}
                   </div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-1">
                     {stats.active_users} active
                   </div>
                 </CardContent>
@@ -661,7 +661,7 @@ export default function AdminDashboard() {
                   <div className="text-3xl font-bold text-neutral-900 dark:text-white mt-2">
                     {stats.total_documents.toLocaleString()}
                   </div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-1">
                     +{stats.documents_last_24h} last 24h
                   </div>
                 </CardContent>
@@ -682,7 +682,7 @@ export default function AdminDashboard() {
                   <div className="text-3xl font-bold text-neutral-900 dark:text-white mt-2">
                     {stats.signups_last_7d}
                   </div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-1">
                     Last 7 days
                   </div>
                 </CardContent>
@@ -696,7 +696,7 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   {Object.entries(stats.users_by_tier).map(([tierName, count]) => (
                     <div key={tierName} className="flex items-center justify-between">
-                      <span className="text-neutral-700 dark:text-neutral-300">{tierName}</span>
+                      <span className="text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">{tierName}</span>
                       <Badge variant="info">{count} users</Badge>
                     </div>
                   ))}
@@ -728,34 +728,34 @@ export default function AdminDashboard() {
                     <tr>
                       <th
                         onClick={() => toggleSort('email')}
-                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
                       >
                         Email {userSortField === 'email' && (userSortDirection === 'asc' ? '↑' : '↓')}
                       </th>
                       <th
                         onClick={() => toggleSort('full_name')}
-                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
                       >
                         Name {userSortField === 'full_name' && (userSortDirection === 'asc' ? '↑' : '↓')}
                       </th>
                       <th
                         onClick={() => toggleSort('tier_name')}
-                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
                       >
                         Tier {userSortField === 'tier_name' && (userSortDirection === 'asc' ? '↑' : '↓')}
                       </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Documents</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Storage</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Monthly Usage</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Status</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300">Actions</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Documents</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Storage</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Monthly Usage</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Status</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAndSortedUsers.map((user) => (
                       <tr key={user.id} className="border-t border-neutral-200 dark:border-neutral-700">
                         <td className="px-4 py-3 text-sm text-neutral-900 dark:text-white">{user.email}</td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.full_name}</td>
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">{user.full_name}</td>
                         <td className="px-4 py-3 text-sm">
                           <select
                             value={user.tier_id}
@@ -774,23 +774,23 @@ export default function AdminDashboard() {
                             <span className="ml-2 text-xs text-admin-primary dark:text-blue-400 dark:text-blue-400">Updating...</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.document_count}</td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">{user.document_count}</td>
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           {formatBytes(user.storage_used_bytes)} / {formatBytes(user.storage_quota_bytes)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                           {user.monthly_usage ? (
                             user.monthly_usage.admin_unlimited ? (
-                              <span className="text-neutral-500">Unlimited</span>
+                              <span className="text-neutral-500 dark:text-neutral-400">Unlimited</span>
                             ) : (
                               <div className="space-y-1">
                                 <div className="text-xs">
                                   Pages: {user.monthly_usage.pages_processed} / {user.monthly_usage.pages_limit || '∞'}
-                                  <span className="text-neutral-500 ml-1">({user.monthly_usage.pages_percent}%)</span>
+                                  <span className="text-neutral-500 dark:text-neutral-400 ml-1">({user.monthly_usage.pages_percent}%)</span>
                                 </div>
                                 <div className="text-xs">
                                   Volume: {formatBytes(user.monthly_usage.volume_uploaded_bytes)} / {user.monthly_usage.volume_limit_bytes ? formatBytes(user.monthly_usage.volume_limit_bytes) : '∞'}
-                                  <span className="text-neutral-500 ml-1">({user.monthly_usage.volume_percent}%)</span>
+                                  <span className="text-neutral-500 dark:text-neutral-400 ml-1">({user.monthly_usage.volume_percent}%)</span>
                                 </div>
                               </div>
                             )
@@ -840,7 +840,7 @@ export default function AdminDashboard() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Monthly Price (€)
                           </label>
                           <input
@@ -852,7 +852,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Annual Price (€)
                           </label>
                           <input
@@ -864,7 +864,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Storage Quota
                           </label>
                           <div className="flex gap-2">
@@ -886,7 +886,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Max File Size
                           </label>
                           <div className="flex gap-2">
@@ -915,7 +915,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, max_documents: e.target.checked ? null : 100 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Documents</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Documents</span>
                           </label>
                           {editingTier.max_documents !== null && (
                             <input
@@ -934,7 +934,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, max_batch_upload_size: e.target.checked ? null : 10 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Batch Size</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Batch Size</span>
                           </label>
                           {editingTier.max_batch_upload_size !== null && (
                             <input
@@ -954,7 +954,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, max_pages_per_month: e.target.checked ? null : 500 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Pages/Month</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Pages/Month</span>
                           </label>
                           {editingTier.max_pages_per_month !== null && (
                             <input
@@ -974,7 +974,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, max_translations_per_month: e.target.checked ? null : 100 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Translations/Month</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Translations/Month</span>
                           </label>
                           {editingTier.max_translations_per_month !== null && (
                             <input
@@ -994,7 +994,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, max_team_members: e.target.checked ? null : 3 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Team Members</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Team Members</span>
                           </label>
                           {editingTier.max_team_members !== null && (
                             <input
@@ -1014,7 +1014,7 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditingTier({ ...editingTier, custom_categories_limit: e.target.checked ? null : 25 })}
                               className="rounded"
                             />
-                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Unlimited Categories</span>
+                            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Unlimited Categories</span>
                           </label>
                           {editingTier.custom_categories_limit !== null && (
                             <input
@@ -1035,7 +1035,7 @@ export default function AdminDashboard() {
                             onChange={(e) => setEditingTier({ ...editingTier, bulk_operations_enabled: e.target.checked })}
                             className="rounded"
                           />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Bulk Operations</span>
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Bulk Operations</span>
                         </label>
                         <label className="flex items-center space-x-2">
                           <input
@@ -1044,7 +1044,7 @@ export default function AdminDashboard() {
                             onChange={(e) => setEditingTier({ ...editingTier, email_to_process_enabled: e.target.checked })}
                             className="rounded"
                           />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Email-to-Document</span>
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Email-to-Document</span>
                         </label>
                         <label className="flex items-center space-x-2">
                           <input
@@ -1053,7 +1053,7 @@ export default function AdminDashboard() {
                             onChange={(e) => setEditingTier({ ...editingTier, multi_user_enabled: e.target.checked })}
                             className="rounded"
                           />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Multi-User</span>
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Multi-User</span>
                         </label>
                         <label className="flex items-center space-x-2">
                           <input
@@ -1062,7 +1062,7 @@ export default function AdminDashboard() {
                             onChange={(e) => setEditingTier({ ...editingTier, is_active: e.target.checked })}
                             className="rounded"
                           />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Active</span>
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Active</span>
                         </label>
                         <label className="flex items-center space-x-2">
                           <input
@@ -1071,7 +1071,7 @@ export default function AdminDashboard() {
                             onChange={(e) => setEditingTier({ ...editingTier, is_public: e.target.checked })}
                             className="rounded"
                           />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Public (shown on pricing page)</span>
+                          <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Public (shown on pricing page)</span>
                         </label>
                       </div>
                       <Button onClick={() => updateTier(tier.id, editingTier)}>
@@ -1195,7 +1195,7 @@ export default function AdminDashboard() {
                       <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-4">Add New Currency</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Select Currency
                           </label>
                           <select
@@ -1223,7 +1223,7 @@ export default function AdminDashboard() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Exchange Rate (per 1 EUR)
                           </label>
                           <input
@@ -1236,7 +1236,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">
                             Selected: {newCurrency.code ? `${newCurrency.code} (${newCurrency.symbol})` : 'None'}
                           </label>
                           <div className="text-sm text-neutral-600 dark:text-neutral-400">
@@ -1278,22 +1278,22 @@ export default function AdminDashboard() {
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-neutral-700">
                       <thead className="bg-neutral-50 dark:bg-neutral-800">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Currency
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Code
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Symbol
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Exchange Rate (per 1 EUR)
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
@@ -1508,7 +1508,7 @@ export default function AdminDashboard() {
                   {/* Error Details */}
                   {clamavHealth.error && (
                     <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded">
-                      <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Error Details:</div>
+                      <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">Error Details:</div>
                       <div className="text-sm text-admin-danger dark:text-red-400 dark:text-red-400 font-mono">
                         {clamavHealth.error}
                       </div>
@@ -1517,7 +1517,7 @@ export default function AdminDashboard() {
 
                   {/* Information Box */}
                   <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
-                    <div className="text-sm text-neutral-700 dark:text-neutral-300">
+                    <div className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                       <strong>Note:</strong> When ClamAV is unavailable, uploads continue to work using heuristic-based scanning only (PDF structure validation, macro detection).
                       Signature-based malware detection is skipped. Restart the service to enable full antivirus protection.
                     </div>
@@ -1663,7 +1663,7 @@ export default function AdminDashboard() {
                     {/* Error Details */}
                     {(emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error) && (
                       <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded">
-                        <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Error Details:</div>
+                        <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-1">Error Details:</div>
                         <div className="text-sm text-admin-danger dark:text-red-400 dark:text-red-400 font-mono">
                           {emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error}
                         </div>
@@ -1698,7 +1698,7 @@ export default function AdminDashboard() {
                                   {activity.status}
                                 </span>
                               </div>
-                              <div className="mt-1 text-neutral-700 dark:text-neutral-300">
+                              <div className="mt-1 text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                                 From: {activity.sender_email} | Documents: {activity.documents_created}
                                 {activity.rejection_reason && ` | Reason: ${activity.rejection_reason}`}
                               </div>
@@ -1710,7 +1710,7 @@ export default function AdminDashboard() {
 
                     {/* Information Box */}
                     <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
-                      <div className="text-sm text-neutral-700 dark:text-neutral-300">
+                      <div className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                         <strong>Note:</strong> The email poller checks for new emails every {emailPollerHealth.polling_interval_seconds} seconds.
                         Use the &quot;Poll Now&quot; button to manually trigger an immediate poll. If the service is unhealthy, check IMAP credentials and network connectivity.
                       </div>
@@ -1732,7 +1732,7 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
                     Email Notifications
                   </h3>
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4">
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-4">
                     BoniDoc sends automated email notifications for important user events. All emails are sent via Brevo with GDPR-compliant consent management.
                   </p>
                 </div>
@@ -1773,7 +1773,7 @@ export default function AdminDashboard() {
 
                 <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-4">
                   <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">Configuration</h4>
-                  <div className="space-y-2 text-sm text-neutral-700 dark:text-neutral-300">
+                  <div className="space-y-2 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
                     <div className="flex items-center justify-between">
                       <span>Email Service Provider:</span>
                       <span className="font-medium">Brevo (Sendinblue)</span>
@@ -1883,16 +1883,16 @@ export default function AdminDashboard() {
                           <table className="min-w-full">
                             <thead className="bg-neutral-50 dark:bg-neutral-800">
                               <tr>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                                   Parameter
                                 </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                                   Value
                                 </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                                   Description
                                 </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                                   Actions
                                 </th>
                               </tr>

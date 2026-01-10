@@ -15,7 +15,7 @@ export function CategoryStatsCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-neutral-600">{label}</p>
-          <p className="text-3xl font-bold text-neutral-900 mt-1">{value}</p>
+          <p className="text-3xl font-bold text-neutral-900 dark:text-white mt-1">{value}</p>
         </div>
         <div className={`h-12 w-12 ${color} rounded-lg flex items-center justify-center`}>
           {icon}

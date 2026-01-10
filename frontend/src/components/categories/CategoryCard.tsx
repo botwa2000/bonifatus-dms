@@ -25,7 +25,7 @@ export function CategoryCard({
             />
           </div>
           <div>
-            <h3 className="font-semibold text-neutral-900">{category.name}</h3>
+            <h3 className="font-semibold text-neutral-900 dark:text-white">{category.name}</h3>
             {category.is_system && (
               <Badge variant="default">System</Badge>
             )}
@@ -60,7 +60,7 @@ export function CategoryCard({
 
       <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
         <span className="text-sm text-neutral-600">Documents</span>
-        <span className="font-medium text-neutral-900">{category.documents_count || 0}</span>
+        <span className="font-medium text-neutral-900 dark:text-white">{category.documents_count || 0}</span>
       </div>
     </div>
   )

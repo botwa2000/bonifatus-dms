@@ -168,7 +168,7 @@ function ResetPasswordContent() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* New Password */}
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                     New Password
                   </label>
                   <div className="relative">
@@ -186,7 +186,7 @@ function ResetPasswordContent() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
                       disabled={!token}
                     >
                       {showPassword ? (
@@ -226,7 +226,7 @@ function ResetPasswordContent() {
 
                 {/* Confirm Password */}
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
                     Confirm Password
                   </label>
                   <div className="relative">
@@ -244,7 +244,7 @@ function ResetPasswordContent() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
                       disabled={!token}
                     >
                       {showConfirmPassword ? (
@@ -320,7 +320,7 @@ function ResetPasswordContent() {
         {/* Help Text */}
         {!success && !token && (
           <div className="mt-8 text-center">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
               Link expired? <Link href="/forgot-password" className="text-admin-primary hover:underline">Request a new one</Link>
             </p>
           </div>

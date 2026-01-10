@@ -65,7 +65,7 @@ export default function DocumentSourceFilter({ onFilterChange }: DocumentSourceF
 
   return (
     <div className="bg-white rounded-lg border border-neutral-200 p-4 mb-6">
-      <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center">
+      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center">
         <svg className="h-5 w-5 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
@@ -85,7 +85,7 @@ export default function DocumentSourceFilter({ onFilterChange }: DocumentSourceF
             <svg className="h-4 w-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            <span className="text-sm font-medium text-neutral-900">My Documents</span>
+            <span className="text-sm font-medium text-neutral-900 dark:text-white">My Documents</span>
           </div>
         </label>
 
@@ -105,7 +105,7 @@ export default function DocumentSourceFilter({ onFilterChange }: DocumentSourceF
               <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
-              <span className="text-sm font-medium text-neutral-900">Shared: {access.owner_name}</span>
+              <span className="text-sm font-medium text-neutral-900 dark:text-white">Shared: {access.owner_name}</span>
             </div>
             <span className="text-xs text-neutral-500 bg-blue-50 px-2 py-0.5 rounded">
               {access.role}

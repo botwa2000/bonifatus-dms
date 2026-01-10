@@ -403,14 +403,14 @@ export default function ProfilePage() {
   const StatCard = ({ label, value }: { label: string; value: string | number }) => (
     <div className="bg-neutral-50 rounded-lg p-4">
       <p className="text-sm text-neutral-600">{label}</p>
-      <p className="text-2xl font-bold text-neutral-900">{value}</p>
+      <p className="text-2xl font-bold text-neutral-900 dark:text-white">{value}</p>
     </div>
   )
 
   const InfoRow = ({ label, value }: { label: string; value: string | React.ReactNode }) => (
     <div>
-      <label className="block text-sm font-medium text-neutral-700 mb-1">{label}</label>
-      <p className="text-neutral-900">{value}</p>
+      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">{label}</label>
+      <p className="text-neutral-900 dark:text-white">{value}</p>
     </div>
   )
 
@@ -487,14 +487,14 @@ export default function ProfilePage() {
                     disabled={!!profile.google_id}
                   />
                   {profile.google_id && (
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 mt-1">
                       Email cannot be changed for Google accounts
                     </p>
                   )}
 
                   {!profile.google_id && (
                     <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-                      <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-4">Change Password (optional)</h4>
+                      <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-4">Change Password (optional)</h4>
                       <div className="space-y-3">
                         <div className="relative">
                           <Input
@@ -507,7 +507,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                            className="absolute right-3 top-9 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
                           >
                             {showCurrentPassword ? (
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -533,7 +533,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => setShowNewPassword(!showNewPassword)}
-                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                            className="absolute right-3 top-9 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
                           >
                             {showNewPassword ? (
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -559,7 +559,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-3 top-9 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                            className="absolute right-3 top-9 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
                           >
                             {showConfirmPassword ? (
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -602,10 +602,10 @@ export default function ProfilePage() {
                     <>
                       {profile.email}
                       {profile.google_id && (
-                        <p className="text-xs text-neutral-500 mt-1">Email cannot be changed (linked to Google account)</p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Email cannot be changed (linked to Google account)</p>
                       )}
                       {!profile.google_id && (
-                        <p className="text-xs text-neutral-500 mt-1">Email can be changed in edit mode</p>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Email can be changed in edit mode</p>
                       )}
                     </>
                   } />
@@ -627,7 +627,7 @@ export default function ProfilePage() {
                             <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-2">
                               Send documents from <span className="font-semibold">{profile.email}</span> to this address to automatically process them.
                             </p>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-1">
                               Only emails from your registered account email are accepted.
                             </p>
                           </>
@@ -638,13 +638,13 @@ export default function ProfilePage() {
                       return (
                         <InfoRow label="Email-to-Process" value={
                           <div className="opacity-60">
-                            <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                            <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
                               <span>Feature locked</span>
                             </div>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-2">
                               Email documents directly for automatic processing
                             </p>
                             <button
@@ -761,7 +761,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-neutral-600">Next billing date:</span>
-                      <span className="font-medium text-neutral-900">{formatDate(subscription.current_period_end)}</span>
+                      <span className="font-medium text-neutral-900 dark:text-white">{formatDate(subscription.current_period_end)}</span>
                     </div>
                     {subscription.cancel_at_period_end && (
                       <Alert type="warning" message="Your subscription will be cancelled at the end of the current billing period." />
@@ -771,7 +771,7 @@ export default function ProfilePage() {
                   {/* Tier Change Options */}
                   {!subscription.cancel_at_period_end && availableTiers.length > 0 && (
                     <div className="pt-4 border-t border-neutral-200 space-y-3">
-                      <h4 className="font-medium text-neutral-900">Change Plan</h4>
+                      <h4 className="font-medium text-neutral-900 dark:text-white">Change Plan</h4>
 
                       {availableTiers
                         .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== subscription.tier_id)
@@ -785,7 +785,7 @@ export default function ProfilePage() {
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <h5 className="font-medium text-neutral-900">{tier.display_name}</h5>
+                                    <h5 className="font-medium text-neutral-900 dark:text-white">{tier.display_name}</h5>
                                     {isComingSoon && <Badge variant="warning" className="text-xs">Coming Soon</Badge>}
                                     {isUpgrade && !isComingSoon && <Badge variant="success" className="text-xs">Upgrade</Badge>}
                                   </div>
@@ -915,7 +915,7 @@ export default function ProfilePage() {
                   <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-neutral-900">Free Plan</h3>
+                        <h3 className="font-semibold text-neutral-900 dark:text-white">Free Plan</h3>
                         <p className="text-sm text-neutral-600 mt-1">
                           {isTrialActive && profile.trial_end_date
                             ? `Premium trial ends ${formatDate(profile.trial_end_date)}`
@@ -928,7 +928,7 @@ export default function ProfilePage() {
 
                   <div className="space-y-3">
                     <div className="mb-4">
-                      <p className="text-sm font-medium text-neutral-700 mb-3">Upgrade to unlock more features:</p>
+                      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">Upgrade to unlock more features:</p>
 
                       <div className="flex items-center justify-between gap-3">
                         {/* Currency Selector */}
@@ -1005,7 +1005,7 @@ export default function ProfilePage() {
                           <div key={tier.id} className="border border-neutral-200 rounded-lg p-4 hover:border-admin-primary transition-colors">
                             <div className="flex items-start justify-between mb-3">
                               <div>
-                                <h4 className="font-semibold text-neutral-900">{tier.display_name}</h4>
+                                <h4 className="font-semibold text-neutral-900 dark:text-white">{tier.display_name}</h4>
                                 <p className="text-sm text-neutral-600 mt-1">{tier.description}</p>
                               </div>
                               {isComingSoon && <Badge variant="warning">Coming Soon</Badge>}
@@ -1015,16 +1015,16 @@ export default function ProfilePage() {
                               <div>
                                 {billingCycle === 'yearly' ? (
                                   <>
-                                    <p className="text-2xl font-bold text-neutral-900">
+                                    <p className="text-2xl font-bold text-neutral-900 dark:text-white">
                                       {currencySymbol}{priceYearly.toFixed(decimalPlaces)}
                                       <span className="text-sm font-normal text-neutral-600">/year</span>
                                     </p>
-                                    <p className="text-xs text-neutral-500 mt-1">
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                                       {currencySymbol}{(priceYearly / 12).toFixed(decimalPlaces)}/month
                                     </p>
                                   </>
                                 ) : (
-                                  <p className="text-2xl font-bold text-neutral-900">
+                                  <p className="text-2xl font-bold text-neutral-900 dark:text-white">
                                     {currencySymbol}{priceMonthly.toFixed(decimalPlaces)}
                                     <span className="text-sm font-normal text-neutral-600">/month</span>
                                   </p>
@@ -1053,7 +1053,7 @@ export default function ProfilePage() {
             <CardHeader title="Danger Zone" />
             <CardContent>
               <div>
-                <h3 className="font-medium text-neutral-900 mb-2">Delete Account</h3>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-2">Delete Account</h3>
                 <p className="text-sm text-neutral-600 mb-4">
                   Once you delete your account, there is no going back. Your documents will remain in Google Drive, but all metadata and categorization will be permanently deleted immediately.
                 </p>
@@ -1087,7 +1087,7 @@ export default function ProfilePage() {
           />
 
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
               Additional feedback (optional)
             </label>
             <textarea
@@ -1131,19 +1131,19 @@ export default function ProfilePage() {
 
               {/* Current Subscription */}
               <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
-                <h4 className="font-medium text-neutral-900 mb-2">Current Subscription</h4>
+                <h4 className="font-medium text-neutral-900 dark:text-white mb-2">Current Subscription</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Plan:</span>
-                    <span className="font-medium text-neutral-900">{billingChangePreview.current_subscription.tier_name}</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">{billingChangePreview.current_subscription.tier_name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Billing Cycle:</span>
-                    <span className="font-medium text-neutral-900 capitalize">{billingChangePreview.current_subscription.billing_cycle}</span>
+                    <span className="font-medium text-neutral-900 dark:text-white capitalize">{billingChangePreview.current_subscription.billing_cycle}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Price:</span>
-                    <span className="font-medium text-neutral-900">
+                    <span className="font-medium text-neutral-900 dark:text-white">
                       {billingChangePreview.current_subscription.currency_symbol}
                       {(billingChangePreview.current_subscription.amount / 100).toFixed(2)}/
                       {billingChangePreview.current_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
@@ -1165,15 +1165,15 @@ export default function ProfilePage() {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Plan:</span>
-                    <span className="font-medium text-neutral-900">{billingChangePreview.new_subscription.tier_name}</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">{billingChangePreview.new_subscription.tier_name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Billing Cycle:</span>
-                    <span className="font-medium text-neutral-900 capitalize">{billingChangePreview.new_subscription.billing_cycle}</span>
+                    <span className="font-medium text-neutral-900 dark:text-white capitalize">{billingChangePreview.new_subscription.billing_cycle}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Price:</span>
-                    <span className="font-medium text-neutral-900">
+                    <span className="font-medium text-neutral-900 dark:text-white">
                       {billingChangePreview.new_subscription.currency_symbol}
                       {(billingChangePreview.new_subscription.amount / 100).toFixed(2)}/
                       {billingChangePreview.new_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
