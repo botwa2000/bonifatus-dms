@@ -8,7 +8,7 @@ interface FeatureCardProps {
   icon: ReactNode
   iconColor?: FeatureIconColor
   title: string
-  description: string
+  description: string | ReactNode
   href?: string
 }
 
