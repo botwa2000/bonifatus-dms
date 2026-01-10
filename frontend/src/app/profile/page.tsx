@@ -402,7 +402,7 @@ export default function ProfilePage() {
 
   const StatCard = ({ label, value }: { label: string; value: string | number }) => (
     <div className="bg-neutral-50 rounded-lg p-4">
-      <p className="text-sm text-neutral-600">{label}</p>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400">{label}</p>
       <p className="text-2xl font-bold text-neutral-900 dark:text-white">{value}</p>
     </div>
   )
@@ -637,14 +637,14 @@ export default function ProfilePage() {
                       // User's tier doesn't support email processing - show upgrade prompt
                       return (
                         <InfoRow label="Email-to-Process" value={
-                          <div className="opacity-60">
-                            <div className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+                          <div>
+                            <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
                               <span>Feature locked</span>
                             </div>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-500 mt-2">
+                            <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-2">
                               Email documents directly for automatic processing
                             </p>
                             <button

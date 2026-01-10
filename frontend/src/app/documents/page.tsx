@@ -339,7 +339,7 @@ export default function DocumentsPage() {
     <div className="bg-white rounded-lg border border-neutral-200 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-neutral-600">{label}</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">{label}</p>
           <p className="text-2xl font-bold text-neutral-900 dark:text-white mt-1">{value}</p>
         </div>
         <div className={`${color} p-3 rounded-lg`}>
@@ -402,7 +402,7 @@ export default function DocumentsPage() {
           <StatsCard
             label="Total Size"
             value={formatFileSize(totalSize)}
-            color="bg-purple-100"
+            color="bg-purple-100 dark:bg-purple-900/30"
             icon={
               <svg className="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
