@@ -153,7 +153,7 @@ function SignupContent() {
       <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Tier Selection Badge (if tier specified) */}
         {tierId !== '0' && (
-          <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 dark:border-blue-800 rounded-lg">
+          <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">You&apos;ve selected</p>
@@ -207,7 +207,7 @@ function SignupContent() {
                   <div className="w-full border-t border-neutral-300 dark:border-neutral-600"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+                  <span className="px-4 bg-white dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
                     or
                   </span>
                 </div>
@@ -232,14 +232,14 @@ function SignupContent() {
             /* Email Registration Form */
             <form onSubmit={handleEmailSignup} className="space-y-4">
               {error && (
-                <div className="p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
+                <div className="p-3 bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400">
                   {error}
                 </div>
               )}
 
               {/* Full Name */}
               <div>
-                <label htmlFor="full_name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                <label htmlFor="full_name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Full Name
                 </label>
                 <input
@@ -255,7 +255,7 @@ function SignupContent() {
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Email Address
                 </label>
                 <input
@@ -271,7 +271,7 @@ function SignupContent() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -327,7 +327,7 @@ function SignupContent() {
 
               {/* Confirm Password */}
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -383,7 +383,7 @@ function SignupContent() {
 
           {/* Trust Signals */}
           <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
-            <div className="flex flex-wrap justify-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+            <div className="flex flex-wrap justify-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
               <div className="flex items-center gap-1">
                 <svg className="w-4 h-4 text-admin-success dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -406,7 +406,7 @@ function SignupContent() {
           </div>
 
           {/* Terms */}
-          <p className="mt-4 text-xs text-center text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+          <p className="mt-4 text-xs text-center text-neutral-500 dark:text-neutral-400">
             By signing up, you agree to our{' '}
             <Link href="/legal/terms" className="text-admin-primary hover:underline">
               Terms of Service

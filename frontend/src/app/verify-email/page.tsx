@@ -208,7 +208,7 @@ function VerifyEmailContent() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400 text-center">
+            <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400 text-center">
               {error}
             </div>
           )}
@@ -270,10 +270,10 @@ function VerifyEmailContent() {
 
         {/* Help Text */}
         <div className="mt-8 text-center">
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
             Check your spam folder if you don&apos;t see the email.
           </p>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400 mt-2">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2">
             The code expires in 15 minutes.
           </p>
         </div>

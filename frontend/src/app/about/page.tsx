@@ -10,7 +10,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-900">
       {/* Navigation */}
-      <nav className="bg-white border-b border-neutral-200">
+      <nav className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center">
@@ -81,7 +81,7 @@ export default function AboutPage() {
             </p>
           </section>
 
-          <section className="mb-12 bg-neutral-50 p-8 rounded-lg">
+          <section className="mb-12 bg-neutral-50 dark:bg-neutral-800 p-8 rounded-lg">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Ready to Get Started?</h2>
             <p className="text-neutral-700 dark:text-neutral-300 mb-6">
               Experience the future of document management with our 30-day premium trial. 

@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
+                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
                   {error}
                 </div>
               )}
@@ -116,7 +116,7 @@ export default function ForgotPasswordPage() {
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                     Email Address
                   </label>
                   <input
@@ -170,7 +170,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {/* Info Box */}
-              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 dark:border-blue-800 rounded-lg">
+              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   <strong className="text-neutral-900 dark:text-white">Didn&apos;t receive the email?</strong><br />
                   Check your spam folder. The link expires in 1 hour.
@@ -205,7 +205,7 @@ export default function ForgotPasswordPage() {
         {/* Help Text */}
         {!success && (
           <div className="mt-8 text-center">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
               Need help? <Link href="/contact" className="text-admin-primary hover:underline">Contact support</Link>
             </p>
           </div>

@@ -159,7 +159,7 @@ function ResetPasswordContent() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
+                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
                   {error}
                 </div>
               )}
@@ -168,7 +168,7 @@ function ResetPasswordContent() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* New Password */}
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                     New Password
                   </label>
                   <div className="relative">
@@ -226,7 +226,7 @@ function ResetPasswordContent() {
 
                 {/* Confirm Password */}
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 mb-2">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                     Confirm Password
                   </label>
                   <div className="relative">
@@ -301,7 +301,7 @@ function ResetPasswordContent() {
               </div>
 
               {/* Redirect Notice */}
-              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 dark:border-blue-800 rounded-lg text-center">
+              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg text-center">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   Redirecting to sign in page in 3 seconds...
                 </p>
@@ -320,7 +320,7 @@ function ResetPasswordContent() {
         {/* Help Text */}
         {!success && !token && (
           <div className="mt-8 text-center">
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-400">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
               Link expired? <Link href="/forgot-password" className="text-admin-primary hover:underline">Request a new one</Link>
             </p>
           </div>
