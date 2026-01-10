@@ -741,7 +741,7 @@ export default function SettingsPage() {
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading settings...</p>
+          <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading settings...</p>
         </div>
       </div>
     )
@@ -822,13 +822,13 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Document Language Recognition
                 </label>
-                <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
+                <div className="bg-semantic-info-bg dark:bg-neutral-800 border border-semantic-info-border dark:border-neutral-700 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <svg className="h-5 w-5 text-admin-primary dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-neutral-900 dark:text-blue-100 mb-2">
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white mb-2">
                         Your documents are automatically recognized in all supported languages
                       </p>
                       <p className="text-xs text-neutral-700 dark:text-neutral-300 mb-3">
@@ -924,7 +924,7 @@ export default function SettingsPage() {
               ) : (
                 <div className="text-center py-8">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-                  <p className="mt-4 text-sm text-neutral-600">Loading storage providers...</p>
+                  <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading storage providers...</p>
                 </div>
               )}
             </CardContent>
@@ -937,7 +937,7 @@ export default function SettingsPage() {
               {sharedLoading ? (
                 <div className="text-center py-8">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-                  <p className="mt-4 text-sm text-neutral-600">Loading shared access...</p>
+                  <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading shared access...</p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1059,7 +1059,7 @@ export default function SettingsPage() {
                           d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                         />
                       </svg>
-                      <p className="mt-2 text-sm text-neutral-600">No shared access yet</p>
+                      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">No shared access yet</p>
                       <p className="text-xs text-neutral-500 dark:text-neutral-400">
                         When someone shares their documents with you, they will appear here
                       </p>
@@ -1094,7 +1094,7 @@ export default function SettingsPage() {
                   {delegatesLoading ? (
                     <div className="text-center py-8">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-                      <p className="mt-4 text-sm text-neutral-600">Loading delegates...</p>
+                      <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading delegates...</p>
                     </div>
                   ) : delegates.length > 0 ? (
                     <div className="mt-6">
@@ -1164,7 +1164,7 @@ export default function SettingsPage() {
                           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                         />
                       </svg>
-                      <p className="mt-2 text-sm text-neutral-600">No delegates yet</p>
+                      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">No delegates yet</p>
                       <p className="text-xs text-neutral-500 dark:text-neutral-400">Invite team members to share access to your documents</p>
                     </div>
                   )}

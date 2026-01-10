@@ -488,7 +488,7 @@ export default function DocumentsPage() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center space-x-3 flex-1">
-                      <div className="text-neutral-600">
+                      <div className="text-neutral-600 dark:text-neutral-400">
                         {getFileIcon(doc.mime_type)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -685,7 +685,7 @@ export default function DocumentsPage() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
-                          <div className="text-neutral-600">
+                          <div className="text-neutral-600 dark:text-neutral-400">
                             {getFileIcon(doc.mime_type)}
                           </div>
                           <div className="flex-1">
@@ -737,13 +737,13 @@ export default function DocumentsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600 dark:text-neutral-400">
                         {formatFileSize(doc.file_size)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getDocumentType(doc.mime_type, doc.file_name)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600 dark:text-neutral-400">
                         {formatDate(doc.created_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -806,7 +806,7 @@ export default function DocumentsPage() {
 
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-neutral-200 flex items-center justify-between">
-              <div className="text-sm text-neutral-600">
+              <div className="text-sm text-neutral-600 dark:text-neutral-400">
                 Showing {((currentPage - 1) * 12) + 1} to {Math.min(currentPage * 12, totalCount)} of {totalCount} documents
               </div>
               <div className="flex items-center space-x-2">
@@ -817,7 +817,7 @@ export default function DocumentsPage() {
                 >
                   Previous
                 </button>
-                <span className="text-sm text-neutral-600">
+                <span className="text-sm text-neutral-600 dark:text-neutral-400">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button

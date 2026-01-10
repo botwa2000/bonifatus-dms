@@ -45,7 +45,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">AI-Powered Categorization</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Automatically categorize documents using advanced machine learning. The system learns from your corrections to improve accuracy over time.
               </p>
             </div>
@@ -58,7 +58,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">OCR & Text Extraction</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Extract text from scanned documents and images with Google Vision API. Make all your documents searchable, even handwritten notes.
               </p>
             </div>
@@ -71,7 +71,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Intelligent Search</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Full-text search across all documents. Filter by category, date, language, or custom keywords to find exactly what you need instantly.
               </p>
             </div>
@@ -84,7 +84,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Google Drive Storage</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Documents stored securely on your own Google Drive. You maintain full ownership and control. No storage limits from us!
               </p>
             </div>
@@ -97,7 +97,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Multi-Language Support</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Support for English, German, Dutch, and more. Automatic language detection and categorization in multiple languages.
               </p>
             </div>
@@ -110,7 +110,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Standardized File Naming</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Automatic file renaming with date, category code, and original name. Keep your documents organized with consistent naming conventions.
               </p>
             </div>
@@ -123,7 +123,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Duplicate Detection</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 SHA-256 hash-based duplicate detection prevents uploading the same document twice. Save storage and avoid confusion.
               </p>
             </div>
@@ -136,7 +136,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Complete Audit Trail</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Track every action with comprehensive audit logs. Know who uploaded, modified, or deleted documents and when.
               </p>
             </div>
@@ -149,7 +149,7 @@ export default function FeaturesPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Multi-User Access (Pro)</h3>
-              <p className="text-neutral-600">
+              <p className="text-neutral-600 dark:text-neutral-400">
                 Share access with up to 3 delegates on the Professional plan. Collaborate with your team while maintaining security.
               </p>
             </div>

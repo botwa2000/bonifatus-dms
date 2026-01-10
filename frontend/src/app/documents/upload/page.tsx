@@ -711,7 +711,7 @@ export default function BatchUploadPage() {
                           <p className="text-neutral-600 dark:text-neutral-400 mb-4">
                             or click to browse from your computer
                           </p>
-                          <p className="text-sm text-neutral-500 dark:text-neutral-400 dark:text-neutral-500">
+                          <p className="text-sm text-neutral-500 dark:text-neutral-400">
                             Supported formats: PDF, DOC, DOCX, JPG, PNG • Max 50MB per file
                           </p>
                         </div>

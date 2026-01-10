@@ -419,7 +419,7 @@ export default function ProfilePage() {
       <div className="flex min-h-screen items-center justify-center bg-neutral-50">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-admin-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-sm text-neutral-600">Loading profile...</p>
+          <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Loading profile...</p>
         </div>
       </div>
     )
@@ -684,7 +684,7 @@ export default function ProfilePage() {
               <CardHeader title="Monthly Usage" />
               <CardContent>
                 <div className="space-y-4">
-                  <div className="text-sm text-neutral-600">
+                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
                     Period: {new Date(statistics.monthly_usage.period_start).toLocaleDateString()} - {new Date(statistics.monthly_usage.period_end).toLocaleDateString()}
                   </div>
 
@@ -714,7 +714,7 @@ export default function ProfilePage() {
               <CardHeader title="Administrator Access" />
               <CardContent>
                 <div className="space-y-3">
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     You have administrator privileges. Access the admin dashboard to manage users, tiers, and monitor system health.
                   </p>
                   <div className="flex items-center space-x-2">
@@ -736,7 +736,7 @@ export default function ProfilePage() {
               {loadingSubscription ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-admin-primary border-t-transparent"></div>
-                  <span className="ml-3 text-sm text-neutral-600">Loading subscription...</span>
+                  <span className="ml-3 text-sm text-neutral-600 dark:text-neutral-400">Loading subscription...</span>
                 </div>
               ) : subscription && subscription.status === 'active' ? (
                 <div className="space-y-4">
@@ -760,7 +760,7 @@ export default function ProfilePage() {
 
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-600">Next billing date:</span>
+                      <span className="text-neutral-600 dark:text-neutral-400">Next billing date:</span>
                       <span className="font-medium text-neutral-900 dark:text-white">{formatDate(subscription.current_period_end)}</span>
                     </div>
                     {subscription.cancel_at_period_end && (
@@ -1017,7 +1017,7 @@ export default function ProfilePage() {
                                   <>
                                     <p className="text-2xl font-bold text-neutral-900 dark:text-white">
                                       {currencySymbol}{priceYearly.toFixed(decimalPlaces)}
-                                      <span className="text-sm font-normal text-neutral-600">/year</span>
+                                      <span className="text-sm font-normal text-neutral-600 dark:text-neutral-400">/year</span>
                                     </p>
                                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                                       {currencySymbol}{(priceYearly / 12).toFixed(decimalPlaces)}/month
@@ -1026,7 +1026,7 @@ export default function ProfilePage() {
                                 ) : (
                                   <p className="text-2xl font-bold text-neutral-900 dark:text-white">
                                     {currencySymbol}{priceMonthly.toFixed(decimalPlaces)}
-                                    <span className="text-sm font-normal text-neutral-600">/month</span>
+                                    <span className="text-sm font-normal text-neutral-600 dark:text-neutral-400">/month</span>
                                   </p>
                                 )}
                               </div>
@@ -1134,15 +1134,15 @@ export default function ProfilePage() {
                 <h4 className="font-medium text-neutral-900 dark:text-white mb-2">Current Subscription</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Plan:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Plan:</span>
                     <span className="font-medium text-neutral-900 dark:text-white">{billingChangePreview.current_subscription.tier_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Billing Cycle:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Billing Cycle:</span>
                     <span className="font-medium text-neutral-900 dark:text-white capitalize">{billingChangePreview.current_subscription.billing_cycle}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Price:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Price:</span>
                     <span className="font-medium text-neutral-900 dark:text-white">
                       {billingChangePreview.current_subscription.currency_symbol}
                       {(billingChangePreview.current_subscription.amount / 100).toFixed(2)}/
@@ -1164,15 +1164,15 @@ export default function ProfilePage() {
                 <h4 className="font-medium text-admin-primary mb-2">New Subscription</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Plan:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Plan:</span>
                     <span className="font-medium text-neutral-900 dark:text-white">{billingChangePreview.new_subscription.tier_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Billing Cycle:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Billing Cycle:</span>
                     <span className="font-medium text-neutral-900 dark:text-white capitalize">{billingChangePreview.new_subscription.billing_cycle}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-600">Price:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Price:</span>
                     <span className="font-medium text-neutral-900 dark:text-white">
                       {billingChangePreview.new_subscription.currency_symbol}
                       {(billingChangePreview.new_subscription.amount / 100).toFixed(2)}/
@@ -1180,7 +1180,7 @@ export default function ProfilePage() {
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-admin-primary/20">
-                    <span className="text-neutral-600">Effective Date:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Effective Date:</span>
                     <span className="font-medium text-admin-primary">{billingChangePreview.change_details.change_effective_date}</span>
                   </div>
                 </div>

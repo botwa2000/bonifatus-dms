@@ -57,7 +57,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Your Google Drive</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Documents stored on your own Google Drive account. We never store your files on our servers.
                 </p>
               </div>
@@ -69,7 +69,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Full Ownership</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   You own your data. Delete your account anytime and your documents remain safely in your Google Drive.
                 </p>
               </div>
@@ -81,7 +81,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Encrypted Tokens</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Your Google Drive access tokens are encrypted using Fernet encryption (AES-128) before storage.
                 </p>
               </div>
@@ -105,7 +105,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">OAuth 2.0 Authentication</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Secure login through Google OAuth 2.0. We never see or store your Google password.
                 </p>
               </div>
@@ -117,7 +117,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Session Management</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Secure session tokens with automatic expiration. Sessions are invalidated on logout.
                 </p>
               </div>
@@ -129,7 +129,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Role-Based Access Control</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Multi-user plans include granular permission controls for team collaboration.
                 </p>
               </div>
@@ -141,7 +141,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Complete Audit Logs</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Every action is logged with timestamp, user, and IP address for full traceability.
                 </p>
               </div>
@@ -165,7 +165,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">HTTPS Everywhere</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   All communication between your browser and our servers is encrypted with TLS 1.3.
                 </p>
               </div>
@@ -177,7 +177,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Minimal Data Collection</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   We only collect essential data needed for service operation. No selling or sharing with third parties.
                 </p>
               </div>
@@ -189,7 +189,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">GDPR Compliant</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Full compliance with GDPR regulations. Right to access, export, and delete your data anytime.
                 </p>
               </div>
@@ -201,7 +201,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Regular Backups</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Database backups every 24 hours. Your documents are already backed up by Google Drive.
                 </p>
               </div>
@@ -225,7 +225,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Docker Containerization</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Application runs in isolated Docker containers for enhanced security and reliability.
                 </p>
               </div>
@@ -237,7 +237,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">PostgreSQL Database</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   Enterprise-grade PostgreSQL database with encrypted connections and access controls.
                 </p>
               </div>
@@ -249,7 +249,7 @@ export default function SecurityPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Regular Updates</h3>
-                <p className="text-neutral-600">
+                <p className="text-neutral-600 dark:text-neutral-400">
                   System dependencies and security patches applied regularly to protect against vulnerabilities.
                 </p>
               </div>
