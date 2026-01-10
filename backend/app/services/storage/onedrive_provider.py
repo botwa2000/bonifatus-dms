@@ -431,12 +431,15 @@ class OneDriveProvider(StorageProvider):
 
             # Search for the main app folder
             search_url = f"{self.graph_base_url}/me/drive/root/children"
-            search_params = {'$filter': f"name eq '{self.app_folder_name}' and folder ne null"}
+            search_params = {'$filter': f"name eq '{self.app_folder_name}'"}
 
             search_response = requests.get(search_url, headers=headers, params=search_params)
             search_response.raise_for_status()
 
-            folders = search_response.json().get('value', [])
+            items = search_response.json().get('value', [])
+
+            # Filter to ensure it's actually a folder
+            folders = [item for item in items if 'folder' in item]
 
             if not folders:
                 logger.info(f"App folder '{self.app_folder_name}' not found in OneDrive - nothing to delete")
