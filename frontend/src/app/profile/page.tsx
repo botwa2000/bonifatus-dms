@@ -621,7 +621,7 @@ export default function ProfilePage() {
                       return (
                         <InfoRow label="Document Processing Email" value={
                           <>
-                            <span className="font-mono text-sm bg-blue-50 dark:bg-blue-900 px-2 py-1 rounded">
+                            <span className="font-mono text-sm bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900 px-2 py-1 rounded">
                               {profile.email_processing_address}
                             </span>
                             <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-2">
@@ -740,16 +740,16 @@ export default function ProfilePage() {
                 </div>
               ) : subscription && subscription.status === 'active' ? (
                 <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-green-900">{subscription.tier_name}</h3>
-                        <p className="text-sm text-green-700 mt-1">
+                        <h3 className="font-semibold text-semantic-success-text dark:text-green-300">{subscription.tier_name}</h3>
+                        <p className="text-sm text-semantic-success-text dark:text-green-400 mt-1">
                           {subscription.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'} billing •
                           {subscription.currency_symbol || subscription.currency}{(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
                         </p>
                         {subscription.pending_billing_cycle && subscription.pending_billing_cycle_date && (
-                          <p className="text-xs text-blue-700 mt-2 font-medium">
+                          <p className="text-xs text-admin-primary dark:text-blue-400 mt-2 font-medium">
                             → Switching to {subscription.pending_billing_cycle === 'yearly' ? 'annual' : 'monthly'} billing on {formatDate(subscription.pending_billing_cycle_date)}
                           </p>
                         )}
@@ -811,13 +811,13 @@ export default function ProfilePage() {
 
                       {/* Billing Cycle Change */}
                       {!subscription.pending_billing_cycle && (
-                        <div className="border border-neutral-200 rounded-lg p-3 bg-blue-50">
+                        <div className="border border-neutral-200 rounded-lg p-3 bg-semantic-info-bg dark:bg-blue-900/10">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <h5 className="font-medium text-blue-900">
+                              <h5 className="font-medium text-semantic-info-text dark:text-blue-100">
                                 Switch to {subscription.billing_cycle === 'yearly' ? 'Monthly' : 'Annual'} Billing
                               </h5>
-                              <p className="text-xs text-blue-700 mt-1">
+                              <p className="text-xs text-semantic-info-text dark:text-blue-300 mt-1">
                                 {subscription.billing_cycle === 'yearly'
                                   ? 'Change will take effect at the end of your current billing period'
                                   : 'Switch to annual billing and save. Change takes effect at period end.'
@@ -903,7 +903,7 @@ export default function ProfilePage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowCancelModal(true)}
-                        className="w-full text-red-600 hover:bg-red-50"
+                        className="w-full text-admin-danger dark:text-red-400 hover:bg-semantic-error-bg dark:bg-red-900/20"
                       >
                         Cancel Subscription
                       </Button>
@@ -1049,7 +1049,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card className="border-red-200">
+          <Card className="border-semantic-error-border dark:border-red-800">
             <CardHeader title="Danger Zone" />
             <CardContent>
               <div>
@@ -1160,7 +1160,7 @@ export default function ProfilePage() {
               </div>
 
               {/* New Subscription */}
-              <div className="border border-admin-primary rounded-lg p-4 bg-blue-50">
+              <div className="border border-admin-primary rounded-lg p-4 bg-semantic-info-bg dark:bg-blue-900/10">
                 <h4 className="font-medium text-admin-primary mb-2">New Subscription</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">

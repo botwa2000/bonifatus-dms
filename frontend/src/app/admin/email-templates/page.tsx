@@ -184,8 +184,8 @@ export default function EmailTemplatesAdmin() {
         {message && (
           <div className={`mb-6 p-4 rounded-lg ${
             message.type === 'success'
-              ? 'bg-green-50 text-green-800 border border-green-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-semantic-success-bg dark:bg-green-900/20 text-semantic-success-text dark:text-green-300 border border-semantic-success-border dark:border-green-800'
+              : 'bg-semantic-error-bg dark:bg-red-900/20 text-semantic-error-text dark:text-red-300 border border-semantic-error-border dark:border-red-800'
           }`}>
             {message.text}
           </div>
@@ -373,7 +373,7 @@ export default function EmailTemplatesAdmin() {
                       id="is_active"
                       checked={formData.is_active}
                       onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-neutral-600 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-admin-primary dark:text-blue-400 border-gray-300 dark:border-neutral-600 rounded focus:ring-blue-500"
                     />
                     <label htmlFor="is_active" className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                       Template is active

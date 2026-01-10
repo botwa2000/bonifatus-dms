@@ -110,7 +110,7 @@ function DriveCallbackContent() {
 
         {status === 'success' && (
           <>
-            <div className="h-12 w-12 mx-auto mb-4 text-green-600">
+            <div className="h-12 w-12 mx-auto mb-4 text-admin-success dark:text-green-400">
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -128,7 +128,7 @@ function DriveCallbackContent() {
 
         {status === 'error' && (
           <>
-            <div className="h-12 w-12 mx-auto mb-4 text-red-600">
+            <div className="h-12 w-12 mx-auto mb-4 text-admin-danger dark:text-red-400">
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"

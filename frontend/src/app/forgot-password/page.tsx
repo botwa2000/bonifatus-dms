@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
                   {error}
                 </div>
               )}
@@ -152,8 +152,8 @@ export default function ForgotPasswordPage() {
             <>
               {/* Icon */}
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <div className="w-16 h-16 bg-semantic-success-bg-strong dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-admin-success dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -170,7 +170,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {/* Info Box */}
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   <strong className="text-neutral-900 dark:text-white">Didn&apos;t receive the email?</strong><br />
                   Check your spam folder. The link expires in 1 hour.

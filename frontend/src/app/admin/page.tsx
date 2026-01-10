@@ -613,7 +613,7 @@ export default function AdminDashboard() {
           >
             System Health
             {clamavHealth && !clamavHealth.available && (
-              <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500"></span>
+              <span className="ml-2 inline-block h-2 w-2 rounded-full bg-admin-danger"></span>
             )}
           </button>
           <button
@@ -771,7 +771,7 @@ export default function AdminDashboard() {
                             ))}
                           </select>
                           {updatingUserId === user.id && (
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">Updating...</span>
+                            <span className="ml-2 text-xs text-admin-primary dark:text-blue-400 dark:text-blue-400">Updating...</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">{user.document_count}</td>
@@ -1163,12 +1163,12 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   {/* Info Box */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
                     <div className="flex items-start">
-                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-5 w-5 text-admin-primary dark:text-blue-400 dark:text-blue-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <div className="text-sm text-blue-900 dark:text-blue-100">
+                      <div className="text-sm text-semantic-info-text dark:text-blue-100 dark:text-blue-100 dark:text-blue-200 dark:text-blue-300">
                         <strong>Exchange Rate Formula:</strong> EUR is the base currency (1.00)
                         <br />
                         <strong>Rate = units of currency per 1 EUR</strong>
@@ -1430,27 +1430,27 @@ export default function AdminDashboard() {
                   {/* Status Banner */}
                   <div className={`p-4 rounded-lg ${
                     clamavHealth.available
-                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                      : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                      ? 'bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800'
+                      : 'bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`h-3 w-3 rounded-full ${
-                          clamavHealth.available ? 'bg-green-500' : 'bg-red-500'
+                          clamavHealth.available ? 'bg-admin-success' : 'bg-admin-danger'
                         } animate-pulse`}></div>
                         <div>
                           <div className={`text-lg font-semibold ${
                             clamavHealth.available
                               ? 'text-green-800 dark:text-green-300'
-                              : 'text-red-800 dark:text-red-300'
+                              : 'text-semantic-error-text dark:text-red-300 dark:text-red-300'
                           }`}>
                             {clamavHealth.status === 'healthy' ? 'Service Healthy' :
                              clamavHealth.status === 'unavailable' ? 'Service Unavailable' : 'Service Unhealthy'}
                           </div>
                           <div className={`text-sm ${
                             clamavHealth.available
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-red-600 dark:text-red-400'
+                              ? 'text-admin-success dark:text-green-400 dark:text-green-400'
+                              : 'text-admin-danger dark:text-red-400 dark:text-red-400'
                           }`}>
                             {clamavHealth.available
                               ? 'Antivirus protection is active'
@@ -1509,14 +1509,14 @@ export default function AdminDashboard() {
                   {clamavHealth.error && (
                     <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded">
                       <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Error Details:</div>
-                      <div className="text-sm text-red-600 dark:text-red-400 font-mono">
+                      <div className="text-sm text-admin-danger dark:text-red-400 dark:text-red-400 font-mono">
                         {clamavHealth.error}
                       </div>
                     </div>
                   )}
 
                   {/* Information Box */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
                     <div className="text-sm text-neutral-700 dark:text-neutral-300">
                       <strong>Note:</strong> When ClamAV is unavailable, uploads continue to work using heuristic-based scanning only (PDF structure validation, macro detection).
                       Signature-based malware detection is skipped. Restart the service to enable full antivirus protection.
@@ -1548,19 +1548,19 @@ export default function AdminDashboard() {
                     {/* Status Banner */}
                     <div className={`p-4 rounded-lg ${
                       emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
-                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                        ? 'bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800'
+                        : 'bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800'
                     }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`h-3 w-3 rounded-full ${
-                            emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy' ? 'bg-green-500' : 'bg-red-500'
+                            emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy' ? 'bg-admin-success' : 'bg-admin-danger'
                           } animate-pulse`}></div>
                           <div>
                             <div className={`text-lg font-semibold ${
                               emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
                                 ? 'text-green-800 dark:text-green-300'
-                                : 'text-red-800 dark:text-red-300'
+                                : 'text-semantic-error-text dark:text-red-300 dark:text-red-300'
                             }`}>
                               {emailPollerHealth.status === 'healthy' ? 'Service Healthy' :
                                emailPollerHealth.status === 'unhealthy' ? 'Service Unhealthy' :
@@ -1568,8 +1568,8 @@ export default function AdminDashboard() {
                             </div>
                             <div className={`text-sm ${
                               emailPollerHealth.imap_available && emailPollerHealth.status === 'healthy'
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400'
+                                ? 'text-admin-success dark:text-green-400 dark:text-green-400'
+                                : 'text-admin-danger dark:text-red-400 dark:text-red-400'
                             }`}>
                               {!emailPollerHealth.polling_task_running
                                 ? 'CRITICAL: Polling task is not running - emails will not be processed'
@@ -1634,8 +1634,8 @@ export default function AdminDashboard() {
                         <div className="text-xs text-neutral-600 dark:text-neutral-400">Polling Task</div>
                         <div className={`text-sm font-medium ${
                           emailPollerHealth.polling_task_running
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            ? 'text-admin-success dark:text-green-400 dark:text-green-400'
+                            : 'text-admin-danger dark:text-red-400 dark:text-red-400'
                         }`}>
                           {emailPollerHealth.polling_task_running ? '✓ Running' : '✗ Stopped'}
                         </div>
@@ -1652,8 +1652,8 @@ export default function AdminDashboard() {
                         <div className="text-xs text-neutral-600 dark:text-neutral-400">Scheduler</div>
                         <div className={`text-sm font-medium ${
                           emailPollerHealth.scheduler_running
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            ? 'text-admin-success dark:text-green-400 dark:text-green-400'
+                            : 'text-admin-danger dark:text-red-400 dark:text-red-400'
                         }`}>
                           {emailPollerHealth.scheduler_running ? '✓ Active' : '✗ Inactive'}
                         </div>
@@ -1664,7 +1664,7 @@ export default function AdminDashboard() {
                     {(emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error) && (
                       <div className="bg-neutral-100 dark:bg-neutral-800 p-3 rounded">
                         <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">Error Details:</div>
-                        <div className="text-sm text-red-600 dark:text-red-400 font-mono">
+                        <div className="text-sm text-admin-danger dark:text-red-400 dark:text-red-400 font-mono">
                           {emailPollerHealth.error || emailPollerHealth.imap_error || emailPollerHealth.last_poll_error}
                         </div>
                       </div>
@@ -1672,8 +1672,8 @@ export default function AdminDashboard() {
 
                     {/* Warning */}
                     {emailPollerHealth.warning && (
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded">
-                        <div className="text-sm text-yellow-800 dark:text-yellow-300">
+                      <div className="bg-semantic-warning-bg dark:bg-yellow-900/20 border border-semantic-warning-border dark:border-yellow-800 p-3 rounded">
+                        <div className="text-sm text-semantic-warning-text dark:text-yellow-300 dark:text-yellow-300">
                           ⚠️ {emailPollerHealth.warning}
                         </div>
                       </div>
@@ -1691,9 +1691,9 @@ export default function AdminDashboard() {
                                   {new Date(activity.received_at).toLocaleString()}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded ${
-                                  activity.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                  activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'
+                                  activity.status === 'completed' ? 'bg-semantic-success-bg-strong dark:bg-green-900/30 text-semantic-success-text dark:text-green-300' :
+                                  activity.status === 'rejected' ? 'bg-semantic-error-bg-strong dark:bg-red-900/30 text-semantic-error-text dark:text-red-300' :
+                                  'bg-semantic-warning-bg-strong dark:bg-yellow-900/30 text-semantic-warning-text dark:text-yellow-300'
                                 }`}>
                                   {activity.status}
                                 </span>
@@ -1709,7 +1709,7 @@ export default function AdminDashboard() {
                     )}
 
                     {/* Information Box */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
                       <div className="text-sm text-neutral-700 dark:text-neutral-300">
                         <strong>Note:</strong> The email poller checks for new emails every {emailPollerHealth.polling_interval_seconds} seconds.
                         Use the &quot;Poll Now&quot; button to manually trigger an immediate poll. If the service is unhealthy, check IMAP credentials and network connectivity.
@@ -1728,7 +1728,7 @@ export default function AdminDashboard() {
             <CardHeader title="Email Template Management" />
             <CardContent>
               <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
                     Email Notifications
                   </h3>
@@ -1811,8 +1811,8 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   {/* Info Box */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <div className="text-sm text-blue-900 dark:text-blue-100 space-y-3">
+                  <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
+                    <div className="text-sm text-semantic-info-text dark:text-blue-100 dark:text-blue-100 dark:text-blue-200 dark:text-blue-300 space-y-3">
                       <div>
                         <strong className="text-base">📊 Entity Quality Scoring System</strong>
                         <p className="mt-1">Multi-factor confidence calculation to filter out garbage entities and keep high-quality extractions.</p>
@@ -1820,7 +1820,7 @@ export default function AdminDashboard() {
 
                       <div>
                         <strong>How it works:</strong>
-                        <div className="mt-1 font-mono text-xs bg-blue-100 dark:bg-blue-900 p-2 rounded">
+                        <div className="mt-1 font-mono text-xs bg-semantic-info-bg-strong dark:bg-blue-900 p-2 rounded">
                           Final Confidence = Base Confidence × Multiplier₁ × Multiplier₂ × ... × Multiplierₙ
                         </div>
                         <p className="mt-1">Each entity starts with a base confidence (0.85-0.95), then gets multiplied by various factors based on quality checks.</p>
@@ -1851,7 +1851,7 @@ export default function AdminDashboard() {
 
                       <div>
                         <strong>Example:</strong>
-                        <div className="mt-1 font-mono text-xs bg-blue-100 dark:bg-blue-900 p-2 rounded space-y-1">
+                        <div className="mt-1 font-mono text-xs bg-semantic-info-bg-strong dark:bg-blue-900 p-2 rounded space-y-1">
                           <div>&quot;Kinopolis&quot; (ORGANIZATION):</div>
                           <div>  Base: 0.85 × length_ok(1.0) × dict_valid(1.3) × proper_case(1.1) = <strong>1.00</strong> ✓ ACCEPTED</div>
                           <div className="mt-2">&quot;KINOPOLIS&quot; (ORGANIZATION):</div>
@@ -1864,7 +1864,7 @@ export default function AdminDashboard() {
                       <div className="pt-2 border-t border-blue-300 dark:border-blue-700">
                         <strong>💡 Debugging:</strong> Check dev backend logs after uploading documents to see detailed scoring for each entity.
                         <br />
-                        Look for <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">[RULE-BASED]</code> and <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">[ENTITY FILTER]</code> log entries.
+                        Look for <code className="bg-semantic-info-bg-strong dark:bg-blue-900 px-1 rounded">[RULE-BASED]</code> and <code className="bg-semantic-info-bg-strong dark:bg-blue-900 px-1 rounded">[ENTITY FILTER]</code> log entries.
                       </div>
                     </div>
                   </div>

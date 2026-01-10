@@ -822,29 +822,29 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Document Language Recognition
                 </label>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
-                    <svg className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 text-admin-primary dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 mb-2">
+                      <p className="text-sm font-medium text-semantic-info-text dark:text-blue-100 dark:text-blue-200 dark:text-blue-300 mb-2">
                         Your documents are automatically recognized in all supported languages
                       </p>
-                      <p className="text-xs text-blue-700 mb-3">
+                      <p className="text-xs text-semantic-info-text dark:text-blue-300 mb-3">
                         The system will detect and process documents in any of the following languages:
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {systemSettings.available_languages.map(langCode => (
                           <span
                             key={langCode}
-                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-900 border border-blue-300"
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-semantic-info-text dark:text-blue-100 dark:text-blue-200 dark:text-blue-300 border border-semantic-info-border dark:border-blue-700"
                           >
                             {getLanguageName(langCode)}
                           </span>
                         ))}
                       </div>
-                      <p className="text-xs text-blue-600 mt-3 italic">
+                      <p className="text-xs text-admin-primary dark:text-blue-400 mt-3 italic">
                         More languages coming soon!
                       </p>
                     </div>
@@ -952,7 +952,7 @@ export default function SettingsPage() {
                         {pendingInvitations.map((invitation) => (
                           <div
                             key={invitation.id}
-                            className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg"
+                            className="p-4 border border-semantic-warning-border dark:border-yellow-800 bg-semantic-warning-bg dark:bg-yellow-900/20 rounded-lg"
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -1196,9 +1196,9 @@ export default function SettingsPage() {
                   placeholder="colleague@example.com"
                   disabled={isInviting}
                 />
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs text-blue-800 font-medium">Delegate Permissions:</p>
-                  <ul className="mt-2 text-xs text-blue-700 space-y-1">
+                <div className="mt-4 p-3 bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-md">
+                  <p className="text-xs text-semantic-info-text dark:text-blue-200 dark:text-blue-300 font-medium">Delegate Permissions:</p>
+                  <ul className="mt-2 text-xs text-semantic-info-text dark:text-blue-300 space-y-1">
                     <li>✓ View and search all your documents</li>
                     <li>✓ Download documents for review</li>
                     <li>✗ Cannot upload, edit, or delete documents</li>

@@ -361,7 +361,7 @@ export default function DocumentsPage() {
 
       {/* Delegate Banner */}
       {isActingAsDelegate && actingAsUser && (
-        <div className="bg-indigo-600 text-white">
+        <div className="bg-admin-primary text-white">
           <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center space-x-3">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -370,7 +370,7 @@ export default function DocumentsPage() {
               </svg>
               <div>
                 <span className="font-medium">Viewing {actingAsUser.owner_name}&apos;s documents</span>
-                <span className="text-indigo-200 ml-2">({actingAsUser.role} access)</span>
+                <span className="text-blue-200 dark:text-blue-300 ml-2">({actingAsUser.role} access)</span>
               </div>
             </div>
           </div>
@@ -391,9 +391,9 @@ export default function DocumentsPage() {
           <StatsCard
             label="Total Documents"
             value={totalCount}
-            color="bg-blue-100"
+            color="bg-semantic-info-bg-strong dark:bg-blue-900/30"
             icon={
-              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             }
@@ -404,7 +404,7 @@ export default function DocumentsPage() {
             value={formatFileSize(totalSize)}
             color="bg-purple-100"
             icon={
-              <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
               </svg>
             }
@@ -413,9 +413,9 @@ export default function DocumentsPage() {
           <StatsCard
             label="Categories"
             value={categories.length}
-            color="bg-green-100"
+            color="bg-semantic-success-bg-strong dark:bg-green-900/30"
             icon={
-              <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6 text-admin-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             }
@@ -483,7 +483,7 @@ export default function DocumentsPage() {
                 <div
                   key={doc.id}
                   className={`border border-neutral-200 rounded-lg p-4 hover:border-admin-primary hover:shadow-md transition-all ${
-                    doc.owner_type === 'shared' ? 'bg-blue-50' : ''
+                    doc.owner_type === 'shared' ? 'bg-semantic-info-bg dark:bg-blue-900/10' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -500,7 +500,7 @@ export default function DocumentsPage() {
                             </svg>
                           )}
                           {doc.owner_type === 'shared' && (
-                            <svg className="h-4 w-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label={`Shared by ${doc.owner_name}`}>
+                            <svg className="h-4 w-4 text-admin-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label={`Shared by ${doc.owner_name}`}>
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                             </svg>
                           )}
@@ -508,7 +508,7 @@ export default function DocumentsPage() {
                         <div className="flex items-center space-x-2">
                           <p className="text-xs text-neutral-500">{formatFileSize(doc.file_size)}</p>
                           {doc.owner_type === 'shared' && doc.owner_name && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                            <span className="text-xs bg-semantic-info-bg-strong dark:bg-blue-900/30 text-semantic-info-text dark:text-blue-300 px-2 py-0.5 rounded">
                               {doc.owner_name}
                             </span>
                           )}
@@ -563,7 +563,7 @@ export default function DocumentsPage() {
                         className={`${
                           doc.can_edit === false
                             ? 'text-neutral-300 cursor-not-allowed'
-                            : 'text-neutral-600 hover:text-blue-600'
+                            : 'text-neutral-600 hover:text-admin-primary'
                         }`}
                         title={doc.can_edit === false ? 'Cannot edit shared documents' : 'Edit'}
                         disabled={doc.can_edit === false}
@@ -574,7 +574,7 @@ export default function DocumentsPage() {
                       </button>
                       <button
                         onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${doc.id}/download`, '_blank')}
-                        className="text-neutral-600 hover:text-green-600"
+                        className="text-neutral-600 hover:text-admin-success"
                         title="Download"
                       >
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -586,7 +586,7 @@ export default function DocumentsPage() {
                         className={`${
                           doc.can_delete === false
                             ? 'text-neutral-300 cursor-not-allowed'
-                            : 'text-neutral-600 hover:text-red-600'
+                            : 'text-neutral-600 hover:text-admin-danger'
                         }`}
                         title={doc.can_delete === false ? 'Cannot delete shared documents' : 'Delete'}
                         disabled={doc.can_delete === false}
@@ -680,7 +680,7 @@ export default function DocumentsPage() {
                     <tr
                       key={doc.id}
                       className={`hover:bg-neutral-50 transition-colors ${
-                        doc.owner_type === 'shared' ? 'bg-blue-50' : ''
+                        doc.owner_type === 'shared' ? 'bg-semantic-info-bg dark:bg-blue-900/10' : ''
                       }`}
                     >
                       <td className="px-6 py-4">
@@ -698,11 +698,11 @@ export default function DocumentsPage() {
                               )}
                               {doc.owner_type === 'shared' && (
                                 <>
-                                  <svg className="h-4 w-4 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label={`Shared by ${doc.owner_name}`}>
+                                  <svg className="h-4 w-4 text-admin-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label={`Shared by ${doc.owner_name}`}>
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                   </svg>
                                   {doc.owner_name && (
-                                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                    <span className="text-xs bg-semantic-info-bg-strong dark:bg-blue-900/30 text-semantic-info-text dark:text-blue-300 px-2 py-0.5 rounded">
                                       {doc.owner_name}
                                     </span>
                                   )}
@@ -763,7 +763,7 @@ export default function DocumentsPage() {
                             className={`${
                               doc.can_edit === false
                                 ? 'text-neutral-300 cursor-not-allowed'
-                                : 'text-neutral-600 hover:text-blue-600'
+                                : 'text-neutral-600 hover:text-admin-primary'
                             }`}
                             title={doc.can_edit === false ? 'Cannot edit shared documents' : 'Edit'}
                             disabled={doc.can_edit === false}
@@ -774,7 +774,7 @@ export default function DocumentsPage() {
                           </button>
                           <button
                             onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/${doc.id}/download`, '_blank')}
-                            className="text-neutral-600 hover:text-green-600"
+                            className="text-neutral-600 hover:text-admin-success"
                             title="Download"
                           >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -786,7 +786,7 @@ export default function DocumentsPage() {
                             className={`${
                               doc.can_delete === false
                                 ? 'text-neutral-300 cursor-not-allowed'
-                                : 'text-neutral-600 hover:text-red-600'
+                                : 'text-neutral-600 hover:text-admin-danger'
                             }`}
                             title={doc.can_delete === false ? 'Cannot delete shared documents' : 'Delete'}
                             disabled={doc.can_delete === false}

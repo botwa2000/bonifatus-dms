@@ -245,7 +245,7 @@ export default function DelegatesPage() {
 
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-primary dark:border-blue-500"></div>
             </div>
           ) : delegates.length === 0 ? (
             <div className="text-center py-12">

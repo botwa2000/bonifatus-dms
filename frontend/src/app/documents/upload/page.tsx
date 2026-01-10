@@ -461,7 +461,7 @@ export default function BatchUploadPage() {
             <p className="mb-3">You need to connect a cloud storage provider (Google Drive, OneDrive, etc.) before uploading documents.</p>
             <Link
               href="/settings"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              className="inline-block bg-admin-primary hover:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium px-4 py-2 rounded-lg transition-colors"
             >
               Go to Settings →
             </Link>
@@ -679,8 +679,8 @@ export default function BatchUploadPage() {
                     {selectedFiles.length > 0 ? (
                       <div className="space-y-4">
                         <div className="flex items-center justify-center mb-4">
-                          <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                            <svg className="h-8 w-8 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <div className="h-16 w-16 rounded-full bg-semantic-success-bg-strong dark:bg-green-900/30 flex items-center justify-center">
+                            <svg className="h-8 w-8 text-admin-success dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
@@ -770,10 +770,10 @@ export default function BatchUploadPage() {
                             {/* Display language warning if present */}
                             {state.analysis?.language_warning && (
                               <div className="mt-2">
-                                <div className="rounded-lg border p-4 bg-yellow-50 border-yellow-200 text-yellow-800">
+                                <div className="rounded-lg border p-4 bg-semantic-warning-bg dark:bg-yellow-900/20 border-semantic-warning-border dark:border-yellow-800 text-semantic-warning-text dark:text-yellow-300">
                                   <p className="text-sm">
                                     <span>{state.analysis.language_warning.split('visit settings')[0]}</span>
-                                    <a href="/settings" className="underline hover:text-yellow-900 font-medium">
+                                    <a href="/settings" className="underline hover:text-admin-warning dark:hover:text-yellow-200 font-medium">
                                       visit settings
                                     </a>
                                     <span>{state.analysis.language_warning.split('visit settings')[1] || ''}</span>
@@ -819,15 +819,15 @@ export default function BatchUploadPage() {
                             Categories (select at least 1)
                           </label>
                           {state.selected_categories.length === 0 && (
-                            <p className="text-sm text-red-600 dark:text-red-400">
+                            <p className="text-sm text-admin-danger dark:text-red-400">
                               Select at least one category
                             </p>
                           )}
                           
                           {/* Selected Categories */}
                           {state.selected_categories.length > 0 && (
-                            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                              <p className="text-xs font-medium text-blue-900 dark:text-blue-300 mb-2">
+                            <div className="mb-3 p-3 bg-semantic-info-bg dark:bg-blue-900/20 rounded-lg">
+                              <p className="text-xs font-medium text-semantic-info-text dark:text-blue-300 mb-2">
                                 Selected ({state.selected_categories.length})
                               </p>
                               <div className="flex flex-wrap gap-2">
@@ -848,7 +848,7 @@ export default function BatchUploadPage() {
                                       {isPrimary && <span className="text-xs">(Primary)</span>}
                                       <button
                                         onClick={() => toggleCategory(index, catId)}
-                                        className="ml-1 hover:text-red-600"
+                                        className="ml-1 hover:text-admin-danger"
                                       >
                                         ×
                                       </button>
@@ -892,7 +892,7 @@ export default function BatchUploadPage() {
                                     key={category.id}
                                     className={`
                                       p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer
-                                      ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
+                                      ${isSelected ? 'bg-semantic-info-bg dark:bg-blue-900/20' : ''}
                                     `}
                                     onClick={() => toggleCategory(index, category.id)}
                                   >
@@ -959,7 +959,7 @@ export default function BatchUploadPage() {
                                         const newKeywords = (state.confirmed_keywords || []).filter(kw => kw !== keyword)
                                         updateFileState(index, {confirmed_keywords: newKeywords})
                                       }}
-                                      className="ml-1 hover:text-red-600"
+                                      className="ml-1 hover:text-admin-danger"
                                     >
                                       ×
                                     </button>

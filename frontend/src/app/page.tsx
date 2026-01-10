@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Button } from '@/components/ui/Button'
+import { Button, FeatureCard } from '@/components/ui'
 import { useAuth } from '@/contexts/auth-context'
 import { useCurrency } from '@/contexts/currency-context'
 import AppHeader from '@/components/AppHeader'
@@ -275,83 +275,71 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="automation"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">AI Auto-Categorization</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Invoices, contracts, receipts, taxes - automatically sorted into the right folders
-              </p>
-            </div>
+              }
+              title="AI Auto-Categorization"
+              description="Invoices, contracts, receipts, taxes - automatically sorted into the right folders"
+            />
 
-            {/* Feature 2 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="search"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Find Anything Instantly</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Smart search across all documents - even finds text in handwritten notes
-              </p>
-            </div>
+              }
+              title="Find Anything Instantly"
+              description="Smart search across all documents - even finds text in handwritten notes"
+            />
 
-            {/* Feature 3 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="cloud"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Your Cloud, Your Control</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Files stored safely in <strong>your Google Drive</strong> - we never store your documents on our servers
-              </p>
-            </div>
+              }
+              title="Your Cloud, Your Control"
+              description={<>Files stored safely in <strong>your Google Drive</strong> - we never store your documents on our servers</>}
+            />
 
-            {/* Feature 4 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="upload"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Bulk Upload & Process</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Upload hundreds of documents at once - AI processes them all automatically (Starter+)
-              </p>
-            </div>
+              }
+              title="Bulk Upload & Process"
+              description="Upload hundreds of documents at once - AI processes them all automatically (Starter+)"
+            />
 
-            {/* Feature 5 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="email"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Email Your Documents</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Forward to your@docs.bonidoc.com - we&apos;ll process and organize it automatically (Pro)
-              </p>
-            </div>
+              }
+              title="Email Your Documents"
+              description="Forward to your@docs.bonidoc.com - we'll process and organize it automatically (Pro)"
+            />
 
-            {/* Feature 6 */}
-            <div className="p-6 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-              <div className="h-12 w-12 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <FeatureCard
+              iconColor="language"
+              icon={
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                 </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">Multilingual Document Analysis</h3>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                AI automatically detects and processes documents in <strong>multiple languages</strong> - analyze international documents effortlessly
-              </p>
-            </div>
+              }
+              title="Multilingual Document Analysis"
+              description={<>AI automatically detects and processes documents in <strong>multiple languages</strong> - analyze international documents effortlessly</>}
+            />
           </div>
         </div>
       </section>
@@ -474,7 +462,7 @@ export default function HomePage() {
                 >
                   Annual
                   {calculateYearlySavings() && (
-                    <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
+                    <span className="ml-2 text-xs bg-admin-success text-white px-2 py-0.5 rounded-full">
                       {calculateYearlySavings()}
                     </span>
                   )}
@@ -492,7 +480,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3 gap-8">
             {loading ? (
               <div className="col-span-3 text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 dark:border-orange-400 mx-auto"></div>
                 <p className="mt-4 text-neutral-600 dark:text-neutral-400">Loading pricing plans...</p>
               </div>
             ) : tiers.length === 0 ? (
@@ -516,7 +504,7 @@ export default function HomePage() {
                     key={tier.id}
                     className={`bg-white dark:bg-neutral-900 rounded-xl p-8 relative ${
                       isPro
-                        ? 'border-2 border-orange-500'
+                        ? 'border-2 border-orange-500 dark:border-orange-400'
                         : 'border border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
@@ -537,7 +525,7 @@ export default function HomePage() {
                         </span>
                         <span className="text-neutral-600 dark:text-neutral-400">/month</span>
                         {!isFree && billingCycle === 'yearly' && (
-                          <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+                          <div className="text-sm text-admin-success dark:text-green-400 mt-1">
                             {formatPrice(formatCentsToEur(tier.price_yearly_cents))} billed annually
                           </div>
                         )}
@@ -642,7 +630,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 text-center space-y-3">
-            <div className="inline-block bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-6 py-3">
+            <div className="inline-block bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800 rounded-lg px-6 py-3">
               <p className="text-sm text-neutral-700 dark:text-neutral-300">
                 <svg className="inline h-5 w-5 text-admin-success mr-2 -mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -663,7 +651,7 @@ export default function HomePage() {
           <h2 className="text-3xl font-bold text-white mb-4">
             Ready to Never Manually File Documents Again?
           </h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-blue-100 dark:text-blue-200 dark:text-blue-300 mb-8 max-w-2xl mx-auto">
             Start free with 50 pages/month. No credit card required.
           </p>
           <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">

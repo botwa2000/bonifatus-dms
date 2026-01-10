@@ -107,9 +107,9 @@ function AcceptInvitationContent() {
         <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
             <div className="mb-6">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-semantic-success-bg-strong dark:bg-green-900">
                 <svg
-                  className="h-6 w-6 text-green-600 dark:text-green-400"
+                  className="h-6 w-6 text-admin-success dark:text-green-400 dark:text-green-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -176,19 +176,19 @@ function AcceptInvitationContent() {
             </h2>
             <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-admin-success dark:text-green-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 View and search the owner&apos;s documents
               </li>
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-admin-success dark:text-green-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Download documents for review
               </li>
               <li className="flex items-start">
-                <svg className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-admin-danger dark:text-red-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 <span>Cannot upload, edit, or delete documents</span>

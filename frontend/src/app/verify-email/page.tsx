@@ -188,7 +188,7 @@ function VerifyEmailContent() {
         <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 p-8">
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-semantic-info-bg-strong dark:bg-blue-900/30 rounded-full flex items-center justify-center">
               <svg className="w-8 h-8 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -208,14 +208,14 @@ function VerifyEmailContent() {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400 text-center">
+            <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400 text-center">
               {error}
             </div>
           )}
 
           {/* Success Message */}
           {resendSuccess && (
-            <div className="mb-6 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-600 dark:text-green-400 text-center">
+            <div className="mb-6 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-admin-success dark:text-green-400 dark:text-green-400 text-center">
               New code sent! Check your email.
             </div>
           )}

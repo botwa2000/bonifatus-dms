@@ -401,8 +401,8 @@ export default function DocumentDetailPage() {
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
         <AppHeader title="Document" />
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <p className="text-red-800">{error}</p>
+          <div className="bg-semantic-error-bg dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 rounded-lg p-6 text-center">
+            <p className="text-semantic-error-text dark:text-red-300">{error}</p>
             <Link href="/documents">
               <button className="mt-4 text-admin-primary hover:underline">
                 Back to Documents
@@ -654,12 +654,12 @@ export default function DocumentDetailPage() {
                     {editedKeywords.map((keyword, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                        className="inline-flex items-center space-x-1 bg-semantic-info-bg-strong dark:bg-blue-900/30 text-blue-800 px-3 py-1 rounded-full text-sm"
                       >
                         <span>{keyword}</span>
                         <button
                           onClick={() => handleRemoveKeyword(keyword)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-admin-primary dark:text-blue-400 hover:text-blue-800"
                         >
                           ×
                         </button>
@@ -762,12 +762,12 @@ export default function DocumentDetailPage() {
                           {entities.map((entity, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                              className="inline-flex items-center space-x-1 bg-semantic-info-bg-strong dark:bg-blue-900/30 text-blue-800 px-3 py-1 rounded-full text-sm"
                             >
                               <span>{entity.value}</span>
                               <button
                                 onClick={() => handleRemoveEntity(entity)}
-                                className="text-blue-600 hover:text-blue-800"
+                                className="text-admin-primary dark:text-blue-400 hover:text-blue-800"
                               >
                                 ×
                               </button>

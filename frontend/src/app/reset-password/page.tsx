@@ -140,7 +140,7 @@ function ResetPasswordContent() {
             <>
               {/* Icon */}
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 bg-semantic-info-bg-strong dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                   <svg className="w-8 h-8 text-admin-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -159,7 +159,7 @@ function ResetPasswordContent() {
 
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                <div className="mb-6 p-3 bg-semantic-error-bg dark:bg-red-900/20 dark:bg-red-900/20 border border-semantic-error-border dark:border-red-800 dark:border-red-800 rounded-lg text-sm text-admin-danger dark:text-red-400 dark:text-red-400">
                   {error}
                 </div>
               )}
@@ -205,7 +205,7 @@ function ResetPasswordContent() {
                   {formData.password.length > 0 && (
                     <div className="mt-2">
                       {passwordStrength.valid ? (
-                        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <p className="text-xs text-admin-success dark:text-green-400 dark:text-green-400 flex items-center gap-1">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -214,7 +214,7 @@ function ResetPasswordContent() {
                       ) : (
                         <div className="space-y-1">
                           {passwordStrength.errors.map((err, idx) => (
-                            <p key={idx} className="text-xs text-red-600 dark:text-red-400">
+                            <p key={idx} className="text-xs text-admin-danger dark:text-red-400 dark:text-red-400">
                               • {err}
                             </p>
                           ))}
@@ -283,8 +283,8 @@ function ResetPasswordContent() {
             <>
               {/* Icon */}
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <div className="w-16 h-16 bg-semantic-success-bg-strong dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-admin-success dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -301,7 +301,7 @@ function ResetPasswordContent() {
               </div>
 
               {/* Redirect Notice */}
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-center">
+              <div className="mb-6 p-4 bg-semantic-info-bg dark:bg-blue-900/10 dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 dark:border-blue-800 rounded-lg text-center">
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   Redirecting to sign in page in 3 seconds...
                 </p>
