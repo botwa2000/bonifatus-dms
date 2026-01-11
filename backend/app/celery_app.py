@@ -373,13 +373,13 @@ def migrate_provider_documents_task(self, migration_id: str, user_id: str):
                         raise ValueError(f"Cannot migrate document without category folder or main folder")
 
                 logger.info(f"[Migration] DEBUG: FINAL category_folder_id for upload: {category_folder_id}")
-                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.title} to folder ID: {category_folder_id}")
+                logger.info(f"[Migration] Uploading document to {to_provider_type}: {doc.file_name} to folder ID: {category_folder_id}")
                 file_stream = BytesIO(file_content)
                 logger.info(f"[Migration] DEBUG: Calling to_provider.upload_document with folder_id={category_folder_id}")
                 upload_result = to_provider.upload_document(
                     to_token,
                     file_stream,
-                    doc.title,
+                    doc.file_name,
                     doc.mime_type,
                     category_folder_id
                 )
