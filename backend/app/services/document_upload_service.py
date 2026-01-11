@@ -261,6 +261,11 @@ class DocumentUploadService:
             # Prepare keywords for storage (as JSON array of strings)
             keywords_json = json.dumps(confirmed_keywords) if confirmed_keywords else None
 
+            # If title is same as original filename (user didn't customize), use standardized filename
+            if title == original_filename:
+                title = standardized_filename
+                logger.info(f"[FILENAME DEBUG] Title matched original filename, using standardized: {title}")
+
             # Create document record using ORM
             document = Document(
                 user_id=uuid_lib.UUID(user_id),
