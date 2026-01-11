@@ -19,6 +19,7 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
   const router = useRouter()
   const pathname = usePathname()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -71,11 +72,11 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
             </Link>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
             {/* Action Button */}
-            {action && <div>{action}</div>}
+            {action && <div className="hidden md:block">{action}</div>}
 
-            {/* Navigation Links */}
+            {/* Navigation Links - Desktop */}
             {showNav && (
               <nav className="hidden md:flex items-center space-x-1">
                 {navLinks.map((link) => (
@@ -115,9 +116,9 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
               </nav>
             )}
 
-            {/* User Menu */}
+            {/* User Menu - Desktop */}
             {user && (
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative hidden md:block" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
                 className="flex items-center space-x-3 px-3 py-2 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
@@ -184,29 +185,122 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
               )}
             </div>
           )}
+
+            {/* Mobile Hamburger Menu Button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 text-neutral-600 dark:text-white hover:text-neutral-900 dark:hover:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-admin-primary rounded-md touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center relative z-50"
+                aria-label="Toggle mobile menu"
+                aria-expanded={mobileMenuOpen}
+                type="button"
+              >
+                {mobileMenuOpen ? (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {showNav && (
-          <nav className="md:hidden mt-4 flex items-center space-x-2 overflow-x-auto">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md transition-colors whitespace-nowrap ${
-                  isActive(link.href)
-                    ? 'bg-admin-primary text-white'
-                    : 'text-neutral-700 hover:bg-neutral-100'
-                }`}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
-                </svg>
-                <span className="text-sm font-medium">{link.label}</span>
-              </Link>
-            ))}
-          </nav>
+        {/* Mobile Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden mt-4 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700">
+            {/* User Info */}
+            {user && (
+              <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 rounded-full bg-admin-primary flex items-center justify-center text-white font-medium">
+                    {user.full_name?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-white">{user.full_name}</p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">{user.email}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Links */}
+            {showNav && (
+              <div className="py-2">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center space-x-3 px-4 py-3 transition-colors ${
+                      isActive(link.href)
+                        ? 'bg-admin-primary text-white'
+                        : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
+                    </svg>
+                    <span className="text-sm font-medium">{link.label}</span>
+                  </Link>
+                ))}
+
+                {/* Homepage Link */}
+                <Link
+                  href="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 px-4 py-3 transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  <span className="text-sm font-medium">Home</span>
+                </Link>
+              </div>
+            )}
+
+            {/* User Menu Items */}
+            {user && (
+              <div className="py-2 border-t border-neutral-200 dark:border-neutral-700">
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="font-medium">Profile</span>
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="font-medium">Settings</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    handleLogout()
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="font-medium">Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </header>
