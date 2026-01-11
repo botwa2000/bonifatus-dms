@@ -132,8 +132,8 @@ export default function HomePage() {
                 <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Pricing</a>
                 <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">About</Link>
                 <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Contact</Link>
-                <Link href="/login">
-                  <Button size="sm">Sign In</Button>
+                <Link href="/login" className="inline-flex items-center justify-center font-medium rounded-md transition-colors px-3 py-1.5 text-sm bg-admin-primary text-white hover:bg-admin-primary/90 dark:bg-admin-primary dark:hover:bg-admin-primary/80">
+                  Sign In
                 </Link>
               </div>
 
@@ -204,9 +204,9 @@ export default function HomePage() {
                   <Link
                     href="/login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium"
+                    className="block mx-3 my-2 px-4 py-2 rounded-md text-sm font-medium text-center bg-admin-primary text-white hover:bg-admin-primary/90 dark:bg-admin-primary dark:hover:bg-admin-primary/80 transition-colors"
                   >
-                    <Button size="sm" className="w-full">Sign In</Button>
+                    Sign In
                   </Link>
                 </div>
               </div>
