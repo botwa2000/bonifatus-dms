@@ -203,7 +203,6 @@ export default function HomePage() {
                   </Link>
                   <Link
                     href="/login"
-                    onClick={() => setMobileMenuOpen(false)}
                     className="block mx-3 my-2 px-4 py-2 rounded-md text-sm font-medium text-center bg-admin-primary text-white hover:bg-admin-primary/90 dark:bg-admin-primary dark:hover:bg-admin-primary/80 transition-colors"
                   >
                     Sign In
@@ -230,7 +229,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
                 <Button size="lg" className="min-w-[200px]">
-                  Start Free - 50 Pages/Month
+                  Start free
                 </Button>
               </Link>
               <a href="#pricing">
@@ -662,7 +661,7 @@ export default function HomePage() {
           </p>
           <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
             <Button size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
-              Get Started Free
+              Start free
             </Button>
           </Link>
         </div>
