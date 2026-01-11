@@ -127,11 +127,11 @@ export default function HomePage() {
               </Link>
 
               <div className="hidden md:flex items-center space-x-8">
-                <a href="#features" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Features</a>
-                <a href="#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">How It Works</a>
-                <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Pricing</a>
-                <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">About</Link>
-                <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary">Contact</Link>
+                <a href="#features" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Features</a>
+                <a href="#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">How It Works</a>
+                <a href="#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Pricing</a>
+                <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">About</Link>
+                <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Contact</Link>
                 <Link href="/login">
                   <Button size="sm">Sign In</Button>
                 </Link>
@@ -140,8 +140,13 @@ export default function HomePage() {
               <div className="md:hidden">
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-neutral-600 dark:text-white hover:text-neutral-900 dark:hover:text-neutral-300 p-2 focus:outline-none focus:ring-2 focus:ring-admin-primary rounded-md"
+                  onTouchEnd={(e) => {
+                    e.preventDefault()
+                    setMobileMenuOpen(!mobileMenuOpen)
+                  }}
+                  className="text-neutral-600 dark:text-white hover:text-neutral-900 dark:hover:text-neutral-300 p-3 focus:outline-none focus:ring-2 focus:ring-admin-primary rounded-md touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center relative z-50"
                   aria-label="Toggle mobile menu"
+                  aria-expanded={mobileMenuOpen}
                   type="button"
                 >
                   {mobileMenuOpen ? (
@@ -164,35 +169,35 @@ export default function HomePage() {
                   <a
                     href="#features"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     Features
                   </a>
                   <a
                     href="#how-it-works"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     How It Works
                   </a>
                   <a
                     href="#pricing"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     Pricing
                   </a>
                   <Link
                     href="/about"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     About
                   </Link>
                   <Link
                     href="/contact"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-admin-primary dark:hover:text-admin-primary hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                   >
                     Contact
                   </Link>

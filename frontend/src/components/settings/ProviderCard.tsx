@@ -71,7 +71,7 @@ export function ProviderCard({
           </div>
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <p className="text-sm font-medium text-neutral-900 dark:text-white">
+              <p className="text-sm font-bold text-neutral-900 dark:text-white">
                 {provider.name}
               </p>
               {provider.is_active && (
@@ -81,7 +81,7 @@ export function ProviderCard({
                 <Badge variant="warning">Upgrade Required</Badge>
               )}
             </div>
-            <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+            <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mt-0.5">
               {provider.connected ? 'Connected' : description}
             </p>
           </div>
