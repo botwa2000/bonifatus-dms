@@ -4,6 +4,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic'
+
 export default function FeaturesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 

@@ -6,6 +6,9 @@ import { apiClient } from '@/services/api-client'
 import { useCurrency } from '@/contexts/currency-context'
 import { logger } from '@/lib/logger'
 
+// Force dynamic rendering to avoid prerendering issues with useSearchParams
+export const dynamic = 'force-dynamic'
+
 function CheckoutContent() {
   const searchParams = useSearchParams()
   const router = useRouter()

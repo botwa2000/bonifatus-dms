@@ -10,6 +10,9 @@ import { CurrencyProvider } from '@/contexts/currency-context'
 import CookieConsent from '@/components/CookieConsent'
 import { GoogleAnalytics, PostHogProvider, PlausibleAnalytics } from '@/components/analytics'
 
+// Force dynamic rendering for all pages to avoid prerendering issues in Next.js 15
+export const dynamic = 'force-dynamic'
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-geist-sans',

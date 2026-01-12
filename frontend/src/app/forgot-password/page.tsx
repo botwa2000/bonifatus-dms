@@ -12,6 +12,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { logger } from '@/lib/logger'
+
+// Force dynamic rendering to avoid prerendering issues
+export const dynamic = 'force-dynamic'
+
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
