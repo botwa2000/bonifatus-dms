@@ -6,14 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider } from 'posthog-js/react'
 import { POSTHOG_KEY, POSTHOG_HOST } from '@/lib/analytics'
-
-declare global {
-  interface Window {
-    CookieConsentApi?: {
-      acceptedCategory: (category: string) => boolean
-    }
-  }
-}
+import * as CookieConsent from 'vanilla-cookieconsent'
 
 const isProduction = process.env.NODE_ENV === 'production'
 const enableInDev = process.env.NEXT_PUBLIC_ENABLE_ANALYTICS_DEV === 'true'
@@ -51,11 +44,16 @@ function PostHogPageView() {
   useEffect(() => {
     // Check consent
     const checkConsent = () => {
-      if (typeof window !== 'undefined' && window.CookieConsentApi) {
-        const hasConsent = window.CookieConsentApi.acceptedCategory('analytics')
-        setConsentGiven(hasConsent)
-        if (hasConsent) {
-          initializePostHog()
+      if (typeof window !== 'undefined') {
+        try {
+          const hasConsent = CookieConsent.acceptedCategory('analytics')
+          setConsentGiven(hasConsent)
+          if (hasConsent) {
+            initializePostHog()
+          }
+        } catch (error) {
+          // CookieConsent not initialized yet
+          setConsentGiven(false)
         }
       }
     }

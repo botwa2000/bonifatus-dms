@@ -4,14 +4,7 @@
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
 import { GA_MEASUREMENT_ID } from '@/lib/analytics'
-
-declare global {
-  interface Window {
-    CookieConsentApi?: {
-      acceptedCategory: (category: string) => boolean
-    }
-  }
-}
+import * as CookieConsent from 'vanilla-cookieconsent'
 
 export default function GoogleAnalytics() {
   const [consentGiven, setConsentGiven] = useState(false)
@@ -22,9 +15,14 @@ export default function GoogleAnalytics() {
   useEffect(() => {
     // Check if user has already consented to analytics
     const checkConsent = () => {
-      if (typeof window !== 'undefined' && window.CookieConsentApi) {
-        const hasConsent = window.CookieConsentApi.acceptedCategory('analytics')
-        setConsentGiven(hasConsent)
+      if (typeof window !== 'undefined') {
+        try {
+          const hasConsent = CookieConsent.acceptedCategory('analytics')
+          setConsentGiven(hasConsent)
+        } catch (error) {
+          // CookieConsent not initialized yet
+          setConsentGiven(false)
+        }
       }
     }
 
