@@ -660,7 +660,7 @@ export default function HomePage() {
             Start free with 50 pages/month. No credit card required.
           </p>
           <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
-            <Button size="lg" className="bg-white text-admin-primary hover:bg-neutral-50">
+            <Button size="lg" className="!bg-white !text-admin-primary hover:!bg-neutral-50">
               Start free
             </Button>
           </Link>
