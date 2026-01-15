@@ -3,8 +3,35 @@
  * About page
  */
 
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
+
+export const metadata: Metadata = {
+  title: 'About Us - Bonifatus DMS | AI Document Management Mission',
+  description: 'Learn about Bonifatus DMS mission to revolutionize document management with AI-powered automation. Built for privacy, security, and efficiency.',
+  openGraph: {
+    title: 'About Bonifatus DMS',
+    description: 'Our mission to revolutionize document management with AI-powered automation',
+    url: 'https://bonidoc.com/about',
+    siteName: 'Bonifatus DMS',
+    type: 'website',
+    images: [{
+      url: 'https://bonidoc.com/og-about.png',
+      width: 1200,
+      height: 630,
+      alt: 'About Bonifatus DMS'
+    }]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About Bonifatus DMS',
+    description: 'Our mission to revolutionize document management with AI',
+  },
+  alternates: {
+    canonical: 'https://bonidoc.com/about'
+  }
+}
 
 export default function AboutPage() {
   return (
