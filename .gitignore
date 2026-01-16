@@ -7,3 +7,9 @@ drive-service-key.json
 HETZNER_SETUP_ACTUAL.md
 HETZNER_MIGRATION_GUIDE.md
 DEPLOYMENT_GUIDE.md
+
+# Claude Code temporary files
+tmpclaude-*
+nul
+PLAN.md
+.claude/settings.local.json
