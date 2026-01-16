@@ -107,9 +107,9 @@ export default function HomePageClient() {
       ) : (
         <nav className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
+            <div className="flex justify-between items-center h-16 md:h-20">
               <Link href="/" className="flex items-center">
-                <div className="relative h-10 w-44">
+                <div className="relative h-12 w-48 md:h-14 md:w-56">
                   <Image
                     src="/logo-header.png"
                     alt="Bonidoc - AI Document Management"
