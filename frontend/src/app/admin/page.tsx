@@ -156,6 +156,19 @@ interface EntityQualityConfig {
   updated_at: string
 }
 
+interface StorageProvider {
+  provider_key: string
+  display_name: string
+  min_tier_id: number
+  min_tier_name: string
+  is_active: boolean
+  sort_order: number
+  icon: string
+  color: string
+  description: string
+  capabilities: string[]
+}
+
 export default function AdminDashboard() {
   const { user, isLoading, hasAttemptedAuth, loadUser } = useAuth()
   const router = useRouter()
@@ -168,7 +181,8 @@ export default function AdminDashboard() {
   const [emailPollerHealth, setEmailPollerHealth] = useState<EmailPollerHealth | null>(null)
   const [entityQualityConfigs, setEntityQualityConfigs] = useState<EntityQualityConfig[]>([])
   const [editingConfig, setEditingConfig] = useState<{key: string, value: string} | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates' | 'entity-quality'>('overview')
+  const [storageProviders, setStorageProviders] = useState<StorageProvider[]>([])
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'providers' | 'currencies' | 'health' | 'email-templates' | 'entity-quality'>('overview')
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [editingCurrency, setEditingCurrency] = useState<{code: string, rate: string} | null>(null)
@@ -242,6 +256,10 @@ export default function AdminDashboard() {
       // Load tiers
       const tiersData = await apiClient.get<{ tiers: TierPlan[] }>('/api/v1/admin/tiers')
       setTiers(tiersData.tiers)
+
+      // Load storage providers
+      const providersData = await apiClient.get<{ providers: StorageProvider[] }>('/api/v1/admin/providers')
+      setStorageProviders(providersData.providers)
 
       // Load currencies
       const currenciesData = await apiClient.get<{ currencies: Currency[] }>('/api/v1/admin/currencies')
@@ -592,6 +610,16 @@ export default function AdminDashboard() {
             }`}
           >
             Tier Configuration
+          </button>
+          <button
+            onClick={() => setActiveTab('providers')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'providers'
+                ? 'text-admin-primary border-b-2 border-admin-primary'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
+            }`}
+          >
+            Storage Providers
           </button>
           <button
             onClick={() => setActiveTab('currencies')}
@@ -1152,6 +1180,120 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Storage Providers Tab */}
+        {activeTab === 'providers' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader title="Storage Provider Configuration" />
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Info Box */}
+                  <div className="bg-semantic-info-bg dark:bg-blue-900/20 border border-semantic-info-border dark:border-blue-800 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <svg className="h-5 w-5 text-admin-primary dark:text-blue-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="text-sm text-semantic-info-text dark:text-blue-200">
+                        <strong>Provider-Tier Mapping:</strong> Shows which cloud storage providers are available for each subscription tier.
+                        Provider configurations are defined in <code className="bg-neutral-200 dark:bg-neutral-700 px-1 rounded">provider_registry.py</code>.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Provider Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-neutral-200 dark:border-neutral-700">
+                          <th className="text-left py-3 px-4 font-semibold text-neutral-900 dark:text-white">Provider</th>
+                          <th className="text-left py-3 px-4 font-semibold text-neutral-900 dark:text-white">Minimum Tier</th>
+                          <th className="text-left py-3 px-4 font-semibold text-neutral-900 dark:text-white">Status</th>
+                          <th className="text-left py-3 px-4 font-semibold text-neutral-900 dark:text-white">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storageProviders.map((provider) => (
+                          <tr key={provider.provider_key} className="border-b border-neutral-100 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                                  style={{ backgroundColor: provider.color }}
+                                >
+                                  {provider.display_name.charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-neutral-900 dark:text-white">{provider.display_name}</div>
+                                  <div className="text-xs text-neutral-500 dark:text-neutral-400">{provider.provider_key}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <Badge variant={provider.min_tier_id === 0 ? 'success' : provider.min_tier_id === 1 ? 'info' : 'warning'}>
+                                {provider.min_tier_name}
+                              </Badge>
+                              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                                Tier ID: {provider.min_tier_id}
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              {provider.is_active ? (
+                                <Badge variant="success">Active</Badge>
+                              ) : (
+                                <Badge variant="default">Inactive</Badge>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-sm text-neutral-600 dark:text-neutral-400 max-w-xs">
+                              {provider.description}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Tier Access Summary */}
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">Provider Access by Tier</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {tiers.filter(t => t.id <= 2).map((tier) => (
+                        <div key={tier.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                          <div className="font-medium text-neutral-900 dark:text-white mb-2">{tier.display_name}</div>
+                          <div className="space-y-2">
+                            {storageProviders
+                              .filter(p => p.min_tier_id <= tier.id)
+                              .map((provider) => (
+                                <div key={provider.provider_key} className="flex items-center gap-2 text-sm">
+                                  <div
+                                    className="w-4 h-4 rounded flex items-center justify-center"
+                                    style={{ backgroundColor: provider.color }}
+                                  >
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                  <span className={provider.is_active ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-500 line-through'}>
+                                    {provider.display_name}
+                                  </span>
+                                  {!provider.is_active && (
+                                    <span className="text-xs text-neutral-400 dark:text-neutral-500">(coming soon)</span>
+                                  )}
+                                </div>
+                              ))}
+                            {storageProviders.filter(p => p.min_tier_id <= tier.id).length === 0 && (
+                              <div className="text-sm text-neutral-500 dark:text-neutral-400">No providers available</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

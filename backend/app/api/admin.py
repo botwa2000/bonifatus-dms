@@ -19,6 +19,7 @@ from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
 from app.services.email_poller_health_service import email_poller_health_service
 from app.services.tier_service import tier_service
+from app.core.provider_registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +568,67 @@ async def update_tier_plan(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update tier plan"
+        )
+    finally:
+        session.close()
+
+
+# ============================================================
+# Storage Providers Endpoints
+# ============================================================
+
+@router.get("/providers")
+async def list_storage_providers(
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    List all storage providers with their tier requirements.
+
+    Returns provider configurations including:
+    - Provider key and display name
+    - Minimum tier required
+    - Active status
+    - UI metadata (icon, color, description)
+    """
+    session = db_manager.session_local()
+    try:
+        # Get all tiers for reference
+        tiers_result = session.execute(
+            select(TierPlan.id, TierPlan.display_name)
+            .order_by(TierPlan.id)
+        ).all()
+        tiers_map = {tier_id: display_name for tier_id, display_name in tiers_result}
+
+        # Get all providers from registry
+        providers = []
+        for provider in ProviderRegistry.get_all():
+            tier_name = tiers_map.get(provider.min_tier_id, f"Tier {provider.min_tier_id}")
+            providers.append({
+                "provider_key": provider.provider_key,
+                "display_name": provider.display_name,
+                "min_tier_id": provider.min_tier_id,
+                "min_tier_name": tier_name,
+                "is_active": provider.is_active,
+                "sort_order": provider.sort_order,
+                "icon": provider.icon,
+                "color": provider.color,
+                "description": provider.description,
+                "capabilities": [cap.value for cap in provider.capabilities] if provider.capabilities else []
+            })
+
+        logger.info(f"Admin {current_user.email} listed storage providers")
+
+        return {
+            "providers": providers,
+            "tiers": [{"id": tid, "name": tname} for tid, tname in tiers_result],
+            "note": "Provider configurations are defined in code. To modify, update provider_registry.py"
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing storage providers: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list storage providers"
         )
     finally:
         session.close()
