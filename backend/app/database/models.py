@@ -72,6 +72,22 @@ class TierPlan(Base, TimestampMixin):
     )
 
 
+class TierProviderSettings(Base, TimestampMixin):
+    """Configure which storage providers are available for each tier"""
+    __tablename__ = "tier_provider_settings"
+
+    id = Column(Integer, primary_key=True)
+    tier_id = Column(Integer, ForeignKey("tier_plans.id", ondelete="CASCADE"), nullable=False)
+    provider_key = Column(String(50), nullable=False)  # e.g., 'google_drive', 'onedrive', 'dropbox', 'box'
+    is_enabled = Column(Boolean, nullable=False, server_default='true')
+
+    __table_args__ = (
+        Index('idx_tier_provider_tier_id', 'tier_id'),
+        Index('idx_tier_provider_provider_key', 'provider_key'),
+        sa.UniqueConstraint('tier_id', 'provider_key', name='uq_tier_provider'),
+    )
+
+
 class UserMonthlyUsage(Base):
     """Track user's monthly usage against tier limits"""
     __tablename__ = "user_monthly_usage"

@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency
+from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency
 from app.database.connection import db_manager, get_db
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -79,6 +79,14 @@ class CurrencyUpdate(BaseModel):
     - Example: USD with exchange_rate = 1.10 means 1 EUR = 1.10 USD
     """
     exchange_rate: Optional[float] = Field(None, ge=0, description="Exchange rate (units of currency per 1 EUR)")
+
+
+class TierProviderSettingsUpdate(BaseModel):
+    """Update provider settings for a tier"""
+    provider_settings: Dict[str, bool] = Field(
+        ...,
+        description="Map of provider_key to is_enabled status, e.g., {'google_drive': true, 'onedrive': true, 'dropbox': false}"
+    )
 
 
 class SystemStats(BaseModel):
@@ -469,6 +477,7 @@ async def list_tier_plans(
     List all tier plans
 
     Admin only endpoint to view tier plan configuration.
+    Includes provider settings for each tier.
     """
     session = db_manager.session_local()
     try:
@@ -477,8 +486,31 @@ async def list_tier_plans(
         )
         tiers = result.scalars().all()
 
+        # Get all provider settings
+        provider_settings_result = session.execute(
+            select(TierProviderSettings)
+        )
+        all_provider_settings = provider_settings_result.scalars().all()
+
+        # Group provider settings by tier_id
+        settings_by_tier = {}
+        for setting in all_provider_settings:
+            if setting.tier_id not in settings_by_tier:
+                settings_by_tier[setting.tier_id] = {}
+            settings_by_tier[setting.tier_id][setting.provider_key] = setting.is_enabled
+
+        # Get all available providers from registry for reference
+        all_providers = [p.provider_key for p in ProviderRegistry.get_all()]
+
         tier_list = []
         for tier in tiers:
+            # Get provider settings for this tier, defaulting to False if not set
+            tier_provider_settings = settings_by_tier.get(tier.id, {})
+            provider_settings = {
+                provider: tier_provider_settings.get(provider, False)
+                for provider in all_providers
+            }
+
             tier_list.append({
                 "id": tier.id,
                 "name": tier.name,
@@ -503,7 +535,8 @@ async def list_tier_plans(
                 "is_public": tier.is_public,
                 "sort_order": tier.sort_order,
                 "created_at": tier.created_at.isoformat(),
-                "updated_at": tier.updated_at.isoformat()
+                "updated_at": tier.updated_at.isoformat(),
+                "provider_settings": provider_settings
             })
 
         logger.info(f"Admin {current_user.email} listed tier plans")
@@ -629,6 +662,80 @@ async def list_storage_providers(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list storage providers"
+        )
+    finally:
+        session.close()
+
+
+@router.patch("/tiers/{tier_id}/providers")
+async def update_tier_provider_settings(
+    tier_id: int,
+    settings_update: TierProviderSettingsUpdate,
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Update provider settings for a specific tier.
+
+    Sets which storage providers are enabled/disabled for the tier.
+    """
+    session = db_manager.session_local()
+    try:
+        # Verify tier exists
+        tier = session.get(TierPlan, tier_id)
+        if not tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tier {tier_id} not found"
+            )
+
+        # Get valid provider keys
+        valid_providers = {p.provider_key for p in ProviderRegistry.get_all()}
+
+        # Update or insert provider settings
+        for provider_key, is_enabled in settings_update.provider_settings.items():
+            if provider_key not in valid_providers:
+                logger.warning(f"Unknown provider key: {provider_key}")
+                continue
+
+            # Check if setting exists
+            existing = session.execute(
+                select(TierProviderSettings).where(
+                    and_(
+                        TierProviderSettings.tier_id == tier_id,
+                        TierProviderSettings.provider_key == provider_key
+                    )
+                )
+            ).scalar_one_or_none()
+
+            if existing:
+                existing.is_enabled = is_enabled
+            else:
+                new_setting = TierProviderSettings(
+                    tier_id=tier_id,
+                    provider_key=provider_key,
+                    is_enabled=is_enabled
+                )
+                session.add(new_setting)
+
+        session.commit()
+
+        logger.info(f"Admin {current_user.email} updated provider settings for tier {tier_id}: {settings_update.provider_settings}")
+
+        return {
+            "message": "Provider settings updated successfully",
+            "tier_id": tier_id,
+            "tier_name": tier.display_name,
+            "updated_providers": list(settings_update.provider_settings.keys())
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating tier provider settings: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update provider settings"
         )
     finally:
         session.close()

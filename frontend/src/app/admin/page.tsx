@@ -95,6 +95,9 @@ interface TierPlan {
   sort_order: number
   is_active: boolean
   is_public: boolean
+
+  // Provider settings (which providers are enabled for this tier)
+  provider_settings?: Record<string, boolean>
 }
 
 interface ClamAVHealth {
@@ -351,7 +354,19 @@ export default function AdminDashboard() {
 
   const updateTier = async (tierId: number, updates: Partial<TierPlan>) => {
     try {
-      await apiClient.patch(`/api/v1/admin/tiers/${tierId}`, updates)
+      // Extract provider_settings from updates (if any) - sent to separate endpoint
+      const { provider_settings, ...tierUpdates } = updates
+
+      // Update tier settings
+      await apiClient.patch(`/api/v1/admin/tiers/${tierId}`, tierUpdates)
+
+      // Update provider settings if changed
+      if (provider_settings) {
+        await apiClient.patch(`/api/v1/admin/tiers/${tierId}/providers`, {
+          provider_settings
+        })
+      }
+
       await loadData()
       setEditingTier(null)
     } catch (error) {
@@ -1092,6 +1107,41 @@ export default function AdminDashboard() {
                           <span className="text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Public (shown on pricing page)</span>
                         </label>
                       </div>
+                      {/* Cloud Storage Providers */}
+                      <div>
+                        <div className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Cloud Storage Providers</div>
+                        <div className="flex items-center flex-wrap gap-4">
+                          {storageProviders.map((provider) => {
+                            // Get current enabled status from tier's provider_settings or default based on min_tier
+                            const isEnabled = editingTier.provider_settings?.[provider.provider_key]
+                              ?? (provider.min_tier_id <= tier.id)
+                            return (
+                              <label key={provider.provider_key} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isEnabled}
+                                  onChange={(e) => {
+                                    const newSettings = {
+                                      ...(editingTier.provider_settings || {}),
+                                      [provider.provider_key]: e.target.checked
+                                    }
+                                    setEditingTier({ ...editingTier, provider_settings: newSettings })
+                                  }}
+                                  className="rounded"
+                                />
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: provider.color }}
+                                />
+                                <span className={`text-sm ${provider.is_active ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-400 dark:text-neutral-500'}`}>
+                                  {provider.display_name}
+                                  {!provider.is_active && ' (coming soon)'}
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
                       <Button onClick={() => updateTier(tier.id, editingTier)}>
                         Save Changes
                       </Button>
@@ -1169,7 +1219,13 @@ export default function AdminDashboard() {
                         <div className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Cloud Storage Providers</div>
                         <div className="flex flex-wrap gap-2">
                           {storageProviders
-                            .filter(p => p.min_tier_id <= tier.id)
+                            .filter(p => {
+                              // If provider_settings exists, use it; otherwise fall back to min_tier check
+                              if (tier.provider_settings && tier.provider_settings[p.provider_key] !== undefined) {
+                                return tier.provider_settings[p.provider_key]
+                              }
+                              return p.min_tier_id <= tier.id
+                            })
                             .map((provider) => (
                               <div
                                 key={provider.provider_key}
@@ -1191,7 +1247,12 @@ export default function AdminDashboard() {
                                 )}
                               </div>
                             ))}
-                          {storageProviders.filter(p => p.min_tier_id <= tier.id).length === 0 && (
+                          {storageProviders.filter(p => {
+                            if (tier.provider_settings && tier.provider_settings[p.provider_key] !== undefined) {
+                              return tier.provider_settings[p.provider_key]
+                            }
+                            return p.min_tier_id <= tier.id
+                          }).length === 0 && (
                             <span className="text-sm text-neutral-500 dark:text-neutral-400">None</span>
                           )}
                         </div>
