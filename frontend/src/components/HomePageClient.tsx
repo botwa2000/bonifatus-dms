@@ -690,6 +690,7 @@ export default function HomePageClient() {
               <ul className="space-y-2">
                 <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
                 <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+                <li><Link href="/faq" className="hover:text-white transition-colors">FAQ</Link></li>
                 <li><Link href="/security" className="hover:text-white transition-colors">Security</Link></li>
               </ul>
             </div>

@@ -16,12 +16,6 @@ export const metadata: Metadata = {
     url: 'https://bonidoc.com/about',
     siteName: 'Bonifatus DMS',
     type: 'website',
-    images: [{
-      url: 'https://bonidoc.com/og-about.png',
-      width: 1200,
-      height: 630,
-      alt: 'About Bonifatus DMS'
-    }]
   },
   twitter: {
     card: 'summary_large_image',

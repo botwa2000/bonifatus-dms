@@ -15,9 +15,6 @@ const inter = Inter({
   variable: '--font-geist-sans',
 })
 
-// Force dynamic rendering - required due to useSearchParams in global components
-export const dynamic = 'force-dynamic'
-
 export const metadata: Metadata = {
   metadataBase: new URL('https://bonidoc.com'),
   title: {

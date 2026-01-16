@@ -1,9 +1,6 @@
 // frontend/src/app/contact/layout.tsx
 import type { Metadata } from 'next'
 
-// Force dynamic rendering due to useSearchParams usage
-export const dynamic = 'force-dynamic'
-
 export const metadata: Metadata = {
   title: 'Contact Us - Get Support | Bonifatus DMS',
   description: 'Need help? Contact Bonifatus DMS support team for assistance with document management, integrations, billing, or account questions.',
@@ -13,12 +10,6 @@ export const metadata: Metadata = {
     url: 'https://bonidoc.com/contact',
     siteName: 'Bonifatus DMS',
     type: 'website',
-    images: [{
-      url: 'https://bonidoc.com/og-contact.png',
-      width: 1200,
-      height: 630,
-      alt: 'Contact Bonifatus DMS'
-    }]
   },
   twitter: {
     card: 'summary_large_image',

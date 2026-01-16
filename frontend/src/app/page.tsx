@@ -18,12 +18,6 @@ export const metadata: Metadata = {
     siteName: 'Bonifatus DMS',
     type: 'website',
     locale: 'en_US',
-    images: [{
-      url: 'https://bonidoc.com/og-home.png',
-      width: 1200,
-      height: 630,
-      alt: 'Bonifatus DMS - AI Document Management'
-    }]
   },
   twitter: {
     card: 'summary_large_image',
