@@ -21,28 +21,38 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   metadataBase: new URL('https://bonidoc.com'),
   title: {
-    default: 'Bonifatus DMS - AI Document Management',
-    template: '%s | Bonifatus DMS'
+    default: 'Bonidoc - AI Document Management',
+    template: '%s | Bonidoc'
   },
   description: 'Professional Document Management System with AI-powered automation',
   keywords: ['document management', 'DMS', 'AI automation', 'cloud storage', 'GDPR compliant'],
-  authors: [{ name: 'Bonifatus' }],
-  creator: 'Bonifatus',
-  publisher: 'Bonifatus',
+  authors: [{ name: 'Bonidoc' }],
+  creator: 'Bonidoc',
+  publisher: 'Bonidoc',
   icons: {
-    icon: '/favicon.ico',
-    apple: '/logo.png',
+    icon: [
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      { rel: 'icon', url: '/favicon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
-  manifest: '/manifest.json',
+  manifest: '/site.webmanifest',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    siteName: 'Bonifatus DMS',
+    siteName: 'Bonidoc',
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@bonifatus',
-    creator: '@bonifatus',
+    site: '@bonidoc',
+    creator: '@bonidoc',
   },
 }
 
@@ -69,14 +79,14 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              "name": "Bonifatus DMS",
+              "name": "Bonidoc",
               "description": "AI-powered document management system for automated organization and categorization",
               "applicationCategory": "BusinessApplication",
               "operatingSystem": "Web",
               "offers": {
                 "@type": "Offer",
                 "price": "0",
-                "priceCurrency": "USD",
+                "priceCurrency": "EUR",
                 "availability": "https://schema.org/InStock"
               },
               "aggregateRating": {

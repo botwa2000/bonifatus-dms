@@ -109,10 +109,10 @@ export default function HomePageClient() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <Link href="/" className="flex items-center">
-                <div className="relative h-10 w-40">
+                <div className="relative h-10 w-44">
                   <Image
-                    src="/logo_text.png"
-                    alt="Bonifatus DMS"
+                    src="/logo-header.png"
+                    alt="Bonidoc - AI Document Management"
                     fill
                     className="object-contain object-left"
                     priority
@@ -672,12 +672,13 @@ export default function HomePageClient() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <div className="h-8 w-8 bg-admin-primary rounded-lg flex items-center justify-center">
-                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <span className="ml-3 text-xl font-bold text-white">Bonifatus DMS</span>
+                <Image
+                  src="/logo-medium.png"
+                  alt="Bonidoc"
+                  width={160}
+                  height={40}
+                  className="object-contain"
+                />
               </div>
               <p className="text-neutral-400">
                 AI-powered document management for modern professionals.
@@ -714,7 +715,7 @@ export default function HomePageClient() {
 
           <div className="border-t border-neutral-800 mt-12 pt-8 text-center">
             <p className="text-neutral-400">
-              © 2024 Bonifatus DMS. All rights reserved.
+              © {new Date().getFullYear()} Bonidoc. All rights reserved.
             </p>
           </div>
         </div>
