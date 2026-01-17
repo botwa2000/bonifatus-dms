@@ -54,10 +54,10 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
           {/* Logo and Title */}
           <div className="flex items-center space-x-4">
             <Link href="/dashboard" className="flex items-center space-x-4">
-              <div className="relative h-12 w-48">
+              <div className="relative h-12 w-48 md:h-14 md:w-56">
                 <Image
-                  src="/logo_text.png"
-                  alt="Bonifatus DMS"
+                  src="/logo-header.png"
+                  alt="Bonidoc - AI Document Management"
                   fill
                   className="object-contain object-left"
                   priority
