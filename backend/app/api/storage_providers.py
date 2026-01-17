@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.database.connection import get_db
-from app.database.models import User, Category, CategoryTranslation
+from app.database.models import User, Category, CategoryTranslation, TierProviderSettings
 from app.middleware.auth_middleware import get_current_active_user
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select
@@ -46,6 +46,26 @@ def _is_provider_connected(user: User, provider_type: str, db: Session) -> bool:
     return is_connected
 
 
+def _is_provider_enabled_for_tier(db: Session, tier_id: int, provider_key: str) -> bool:
+    """Check if a provider is enabled for a specific tier."""
+    # Query the tier_provider_settings table
+    setting = db.query(TierProviderSettings).filter(
+        TierProviderSettings.tier_id == tier_id,
+        TierProviderSettings.provider_key == provider_key
+    ).first()
+
+    if setting:
+        return setting.is_enabled
+
+    # If no explicit setting exists, fall back to ProviderRegistry min_tier check
+    provider_meta = ProviderRegistry.get(provider_key)
+    if provider_meta:
+        return tier_id >= provider_meta.min_tier_id
+
+    # Default: provider is enabled if no configuration found
+    return True
+
+
 @router.get("/providers/available")
 async def get_available_providers(
     current_user: User = Depends(get_current_active_user),
@@ -78,18 +98,21 @@ async def get_available_providers(
         all_providers = ProviderFactory.get_available_providers()
         logger.debug(f"🔍 Registered providers: {all_providers}")
 
-        # For now, all providers are available (tier checking will be added later)
-        # In production, this would call tier_service.get_available_providers()
-        available_providers = all_providers
+        # Get user's tier ID for permission checking
+        user_tier_id = fresh_user.tier_id or 0
+        logger.debug(f"🔍 User tier_id: {user_tier_id}")
 
         provider_list = []
-        for provider_type in available_providers:
+        for provider_type in all_providers:
+            # Check if provider is enabled for user's tier
+            is_enabled = _is_provider_enabled_for_tier(db, user_tier_id, provider_type)
+
             provider_info = {
                 'type': provider_type,
                 'name': _format_provider_name(provider_type),
                 'connected': _is_provider_connected(fresh_user, provider_type, db),
                 'is_active': provider_type == active_provider_type,
-                'enabled': True  # Will be tier-based later
+                'enabled': is_enabled
             }
             logger.debug(f"📋 Provider info: {provider_info}")
             provider_list.append(provider_info)

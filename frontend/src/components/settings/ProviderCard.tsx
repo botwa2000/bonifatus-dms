@@ -49,20 +49,35 @@ export function ProviderCard({
   const icon = PROVIDER_ICONS[provider.type] || PROVIDER_ICONS.google_drive
   const description = PROVIDER_DESCRIPTIONS[provider.type] || 'Cloud storage provider'
 
-  // Determine card styling based on connection status
-  const cardBgColor = provider.connected
-    ? 'bg-semantic-success-bg dark:bg-neutral-800'
-    : 'bg-white dark:bg-neutral-800'
-  const cardBorderColor = provider.connected
-    ? 'border-semantic-success-border dark:border-green-600'
-    : 'border-neutral-200 dark:border-neutral-700'
-  const iconColor = provider.connected
-    ? 'text-admin-success dark:text-green-400'
-    : 'text-neutral-400 dark:text-neutral-500'
+  // Determine if provider is disabled for this tier
+  const isDisabledForTier = !provider.enabled
+
+  // Determine card styling based on connection status and tier availability
+  const cardBgColor = isDisabledForTier
+    ? 'bg-neutral-50 dark:bg-neutral-900'
+    : provider.connected
+      ? 'bg-semantic-success-bg dark:bg-neutral-800'
+      : 'bg-white dark:bg-neutral-800'
+  const cardBorderColor = isDisabledForTier
+    ? 'border-neutral-200 dark:border-neutral-700'
+    : provider.connected
+      ? 'border-semantic-success-border dark:border-green-600'
+      : 'border-neutral-200 dark:border-neutral-700'
+  const iconColor = isDisabledForTier
+    ? 'text-neutral-300 dark:text-neutral-600'
+    : provider.connected
+      ? 'text-admin-success dark:text-green-400'
+      : 'text-neutral-400 dark:text-neutral-500'
+  const textColor = isDisabledForTier
+    ? 'text-neutral-400 dark:text-neutral-500'
+    : 'text-neutral-900 dark:text-white'
+  const subTextColor = isDisabledForTier
+    ? 'text-neutral-400 dark:text-neutral-500'
+    : 'text-neutral-700 dark:text-neutral-300'
 
   return (
     <div className="space-y-3">
-      <div className={`flex items-center justify-between p-4 ${cardBgColor} border ${cardBorderColor} rounded-lg`}>
+      <div className={`flex items-center justify-between p-4 ${cardBgColor} border ${cardBorderColor} rounded-lg ${isDisabledForTier ? 'opacity-75' : ''}`}>
         <div className="flex items-center space-x-3 flex-1">
           <div className="flex-shrink-0">
             <svg className={`h-10 w-10 ${iconColor}`} fill="currentColor" viewBox={icon.viewBox}>
@@ -71,28 +86,39 @@ export function ProviderCard({
           </div>
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <p className="text-sm font-bold text-neutral-900 dark:text-white">
+              <p className={`text-sm font-bold ${textColor}`}>
                 {provider.name}
               </p>
               {provider.is_active && (
                 <Badge variant="success">Active</Badge>
               )}
-              {!provider.enabled && (
-                <Badge variant="warning">Upgrade Required</Badge>
+              {isDisabledForTier && (
+                <Badge variant="info">Pro Feature</Badge>
               )}
             </div>
-            <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mt-0.5">
-              {provider.connected ? 'Connected' : description}
+            <p className={`text-xs font-medium ${subTextColor} mt-0.5`}>
+              {isDisabledForTier
+                ? 'Available with higher tier subscription'
+                : provider.connected
+                  ? 'Connected'
+                  : description}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          {!provider.connected ? (
+          {isDisabledForTier ? (
+            <a
+              href="/profile#subscription"
+              className="inline-flex items-center justify-center font-medium rounded-md transition-colors px-4 py-2 text-sm bg-admin-primary text-white hover:bg-admin-primary/90"
+            >
+              Upgrade
+            </a>
+          ) : !provider.connected ? (
             <Button
               variant="primary"
               onClick={() => onConnect(provider.type)}
-              disabled={loading || !provider.enabled}
+              disabled={loading}
             >
               {loading ? 'Connecting...' : 'Connect'}
             </Button>
@@ -119,13 +145,19 @@ export function ProviderCard({
         </div>
       </div>
 
-      {provider.connected && !provider.is_active && (
+      {isDisabledForTier && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 px-1">
+          Upgrade your subscription to connect {provider.name} and access additional cloud storage options.
+        </p>
+      )}
+
+      {!isDisabledForTier && provider.connected && !provider.is_active && (
         <p className="text-xs text-neutral-600 dark:text-neutral-300 px-1">
           This provider is connected but not active. Set it as active to use it for new document uploads.
         </p>
       )}
 
-      {provider.is_active && (
+      {!isDisabledForTier && provider.is_active && (
         <p className="text-xs text-neutral-600 dark:text-neutral-300 px-1">
           Your documents are automatically saved to {provider.name} with full version history and sharing capabilities.
         </p>
