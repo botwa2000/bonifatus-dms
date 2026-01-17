@@ -53,7 +53,6 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null)
-  const [saving, setSaving] = useState(false)
   const [driveLoading, setDriveLoading] = useState(false)
   const [storageProviders, setStorageProviders] = useState<ProviderInfo[]>([])
   const [providersLoading, setProvidersLoading] = useState(false)
@@ -356,70 +355,60 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSave = async () => {
-    if (!preferences || !systemSettings) return
-
-    // Always include all available languages for document recognition
-    const preferencesWithAllLanguages = {
-      ...preferences,
-      preferred_doc_languages: systemSettings.available_languages
-    }
-
-    logger.debug('[SETTINGS DEBUG] === Save Button Clicked ===')
-    logger.debug('[SETTINGS DEBUG] Saving preferences to backend...')
-    logger.debug('[SETTINGS DEBUG] Components being saved:')
-    logger.debug('[SETTINGS DEBUG]   - Language:', preferencesWithAllLanguages.language)
-    logger.debug('[SETTINGS DEBUG]   - Preferred Doc Languages (all):', preferencesWithAllLanguages.preferred_doc_languages)
-    logger.debug('[SETTINGS DEBUG]   - Timezone:', preferencesWithAllLanguages.timezone)
-    logger.debug('[SETTINGS DEBUG]   - Theme:', preferencesWithAllLanguages.theme)
-    logger.debug('[SETTINGS DEBUG]   - Notifications Enabled:', preferencesWithAllLanguages.notifications_enabled)
-    logger.debug('[SETTINGS DEBUG]   - Auto Categorization:', preferencesWithAllLanguages.auto_categorization)
-    logger.debug('[SETTINGS DEBUG] Endpoint: PUT /api/v1/users/preferences')
-
-    setSaving(true)
-    setMessage(null)
-
-    const oldLanguage = preferences.language
-
-    try {
-      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
-
-      logger.debug('[SETTINGS DEBUG] ✅ Preferences saved successfully to database')
-      logger.debug('[SETTINGS DEBUG] Theme was saved as:', preferences.theme)
-
-      setMessage({ type: 'success', text: 'Settings saved successfully' })
-
-      if (preferences.language !== oldLanguage) {
-        logger.debug('[SETTINGS DEBUG] Language changed, reloading page...')
-        setMessage({ type: 'success', text: 'Settings saved. Reloading to apply language changes...' })
-        setTimeout(() => {
-          window.location.href = '/dashboard'
-        }, 1500)
-      }
-    } catch (error) {
-      // Error already logged by API client
-      logger.debug('[SETTINGS DEBUG] ❌ Failed to save preferences')
-      logger.error('[SETTINGS DEBUG] Error:', error)
-      setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleThemeChange = (newTheme: string) => {
+  const handleThemeChange = async (newTheme: string) => {
     logger.debug('[SETTINGS DEBUG] === Theme Changed in UI ===')
     logger.debug('[SETTINGS DEBUG] New theme selected:', newTheme)
-    logger.debug('[SETTINGS DEBUG] Note: Theme will be saved to DB when "Save Changes" is clicked')
 
-    setPreferences({ ...preferences!, theme: newTheme })
+    // Update state immediately for responsive UI
+    const updatedPreferences = { ...preferences!, theme: newTheme }
+    setPreferences(updatedPreferences)
+
+    // Apply theme to DOM immediately
     if (mounted && typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme)
       const root = document.documentElement
       root.classList.remove('light', 'dark')
       root.classList.add(newTheme)
+      logger.debug('[SETTINGS DEBUG] Applied theme to DOM immediately')
+    }
 
-      logger.debug('[SETTINGS DEBUG] Applied theme to DOM immediately for preview')
-      logger.debug('[SETTINGS DEBUG] Saved theme to localStorage for persistence')
+    // Auto-save to backend
+    try {
+      const preferencesWithAllLanguages = {
+        ...updatedPreferences,
+        preferred_doc_languages: systemSettings?.available_languages || []
+      }
+      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      logger.debug('[SETTINGS DEBUG] ✅ Theme saved to backend')
+      setMessage({ type: 'success', text: 'Theme updated' })
+      setTimeout(() => setMessage(null), 2000)
+    } catch (error) {
+      logger.error('[SETTINGS DEBUG] ❌ Failed to save theme:', error)
+      setMessage({ type: 'error', text: 'Failed to save theme' })
+    }
+  }
+
+  const handleTimezoneChange = async (newTimezone: string) => {
+    logger.debug('[SETTINGS DEBUG] === Timezone Changed in UI ===')
+    logger.debug('[SETTINGS DEBUG] New timezone selected:', newTimezone)
+
+    // Update state immediately
+    const updatedPreferences = { ...preferences!, timezone: newTimezone }
+    setPreferences(updatedPreferences)
+
+    // Auto-save to backend
+    try {
+      const preferencesWithAllLanguages = {
+        ...updatedPreferences,
+        preferred_doc_languages: systemSettings?.available_languages || []
+      }
+      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      logger.debug('[SETTINGS DEBUG] ✅ Timezone saved to backend')
+      setMessage({ type: 'success', text: 'Timezone updated' })
+      setTimeout(() => setMessage(null), 2000)
+    } catch (error) {
+      logger.error('[SETTINGS DEBUG] ❌ Failed to save timezone:', error)
+      setMessage({ type: 'error', text: 'Failed to save timezone' })
     }
   }
 
@@ -814,7 +803,7 @@ export default function SettingsPage() {
                 label="Timezone"
                 hint="Your timezone for displaying dates and times"
                 value={preferences.timezone}
-                onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
+                onChange={(e) => handleTimezoneChange(e.target.value)}
                 options={timezoneOptions}
               />
 
@@ -1255,14 +1244,6 @@ export default function SettingsPage() {
             />
           )}
 
-          <div className="flex justify-end space-x-3">
-            <Button variant="secondary" onClick={() => router.push('/dashboard')}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
         </div>
       </main>
     </div>
