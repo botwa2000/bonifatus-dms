@@ -312,8 +312,8 @@ export default function ProfilePage() {
     try {
       // If user has an active subscription, use update endpoint
       if (subscription) {
-        const response = await apiClient.put(
-          '/api/v1/billing/subscriptions/update',
+        await apiClient.put(
+          '/api/v1/billing/subscription',
           {
             tier_id: tierId,
             billing_cycle: billingCycle
