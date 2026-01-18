@@ -406,6 +406,13 @@ async def update_subscription(
                 detail="No active subscription"
             )
 
+        # Validate subscription has Stripe ID before any Stripe operations
+        if not subscription.stripe_subscription_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe subscription ID"
+            )
+
         if update_request.tier_id and update_request.tier_id != subscription.tier_id:
             new_tier = session.query(TierPlan).filter(TierPlan.id == update_request.tier_id).first()
             if not new_tier:
@@ -435,11 +442,16 @@ async def update_subscription(
                 proration_behavior='create_prorations'
             )
 
-            if updated_stripe_sub:
-                subscription.tier_id = new_tier.id
-                subscription.stripe_price_id = new_price_id
-                subscription.billing_cycle = billing_cycle
-                current_user.tier_id = new_tier.id
+            if not updated_stripe_sub:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update subscription in Stripe"
+                )
+
+            subscription.tier_id = new_tier.id
+            subscription.stripe_price_id = new_price_id
+            subscription.billing_cycle = billing_cycle
+            current_user.tier_id = new_tier.id
 
         if update_request.cancel_at_period_end is not None:
             updated_stripe_sub = await stripe_service.update_subscription(
@@ -447,10 +459,15 @@ async def update_subscription(
                 cancel_at_period_end=update_request.cancel_at_period_end
             )
 
-            if updated_stripe_sub:
-                subscription.cancel_at_period_end = update_request.cancel_at_period_end
-                if update_request.cancel_at_period_end:
-                    subscription.canceled_at = datetime.now(timezone.utc)
+            if not updated_stripe_sub:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update subscription cancellation status in Stripe"
+                )
+
+            subscription.cancel_at_period_end = update_request.cancel_at_period_end
+            if update_request.cancel_at_period_end:
+                subscription.canceled_at = datetime.now(timezone.utc)
 
         session.commit()
         session.refresh(subscription)
@@ -750,6 +767,205 @@ async def confirm_payment_method_update(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update payment method"
+        )
+
+
+@router.post(
+    "/subscriptions/preview-upgrade",
+    status_code=status.HTTP_200_OK,
+    summary="Preview Tier Upgrade Details"
+)
+async def preview_upgrade(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Preview the details of a tier upgrade without executing it.
+    Returns current subscription, new tier details, and proration amounts.
+    """
+    try:
+        tier_id = request.get('tier_id')
+        new_billing_cycle = request.get('billing_cycle')
+
+        if not tier_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tier_id is required"
+            )
+
+        # Get active subscription
+        subscription = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active subscription found"
+            )
+
+        # Validate subscription has Stripe ID
+        if not subscription.stripe_subscription_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe subscription ID"
+            )
+
+        # Get new tier information
+        new_tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
+        if not new_tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tier {tier_id} not found"
+            )
+
+        # Check if already on requested tier
+        if subscription.tier_id == tier_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Already on this tier"
+            )
+
+        # Get current tier information
+        current_tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+        if not current_tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Current tier not found"
+            )
+
+        import stripe
+        from app.database.models import Currency
+
+        # Get subscription's currency from Stripe price
+        if not subscription.stripe_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe price ID"
+            )
+
+        try:
+            current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+            currency = current_price.currency.upper()
+        except Exception as e:
+            logger.error(f"Failed to retrieve current price {subscription.stripe_price_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve subscription price"
+            )
+
+        # Get currency symbol
+        currency_obj = session.query(Currency).filter(Currency.code == currency).first()
+        currency_symbol = currency_obj.symbol if currency_obj else currency
+
+        # Determine billing cycle
+        billing_cycle = new_billing_cycle if new_billing_cycle else subscription.billing_cycle
+
+        # Get or create new price ID for the new tier
+        new_price_id = await stripe_service.get_or_create_price(
+            session, new_tier, billing_cycle, currency
+        )
+
+        if not new_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get price for new tier"
+            )
+
+        # Get new price details
+        try:
+            new_price_obj = stripe.Price.retrieve(new_price_id)
+            new_amount = new_price_obj.unit_amount
+        except Exception as e:
+            logger.error(f"Failed to retrieve new price {new_price_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve new price details"
+            )
+
+        # Get proration preview from Stripe using Invoice.upcoming
+        try:
+            stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+            subscription_item_id = stripe_sub['items']['data'][0]['id']
+
+            # Preview the upcoming invoice with the new price
+            upcoming_invoice = stripe.Invoice.upcoming(
+                customer=current_user.stripe_customer_id,
+                subscription=subscription.stripe_subscription_id,
+                subscription_items=[{
+                    'id': subscription_item_id,
+                    'price': new_price_id,
+                }],
+                subscription_proration_behavior='create_prorations'
+            )
+
+            # Calculate proration details
+            proration_lines = [line for line in upcoming_invoice.lines.data if line.proration]
+
+            credit_amount = 0
+            charge_amount = 0
+
+            for line in proration_lines:
+                if line.amount < 0:
+                    credit_amount += abs(line.amount)
+                else:
+                    charge_amount += line.amount
+
+            # Net amount due now (immediate charge)
+            net_amount = upcoming_invoice.amount_due
+
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to preview invoice: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to preview upgrade: {str(e)}"
+            )
+
+        # Get current amount
+        current_amount = subscription.amount_cents or (
+            current_tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else current_tier.price_yearly_cents
+        )
+
+        return {
+            "success": True,
+            "current_subscription": {
+                "tier_name": current_tier.display_name,
+                "tier_id": current_tier.id,
+                "billing_cycle": subscription.billing_cycle,
+                "amount": current_amount,
+                "currency": currency,
+                "currency_symbol": currency_symbol,
+                "period_end": subscription.current_period_end.isoformat()
+            },
+            "new_subscription": {
+                "tier_name": new_tier.display_name,
+                "tier_id": new_tier.id,
+                "billing_cycle": billing_cycle,
+                "amount": new_amount,
+                "currency": currency,
+                "currency_symbol": currency_symbol
+            },
+            "proration_details": {
+                "credit_for_unused_time": credit_amount,
+                "prorated_charge": charge_amount,
+                "net_amount_due": net_amount,
+                "currency": currency,
+                "currency_symbol": currency_symbol,
+                "immediate_charge": True,
+                "description": "Your card will be charged immediately for the prorated difference."
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Preview upgrade error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
 
 

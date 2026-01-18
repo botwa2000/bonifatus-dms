@@ -105,6 +105,35 @@ export default function ProfilePage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [hasAttemptedAuth, setHasAttemptedAuth] = useState(false)
   const [showBillingChangeModal, setShowBillingChangeModal] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradePreview, setUpgradePreview] = useState<{
+    current_subscription: {
+      tier_name: string
+      tier_id: number
+      billing_cycle: string
+      amount: number
+      currency: string
+      currency_symbol: string
+      period_end: string
+    }
+    new_subscription: {
+      tier_name: string
+      tier_id: number
+      billing_cycle: string
+      amount: number
+      currency: string
+      currency_symbol: string
+    }
+    proration_details: {
+      credit_for_unused_time: number
+      prorated_charge: number
+      net_amount_due: number
+      currency: string
+      currency_symbol: string
+      immediate_charge: boolean
+      description: string
+    }
+  } | null>(null)
   const [billingChangePreview, setBillingChangePreview] = useState<{
     current_subscription: {
       tier_name: string
@@ -310,10 +339,39 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      // If user has an active subscription, use update endpoint
+      // If user has an active subscription, show preview modal first
       if (subscription) {
-        await apiClient.put(
-          '/api/v1/billing/subscription',
+        // Get preview of the upgrade
+        const previewResponse = await apiClient.post<{
+          success: boolean
+          current_subscription: {
+            tier_name: string
+            tier_id: number
+            billing_cycle: string
+            amount: number
+            currency: string
+            currency_symbol: string
+            period_end: string
+          }
+          new_subscription: {
+            tier_name: string
+            tier_id: number
+            billing_cycle: string
+            amount: number
+            currency: string
+            currency_symbol: string
+          }
+          proration_details: {
+            credit_for_unused_time: number
+            prorated_charge: number
+            net_amount_due: number
+            currency: string
+            currency_symbol: string
+            immediate_charge: boolean
+            description: string
+          }
+        }>(
+          '/api/v1/billing/subscriptions/preview-upgrade',
           {
             tier_id: tierId,
             billing_cycle: billingCycle
@@ -321,11 +379,10 @@ export default function ProfilePage() {
           true
         )
 
-        setMessage({ type: 'success', text: 'Subscription upgraded successfully! Changes will take effect immediately with prorated billing.' })
-
-        // Reload profile to show updated tier
-        await loadProfileData()
-        await loadSubscriptionData()
+        if (previewResponse.success) {
+          setUpgradePreview(previewResponse)
+          setShowUpgradeModal(true)
+        }
       } else {
         // No active subscription - create new checkout session
         // Validate currency is selected
@@ -347,6 +404,37 @@ export default function ProfilePage() {
 
         window.location.href = response.checkout_url
       }
+    } catch (error) {
+      logger.error('Failed to preview upgrade:', error)
+      setMessage({ type: 'error', text: 'Failed to load upgrade preview. Please try again.' })
+    } finally {
+      setProcessingSubscription(false)
+    }
+  }
+
+  const executeUpgrade = async () => {
+    if (!upgradePreview) return
+
+    setProcessingSubscription(true)
+    setMessage(null)
+
+    try {
+      await apiClient.put(
+        '/api/v1/billing/subscription',
+        {
+          tier_id: upgradePreview.new_subscription.tier_id,
+          billing_cycle: upgradePreview.new_subscription.billing_cycle
+        },
+        true
+      )
+
+      setMessage({ type: 'success', text: 'Subscription upgraded successfully! Your card has been charged for the prorated amount.' })
+      setShowUpgradeModal(false)
+      setUpgradePreview(null)
+
+      // Reload profile to show updated tier
+      await loadProfileData()
+      await loadSubscriptionData()
     } catch (error) {
       logger.error('Failed to upgrade subscription:', error)
       setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' })
@@ -1243,6 +1331,123 @@ export default function ProfilePage() {
             onClick={() => {
               setShowBillingChangeModal(false)
               setBillingChangePreview(null)
+            }}
+            disabled={processingSubscription}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Upgrade Preview Modal */}
+      <Modal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)}>
+        <ModalHeader title="Confirm Plan Upgrade" onClose={() => setShowUpgradeModal(false)} />
+        <ModalContent>
+          {upgradePreview && (
+            <div className="space-y-4">
+              {/* Current Plan */}
+              <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                <h4 className="font-medium text-neutral-900 dark:text-white mb-2">Current Plan</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Plan:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">{upgradePreview.current_subscription.tier_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Billing:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white capitalize">{upgradePreview.current_subscription.billing_cycle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Price:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">
+                      {upgradePreview.current_subscription.currency_symbol}
+                      {(upgradePreview.current_subscription.amount / 100).toFixed(2)}/
+                      {upgradePreview.current_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex justify-center">
+                <svg className="h-6 w-6 text-semantic-success-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+              </div>
+
+              {/* New Plan */}
+              <div className="border border-semantic-success-border rounded-lg p-4 bg-semantic-success-bg dark:bg-green-900/20">
+                <h4 className="font-medium text-semantic-success-text dark:text-green-300 mb-2">New Plan</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Plan:</span>
+                    <span className="font-medium text-semantic-success-text dark:text-green-300">{upgradePreview.new_subscription.tier_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Billing:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white capitalize">{upgradePreview.new_subscription.billing_cycle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Price:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">
+                      {upgradePreview.new_subscription.currency_symbol}
+                      {(upgradePreview.new_subscription.amount / 100).toFixed(2)}/
+                      {upgradePreview.new_subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Proration Details */}
+              <div className="border border-admin-primary rounded-lg p-4 bg-semantic-info-bg dark:bg-blue-900/10">
+                <h4 className="font-medium text-admin-primary mb-2">Billing Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Credit for unused time:</span>
+                    <span className="font-medium text-semantic-success-text">
+                      -{upgradePreview.proration_details.currency_symbol}
+                      {(upgradePreview.proration_details.credit_for_unused_time / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-600 dark:text-neutral-400">Prorated charge for new plan:</span>
+                    <span className="font-medium text-neutral-900 dark:text-white">
+                      {upgradePreview.proration_details.currency_symbol}
+                      {(upgradePreview.proration_details.prorated_charge / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-admin-primary/20">
+                    <span className="font-semibold text-neutral-900 dark:text-white">Amount due now:</span>
+                    <span className="font-bold text-admin-primary text-lg">
+                      {upgradePreview.proration_details.currency_symbol}
+                      {(upgradePreview.proration_details.net_amount_due / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <Alert
+                type="warning"
+                message="Your card will be charged immediately for the prorated amount. The upgrade takes effect right away."
+              />
+            </div>
+          )}
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="primary"
+            onClick={executeUpgrade}
+            disabled={processingSubscription}
+            className="flex-1"
+          >
+            {processingSubscription ? 'Processing...' : 'Confirm Upgrade'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowUpgradeModal(false)
+              setUpgradePreview(null)
             }}
             disabled={processingSubscription}
             className="flex-1"
