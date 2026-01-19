@@ -699,8 +699,8 @@ export default function ProfilePage() {
                   } />
                   {(() => {
                     // Check if user's tier supports email processing
-                    // Use subscription tier if available, otherwise fall back to profile tier_id
-                    const tierIdToCheck = subscription?.tier_id ?? profile.tier_id
+                    // Always use profile.tier_id as source of truth (from users table)
+                    const tierIdToCheck = profile.tier_id
                     const userTier = availableTiers.find(t => t.id === tierIdToCheck)
                     const tierSupportsEmailProcessing = userTier?.email_to_process_enabled
 
@@ -832,7 +832,7 @@ export default function ProfilePage() {
                   <div className="bg-semantic-success-bg dark:bg-green-900/20 border border-semantic-success-border dark:border-green-800 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-semantic-success-text dark:text-green-300">{subscription.tier_name}</h3>
+                        <h3 className="font-semibold text-semantic-success-text dark:text-green-300">{availableTiers.find(t => t.id === profile.tier_id)?.display_name || subscription.tier_name}</h3>
                         <p className="text-sm text-semantic-success-text dark:text-green-400 mt-1">
                           {subscription.billing_cycle === 'yearly' ? 'Annual' : 'Monthly'} billing •
                           {subscription.currency_symbol || subscription.currency}{(subscription.amount / 100).toFixed(2)}/{subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
@@ -863,11 +863,11 @@ export default function ProfilePage() {
                       <h4 className="font-medium text-neutral-900 dark:text-white">Change Plan</h4>
 
                       {availableTiers
-                        .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== subscription.tier_id)
+                        .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== profile.tier_id)
                         .map(tier => {
                           const isPro = tier.name.toLowerCase() === 'pro'
                           const isComingSoon = false // Pro tier is now available
-                          const isUpgrade = tier.id > subscription.tier_id
+                          const isUpgrade = tier.id > profile.tier_id
 
                           return (
                             <div key={tier.id} className="border border-neutral-200 rounded-lg p-3">
