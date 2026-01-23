@@ -185,6 +185,21 @@ class ScannerSettings(BaseSettings):
         extra = "ignore"
 
 
+class PerformanceSettings(BaseSettings):
+    """Performance monitoring configuration from environment variables"""
+
+    perf_logging_enabled: bool = Field(default=True, description="Enable performance logging")
+    perf_slow_request_threshold_ms: int = Field(default=1000, description="Log requests slower than this (ms)")
+    perf_slow_db_query_threshold_ms: int = Field(default=100, description="Log DB queries slower than this (ms)")
+    perf_log_all_requests: bool = Field(default=False, description="Log all requests (not just slow ones)")
+    perf_log_db_queries: bool = Field(default=True, description="Log slow database queries")
+    perf_metrics_endpoint_enabled: bool = Field(default=False, description="Enable /metrics endpoint (internal only)")
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+
+
 class EmailSettings(BaseSettings):
     """Email service configuration from environment variables"""
 
@@ -305,6 +320,7 @@ class Settings(BaseSettings):
     email: EmailSettings = Field(default_factory=EmailSettings)
     email_processing: EmailProcessingSettings = Field(default_factory=EmailProcessingSettings)
     stripe: StripeSettings = Field(default_factory=StripeSettings)
+    performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

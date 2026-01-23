@@ -823,14 +823,15 @@ async def preview_upgrade(
             )
 
         # Check if already on requested tier
-        if subscription.tier_id == tier_id:
+        # Use user's tier_id as source of truth (not subscription.tier_id which may be stale)
+        if current_user.tier_id == tier_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Already on this tier"
             )
 
-        # Get current tier information
-        current_tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+        # Get current tier information (from user's tier_id as source of truth)
+        current_tier = session.query(TierPlan).filter(TierPlan.id == current_user.tier_id).first()
         if not current_tier:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

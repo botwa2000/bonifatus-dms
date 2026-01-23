@@ -2,6 +2,7 @@
 
 import { ApiResponse, ApiError, RequestConfig } from '@/types/auth.types'
 import { logger } from '@/lib/logger'
+import { performanceMonitor } from '@/lib/performance'
 
 interface ApiClientConfig {
   baseURL: string
@@ -119,6 +120,16 @@ export class ApiClient {
         }
 
         const duration = Date.now() - startTime
+
+        // Record performance metric
+        const responseRequestId = response.headers.get('X-Request-ID') || undefined
+        performanceMonitor.recordApiCall(
+          endpoint,
+          method,
+          duration,
+          response.status,
+          responseRequestId
+        )
 
         if (!response.ok) {
           const error = this.createHttpError(response, responseData)

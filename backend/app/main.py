@@ -338,6 +338,7 @@ routers = [
     ("app.api.webhooks", "Webhooks"),
     ("app.api.email_processing", "EmailProcessing"),
     ("app.api.delegates", "Delegates"),
+    ("app.api.metrics", "Metrics"),
 ]
 
 for module_path, name in routers:

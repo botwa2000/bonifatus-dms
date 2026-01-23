@@ -6,13 +6,19 @@ Production-ready connection pooling and health monitoring
 """
 
 import logging
+import time
+import threading
 from typing import Generator
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+perf_logger = logging.getLogger("app.performance")
+
+# Thread-local storage for query timing
+_query_context = threading.local()
 
 
 class DatabaseManager:
@@ -107,6 +113,64 @@ class DatabaseManager:
 
 # Global database manager instance
 db_manager = DatabaseManager()
+
+
+def _setup_query_timing_events(engine_instance):
+    """Set up SQLAlchemy event listeners for query performance monitoring."""
+    from app.services.performance_service import performance_monitor
+
+    @event.listens_for(engine_instance, "before_cursor_execute")
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        """Record query start time."""
+        _query_context.start_time = time.perf_counter()
+
+    @event.listens_for(engine_instance, "after_cursor_execute")
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        """Record query end time and log if slow."""
+        if not hasattr(_query_context, "start_time"):
+            return
+
+        duration_ms = (time.perf_counter() - _query_context.start_time) * 1000
+
+        # Determine query type
+        stmt_upper = statement.strip().upper()[:20]
+        if stmt_upper.startswith("SELECT"):
+            query_type = "SELECT"
+        elif stmt_upper.startswith("INSERT"):
+            query_type = "INSERT"
+        elif stmt_upper.startswith("UPDATE"):
+            query_type = "UPDATE"
+        elif stmt_upper.startswith("DELETE"):
+            query_type = "DELETE"
+        else:
+            query_type = "OTHER"
+
+        # Get request_id from context if available
+        request_id = getattr(_query_context, "request_id", "unknown")
+
+        # Record in performance monitor
+        performance_monitor.record_db_query(
+            request_id=request_id,
+            query_type=query_type,
+            duration_ms=duration_ms
+        )
+
+        del _query_context.start_time
+
+
+def set_request_context(request_id: str):
+    """Set the current request ID for DB query tracking."""
+    _query_context.request_id = request_id
+
+
+def clear_request_context():
+    """Clear the current request context."""
+    if hasattr(_query_context, "request_id"):
+        del _query_context.request_id
+
+
+# Set up event listeners
+_setup_query_timing_events(db_manager.engine)
 
 # Convenience exports for backward compatibility
 engine = db_manager.engine
