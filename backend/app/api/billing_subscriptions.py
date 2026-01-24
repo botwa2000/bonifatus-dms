@@ -894,6 +894,7 @@ async def preview_upgrade(
 
             # Preview the upcoming invoice with the new price
             # Note: Stripe SDK v6+ uses create_preview instead of upcoming
+            # proration_behavior is a top-level param, not inside subscription_details
             upcoming_invoice = stripe.Invoice.create_preview(
                 customer=current_user.stripe_customer_id,
                 subscription=subscription.stripe_subscription_id,
@@ -901,9 +902,9 @@ async def preview_upgrade(
                     'items': [{
                         'id': subscription_item_id,
                         'price': new_price_id,
-                    }],
-                    'proration_behavior': 'create_prorations'
-                }
+                    }]
+                },
+                subscription_proration_behavior='create_prorations'
             )
 
             # Calculate proration details
