@@ -887,20 +887,23 @@ async def preview_upgrade(
                 detail="Failed to retrieve new price details"
             )
 
-        # Get proration preview from Stripe using Invoice.upcoming
+        # Get proration preview from Stripe using Invoice.create_preview
         try:
             stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
             subscription_item_id = stripe_sub['items']['data'][0]['id']
 
             # Preview the upcoming invoice with the new price
-            upcoming_invoice = stripe.Invoice.upcoming(
+            # Note: Stripe SDK v6+ uses create_preview instead of upcoming
+            upcoming_invoice = stripe.Invoice.create_preview(
                 customer=current_user.stripe_customer_id,
                 subscription=subscription.stripe_subscription_id,
-                subscription_items=[{
-                    'id': subscription_item_id,
-                    'price': new_price_id,
-                }],
-                subscription_proration_behavior='create_prorations'
+                subscription_details={
+                    'items': [{
+                        'id': subscription_item_id,
+                        'price': new_price_id,
+                    }],
+                    'proration_behavior': 'create_prorations'
+                }
             )
 
             # Calculate proration details
