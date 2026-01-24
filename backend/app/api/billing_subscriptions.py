@@ -999,6 +999,243 @@ async def preview_upgrade(
 
 
 @router.post(
+    "/subscriptions/execute-upgrade",
+    status_code=status.HTTP_200_OK,
+    summary="Execute Subscription Upgrade with Payment"
+)
+async def execute_upgrade(
+    request: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Execute subscription upgrade with proper Stripe payment flow.
+
+    1. Updates the subscription in Stripe with proration
+    2. Creates an immediate invoice for the proration amount
+    3. Returns the Stripe-hosted invoice URL for payment confirmation
+
+    The user is redirected to Stripe to confirm payment (with 3D Secure if needed).
+    After payment, webhook handles the confirmation email.
+    """
+    import stripe
+    from app.core.config import settings
+
+    try:
+        tier_id = request.get('tier_id')
+        billing_cycle = request.get('billing_cycle', 'yearly')
+
+        if not tier_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tier_id is required"
+            )
+
+        # Get active subscription
+        subscription = session.execute(
+            select(Subscription)
+            .where(Subscription.user_id == current_user.id)
+            .where(Subscription.status.in_(['active', 'trialing']))
+        ).scalar_one_or_none()
+
+        if not subscription:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No active subscription found"
+            )
+
+        if not subscription.stripe_subscription_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subscription has no Stripe subscription ID"
+            )
+
+        # Verify upgrade is valid (new tier > current tier)
+        if current_user.tier_id >= tier_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only upgrade to a higher tier"
+            )
+
+        # Get new tier
+        new_tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
+        if not new_tier:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tier {tier_id} not found"
+            )
+
+        # Get currency from current subscription
+        try:
+            current_price = stripe.Price.retrieve(subscription.stripe_price_id)
+            currency = current_price.currency.upper()
+        except Exception as e:
+            logger.error(f"Failed to retrieve current price currency: {e}")
+            currency = 'EUR'
+
+        # Get or create the new price in Stripe
+        new_price_id = await stripe_service.get_or_create_price(
+            session, new_tier, billing_cycle, currency
+        )
+
+        if not new_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create price for new tier"
+            )
+
+        # Get current subscription item
+        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+        subscription_item_id = stripe_sub['items']['data'][0]['id']
+
+        # Update the subscription with proration
+        # Using payment_behavior='pending_if_incomplete' to handle 3D Secure
+        updated_sub = stripe.Subscription.modify(
+            subscription.stripe_subscription_id,
+            items=[{
+                'id': subscription_item_id,
+                'price': new_price_id,
+            }],
+            proration_behavior='always_invoice',  # Create invoice immediately
+            payment_behavior='pending_if_incomplete',  # Handle 3D Secure
+            metadata={
+                'tier_id': str(tier_id),
+                'billing_cycle': billing_cycle,
+                'user_id': str(current_user.id),
+                'currency': currency,
+                'upgrade_from_tier': str(current_user.tier_id),
+            }
+        )
+
+        # Get the latest invoice (proration invoice)
+        latest_invoice = stripe.Invoice.retrieve(updated_sub.latest_invoice)
+
+        # Check if payment is needed and invoice has a hosted URL
+        if latest_invoice.status == 'open' and latest_invoice.amount_due > 0:
+            # If invoice needs payment, return the hosted URL
+            if latest_invoice.hosted_invoice_url:
+                # Update local subscription record with pending upgrade
+                subscription.stripe_price_id = new_price_id
+                subscription.billing_cycle = billing_cycle
+                # Note: tier_id is NOT updated yet - will be updated on successful payment
+                session.commit()
+
+                return {
+                    "success": True,
+                    "payment_required": True,
+                    "invoice_url": latest_invoice.hosted_invoice_url,
+                    "invoice_id": latest_invoice.id,
+                    "amount_due": latest_invoice.amount_due,
+                    "currency": latest_invoice.currency.upper(),
+                    "message": "Please complete payment to activate your upgrade"
+                }
+            else:
+                # Try to pay the invoice with the default payment method
+                try:
+                    paid_invoice = stripe.Invoice.pay(latest_invoice.id)
+                    if paid_invoice.status == 'paid':
+                        # Payment successful, update local records
+                        subscription.tier_id = tier_id
+                        subscription.stripe_price_id = new_price_id
+                        subscription.billing_cycle = billing_cycle
+                        current_user.tier_id = tier_id
+                        session.commit()
+
+                        # Send confirmation email
+                        try:
+                            from app.services.email_service import email_service
+                            await email_service.send_subscription_upgraded_email(
+                                current_user.email,
+                                current_user.full_name or current_user.email,
+                                new_tier.display_name,
+                                billing_cycle,
+                                paid_invoice.amount_paid / 100,
+                                paid_invoice.currency.upper()
+                            )
+                        except Exception as email_error:
+                            logger.error(f"Failed to send upgrade email: {email_error}")
+
+                        return {
+                            "success": True,
+                            "payment_required": False,
+                            "message": "Upgrade successful! Your subscription has been updated.",
+                            "new_tier": new_tier.display_name,
+                            "invoice_pdf": paid_invoice.invoice_pdf
+                        }
+                except stripe.error.CardError as card_error:
+                    # Card declined - return hosted invoice URL for retry
+                    logger.warning(f"Card declined for upgrade: {card_error}")
+                    return {
+                        "success": True,
+                        "payment_required": True,
+                        "invoice_url": latest_invoice.hosted_invoice_url or f"https://invoice.stripe.com/i/{latest_invoice.id}",
+                        "invoice_id": latest_invoice.id,
+                        "amount_due": latest_invoice.amount_due,
+                        "currency": latest_invoice.currency.upper(),
+                        "message": "Payment failed. Please update your payment method.",
+                        "error": str(card_error.user_message) if hasattr(card_error, 'user_message') else "Card declined"
+                    }
+
+        elif latest_invoice.status == 'paid':
+            # Invoice was already paid (e.g., $0 proration or auto-charged)
+            subscription.tier_id = tier_id
+            subscription.stripe_price_id = new_price_id
+            subscription.billing_cycle = billing_cycle
+            current_user.tier_id = tier_id
+            session.commit()
+
+            # Send confirmation email
+            try:
+                from app.services.email_service import email_service
+                await email_service.send_subscription_upgraded_email(
+                    current_user.email,
+                    current_user.full_name or current_user.email,
+                    new_tier.display_name,
+                    billing_cycle,
+                    latest_invoice.amount_paid / 100 if latest_invoice.amount_paid else 0,
+                    currency
+                )
+            except Exception as email_error:
+                logger.error(f"Failed to send upgrade email: {email_error}")
+
+            return {
+                "success": True,
+                "payment_required": False,
+                "message": "Upgrade successful! Your subscription has been updated.",
+                "new_tier": new_tier.display_name,
+                "invoice_pdf": latest_invoice.invoice_pdf if hasattr(latest_invoice, 'invoice_pdf') else None
+            }
+
+        else:
+            # Unexpected state
+            logger.warning(f"Unexpected invoice status after upgrade: {latest_invoice.status}")
+            return {
+                "success": True,
+                "payment_required": False,
+                "message": "Upgrade initiated. You will receive a confirmation email shortly.",
+                "new_tier": new_tier.display_name
+            }
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except stripe.error.StripeError as e:
+        session.rollback()
+        logger.error(f"Stripe error during upgrade: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment error: {str(e)}"
+        )
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Execute upgrade error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
     "/subscriptions/preview-billing-cycle-change",
     status_code=status.HTTP_200_OK,
     summary="Preview Billing Cycle Change Details"

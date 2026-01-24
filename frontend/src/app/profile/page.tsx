@@ -419,8 +419,8 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      await apiClient.put(
-        '/api/v1/billing/subscription',
+      const response = await apiClient.post(
+        '/api/v1/billing/subscriptions/execute-upgrade',
         {
           tier_id: upgradePreview.new_subscription.tier_id,
           billing_cycle: upgradePreview.new_subscription.billing_cycle
@@ -428,13 +428,19 @@ export default function ProfilePage() {
         true
       )
 
-      setMessage({ type: 'success', text: 'Subscription upgraded successfully! Your card has been charged for the prorated amount.' })
-      setShowUpgradeModal(false)
-      setUpgradePreview(null)
+      if (response.payment_required && response.invoice_url) {
+        // Redirect to Stripe for payment
+        window.location.href = response.invoice_url
+      } else {
+        // Payment was successful or no payment needed
+        setMessage({ type: 'success', text: response.message || 'Subscription upgraded successfully!' })
+        setShowUpgradeModal(false)
+        setUpgradePreview(null)
 
-      // Reload profile to show updated tier
-      await loadProfileData()
-      await loadSubscriptionData()
+        // Reload profile to show updated tier
+        await loadProfileData()
+        await loadSubscriptionData()
+      }
     } catch (error) {
       logger.error('Failed to upgrade subscription:', error)
       setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' })

@@ -788,6 +788,86 @@ class EmailService:
             logger.error(f"Failed to send subscription confirmation to {user_email}: {e}")
             return False
 
+    async def send_subscription_upgraded_email(
+        self,
+        to_email: str,
+        to_name: str,
+        new_plan_name: str,
+        billing_cycle: str,
+        amount: float,
+        currency: str
+    ) -> bool:
+        """
+        Send subscription upgrade confirmation email
+
+        Args:
+            to_email: User email address
+            to_name: User name
+            new_plan_name: New subscription plan name
+            billing_cycle: Billing cycle (monthly/yearly)
+            amount: Amount charged for proration
+            currency: Currency code (EUR, USD, etc.)
+
+        Returns:
+            True if email sent successfully
+        """
+        try:
+            currency_symbols = {'EUR': '€', 'USD': '$', 'GBP': '£'}
+            currency_symbol = currency_symbols.get(currency.upper(), currency)
+            period = 'year' if billing_cycle == 'yearly' else 'month'
+
+            subject = f"Your subscription has been upgraded to {new_plan_name}"
+
+            html_content = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #2563eb;">🎉 Upgrade Successful!</h1>
+                </div>
+
+                <p>Hi {to_name},</p>
+
+                <p>Great news! Your subscription has been successfully upgraded to <strong>{new_plan_name}</strong>.</p>
+
+                <div style="background-color: #f3f4f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #374151;">Upgrade Details</h3>
+                    <p><strong>New Plan:</strong> {new_plan_name}</p>
+                    <p><strong>Billing Cycle:</strong> {billing_cycle.capitalize()}</p>
+                    <p><strong>Amount Charged:</strong> {currency_symbol}{amount:.2f}</p>
+                </div>
+
+                <p>Your new plan benefits are now active. You can start using all the features immediately.</p>
+
+                <p>You will receive a separate invoice email with the payment receipt shortly.</p>
+
+                <div style="margin-top: 30px; text-align: center;">
+                    <a href="{settings.app.app_frontend_url}/profile"
+                       style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                        View Your Account
+                    </a>
+                </div>
+
+                <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+                    If you have any questions about your upgrade, please don't hesitate to contact our support team.
+                </p>
+
+                <p style="margin-top: 20px;">Best regards,<br>The BoniDoc Team</p>
+            </body>
+            </html>
+            """
+
+            return await self.send_email(
+                to_email=to_email,
+                to_name=to_name,
+                subject=subject,
+                html_content=html_content,
+                from_email=settings.email.email_from_info
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send subscription upgrade email to {to_email}: {e}")
+            return False
+
     async def send_invoice_email(
         self,
         session: Session,
