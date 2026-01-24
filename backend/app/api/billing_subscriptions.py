@@ -906,33 +906,38 @@ async def preview_upgrade(
                 }
             )
 
-            # Calculate proration details
-            # In Stripe API 2025+, proration info is nested in parent.subscription_item_details
-            def is_proration_line(line):
-                try:
-                    parent = getattr(line, 'parent', None)
-                    if parent:
-                        sub_details = getattr(parent, 'subscription_item_details', None)
-                        if sub_details:
-                            return getattr(sub_details, 'proration', False)
-                    # Fallback for older API versions
-                    return getattr(line, 'proration', False)
-                except Exception:
-                    return False
-
-            proration_lines = [line for line in upcoming_invoice.lines.data if is_proration_line(line)]
-
-            credit_amount = 0
-            charge_amount = 0
-
-            for line in proration_lines:
-                if line.amount < 0:
-                    credit_amount += abs(line.amount)
-                else:
-                    charge_amount += line.amount
-
-            # Net amount due now (immediate charge)
+            # Net amount due now from Stripe (includes any historical adjustments)
             net_amount = upcoming_invoice.amount_due
+
+            # Calculate theoretical proration based on time remaining
+            # This gives users a cleaner understanding of what they're paying for
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc)
+            period_end = subscription.current_period_end
+            period_start = subscription.current_period_start
+
+            if period_end and period_start:
+                total_period_seconds = (period_end - period_start).total_seconds()
+                remaining_seconds = max(0, (period_end - now).total_seconds())
+                proration_factor = remaining_seconds / total_period_seconds if total_period_seconds > 0 else 0
+
+                # Get current subscription price for proration calculation
+                current_price = subscription.amount_cents or (
+                    current_tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else current_tier.price_yearly_cents
+                )
+
+                # Calculate theoretical credit (unused current plan) and charge (new plan for remaining time)
+                credit_amount = int(current_price * proration_factor)
+                charge_amount = int(new_amount * proration_factor)
+            else:
+                # Fallback: just show the net amount as the charge
+                credit_amount = 0
+                charge_amount = net_amount
+
+            # If Stripe's amount significantly differs from our calculation,
+            # it means there are historical adjustments
+            theoretical_net = charge_amount - credit_amount
+            has_adjustments = abs(net_amount - theoretical_net) > 100  # More than €1 difference
 
         except stripe.error.StripeError as e:
             logger.error(f"Failed to preview invoice: {e}")
@@ -972,7 +977,14 @@ async def preview_upgrade(
                 "currency": currency,
                 "currency_symbol": currency_symbol,
                 "immediate_charge": True,
-                "description": "Your card will be charged immediately for the prorated difference."
+                "has_adjustments": has_adjustments,
+                "description": (
+                    "Your card will be charged immediately for the prorated amount. "
+                    "This includes adjustments from previous billing changes."
+                    if has_adjustments else
+                    "Your card will be charged immediately for the prorated amount. "
+                    "The upgrade takes effect right away."
+                )
             }
         }
 
