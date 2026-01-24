@@ -907,7 +907,20 @@ async def preview_upgrade(
             )
 
             # Calculate proration details
-            proration_lines = [line for line in upcoming_invoice.lines.data if line.proration]
+            # In Stripe API 2025+, proration info is nested in parent.subscription_item_details
+            def is_proration_line(line):
+                try:
+                    parent = getattr(line, 'parent', None)
+                    if parent:
+                        sub_details = getattr(parent, 'subscription_item_details', None)
+                        if sub_details:
+                            return getattr(sub_details, 'proration', False)
+                    # Fallback for older API versions
+                    return getattr(line, 'proration', False)
+                except Exception:
+                    return False
+
+            proration_lines = [line for line in upcoming_invoice.lines.data if is_proration_line(line)]
 
             credit_amount = 0
             charge_amount = 0
