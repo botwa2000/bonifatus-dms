@@ -421,6 +421,11 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
+      logger.debug('Calling execute-upgrade with:', {
+        tier_id: upgradePreview.new_subscription.tier_id,
+        billing_cycle: upgradePreview.new_subscription.billing_cycle
+      })
+
       const response = await apiClient.post(
         '/api/v1/billing/subscriptions/execute-upgrade',
         {
@@ -430,10 +435,13 @@ export default function ProfilePage() {
         true
       ) as { success: boolean; payment_required?: boolean; invoice_url?: string; message?: string }
 
+      logger.debug('Execute-upgrade response:', response)
+
       if (response.payment_required && response.invoice_url) {
         // Redirect to Stripe for payment
+        logger.debug('Redirecting to Stripe invoice:', response.invoice_url)
         window.location.href = response.invoice_url
-      } else {
+      } else if (response.success) {
         // Payment was successful or no payment needed
         setMessage({ type: 'success', text: response.message || 'Subscription upgraded successfully!' })
         setShowUpgradeModal(false)
@@ -442,10 +450,17 @@ export default function ProfilePage() {
         // Reload profile to show updated tier
         await loadProfileData()
         await loadSubscriptionData()
+      } else {
+        // Unexpected response
+        logger.error('Unexpected response from execute-upgrade:', response)
+        setMessage({ type: 'error', text: response.message || 'Upgrade failed. Please try again.' })
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Failed to upgrade subscription:', error)
-      setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' })
+      const errorMessage = error instanceof Error ? error.message :
+        (typeof error === 'object' && error !== null && 'detail' in error) ? String((error as { detail: unknown }).detail) :
+        'Failed to upgrade subscription. Please try again.'
+      setMessage({ type: 'error', text: errorMessage })
     } finally {
       setProcessingSubscription(false)
     }

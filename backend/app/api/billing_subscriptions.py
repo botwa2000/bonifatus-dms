@@ -1098,8 +1098,11 @@ async def execute_upgrade(
         subscription_item_id = stripe_sub['items']['data'][0]['id']
 
         # Update the subscription with proration
-        # Note: payment_behavior='pending_if_incomplete' doesn't allow metadata
-        # So we use 'default_incomplete' and handle payment separately
+        # Use pending_if_incomplete to prevent auto-charging - invoice payment required
+        logger.info(f"Modifying Stripe subscription {subscription.stripe_subscription_id}")
+        logger.info(f"  subscription_item_id: {subscription_item_id}")
+        logger.info(f"  new_price_id: {new_price_id}")
+
         updated_sub = stripe.Subscription.modify(
             subscription.stripe_subscription_id,
             items=[{
@@ -1107,80 +1110,58 @@ async def execute_upgrade(
                 'price': new_price_id,
             }],
             proration_behavior='always_invoice',  # Create invoice immediately
-            payment_behavior='default_incomplete',  # Allow us to handle payment via invoice
+            payment_behavior='pending_if_incomplete',  # Require manual payment via invoice
         )
+
+        logger.info(f"Stripe subscription modified. Status: {updated_sub.status}")
+        logger.info(f"Latest invoice: {updated_sub.latest_invoice}")
 
         # Get the latest invoice (proration invoice)
         latest_invoice = stripe.Invoice.retrieve(updated_sub.latest_invoice)
+        logger.info(f"Invoice status: {latest_invoice.status}")
+        logger.info(f"Invoice amount_due: {latest_invoice.amount_due}")
+        logger.info(f"Invoice hosted_invoice_url: {latest_invoice.hosted_invoice_url}")
 
-        # Check if payment is needed and invoice has a hosted URL
-        if latest_invoice.status == 'open' and latest_invoice.amount_due > 0:
-            # If invoice needs payment, return the hosted URL
-            if latest_invoice.hosted_invoice_url:
-                # Update local subscription record with pending upgrade
-                subscription.stripe_price_id = new_price_id
-                subscription.billing_cycle = billing_cycle
-                # Note: tier_id is NOT updated yet - will be updated on successful payment
-                session.commit()
+        # With pending_if_incomplete, the invoice should be 'open' and need payment
+        if latest_invoice.amount_due > 0:
+            # Invoice requires payment - return the hosted URL for user confirmation
+            invoice_url = latest_invoice.hosted_invoice_url
+            if not invoice_url:
+                # If no hosted URL, try to get/create one by finalizing the invoice
+                if latest_invoice.status == 'draft':
+                    logger.info("Finalizing draft invoice")
+                    latest_invoice = stripe.Invoice.finalize_invoice(latest_invoice.id)
+                    invoice_url = latest_invoice.hosted_invoice_url
 
+            if invoice_url:
+                # DO NOT update local subscription yet - wait for payment confirmation via webhook
+                logger.info(f"Returning invoice URL for payment: {invoice_url}")
                 return {
                     "success": True,
                     "payment_required": True,
-                    "invoice_url": latest_invoice.hosted_invoice_url,
+                    "invoice_url": invoice_url,
                     "invoice_id": latest_invoice.id,
                     "amount_due": latest_invoice.amount_due,
                     "currency": latest_invoice.currency.upper(),
                     "message": "Please complete payment to activate your upgrade"
                 }
             else:
-                # Try to pay the invoice with the default payment method
-                try:
-                    paid_invoice = stripe.Invoice.pay(latest_invoice.id)
-                    if paid_invoice.status == 'paid':
-                        # Payment successful, update local records
-                        subscription.tier_id = tier_id
-                        subscription.stripe_price_id = new_price_id
-                        subscription.billing_cycle = billing_cycle
-                        current_user.tier_id = tier_id
-                        session.commit()
+                # Fallback: create URL from invoice ID
+                logger.warning("No hosted_invoice_url - using fallback URL")
+                fallback_url = f"https://invoice.stripe.com/i/{latest_invoice.id}"
+                return {
+                    "success": True,
+                    "payment_required": True,
+                    "invoice_url": fallback_url,
+                    "invoice_id": latest_invoice.id,
+                    "amount_due": latest_invoice.amount_due,
+                    "currency": latest_invoice.currency.upper(),
+                    "message": "Please complete payment to activate your upgrade"
+                }
 
-                        # Send confirmation email
-                        try:
-                            from app.services.email_service import email_service
-                            await email_service.send_subscription_upgraded_email(
-                                current_user.email,
-                                current_user.full_name or current_user.email,
-                                new_tier.display_name,
-                                billing_cycle,
-                                paid_invoice.amount_paid / 100,
-                                paid_invoice.currency.upper()
-                            )
-                        except Exception as email_error:
-                            logger.error(f"Failed to send upgrade email: {email_error}")
-
-                        return {
-                            "success": True,
-                            "payment_required": False,
-                            "message": "Upgrade successful! Your subscription has been updated.",
-                            "new_tier": new_tier.display_name,
-                            "invoice_pdf": paid_invoice.invoice_pdf
-                        }
-                except stripe.error.CardError as card_error:
-                    # Card declined - return hosted invoice URL for retry
-                    logger.warning(f"Card declined for upgrade: {card_error}")
-                    return {
-                        "success": True,
-                        "payment_required": True,
-                        "invoice_url": latest_invoice.hosted_invoice_url or f"https://invoice.stripe.com/i/{latest_invoice.id}",
-                        "invoice_id": latest_invoice.id,
-                        "amount_due": latest_invoice.amount_due,
-                        "currency": latest_invoice.currency.upper(),
-                        "message": "Payment failed. Please update your payment method.",
-                        "error": str(card_error.user_message) if hasattr(card_error, 'user_message') else "Card declined"
-                    }
-
-        elif latest_invoice.status == 'paid':
-            # Invoice was already paid (e.g., $0 proration or auto-charged)
+        elif latest_invoice.status == 'paid' or latest_invoice.amount_due == 0:
+            # Invoice was already paid (e.g., $0 proration due to credits)
+            logger.info("Invoice already paid or $0 due - updating tier immediately")
             subscription.tier_id = tier_id
             subscription.stripe_price_id = new_price_id
             subscription.billing_cycle = billing_cycle
@@ -1210,14 +1191,12 @@ async def execute_upgrade(
             }
 
         else:
-            # Unexpected state
-            logger.warning(f"Unexpected invoice status after upgrade: {latest_invoice.status}")
-            return {
-                "success": True,
-                "payment_required": False,
-                "message": "Upgrade initiated. You will receive a confirmation email shortly.",
-                "new_tier": new_tier.display_name
-            }
+            # Unexpected state - log and return error
+            logger.error(f"Unexpected invoice state: status={latest_invoice.status}, amount_due={latest_invoice.amount_due}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unexpected invoice state: {latest_invoice.status}"
+            )
 
     except HTTPException:
         session.rollback()

@@ -464,6 +464,38 @@ async def handle_subscription_updated(event, session: Session):
         user.subscription_status = stripe_sub.status
         user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
 
+    # Check if the price has changed (upgrade/downgrade)
+    try:
+        current_price_id = stripe_sub['items']['data'][0]['price']['id']
+        if subscription.stripe_price_id != current_price_id:
+            logger.info(f"Subscription price changed from {subscription.stripe_price_id} to {current_price_id}")
+
+            # Find the tier for this new price
+            all_tiers = session.query(TierPlan).all()
+            new_tier = None
+
+            for tier in all_tiers:
+                if tier.stripe_price_ids:
+                    for billing_cycle, currencies in tier.stripe_price_ids.items():
+                        if isinstance(currencies, dict):
+                            for currency, price_id in currencies.items():
+                                if price_id == current_price_id:
+                                    new_tier = tier
+                                    break
+                        if new_tier:
+                            break
+                if new_tier:
+                    break
+
+            if new_tier and subscription.tier_id != new_tier.id:
+                logger.info(f"Updating tier from {subscription.tier_id} to {new_tier.id} ({new_tier.name})")
+                subscription.tier_id = new_tier.id
+                subscription.stripe_price_id = current_price_id
+                if user:
+                    user.tier_id = new_tier.id
+    except Exception as e:
+        logger.error(f"Error checking for tier change: {e}")
+
     session.commit()
     logger.info(f"Updated subscription {subscription.id} to status {stripe_sub.status}")
 
@@ -597,6 +629,68 @@ async def handle_invoice_payment_succeeded(event, session: Session):
 
     session.commit()
     logger.info(f"Invoice {stripe_invoice.id} payment succeeded for user {user.email}")
+
+    # Check if this is an upgrade invoice - if so, update the tier
+    if stripe_invoice.billing_reason in ('subscription_update', 'subscription_create'):
+        try:
+            # Get the subscription from Stripe to check the current price
+            import stripe
+            stripe_sub = stripe.Subscription.retrieve(stripe_invoice.subscription)
+            current_price_id = stripe_sub['items']['data'][0]['price']['id']
+
+            # Find the tier for this price by checking all tiers' stripe_price_ids
+            subscription = session.query(Subscription).filter(
+                Subscription.stripe_subscription_id == stripe_invoice.subscription
+            ).first()
+
+            if subscription and subscription.stripe_price_id != current_price_id:
+                # Price changed - this is an upgrade
+                logger.info(f"Detected price change from {subscription.stripe_price_id} to {current_price_id}")
+
+                # Find the tier that matches this new price
+                # We need to search all tiers for this price ID
+                all_tiers = session.query(TierPlan).all()
+                new_tier = None
+
+                for tier in all_tiers:
+                    if tier.stripe_price_ids:
+                        for billing_cycle, currencies in tier.stripe_price_ids.items():
+                            if isinstance(currencies, dict):
+                                for currency, price_id in currencies.items():
+                                    if price_id == current_price_id:
+                                        new_tier = tier
+                                        break
+                            if new_tier:
+                                break
+                    if new_tier:
+                        break
+
+                if new_tier:
+                    logger.info(f"Updating user {user.email} tier from {subscription.tier_id} to {new_tier.id} ({new_tier.name})")
+                    subscription.tier_id = new_tier.id
+                    subscription.stripe_price_id = current_price_id
+                    user.tier_id = new_tier.id
+                    session.commit()
+
+                    # Send upgrade confirmation email
+                    try:
+                        billing_cycle = 'yearly' if 'year' in str(stripe_sub['items']['data'][0]['price'].get('recurring', {}).get('interval', '')) else 'monthly'
+                        asyncio.create_task(
+                            email_service.send_subscription_upgraded_email(
+                                user.email,
+                                user.full_name or user.email,
+                                new_tier.display_name,
+                                billing_cycle,
+                                stripe_invoice.amount_paid / 100,
+                                stripe_invoice.currency.upper()
+                            )
+                        )
+                    except Exception as email_err:
+                        logger.error(f"Failed to send upgrade email: {email_err}")
+                else:
+                    logger.warning(f"Could not find tier for price_id {current_price_id}")
+        except Exception as upgrade_err:
+            logger.error(f"Error checking for upgrade: {upgrade_err}")
 
     # Send invoice email
     try:
