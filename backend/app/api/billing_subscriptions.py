@@ -1089,7 +1089,8 @@ async def execute_upgrade(
         subscription_item_id = stripe_sub['items']['data'][0]['id']
 
         # Update the subscription with proration
-        # Using payment_behavior='pending_if_incomplete' to handle 3D Secure
+        # Note: payment_behavior='pending_if_incomplete' doesn't allow metadata
+        # So we use 'default_incomplete' and handle payment separately
         updated_sub = stripe.Subscription.modify(
             subscription.stripe_subscription_id,
             items=[{
@@ -1097,14 +1098,7 @@ async def execute_upgrade(
                 'price': new_price_id,
             }],
             proration_behavior='always_invoice',  # Create invoice immediately
-            payment_behavior='pending_if_incomplete',  # Handle 3D Secure
-            metadata={
-                'tier_id': str(tier_id),
-                'billing_cycle': billing_cycle,
-                'user_id': str(current_user.id),
-                'currency': currency,
-                'upgrade_from_tier': str(current_user.tier_id),
-            }
+            payment_behavior='default_incomplete',  # Allow us to handle payment via invoice
         )
 
         # Get the latest invoice (proration invoice)
