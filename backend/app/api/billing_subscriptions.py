@@ -910,7 +910,6 @@ async def preview_upgrade(
             net_amount = upcoming_invoice.amount_due
 
             # Calculate theoretical proration based on time remaining
-            # This gives users a cleaner understanding of what they're paying for
             import datetime
             now = datetime.datetime.now(datetime.timezone.utc)
             period_end = subscription.current_period_end
@@ -927,17 +926,26 @@ async def preview_upgrade(
                 )
 
                 # Calculate theoretical credit (unused current plan) and charge (new plan for remaining time)
-                credit_amount = int(current_price * proration_factor)
-                charge_amount = int(new_amount * proration_factor)
+                theoretical_credit = int(current_price * proration_factor)
+                theoretical_charge = int(new_amount * proration_factor)
+                theoretical_net = theoretical_charge - theoretical_credit
             else:
-                # Fallback: just show the net amount as the charge
-                credit_amount = 0
-                charge_amount = net_amount
+                theoretical_credit = 0
+                theoretical_charge = net_amount
+                theoretical_net = net_amount
 
             # If Stripe's amount significantly differs from our calculation,
-            # it means there are historical adjustments
-            theoretical_net = charge_amount - credit_amount
+            # it means there are historical adjustments - don't show misleading breakdown
             has_adjustments = abs(net_amount - theoretical_net) > 100  # More than €1 difference
+
+            # Only show breakdown if it matches the actual amount (no historical adjustments)
+            if has_adjustments:
+                # Don't show misleading breakdown - just show the net amount
+                credit_amount = 0
+                charge_amount = net_amount
+            else:
+                credit_amount = theoretical_credit
+                charge_amount = theoretical_charge
 
         except stripe.error.StripeError as e:
             logger.error(f"Failed to preview invoice: {e}")
@@ -978,9 +986,10 @@ async def preview_upgrade(
                 "currency_symbol": currency_symbol,
                 "immediate_charge": True,
                 "has_adjustments": has_adjustments,
+                "show_breakdown": not has_adjustments,
                 "description": (
-                    "Your card will be charged immediately for the prorated amount. "
-                    "This includes adjustments from previous billing changes."
+                    "This amount includes adjustments from previous billing changes. "
+                    "Your card will be charged immediately and the upgrade takes effect right away."
                     if has_adjustments else
                     "Your card will be charged immediately for the prorated amount. "
                     "The upgrade takes effect right away."

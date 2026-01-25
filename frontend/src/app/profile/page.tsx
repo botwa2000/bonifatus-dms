@@ -131,6 +131,8 @@ export default function ProfilePage() {
       currency: string
       currency_symbol: string
       immediate_charge: boolean
+      has_adjustments?: boolean
+      show_breakdown?: boolean
       description: string
     }
   } | null>(null)
@@ -1409,21 +1411,25 @@ export default function ProfilePage() {
               <div className="border border-admin-primary rounded-lg p-4 bg-semantic-info-bg dark:bg-blue-900/10">
                 <h4 className="font-medium text-admin-primary mb-2">Billing Summary</h4>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">Credit for unused time:</span>
-                    <span className="font-medium text-semantic-success-text">
-                      -{upgradePreview.proration_details.currency_symbol}
-                      {(upgradePreview.proration_details.credit_for_unused_time / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-neutral-600 dark:text-neutral-400">Prorated charge for new plan:</span>
-                    <span className="font-medium text-neutral-900 dark:text-white">
-                      {upgradePreview.proration_details.currency_symbol}
-                      {(upgradePreview.proration_details.prorated_charge / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-admin-primary/20">
+                  {upgradePreview.proration_details.show_breakdown !== false && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">Credit for unused time:</span>
+                        <span className="font-medium text-semantic-success-text">
+                          -{upgradePreview.proration_details.currency_symbol}
+                          {(upgradePreview.proration_details.credit_for_unused_time / 100).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600 dark:text-neutral-400">Prorated charge for new plan:</span>
+                        <span className="font-medium text-neutral-900 dark:text-white">
+                          {upgradePreview.proration_details.currency_symbol}
+                          {(upgradePreview.proration_details.prorated_charge / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className={`flex justify-between ${upgradePreview.proration_details.show_breakdown !== false ? 'pt-2 border-t border-admin-primary/20' : ''}`}>
                     <span className="font-semibold text-neutral-900 dark:text-white">Amount due now:</span>
                     <span className="font-bold text-admin-primary text-lg">
                       {upgradePreview.proration_details.currency_symbol}
@@ -1435,7 +1441,7 @@ export default function ProfilePage() {
 
               <Alert
                 type="warning"
-                message="Your card will be charged immediately for the prorated amount. The upgrade takes effect right away."
+                message={upgradePreview.proration_details.description || "Your card will be charged immediately for the prorated amount. The upgrade takes effect right away."}
               />
             </div>
           )}
