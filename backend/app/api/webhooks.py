@@ -107,6 +107,8 @@ async def stripe_webhook(
 
 async def handle_checkout_session_completed(event, session: Session):
     """Process checkout.session.completed event"""
+    import stripe as stripe_lib
+
     checkout_session = event.data.object
     logger.info(f"[WEBHOOK] Processing checkout.session.completed: {checkout_session.id}")
 
@@ -115,8 +117,10 @@ async def handle_checkout_session_completed(event, session: Session):
     tier_id = checkout_session.metadata.get('tier_id')
     billing_cycle = checkout_session.metadata.get('billing_cycle')
     referral_code = checkout_session.metadata.get('referral_code')
+    is_upgrade = checkout_session.metadata.get('is_upgrade') == 'true'
+    old_subscription_id = checkout_session.metadata.get('old_subscription_id')
 
-    logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier_id={tier_id}, billing_cycle={billing_cycle}")
+    logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier_id={tier_id}, billing_cycle={billing_cycle}, is_upgrade={is_upgrade}")
 
     if not user_id or not tier_id:
         logger.warning(f"[WEBHOOK] Missing metadata in checkout session {checkout_session.id}")
@@ -140,6 +144,28 @@ async def handle_checkout_session_completed(event, session: Session):
     if not tier:
         logger.warning(f"Tier {tier_id} not found for checkout session {checkout_session.id}")
         return
+
+    # Handle upgrade - cancel the old subscription
+    if is_upgrade and old_subscription_id:
+        logger.info(f"[WEBHOOK] This is an upgrade - cancelling old subscription {old_subscription_id}")
+        try:
+            # Cancel the old subscription immediately (prorate refund if enabled in Stripe)
+            stripe_lib.Subscription.cancel(
+                old_subscription_id,
+                prorate=True,  # Refund unused time
+            )
+            logger.info(f"[WEBHOOK] Old subscription {old_subscription_id} cancelled")
+
+            # Update the old subscription record in our database
+            old_sub = session.query(Subscription).filter(
+                Subscription.stripe_subscription_id == old_subscription_id
+            ).first()
+            if old_sub:
+                old_sub.status = 'canceled'
+                old_sub.ended_at = datetime.now(timezone.utc)
+                logger.info(f"[WEBHOOK] Updated old subscription record to canceled")
+        except Exception as cancel_error:
+            logger.error(f"[WEBHOOK] Error cancelling old subscription: {cancel_error}")
 
     # Process referral code if provided
     if referral_code:

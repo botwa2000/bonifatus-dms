@@ -887,72 +887,30 @@ async def preview_upgrade(
                 detail="Failed to retrieve new price details"
             )
 
-        # Get proration preview from Stripe using Invoice.create_preview
-        try:
-            stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-            subscription_item_id = stripe_sub['items']['data'][0]['id']
+        # Calculate estimated refund for remaining time on current plan
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        period_end = subscription.current_period_end
+        period_start = subscription.current_period_start
 
-            # Preview the upcoming invoice with the new price
-            # Note: Stripe SDK v14+ uses create_preview instead of upcoming
-            # Prorations are calculated automatically when previewing subscription changes
-            upcoming_invoice = stripe.Invoice.create_preview(
-                customer=current_user.stripe_customer_id,
-                subscription=subscription.stripe_subscription_id,
-                subscription_details={
-                    'items': [{
-                        'id': subscription_item_id,
-                        'price': new_price_id,
-                    }]
-                }
+        credit_amount = 0
+        if period_end and period_start:
+            total_period_seconds = (period_end - period_start).total_seconds()
+            remaining_seconds = max(0, (period_end - now).total_seconds())
+            proration_factor = remaining_seconds / total_period_seconds if total_period_seconds > 0 else 0
+
+            # Get current subscription price
+            current_price_amount = subscription.amount_cents or (
+                current_tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else current_tier.price_yearly_cents
             )
 
-            # Net amount due now from Stripe (includes any historical adjustments)
-            net_amount = upcoming_invoice.amount_due
+            # Estimated credit for unused time on current plan
+            credit_amount = int(current_price_amount * proration_factor)
 
-            # Calculate theoretical proration based on time remaining
-            import datetime
-            now = datetime.datetime.now(datetime.timezone.utc)
-            period_end = subscription.current_period_end
-            period_start = subscription.current_period_start
-
-            if period_end and period_start:
-                total_period_seconds = (period_end - period_start).total_seconds()
-                remaining_seconds = max(0, (period_end - now).total_seconds())
-                proration_factor = remaining_seconds / total_period_seconds if total_period_seconds > 0 else 0
-
-                # Get current subscription price for proration calculation
-                current_price = subscription.amount_cents or (
-                    current_tier.price_monthly_cents if subscription.billing_cycle == 'monthly' else current_tier.price_yearly_cents
-                )
-
-                # Calculate theoretical credit (unused current plan) and charge (new plan for remaining time)
-                theoretical_credit = int(current_price * proration_factor)
-                theoretical_charge = int(new_amount * proration_factor)
-                theoretical_net = theoretical_charge - theoretical_credit
-            else:
-                theoretical_credit = 0
-                theoretical_charge = net_amount
-                theoretical_net = net_amount
-
-            # If Stripe's amount significantly differs from our calculation,
-            # it means there are historical adjustments - don't show misleading breakdown
-            has_adjustments = abs(net_amount - theoretical_net) > 100  # More than €1 difference
-
-            # Only show breakdown if it matches the actual amount (no historical adjustments)
-            if has_adjustments:
-                # Don't show misleading breakdown - just show the net amount
-                credit_amount = 0
-                charge_amount = net_amount
-            else:
-                credit_amount = theoretical_credit
-                charge_amount = theoretical_charge
-
-        except stripe.error.StripeError as e:
-            logger.error(f"Failed to preview invoice: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to preview upgrade: {str(e)}"
-            )
+        # With Checkout, user pays full new plan price
+        # Old subscription is cancelled with prorated refund
+        charge_amount = new_amount
+        net_amount = new_amount  # User pays full price for new plan
 
         # Get current amount
         current_amount = subscription.amount_cents or (
@@ -980,19 +938,16 @@ async def preview_upgrade(
             },
             "proration_details": {
                 "credit_for_unused_time": credit_amount,
-                "prorated_charge": charge_amount,
+                "new_plan_charge": charge_amount,
                 "net_amount_due": net_amount,
                 "currency": currency,
                 "currency_symbol": currency_symbol,
                 "immediate_charge": True,
-                "has_adjustments": has_adjustments,
-                "show_breakdown": not has_adjustments,
+                "show_breakdown": True,
                 "description": (
-                    "This amount includes adjustments from previous billing changes. "
-                    "Your card will be charged immediately and the upgrade takes effect right away."
-                    if has_adjustments else
-                    "Your card will be charged immediately for the prorated amount. "
-                    "The upgrade takes effect right away."
+                    f"You'll be charged {currency_symbol}{new_amount / 100:.2f} for your new {new_tier.display_name} plan. "
+                    f"Your current plan will be cancelled and you'll receive a prorated refund of approximately "
+                    f"{currency_symbol}{credit_amount / 100:.2f} for the unused time."
                 )
             }
         }
@@ -1018,14 +973,13 @@ async def execute_upgrade(
     session: Session = Depends(get_db)
 ):
     """
-    Execute subscription upgrade with proper Stripe payment flow.
+    Execute subscription upgrade using Stripe Billing Portal.
 
-    1. Updates the subscription in Stripe with proration
-    2. Creates an immediate invoice for the proration amount
-    3. Returns the Stripe-hosted invoice URL for payment confirmation
+    This redirects the user to Stripe's hosted Billing Portal where they can
+    manage their subscription, including upgrading to a new plan with proper
+    proration handling.
 
-    The user is redirected to Stripe to confirm payment (with 3D Secure if needed).
-    After payment, webhook handles the confirmation email.
+    After the upgrade, Stripe webhooks will update our database.
     """
     import stripe
     from app.core.config import settings
@@ -1093,110 +1047,65 @@ async def execute_upgrade(
                 detail="Failed to create price for new tier"
             )
 
-        # Get current subscription item
-        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-        subscription_item_id = stripe_sub['items']['data'][0]['id']
+        # Get frontend URL for redirect
+        frontend_url = settings.app.app_frontend_url
 
-        # Update the subscription with proration
-        # Use pending_if_incomplete to prevent auto-charging - invoice payment required
-        logger.info(f"Modifying Stripe subscription {subscription.stripe_subscription_id}")
-        logger.info(f"  subscription_item_id: {subscription_item_id}")
+        # First, void any existing open invoices to prevent confusion
+        try:
+            open_invoices = stripe.Invoice.list(
+                customer=current_user.stripe_customer_id,
+                status='open',
+                limit=10
+            )
+            for inv in open_invoices.data:
+                if inv.subscription == subscription.stripe_subscription_id:
+                    logger.info(f"Voiding existing open invoice: {inv.id}")
+                    stripe.Invoice.void_invoice(inv.id)
+        except Exception as void_error:
+            logger.warning(f"Error voiding open invoices: {void_error}")
+
+        # Create a Checkout Session for subscription upgrade
+        # This is the cleanest way to handle upgrades with proper proration
+        logger.info(f"Creating Checkout Session for upgrade")
+        logger.info(f"  subscription_id: {subscription.stripe_subscription_id}")
         logger.info(f"  new_price_id: {new_price_id}")
 
-        updated_sub = stripe.Subscription.modify(
-            subscription.stripe_subscription_id,
-            items=[{
-                'id': subscription_item_id,
+        checkout_session = stripe.checkout.Session.create(
+            customer=current_user.stripe_customer_id,
+            mode='subscription',
+            line_items=[{
                 'price': new_price_id,
+                'quantity': 1,
             }],
-            proration_behavior='always_invoice',  # Create invoice immediately
-            payment_behavior='pending_if_incomplete',  # Require manual payment via invoice
+            subscription_data={
+                'metadata': {
+                    'user_id': str(current_user.id),
+                    'tier_id': str(tier_id),
+                    'upgrade_from_subscription': subscription.stripe_subscription_id,
+                }
+            },
+            success_url=f"{frontend_url}/profile?upgrade=success",
+            cancel_url=f"{frontend_url}/profile?upgrade=cancelled",
+            metadata={
+                'user_id': str(current_user.id),
+                'tier_id': str(tier_id),
+                'is_upgrade': 'true',
+                'old_subscription_id': subscription.stripe_subscription_id,
+            },
+            # Allow promotion codes
+            allow_promotion_codes=True,
         )
 
-        logger.info(f"Stripe subscription modified. Status: {updated_sub.status}")
-        logger.info(f"Latest invoice: {updated_sub.latest_invoice}")
+        logger.info(f"Checkout Session created: {checkout_session.id}")
+        logger.info(f"Checkout URL: {checkout_session.url}")
 
-        # Get the latest invoice (proration invoice)
-        latest_invoice = stripe.Invoice.retrieve(updated_sub.latest_invoice)
-        logger.info(f"Invoice status: {latest_invoice.status}")
-        logger.info(f"Invoice amount_due: {latest_invoice.amount_due}")
-        logger.info(f"Invoice hosted_invoice_url: {latest_invoice.hosted_invoice_url}")
-
-        # With pending_if_incomplete, the invoice should be 'open' and need payment
-        if latest_invoice.amount_due > 0:
-            # Invoice requires payment - return the hosted URL for user confirmation
-            invoice_url = latest_invoice.hosted_invoice_url
-            if not invoice_url:
-                # If no hosted URL, try to get/create one by finalizing the invoice
-                if latest_invoice.status == 'draft':
-                    logger.info("Finalizing draft invoice")
-                    latest_invoice = stripe.Invoice.finalize_invoice(latest_invoice.id)
-                    invoice_url = latest_invoice.hosted_invoice_url
-
-            if invoice_url:
-                # DO NOT update local subscription yet - wait for payment confirmation via webhook
-                logger.info(f"Returning invoice URL for payment: {invoice_url}")
-                return {
-                    "success": True,
-                    "payment_required": True,
-                    "invoice_url": invoice_url,
-                    "invoice_id": latest_invoice.id,
-                    "amount_due": latest_invoice.amount_due,
-                    "currency": latest_invoice.currency.upper(),
-                    "message": "Please complete payment to activate your upgrade"
-                }
-            else:
-                # Fallback: create URL from invoice ID
-                logger.warning("No hosted_invoice_url - using fallback URL")
-                fallback_url = f"https://invoice.stripe.com/i/{latest_invoice.id}"
-                return {
-                    "success": True,
-                    "payment_required": True,
-                    "invoice_url": fallback_url,
-                    "invoice_id": latest_invoice.id,
-                    "amount_due": latest_invoice.amount_due,
-                    "currency": latest_invoice.currency.upper(),
-                    "message": "Please complete payment to activate your upgrade"
-                }
-
-        elif latest_invoice.status == 'paid' or latest_invoice.amount_due == 0:
-            # Invoice was already paid (e.g., $0 proration due to credits)
-            logger.info("Invoice already paid or $0 due - updating tier immediately")
-            subscription.tier_id = tier_id
-            subscription.stripe_price_id = new_price_id
-            subscription.billing_cycle = billing_cycle
-            current_user.tier_id = tier_id
-            session.commit()
-
-            # Send confirmation email
-            try:
-                from app.services.email_service import email_service
-                await email_service.send_subscription_upgraded_email(
-                    current_user.email,
-                    current_user.full_name or current_user.email,
-                    new_tier.display_name,
-                    billing_cycle,
-                    latest_invoice.amount_paid / 100 if latest_invoice.amount_paid else 0,
-                    currency
-                )
-            except Exception as email_error:
-                logger.error(f"Failed to send upgrade email: {email_error}")
-
-            return {
-                "success": True,
-                "payment_required": False,
-                "message": "Upgrade successful! Your subscription has been updated.",
-                "new_tier": new_tier.display_name,
-                "invoice_pdf": latest_invoice.invoice_pdf if hasattr(latest_invoice, 'invoice_pdf') else None
-            }
-
-        else:
-            # Unexpected state - log and return error
-            logger.error(f"Unexpected invoice state: status={latest_invoice.status}, amount_due={latest_invoice.amount_due}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unexpected invoice state: {latest_invoice.status}"
-            )
+        return {
+            "success": True,
+            "payment_required": True,
+            "invoice_url": checkout_session.url,
+            "checkout_session_id": checkout_session.id,
+            "message": "Please complete payment to activate your upgrade"
+        }
 
     except HTTPException:
         session.rollback()
