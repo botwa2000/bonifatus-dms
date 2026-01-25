@@ -365,11 +365,12 @@ export default function ProfilePage() {
           }
           proration_details: {
             credit_for_unused_time: number
-            prorated_charge: number
+            new_plan_charge: number
             net_amount_due: number
             currency: string
             currency_symbol: string
             immediate_charge: boolean
+            show_breakdown: boolean
             description: string
           }
         }>(
