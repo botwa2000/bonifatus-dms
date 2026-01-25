@@ -426,7 +426,7 @@ export default function ProfilePage() {
           billing_cycle: upgradePreview.new_subscription.billing_cycle
         },
         true
-      )
+      ) as { success: boolean; payment_required?: boolean; invoice_url?: string; message?: string }
 
       if (response.payment_required && response.invoice_url) {
         // Redirect to Stripe for payment
