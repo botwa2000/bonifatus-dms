@@ -723,7 +723,8 @@ class EmailService:
         tier_feature_2: str,
         tier_feature_3: str,
         dashboard_url: str,
-        support_url: str
+        support_url: str,
+        start_date: str = None
     ) -> bool:
         """
         Send subscription confirmation email using database template
@@ -755,7 +756,8 @@ class EmailService:
                 'billing_period': billing_period,
                 'amount': str(amount),
                 'currency_symbol': currency_symbol,
-                'next_billing_date': next_billing_date,
+                'start_date': start_date or next_billing_date,  # Subscription start date
+                'next_billing_date': next_billing_date,  # End date / next renewal
                 'tier_feature_1': tier_feature_1,
                 'tier_feature_2': tier_feature_2,
                 'tier_feature_3': tier_feature_3,

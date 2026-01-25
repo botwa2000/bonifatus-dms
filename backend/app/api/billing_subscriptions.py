@@ -1081,6 +1081,8 @@ async def execute_upgrade(
                 'metadata': {
                     'user_id': str(current_user.id),
                     'tier_id': str(tier_id),
+                    'billing_cycle': billing_cycle,
+                    'currency': currency,
                     'upgrade_from_subscription': subscription.stripe_subscription_id,
                 }
             },
@@ -1089,6 +1091,7 @@ async def execute_upgrade(
             metadata={
                 'user_id': str(current_user.id),
                 'tier_id': str(tier_id),
+                'billing_cycle': billing_cycle,
                 'is_upgrade': 'true',
                 'old_subscription_id': subscription.stripe_subscription_id,
             },

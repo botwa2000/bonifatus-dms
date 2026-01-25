@@ -145,27 +145,73 @@ async def handle_checkout_session_completed(event, session: Session):
         logger.warning(f"Tier {tier_id} not found for checkout session {checkout_session.id}")
         return
 
-    # Handle upgrade - cancel the old subscription
+    # Handle upgrade - cancel the old subscription and update user tier
     if is_upgrade and old_subscription_id:
-        logger.info(f"[WEBHOOK] This is an upgrade - cancelling old subscription {old_subscription_id}")
-        try:
-            # Cancel the old subscription immediately (prorate refund if enabled in Stripe)
-            stripe_lib.Subscription.cancel(
-                old_subscription_id,
-                prorate=True,  # Refund unused time
-            )
-            logger.info(f"[WEBHOOK] Old subscription {old_subscription_id} cancelled")
+        logger.info(f"[WEBHOOK] This is an upgrade - processing tier update and cancelling old subscription")
 
-            # Update the old subscription record in our database
+        # Update user's tier immediately
+        user.tier_id = int(tier_id)
+        logger.info(f"[WEBHOOK] Updated user {user.email} tier_id to {tier_id}")
+
+        try:
+            # Get the old subscription to calculate refund
             old_sub = session.query(Subscription).filter(
                 Subscription.stripe_subscription_id == old_subscription_id
             ).first()
+
+            refund_amount = 0
+            if old_sub and old_sub.current_period_end and old_sub.current_period_start:
+                # Calculate unused time for refund
+                now = datetime.now(timezone.utc)
+                total_period = (old_sub.current_period_end - old_sub.current_period_start).total_seconds()
+                remaining = max(0, (old_sub.current_period_end - now).total_seconds())
+                proration_factor = remaining / total_period if total_period > 0 else 0
+
+                if old_sub.amount_cents:
+                    refund_amount = int(old_sub.amount_cents * proration_factor)
+                    logger.info(f"[WEBHOOK] Calculated refund amount: {refund_amount} cents")
+
+            # Cancel the old subscription (Stripe handles proration internally)
+            stripe_lib.Subscription.cancel(old_subscription_id)
+            logger.info(f"[WEBHOOK] Old subscription {old_subscription_id} cancelled")
+
+            # Issue actual refund if there's unused time
+            if refund_amount > 50:  # Only refund if more than 50 cents
+                try:
+                    # Get the last payment for this subscription to refund
+                    payments = stripe_lib.PaymentIntent.list(
+                        customer=checkout_session.customer,
+                        limit=5
+                    )
+                    # Find a payment related to the old subscription
+                    for payment in payments.data:
+                        if payment.status == 'succeeded' and payment.amount >= refund_amount:
+                            refund = stripe_lib.Refund.create(
+                                payment_intent=payment.id,
+                                amount=refund_amount,
+                                reason='requested_by_customer',
+                                metadata={
+                                    'reason': 'subscription_upgrade_proration',
+                                    'old_subscription': old_subscription_id,
+                                    'user_id': str(user.id)
+                                }
+                            )
+                            logger.info(f"[WEBHOOK] Created refund {refund.id} for {refund_amount} cents")
+                            break
+                except Exception as refund_error:
+                    logger.warning(f"[WEBHOOK] Could not create refund: {refund_error}")
+                    # Not critical - user still gets the upgrade
+
+            # Update the old subscription record in our database
             if old_sub:
                 old_sub.status = 'canceled'
                 old_sub.ended_at = datetime.now(timezone.utc)
                 logger.info(f"[WEBHOOK] Updated old subscription record to canceled")
+
         except Exception as cancel_error:
-            logger.error(f"[WEBHOOK] Error cancelling old subscription: {cancel_error}")
+            logger.error(f"[WEBHOOK] Error processing upgrade: {cancel_error}")
+            # Still update the tier even if cancellation fails
+            user.tier_id = int(tier_id)
 
     # Process referral code if provided
     if referral_code:
@@ -422,8 +468,15 @@ async def handle_subscription_created(event, session: Session):
         # Format billing period (capitalize first letter)
         billing_period = billing_cycle.capitalize()
 
-        # Format next billing date
+        # Log dates for debugging
+        logger.info(f"[WEBHOOK] Email dates: period_start={period_start}, period_end={period_end}")
+        logger.info(f"[WEBHOOK] Subscription dates in DB: start={db_subscription.current_period_start}, end={db_subscription.current_period_end}")
+
+        # Format subscription dates
+        start_date = db_subscription.current_period_start.strftime('%B %d, %Y')
         next_billing_date = db_subscription.current_period_end.strftime('%B %d, %Y')
+
+        logger.info(f"[WEBHOOK] Email will use: start_date={start_date}, next_billing_date={next_billing_date}")
 
         # Get dashboard URL from settings
         frontend_url = settings.app.app_frontend_url
@@ -457,7 +510,8 @@ async def handle_subscription_created(event, session: Session):
                 tier_feature_2=tier_feature_2,
                 tier_feature_3=tier_feature_3,
                 dashboard_url=dashboard_url,
-                support_url=support_url
+                support_url=support_url,
+                start_date=start_date
             )
         )
         logger.info(f"Subscription confirmation email queued for {user.email}")
