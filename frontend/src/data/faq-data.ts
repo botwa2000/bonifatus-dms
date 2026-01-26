@@ -152,7 +152,7 @@ export const faqs: FAQ[] = [
     id: 'billing-4',
     category: FAQCategory.BILLING_SECURITY,
     question: 'Can I upgrade or downgrade my tier anytime?',
-    answer: 'Yes! You can upgrade immediately, and the change takes effect right away. When upgrading, you\'ll be charged a prorated amount for the remainder of your billing cycle. If you downgrade, the change takes effect at the start of your next billing cycle, and you\'ll keep your current benefits until then.'
+    answer: 'Yes! You can <strong>upgrade immediately</strong>, and the change takes effect right away. When upgrading, you\'ll only pay the <strong>price difference</strong> between your current and new tier, prorated for the remaining time in your billing cycle. For example, if you\'re halfway through a Starter yearly subscription and upgrade to Pro, you\'ll pay roughly half of the Pro-Starter price difference. Your subscription continues with the same billing date. Downgrades take effect at your next billing cycle, and you keep current benefits until then.'
   },
   {
     id: 'billing-5',

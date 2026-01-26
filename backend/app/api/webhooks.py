@@ -106,9 +106,12 @@ async def stripe_webhook(
 
 
 async def handle_checkout_session_completed(event, session: Session):
-    """Process checkout.session.completed event"""
-    import stripe as stripe_lib
+    """
+    Process checkout.session.completed event.
 
+    This handles NEW subscriptions only (when a free user subscribes).
+    Upgrades are handled via Subscription.modify() and the subscription.updated webhook.
+    """
     checkout_session = event.data.object
     logger.info(f"[WEBHOOK] Processing checkout.session.completed: {checkout_session.id}")
 
@@ -117,10 +120,8 @@ async def handle_checkout_session_completed(event, session: Session):
     tier_id = checkout_session.metadata.get('tier_id')
     billing_cycle = checkout_session.metadata.get('billing_cycle')
     referral_code = checkout_session.metadata.get('referral_code')
-    is_upgrade = checkout_session.metadata.get('is_upgrade') == 'true'
-    old_subscription_id = checkout_session.metadata.get('old_subscription_id')
 
-    logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier_id={tier_id}, billing_cycle={billing_cycle}, is_upgrade={is_upgrade}")
+    logger.info(f"[WEBHOOK] Metadata: user_id={user_id}, tier_id={tier_id}, billing_cycle={billing_cycle}")
 
     if not user_id or not tier_id:
         logger.warning(f"[WEBHOOK] Missing metadata in checkout session {checkout_session.id}")
@@ -145,111 +146,18 @@ async def handle_checkout_session_completed(event, session: Session):
         logger.warning(f"Tier {tier_id} not found for checkout session {checkout_session.id}")
         return
 
-    # Handle upgrade - cancel the old subscription and update user tier
-    if is_upgrade and old_subscription_id:
-        logger.info(f"[WEBHOOK] This is an upgrade - processing tier update and cancelling old subscription")
-
-        # Update user's tier immediately
-        user.tier_id = int(tier_id)
-        logger.info(f"[WEBHOOK] Updated user {user.email} tier_id to {tier_id}")
-
-        try:
-            # Get the old subscription to calculate refund
-            old_sub = session.query(Subscription).filter(
-                Subscription.stripe_subscription_id == old_subscription_id
-            ).first()
-
-            refund_amount = 0
-            if old_sub and old_sub.current_period_end and old_sub.current_period_start:
-                # Calculate unused time for refund
-                now = datetime.now(timezone.utc)
-                total_period = (old_sub.current_period_end - old_sub.current_period_start).total_seconds()
-                remaining = max(0, (old_sub.current_period_end - now).total_seconds())
-                proration_factor = remaining / total_period if total_period > 0 else 0
-
-                if old_sub.amount_cents:
-                    refund_amount = int(old_sub.amount_cents * proration_factor)
-                    logger.info(f"[WEBHOOK] Calculated refund amount: {refund_amount} cents")
-
-            # Cancel the old subscription (Stripe handles proration internally)
-            stripe_lib.Subscription.cancel(old_subscription_id)
-            logger.info(f"[WEBHOOK] Old subscription {old_subscription_id} cancelled")
-
-            # Issue actual refund if there's unused time
-            if refund_amount > 50:  # Only refund if more than 50 cents
-                try:
-                    # Get the invoices for the OLD subscription specifically (not just any payment)
-                    old_invoices = stripe_lib.Invoice.list(
-                        subscription=old_subscription_id,
-                        status='paid',
-                        limit=5
-                    )
-                    logger.info(f"[WEBHOOK] Found {len(old_invoices.data)} paid invoices for old subscription")
-
-                    refund_created = False
-                    for invoice in old_invoices.data:
-                        if invoice.payment_intent:
-                            try:
-                                refund = stripe_lib.Refund.create(
-                                    payment_intent=invoice.payment_intent,
-                                    amount=refund_amount,
-                                    reason='requested_by_customer',
-                                    metadata={
-                                        'reason': 'subscription_upgrade_proration',
-                                        'old_subscription': old_subscription_id,
-                                        'old_invoice': invoice.id,
-                                        'user_id': str(user.id)
-                                    }
-                                )
-                                logger.info(f"[WEBHOOK] Created refund {refund.id} for {refund_amount} cents from invoice {invoice.id}")
-                                refund_created = True
-                                break
-                            except stripe_lib.error.InvalidRequestError as e:
-                                # Payment might already be refunded or not refundable
-                                logger.warning(f"[WEBHOOK] Could not refund invoice {invoice.id}: {e}")
-                                continue
-
-                    if not refund_created:
-                        logger.warning(f"[WEBHOOK] Could not find refundable payment for old subscription")
-                except Exception as refund_error:
-                    logger.warning(f"[WEBHOOK] Could not create refund: {refund_error}")
-                    # Not critical - user still gets the upgrade
-
-            # Update the old subscription record in our database
-            if old_sub:
-                old_sub.status = 'canceled'
-                old_sub.ended_at = datetime.now(timezone.utc)
-                logger.info(f"[WEBHOOK] Updated old subscription record to canceled")
-
-        except Exception as cancel_error:
-            logger.error(f"[WEBHOOK] Error processing upgrade: {cancel_error}")
-            # Still update the tier even if cancellation fails
-            user.tier_id = int(tier_id)
+    # Update user's tier (subscription record will be created by subscription.created webhook)
+    user.tier_id = int(tier_id)
+    logger.info(f"[WEBHOOK] Updated user {user.email} tier_id to {tier_id}")
 
     # Process referral code if provided
     if referral_code:
-        from app.database.models import Referral
-        from datetime import datetime, timezone
-
-        # Find the referrer by their referral code (assuming users have a referral_code field)
         # For now, just log the referral - full implementation depends on your referral system
         logger.info(f"Referral code '{referral_code}' used by user {user.email}")
-
         # TODO: Create referral record when referral system is fully implemented
-        # referrer = session.query(User).filter(User.referral_code == referral_code).first()
-        # if referrer:
-        #     referral = Referral(
-        #         referrer_id=referrer.id,
-        #         referred_id=user.id,
-        #         code=referral_code,
-        #         status='completed',
-        #         completed_at=datetime.now(timezone.utc)
-        #     )
-        #     session.add(referral)
 
-    # Subscription will be created via the subscription.created webhook
-    # Just log the successful checkout here
-    logger.info(f"Checkout session completed for user {user.email}, tier {tier.name}")
+    # Subscription record will be created via the subscription.created webhook
+    logger.info(f"[WEBHOOK] Checkout session completed for user {user.email}, tier {tier.name}")
 
     session.commit()
 
@@ -289,12 +197,19 @@ async def handle_subscription_created(event, session: Session):
             logger.warning(f"[WEBHOOK] Error extracting tier_id from items: {e}")
 
     if not tier_id:
-        # Fallback: use user's current tier_id (already updated in checkout.session.completed)
+        # tier_id should always be in subscription metadata (set by create-checkout or execute-upgrade)
+        # Log full details for debugging if not found
+        logger.error(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}")
+        logger.error(f"[WEBHOOK] Subscription metadata: {stripe_sub.metadata}")
+        logger.error(f"[WEBHOOK] User: {user.email}, current tier_id: {user.tier_id}")
+
+        # Use user's tier_id which was set by checkout.session.completed
+        # This is not a guess - it was explicitly set when the checkout completed
         if user.tier_id and user.tier_id > 0:
             tier_id = str(user.tier_id)
-            logger.info(f"[WEBHOOK] Using user's current tier_id as fallback: {tier_id}")
+            logger.info(f"[WEBHOOK] Using user's tier_id (set by checkout.session.completed): {tier_id}")
         else:
-            logger.warning(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}, metadata: {stripe_sub.metadata}")
+            logger.error(f"[WEBHOOK] Cannot determine tier for subscription {stripe_sub.id} - skipping creation")
             return
 
     tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
@@ -539,6 +454,8 @@ async def handle_subscription_created(event, session: Session):
 
 async def handle_subscription_updated(event, session: Session):
     """Process subscription.updated event"""
+    import stripe as stripe_lib
+
     stripe_sub = event.data.object
 
     subscription = session.query(Subscription).filter(
@@ -548,6 +465,9 @@ async def handle_subscription_updated(event, session: Session):
     if not subscription:
         logger.warning(f"Subscription {stripe_sub.id} not found in database")
         return
+
+    old_tier_id = subscription.tier_id
+    old_price_id = subscription.stripe_price_id
 
     subscription.status = stripe_sub.status
     subscription.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
@@ -563,39 +483,100 @@ async def handle_subscription_updated(event, session: Session):
         user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
 
     # Check if the price has changed (upgrade/downgrade)
+    tier_changed = False
+    new_tier = None
+
     try:
         current_price_id = stripe_sub['items']['data'][0]['price']['id']
+        current_price = stripe_sub['items']['data'][0]['price']
+
+        # Update price ID and amount
         if subscription.stripe_price_id != current_price_id:
-            logger.info(f"Subscription price changed from {subscription.stripe_price_id} to {current_price_id}")
+            logger.info(f"[WEBHOOK] Subscription price changed from {subscription.stripe_price_id} to {current_price_id}")
+            subscription.stripe_price_id = current_price_id
 
-            # Find the tier for this new price
-            all_tiers = session.query(TierPlan).all()
-            new_tier = None
+            # Update amount from the new price
+            if isinstance(current_price, dict) and 'unit_amount' in current_price:
+                subscription.amount_cents = current_price['unit_amount']
+                logger.info(f"[WEBHOOK] Updated amount_cents to {subscription.amount_cents}")
 
-            for tier in all_tiers:
-                if tier.stripe_price_ids:
-                    for billing_cycle, currencies in tier.stripe_price_ids.items():
-                        if isinstance(currencies, dict):
-                            for currency, price_id in currencies.items():
-                                if price_id == current_price_id:
-                                    new_tier = tier
-                                    break
-                        if new_tier:
-                            break
+            # Update currency if available
+            if isinstance(current_price, dict) and 'currency' in current_price:
+                subscription.currency = current_price['currency'].upper()
+                logger.info(f"[WEBHOOK] Updated currency to {subscription.currency}")
+
+            # First, try to get tier_id from subscription metadata (set by execute-upgrade)
+            if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
+                new_tier_id = int(stripe_sub.metadata['tier_id'])
+                new_tier = session.query(TierPlan).filter(TierPlan.id == new_tier_id).first()
                 if new_tier:
-                    break
+                    logger.info(f"[WEBHOOK] Found tier {new_tier.name} from subscription metadata")
 
+            # Fallback: search for tier by price ID in stripe_price_ids
+            if not new_tier:
+                all_tiers = session.query(TierPlan).all()
+                for tier in all_tiers:
+                    if tier.stripe_price_ids:
+                        for billing_cycle, currencies in tier.stripe_price_ids.items():
+                            if isinstance(currencies, dict):
+                                for currency, price_id in currencies.items():
+                                    if price_id == current_price_id:
+                                        new_tier = tier
+                                        logger.info(f"[WEBHOOK] Found tier {tier.name} from stripe_price_ids")
+                                        break
+                            if new_tier:
+                                break
+                    if new_tier:
+                        break
+
+            # Update tier if found and different
             if new_tier and subscription.tier_id != new_tier.id:
-                logger.info(f"Updating tier from {subscription.tier_id} to {new_tier.id} ({new_tier.name})")
+                logger.info(f"[WEBHOOK] Updating tier from {subscription.tier_id} to {new_tier.id} ({new_tier.name})")
                 subscription.tier_id = new_tier.id
-                subscription.stripe_price_id = current_price_id
                 if user:
                     user.tier_id = new_tier.id
+                tier_changed = True
     except Exception as e:
-        logger.error(f"Error checking for tier change: {e}")
+        logger.error(f"[WEBHOOK] Error checking for tier change: {e}")
 
     session.commit()
-    logger.info(f"Updated subscription {subscription.id} to status {stripe_sub.status}")
+    logger.info(f"[WEBHOOK] Updated subscription {subscription.id} to status {stripe_sub.status}")
+
+    # Send upgrade confirmation email if tier changed to a higher tier
+    if tier_changed and new_tier and new_tier.id > old_tier_id:
+        try:
+            # Get billing cycle from price interval
+            billing_cycle = 'yearly'
+            try:
+                price_obj = stripe_lib.Price.retrieve(subscription.stripe_price_id)
+                if price_obj.recurring and price_obj.recurring.interval == 'month':
+                    billing_cycle = 'monthly'
+            except Exception:
+                pass
+
+            # Get amount paid (proration amount from latest invoice)
+            amount_paid = 0
+            try:
+                stripe_sub_obj = stripe_lib.Subscription.retrieve(stripe_sub.id)
+                if stripe_sub_obj.latest_invoice:
+                    invoice = stripe_lib.Invoice.retrieve(stripe_sub_obj.latest_invoice)
+                    amount_paid = invoice.amount_paid / 100 if invoice.amount_paid else 0
+            except Exception:
+                amount_paid = subscription.amount_cents / 100 if subscription.amount_cents else 0
+
+            logger.info(f"[WEBHOOK] Sending upgrade confirmation email to {user.email}")
+            asyncio.create_task(
+                email_service.send_subscription_upgraded_email(
+                    user.email,
+                    user.full_name or user.email,
+                    new_tier.display_name,
+                    billing_cycle,
+                    amount_paid,
+                    subscription.currency or 'EUR'
+                )
+            )
+        except Exception as email_err:
+            logger.error(f"[WEBHOOK] Failed to send upgrade email: {email_err}")
 
 
 async def handle_subscription_deleted(event, session: Session):

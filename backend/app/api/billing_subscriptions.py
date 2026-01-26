@@ -1011,13 +1011,13 @@ async def execute_upgrade(
     session: Session = Depends(get_db)
 ):
     """
-    Execute subscription upgrade using Stripe Billing Portal.
+    Execute subscription upgrade using Stripe Subscription.modify().
 
-    This redirects the user to Stripe's hosted Billing Portal where they can
-    manage their subscription, including upgrading to a new plan with proper
-    proration handling.
-
-    After the upgrade, Stripe webhooks will update our database.
+    This is the Stripe best practice for upgrades:
+    - Modifies the existing subscription (same subscription ID)
+    - Stripe automatically calculates proration (charges only the difference)
+    - No manual refund needed
+    - subscription.updated webhook handles database updates
     """
     import stripe
     from app.core.config import settings
@@ -1085,68 +1085,87 @@ async def execute_upgrade(
                 detail="Failed to create price for new tier"
             )
 
-        # Get frontend URL for redirect
-        frontend_url = settings.app.app_frontend_url
+        # Get the current Stripe subscription to find the subscription item ID
+        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+        subscription_item_id = stripe_sub['items']['data'][0]['id']
 
-        # First, void any existing open invoices to prevent confusion
-        try:
-            open_invoices = stripe.Invoice.list(
-                customer=current_user.stripe_customer_id,
-                status='open',
-                limit=10
-            )
-            for inv in open_invoices.data:
-                if inv.subscription == subscription.stripe_subscription_id:
-                    logger.info(f"Voiding existing open invoice: {inv.id}")
-                    stripe.Invoice.void_invoice(inv.id)
-        except Exception as void_error:
-            logger.warning(f"Error voiding open invoices: {void_error}")
+        logger.info(f"Upgrading subscription {subscription.stripe_subscription_id}")
+        logger.info(f"  Current price: {subscription.stripe_price_id}")
+        logger.info(f"  New price: {new_price_id}")
+        logger.info(f"  Subscription item ID: {subscription_item_id}")
 
-        # Create a Checkout Session for subscription upgrade
-        # This is the cleanest way to handle upgrades with proper proration
-        logger.info(f"Creating Checkout Session for upgrade")
-        logger.info(f"  subscription_id: {subscription.stripe_subscription_id}")
-        logger.info(f"  new_price_id: {new_price_id}")
-
-        checkout_session = stripe.checkout.Session.create(
-            customer=current_user.stripe_customer_id,
-            mode='subscription',
-            line_items=[{
+        # Use Stripe Subscription.modify() - the industry standard approach
+        # This modifies the existing subscription instead of creating a new one
+        updated_subscription = stripe.Subscription.modify(
+            subscription.stripe_subscription_id,
+            items=[{
+                'id': subscription_item_id,
                 'price': new_price_id,
-                'quantity': 1,
             }],
-            subscription_data={
-                'metadata': {
-                    'user_id': str(current_user.id),
-                    'tier_id': str(tier_id),
-                    'billing_cycle': billing_cycle,
-                    'currency': currency,
-                    'upgrade_from_subscription': subscription.stripe_subscription_id,
-                }
-            },
-            success_url=f"{frontend_url}/profile?upgrade=success",
-            cancel_url=f"{frontend_url}/profile?upgrade=cancelled",
+            # Create prorations and invoice immediately
+            proration_behavior='always_invoice',
+            # Require payment confirmation for the prorated amount
+            payment_behavior='pending_if_incomplete',
+            # Store tier info in metadata for webhook processing
             metadata={
                 'user_id': str(current_user.id),
                 'tier_id': str(tier_id),
                 'billing_cycle': billing_cycle,
-                'is_upgrade': 'true',
-                'old_subscription_id': subscription.stripe_subscription_id,
-            },
-            # Allow promotion codes
-            allow_promotion_codes=True,
+                'currency': currency,
+            }
         )
 
-        logger.info(f"Checkout Session created: {checkout_session.id}")
-        logger.info(f"Checkout URL: {checkout_session.url}")
+        logger.info(f"Subscription modified successfully: {updated_subscription.id}")
+        logger.info(f"  New status: {updated_subscription.status}")
 
-        return {
-            "success": True,
-            "payment_required": True,
-            "invoice_url": checkout_session.url,
-            "checkout_session_id": checkout_session.id,
-            "message": "Please complete payment to activate your upgrade"
-        }
+        # Check if there's a pending invoice that needs payment
+        # When proration_behavior='always_invoice', Stripe creates an invoice immediately
+        latest_invoice_id = updated_subscription.latest_invoice
+        invoice_url = None
+        payment_required = False
+
+        if latest_invoice_id:
+            try:
+                invoice = stripe.Invoice.retrieve(latest_invoice_id)
+                logger.info(f"  Latest invoice: {invoice.id}, status: {invoice.status}, amount_due: {invoice.amount_due}")
+
+                if invoice.status == 'open' and invoice.amount_due > 0:
+                    # Invoice needs payment - get the hosted invoice URL
+                    payment_required = True
+                    invoice_url = invoice.hosted_invoice_url
+                    logger.info(f"  Payment required, invoice URL: {invoice_url}")
+                elif invoice.status == 'paid':
+                    # Payment was successful (customer had valid payment method)
+                    logger.info(f"  Invoice already paid")
+            except Exception as inv_error:
+                logger.warning(f"Could not retrieve invoice: {inv_error}")
+
+        # Update our database immediately (webhook will also update, but this ensures consistency)
+        subscription.tier_id = tier_id
+        subscription.stripe_price_id = new_price_id
+        current_user.tier_id = tier_id
+        session.commit()
+
+        logger.info(f"Database updated: user {current_user.email} now on tier {new_tier.name}")
+
+        # Get frontend URL for success redirect
+        frontend_url = settings.app.app_frontend_url
+
+        if payment_required and invoice_url:
+            return {
+                "success": True,
+                "payment_required": True,
+                "invoice_url": invoice_url,
+                "message": "Please complete payment to activate your upgrade"
+            }
+        else:
+            # Upgrade successful, no additional payment needed (or payment was automatic)
+            return {
+                "success": True,
+                "payment_required": False,
+                "message": f"Successfully upgraded to {new_tier.display_name}",
+                "redirect_url": f"{frontend_url}/profile?upgrade=success"
+            }
 
     except HTTPException:
         session.rollback()
