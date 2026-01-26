@@ -150,6 +150,44 @@ async def create_checkout_session(
             session.commit()
             logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
+        # Clear any pending invoice items that might cause currency conflicts
+        try:
+            pending_items = stripe.InvoiceItem.list(
+                customer=stripe_customer_id,
+                pending=True
+            )
+            for item in pending_items.data:
+                stripe.InvoiceItem.delete(item.id)
+                logger.info(f"Deleted pending invoice item {item.id}")
+        except Exception as e:
+            logger.warning(f"Could not clear pending invoice items: {e}")
+
+        # Void any open invoices to prevent currency conflicts
+        try:
+            open_invoices = stripe.Invoice.list(
+                customer=stripe_customer_id,
+                status='open',
+                limit=10
+            )
+            for inv in open_invoices.data:
+                stripe.Invoice.void_invoice(inv.id)
+                logger.info(f"Voided open invoice {inv.id}")
+        except Exception as e:
+            logger.warning(f"Could not void open invoices: {e}")
+
+        # Check customer balance and clear if it exists (to avoid currency conflicts)
+        try:
+            customer = stripe.Customer.retrieve(stripe_customer_id)
+            if customer.balance != 0:
+                # Reset balance to 0 to avoid currency conflicts
+                stripe.Customer.modify(
+                    stripe_customer_id,
+                    balance=0
+                )
+                logger.info(f"Cleared customer balance of {customer.balance}")
+        except Exception as e:
+            logger.warning(f"Could not check/clear customer balance: {e}")
+
         # Create checkout session with existing customer
         # Note: payment_method_types omitted - Stripe automatically shows all methods enabled in dashboard
         checkout_session = stripe.checkout.Session.create(

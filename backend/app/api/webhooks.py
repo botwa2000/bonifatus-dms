@@ -598,7 +598,23 @@ async def handle_subscription_deleted(event, session: Session):
     user = session.query(User).filter(User.id == subscription.user_id).first()
     tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
 
+    # Check if this is an upgrade cancellation (user has another active subscription)
+    # or if the subscription was marked as upgrade cancellation
+    is_upgrade_cancellation = False
+
+    # Check if user has another active subscription (they upgraded)
     if user:
+        other_active_sub = session.query(Subscription).filter(
+            Subscription.user_id == user.id,
+            Subscription.status.in_(['active', 'trialing']),
+            Subscription.id != subscription.id
+        ).first()
+        if other_active_sub:
+            is_upgrade_cancellation = True
+            logger.info(f"[WEBHOOK] User {user.email} has another active subscription - this is an upgrade cancellation")
+
+    if user and not is_upgrade_cancellation:
+        # Only reset to free tier if this is NOT an upgrade
         free_tier = session.query(TierPlan).filter(TierPlan.name == 'free').first()
         if free_tier:
             user.tier_id = free_tier.id
@@ -607,10 +623,15 @@ async def handle_subscription_deleted(event, session: Session):
     session.commit()
     logger.info(f"Deleted subscription {subscription.id}")
 
+    # Only send cancellation email if this is NOT an upgrade cancellation
+    if is_upgrade_cancellation:
+        logger.info(f"[WEBHOOK] Skipping cancellation email - this is an upgrade")
+        return
+
     # Send cancellation confirmation email
     try:
         # Access ends at current_period_end (user keeps access until then)
-        access_end_date = subscription.current_period_end.strftime('%B %d, %Y')
+        access_end_date = subscription.current_period_end.strftime('%B %d, %Y') if subscription.current_period_end else 'today'
 
         # Get frontend URL
         frontend_url = settings.app.app_frontend_url
