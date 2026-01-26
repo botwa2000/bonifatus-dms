@@ -892,6 +892,16 @@ export default function ProfilePage() {
                           const isComingSoon = false // Pro tier is now available
                           const isUpgrade = tier.id > profile.tier_id
 
+                          // Use subscription's currency for upgrade prices
+                          const subCurrency = availableCurrencies.find(c => c.code === subscription.currency)
+                          const exchangeRate = subCurrency?.exchange_rate || 1
+                          const currencySymbol = subscription.currency_symbol || subCurrency?.symbol || tier.currency_symbol
+                          const decimalPlaces = subCurrency?.decimal_places || 2
+
+                          // Convert tier prices from base currency to subscription currency
+                          const priceYearly = (tier.price_yearly_cents / 100) * exchangeRate
+                          const priceMonthly = (tier.price_monthly_cents / 100) * exchangeRate
+
                           return (
                             <div key={tier.id} className="border border-neutral-200 rounded-lg p-3">
                               <div className="flex items-center justify-between">
@@ -903,8 +913,8 @@ export default function ProfilePage() {
                                   </div>
                                   <p className="text-xs text-neutral-600 mt-1">
                                     {subscription.billing_cycle === 'yearly'
-                                      ? `${tier.currency_symbol}${(tier.price_yearly_cents / 100).toFixed(2)}/year`
-                                      : `${tier.currency_symbol}${(tier.price_monthly_cents / 100).toFixed(2)}/month`
+                                      ? `${currencySymbol}${priceYearly.toFixed(decimalPlaces)}/year`
+                                      : `${currencySymbol}${priceMonthly.toFixed(decimalPlaces)}/month`
                                     }
                                   </p>
                                 </div>
