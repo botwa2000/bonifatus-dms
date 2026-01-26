@@ -178,26 +178,39 @@ async def handle_checkout_session_completed(event, session: Session):
             # Issue actual refund if there's unused time
             if refund_amount > 50:  # Only refund if more than 50 cents
                 try:
-                    # Get the last payment for this subscription to refund
-                    payments = stripe_lib.PaymentIntent.list(
-                        customer=checkout_session.customer,
+                    # Get the invoices for the OLD subscription specifically (not just any payment)
+                    old_invoices = stripe_lib.Invoice.list(
+                        subscription=old_subscription_id,
+                        status='paid',
                         limit=5
                     )
-                    # Find a payment related to the old subscription
-                    for payment in payments.data:
-                        if payment.status == 'succeeded' and payment.amount >= refund_amount:
-                            refund = stripe_lib.Refund.create(
-                                payment_intent=payment.id,
-                                amount=refund_amount,
-                                reason='requested_by_customer',
-                                metadata={
-                                    'reason': 'subscription_upgrade_proration',
-                                    'old_subscription': old_subscription_id,
-                                    'user_id': str(user.id)
-                                }
-                            )
-                            logger.info(f"[WEBHOOK] Created refund {refund.id} for {refund_amount} cents")
-                            break
+                    logger.info(f"[WEBHOOK] Found {len(old_invoices.data)} paid invoices for old subscription")
+
+                    refund_created = False
+                    for invoice in old_invoices.data:
+                        if invoice.payment_intent:
+                            try:
+                                refund = stripe_lib.Refund.create(
+                                    payment_intent=invoice.payment_intent,
+                                    amount=refund_amount,
+                                    reason='requested_by_customer',
+                                    metadata={
+                                        'reason': 'subscription_upgrade_proration',
+                                        'old_subscription': old_subscription_id,
+                                        'old_invoice': invoice.id,
+                                        'user_id': str(user.id)
+                                    }
+                                )
+                                logger.info(f"[WEBHOOK] Created refund {refund.id} for {refund_amount} cents from invoice {invoice.id}")
+                                refund_created = True
+                                break
+                            except stripe_lib.error.InvalidRequestError as e:
+                                # Payment might already be refunded or not refundable
+                                logger.warning(f"[WEBHOOK] Could not refund invoice {invoice.id}: {e}")
+                                continue
+
+                    if not refund_created:
+                        logger.warning(f"[WEBHOOK] Could not find refundable payment for old subscription")
                 except Exception as refund_error:
                     logger.warning(f"[WEBHOOK] Could not create refund: {refund_error}")
                     # Not critical - user still gets the upgrade
@@ -276,8 +289,13 @@ async def handle_subscription_created(event, session: Session):
             logger.warning(f"[WEBHOOK] Error extracting tier_id from items: {e}")
 
     if not tier_id:
-        logger.warning(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}, metadata: {stripe_sub.metadata}")
-        return
+        # Fallback: use user's current tier_id (already updated in checkout.session.completed)
+        if user.tier_id and user.tier_id > 0:
+            tier_id = str(user.tier_id)
+            logger.info(f"[WEBHOOK] Using user's current tier_id as fallback: {tier_id}")
+        else:
+            logger.warning(f"[WEBHOOK] No tier_id found in subscription {stripe_sub.id}, metadata: {stripe_sub.metadata}")
+            return
 
     tier = session.query(TierPlan).filter(TierPlan.id == tier_id).first()
     if not tier:
