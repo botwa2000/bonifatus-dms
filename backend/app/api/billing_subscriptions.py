@@ -23,6 +23,23 @@ from app.services.stripe_service import stripe_service
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/billing", tags=["billing"])
 
+# Stripe subscription statuses that indicate an active/usable subscription
+# Reference: https://stripe.com/docs/api/subscriptions/object#subscription_object-status
+ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due']
+
+
+def get_active_subscription(session: Session, user_id) -> Subscription | None:
+    """
+    Get the user's current active subscription.
+    Returns the most recent one if multiple exist (legacy data from old upgrade flow).
+    """
+    return session.execute(
+        select(Subscription)
+        .where(Subscription.user_id == user_id)
+        .where(Subscription.status.in_(ACTIVE_SUBSCRIPTION_STATUSES))
+        .order_by(Subscription.created_at.desc())
+    ).scalars().first()
+
 
 @router.post(
     "/subscriptions/create-checkout",
@@ -93,11 +110,7 @@ async def create_checkout_session(
             )
 
         # Check for existing active subscription
-        existing_sub = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        existing_sub = get_active_subscription(session, current_user.id)
 
         if existing_sub:
             raise HTTPException(
@@ -235,11 +248,7 @@ async def create_subscription(
 ) -> SubscriptionResponse:
     """Create a new subscription for the current user"""
     try:
-        existing_sub = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        existing_sub = get_active_subscription(session, current_user.id)
 
         if existing_sub:
             raise HTTPException(
@@ -346,11 +355,7 @@ async def get_subscription(
     """Get current user's active subscription"""
     from app.database.models import Currency
 
-    subscription = session.execute(
-        select(Subscription)
-        .where(Subscription.user_id == current_user.id)
-        .where(Subscription.status.in_(['active', 'trialing', 'past_due']))
-    ).scalar_one_or_none()
+    subscription = get_active_subscription(session, current_user.id)
 
     if not subscription:
         raise HTTPException(
@@ -432,11 +437,7 @@ async def update_subscription(
 ) -> SubscriptionResponse:
     """Update existing subscription (upgrade, downgrade, or cancel)"""
     try:
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -553,11 +554,7 @@ async def cancel_subscription(
 ):
     """Cancel subscription with immediate effect"""
     try:
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -608,11 +605,7 @@ async def cancel_subscription_at_period_end(
 ):
     """Cancel subscription at the end of the current billing period"""
     try:
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -833,11 +826,7 @@ async def preview_upgrade(
             )
 
         # Get active subscription
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -1033,11 +1022,7 @@ async def execute_upgrade(
             )
 
         # Get active subscription
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -1210,11 +1195,7 @@ async def preview_billing_cycle_change(
             )
 
         # Get active subscription
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
@@ -1356,11 +1337,7 @@ async def schedule_billing_cycle_change(
             )
 
         # Get active subscription
-        subscription = session.execute(
-            select(Subscription)
-            .where(Subscription.user_id == current_user.id)
-            .where(Subscription.status.in_(['active', 'trialing']))
-        ).scalar_one_or_none()
+        subscription = get_active_subscription(session, current_user.id)
 
         if not subscription:
             raise HTTPException(
