@@ -810,13 +810,41 @@ async def handle_invoice_payment_succeeded(event, session: Session):
         currency_obj = session.query(Currency).filter(Currency.code == currency).first()
         currency_symbol = currency_obj.symbol if currency_obj else '$'
 
-        # Format dates - use invoice period dates (most accurate for billing cycle)
+        # Format dates
         invoice_date = datetime.fromtimestamp(stripe_invoice.created, tz=timezone.utc).strftime('%B %d, %Y')
 
-        # Use invoice period dates (always accurate, especially for new subscriptions)
-        # Note: Subscription record might not be updated yet when invoice.payment_succeeded fires
-        period_start = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_start else 'N/A'
-        period_end = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc).strftime('%B %d, %Y') if stripe_invoice.period_end else 'N/A'
+        # Get billing period from the best source:
+        # 1. Invoice line items (most accurate for subscription billing period)
+        # 2. Subscription current period dates
+        # 3. Fall back to invoice period dates (can be same for checkout invoices)
+        period_start_dt = None
+        period_end_dt = None
+
+        # Try to get from invoice line items first (most accurate for subscriptions)
+        if stripe_invoice.lines and stripe_invoice.lines.data:
+            for line in stripe_invoice.lines.data:
+                if line.period:
+                    period_start_dt = datetime.fromtimestamp(line.period.start, tz=timezone.utc)
+                    period_end_dt = datetime.fromtimestamp(line.period.end, tz=timezone.utc)
+                    break
+
+        # If line items don't have it, try subscription
+        if not period_end_dt and subscription:
+            if subscription.current_period_start:
+                period_start_dt = subscription.current_period_start
+            if subscription.current_period_end:
+                period_end_dt = subscription.current_period_end
+
+        # Fall back to invoice period dates as last resort
+        if not period_start_dt and stripe_invoice.period_start:
+            period_start_dt = datetime.fromtimestamp(stripe_invoice.period_start, tz=timezone.utc)
+        if not period_end_dt and stripe_invoice.period_end:
+            period_end_dt = datetime.fromtimestamp(stripe_invoice.period_end, tz=timezone.utc)
+
+        period_start = period_start_dt.strftime('%B %d, %Y') if period_start_dt else 'N/A'
+        period_end = period_end_dt.strftime('%B %d, %Y') if period_end_dt else 'N/A'
+
+        logger.info(f"[WEBHOOK] Invoice email dates: period_start={period_start}, period_end={period_end}")
 
         # Calculate amount
         amount = stripe_invoice.amount_paid / 100
