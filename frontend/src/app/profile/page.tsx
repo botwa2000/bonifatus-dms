@@ -886,12 +886,8 @@ export default function ProfilePage() {
                       <h4 className="font-medium text-neutral-900 dark:text-white">Change Plan</h4>
 
                       {availableTiers
-                        .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id !== profile.tier_id)
+                        .filter(tier => tier.name.toLowerCase() !== 'free' && tier.id > profile.tier_id)
                         .map(tier => {
-                          const isPro = tier.name.toLowerCase() === 'pro'
-                          const isComingSoon = false // Pro tier is now available
-                          const isUpgrade = tier.id > profile.tier_id
-
                           // Use subscription's currency for tier prices (case-insensitive match)
                           const subCurrencyCode = subscription.currency?.toUpperCase()
                           const subCurrency = availableCurrencies.find(c => c.code?.toUpperCase() === subCurrencyCode)
@@ -910,8 +906,7 @@ export default function ProfilePage() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <h5 className="font-medium text-neutral-900 dark:text-white">{tier.display_name}</h5>
-                                    {isComingSoon && <Badge variant="warning" className="text-xs">Coming Soon</Badge>}
-                                    {isUpgrade && !isComingSoon && <Badge variant="success" className="text-xs">Upgrade</Badge>}
+                                    <Badge variant="success" className="text-xs">Upgrade</Badge>
                                   </div>
                                   <p className="text-xs text-neutral-600 mt-1">
                                     {subscription.billing_cycle === 'yearly'
@@ -921,12 +916,12 @@ export default function ProfilePage() {
                                   </p>
                                 </div>
                                 <Button
-                                  variant={isUpgrade ? "primary" : "secondary"}
+                                  variant="primary"
                                   size="sm"
-                                  onClick={() => !isComingSoon && handleUpgrade(tier.id)}
-                                  disabled={isComingSoon || processingSubscription}
+                                  onClick={() => handleUpgrade(tier.id)}
+                                  disabled={processingSubscription}
                                 >
-                                  {isComingSoon ? 'Coming Soon' : isUpgrade ? 'Upgrade' : 'Switch'}
+                                  Upgrade
                                 </Button>
                               </div>
                             </div>
