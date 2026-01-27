@@ -22,6 +22,7 @@ from app.middleware.auth_middleware import get_current_active_user, get_current_
 from app.services.stripe_service import stripe_service
 from app.services.email_service import email_service
 from app.core.config import settings
+from app.api.billing_subscriptions import get_active_subscription, ACTIVE_SUBSCRIPTION_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +147,19 @@ async def cancel_subscription(
     All configuration values loaded from system_settings table
     """
     try:
-        # Get active subscription
-        subscription = session.query(Subscription).filter(
-            Subscription.user_id == current_user.id,
-            Subscription.status.in_(['active', 'trialing'])
-        ).first()
+        # Get active subscription using centralized helper
+        # This handles multiple subscription records from legacy upgrade flow
+        subscription = get_active_subscription(session, current_user.id)
+
+        logger.info(f"Cancel subscription request from user {current_user.email}")
+        logger.info(f"  Found subscription: {subscription.id if subscription else 'None'}")
+        if subscription:
+            logger.info(f"  Stripe subscription ID: {subscription.stripe_subscription_id}")
+            logger.info(f"  Status: {subscription.status}")
+            logger.info(f"  Tier ID: {subscription.tier_id}")
 
         if not subscription:
+            logger.warning(f"No active subscription found for user {current_user.email}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No active subscription found"
@@ -176,19 +183,44 @@ async def cancel_subscription(
         stripe_refund_id = None
         refund_issued = False
 
+        logger.info(f"  Cancel type: {request.cancel_type}, Refund eligible: {refund_eligible}")
+        logger.info(f"  Subscription age: {subscription_age_days} days, Refund policy: {refund_policy_days} days")
+
         # Handle immediate cancellation with refund
         if request.cancel_type == "immediate" and refund_eligible:
-            # Find the most recent payment for this user
+            payment_intent_id = None
+
+            # First, try to find the payment intent from our Payment records
             recent_payment = session.query(Payment).filter(
                 Payment.user_id == current_user.id,
                 Payment.status == 'succeeded'
             ).order_by(Payment.created_at.desc()).first()
 
-            if recent_payment and recent_payment.stripe_payment_intent_id:
+            logger.info(f"  Recent payment found: {recent_payment.id if recent_payment else 'None'}")
+            if recent_payment:
+                logger.info(f"  Payment intent ID from DB: {recent_payment.stripe_payment_intent_id}")
+                payment_intent_id = recent_payment.stripe_payment_intent_id
+
+            # If no Payment record, try to get payment_intent from Stripe invoice directly
+            if not payment_intent_id and subscription.stripe_subscription_id:
+                try:
+                    # Get the subscription's invoices from Stripe
+                    invoices = stripe.Invoice.list(
+                        subscription=subscription.stripe_subscription_id,
+                        status='paid',
+                        limit=1
+                    )
+                    if invoices.data:
+                        payment_intent_id = invoices.data[0].payment_intent
+                        logger.info(f"  Payment intent ID from Stripe invoice: {payment_intent_id}")
+                except Exception as e:
+                    logger.warning(f"Could not retrieve invoices from Stripe: {e}")
+
+            if payment_intent_id:
                 try:
                     # Issue refund via Stripe
                     refund = stripe.Refund.create(
-                        payment_intent=recent_payment.stripe_payment_intent_id,
+                        payment_intent=payment_intent_id,
                         reason='requested_by_customer'
                     )
 
@@ -201,6 +233,8 @@ async def cancel_subscription(
                 except Exception as e:
                     logger.error(f"Refund failed for user {current_user.email}: {e}")
                     # Continue with cancellation even if refund fails
+            else:
+                logger.warning(f"No payment intent found for user {current_user.email}, cannot issue refund")
 
             # Cancel subscription immediately in Stripe
             try:

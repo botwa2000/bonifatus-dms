@@ -727,6 +727,27 @@ async def handle_invoice_payment_succeeded(event, session: Session):
 
         session.add(invoice)
 
+    # Also create a Payment record for refund tracking
+    # The payment_intent is needed for refunds during cancellation
+    if hasattr(stripe_invoice, 'payment_intent') and stripe_invoice.payment_intent:
+        existing_payment = session.query(Payment).filter(
+            Payment.stripe_payment_intent_id == stripe_invoice.payment_intent
+        ).first()
+
+        if not existing_payment:
+            payment = Payment(
+                user_id=user.id,
+                stripe_payment_intent_id=stripe_invoice.payment_intent,
+                stripe_invoice_id=stripe_invoice.id,
+                amount_cents=stripe_invoice.amount_paid,
+                amount_refunded_cents=0,
+                currency=stripe_invoice.currency.upper(),
+                status='succeeded',
+                payment_method='card'  # Subscriptions typically use card
+            )
+            session.add(payment)
+            logger.info(f"Created Payment record for invoice {stripe_invoice.id} with payment_intent {stripe_invoice.payment_intent}")
+
     session.commit()
     logger.info(f"Invoice {stripe_invoice.id} payment succeeded for user {user.email}")
 
