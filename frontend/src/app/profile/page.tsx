@@ -892,11 +892,13 @@ export default function ProfilePage() {
                           const isComingSoon = false // Pro tier is now available
                           const isUpgrade = tier.id > profile.tier_id
 
-                          // Use subscription's currency for upgrade prices
-                          const subCurrency = availableCurrencies.find(c => c.code === subscription.currency)
+                          // Use subscription's currency for tier prices (case-insensitive match)
+                          const subCurrencyCode = subscription.currency?.toUpperCase()
+                          const subCurrency = availableCurrencies.find(c => c.code?.toUpperCase() === subCurrencyCode)
                           const exchangeRate = subCurrency?.exchange_rate || 1
-                          const currencySymbol = subscription.currency_symbol || subCurrency?.symbol || tier.currency_symbol
-                          const decimalPlaces = subCurrency?.decimal_places || 2
+                          // Prefer subscription.currency_symbol (from backend), fallback to currency table symbol
+                          const currencySymbol = subscription.currency_symbol || subCurrency?.symbol || '€'
+                          const decimalPlaces = subCurrency?.decimal_places ?? 2
 
                           // Convert tier prices from base currency to subscription currency
                           const priceYearly = (tier.price_yearly_cents / 100) * exchangeRate
