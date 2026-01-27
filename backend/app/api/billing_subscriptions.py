@@ -354,6 +354,7 @@ async def get_subscription(
 ) -> SubscriptionResponse:
     """Get current user's active subscription"""
     from app.database.models import Currency
+    import stripe
 
     subscription = get_active_subscription(session, current_user.id)
 
@@ -364,6 +365,20 @@ async def get_subscription(
         )
 
     tier = session.query(TierPlan).filter(TierPlan.id == subscription.tier_id).first()
+
+    # If subscription doesn't have currency/amount, fetch from Stripe and update
+    if not subscription.currency or not subscription.amount_cents:
+        try:
+            if subscription.stripe_price_id:
+                stripe_price = stripe.Price.retrieve(subscription.stripe_price_id)
+                if not subscription.currency and stripe_price.currency:
+                    subscription.currency = stripe_price.currency.upper()
+                if not subscription.amount_cents and stripe_price.unit_amount:
+                    subscription.amount_cents = stripe_price.unit_amount
+                session.commit()
+                logger.info(f"Updated subscription with currency={subscription.currency}, amount={subscription.amount_cents}")
+        except Exception as e:
+            logger.warning(f"Could not fetch price from Stripe: {e}")
 
     # Use subscription's actual currency/amount if available, otherwise fall back to tier defaults
     actual_currency = subscription.currency or tier.currency
@@ -1125,9 +1140,20 @@ async def execute_upgrade(
             except Exception as inv_error:
                 logger.warning(f"Could not retrieve invoice: {inv_error}")
 
+        # Get the new price amount from Stripe
+        new_price_amount = None
+        try:
+            new_price_obj = stripe.Price.retrieve(new_price_id)
+            new_price_amount = new_price_obj.unit_amount
+        except Exception as e:
+            logger.warning(f"Could not retrieve new price amount: {e}")
+
         # Update our database immediately (webhook will also update, but this ensures consistency)
         subscription.tier_id = tier_id
         subscription.stripe_price_id = new_price_id
+        subscription.currency = currency  # Preserve the subscription currency
+        if new_price_amount:
+            subscription.amount_cents = new_price_amount
         current_user.tier_id = tier_id
         session.commit()
 
