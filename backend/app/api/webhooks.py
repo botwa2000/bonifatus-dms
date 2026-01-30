@@ -178,22 +178,21 @@ async def handle_subscription_created(event, session: Session):
 
     logger.info(f"[WEBHOOK] Found user: {user.email}")
 
-    # Get tier from subscription metadata or price metadata
+    # Get tier from subscription metadata or price metadata (use dict-style access)
+    sub_data = stripe_sub if isinstance(stripe_sub, dict) else stripe_sub.to_dict() if hasattr(stripe_sub, 'to_dict') else {}
+    metadata = sub_data.get('metadata', {})
     tier_id = None
-    if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
-        tier_id = stripe_sub.metadata['tier_id']
+    if metadata and 'tier_id' in metadata:
+        tier_id = metadata['tier_id']
         logger.info(f"[WEBHOOK] Got tier_id from subscription metadata: {tier_id}")
-    elif hasattr(stripe_sub, 'items') and stripe_sub.items:
+    else:
         try:
-            if hasattr(stripe_sub.items, 'data') and stripe_sub.items.data:
-                items_data = stripe_sub.items.data
-                if len(items_data) > 0:
-                    item = items_data[0]
-                    if hasattr(item, 'price') and item.price:
-                        price = item.price
-                        if hasattr(price, 'metadata') and price.metadata and 'tier_id' in price.metadata:
-                            tier_id = price.metadata['tier_id']
-                            logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
+            items_data = sub_data.get('items', {}).get('data', [])
+            if items_data:
+                price_meta = items_data[0].get('price', {}).get('metadata', {})
+                if price_meta and 'tier_id' in price_meta:
+                    tier_id = price_meta['tier_id']
+                    logger.info(f"[WEBHOOK] Got tier_id from price metadata: {tier_id}")
         except Exception as e:
             logger.warning(f"[WEBHOOK] Error extracting tier_id from items: {e}")
 
@@ -238,10 +237,10 @@ async def handle_subscription_created(event, session: Session):
     currency = None
     amount_cents = None
 
-    # Check metadata first
-    if hasattr(stripe_sub, 'metadata') and stripe_sub.metadata:
-        billing_cycle = stripe_sub.metadata.get('billing_cycle')
-        currency = stripe_sub.metadata.get('currency')
+    # Check metadata first (use dict-style access)
+    if metadata:
+        billing_cycle = metadata.get('billing_cycle')
+        currency = metadata.get('currency')
         if currency:
             currency = currency.upper()
         logger.info(f"[WEBHOOK] Got from metadata: billing_cycle={billing_cycle}, currency={currency}")
@@ -521,47 +520,39 @@ async def handle_subscription_updated(event, session: Session):
     new_tier = None
 
     try:
-        current_price_id = stripe_sub['items']['data'][0]['price']['id']
-        current_price = stripe_sub['items']['data'][0]['price']
+        # Extract current price using dict-style access (safe across API versions)
+        items_data = sub_data.get('items', {}).get('data', [])
+        current_price_id = None
+        current_price = None
+        if items_data:
+            current_price = items_data[0].get('price', {}) if isinstance(items_data[0], dict) else {}
+            current_price_id = current_price.get('id') if isinstance(current_price, dict) else None
 
-        # Update price ID and amount
-        if subscription.stripe_price_id != current_price_id:
-            logger.info(f"[WEBHOOK] Subscription price changed from {subscription.stripe_price_id} to {current_price_id}")
-            subscription.stripe_price_id = current_price_id
+        if current_price_id:
+            logger.info(f"[WEBHOOK] Current price_id: {current_price_id}, DB price_id: {subscription.stripe_price_id}")
 
-            # Update amount from the new price
-            if isinstance(current_price, dict) and 'unit_amount' in current_price:
-                subscription.amount_cents = current_price['unit_amount']
-                logger.info(f"[WEBHOOK] Updated amount_cents to {subscription.amount_cents}")
+            # Update price ID and amount
+            if subscription.stripe_price_id != current_price_id:
+                logger.info(f"[WEBHOOK] Subscription price changed from {subscription.stripe_price_id} to {current_price_id}")
+                subscription.stripe_price_id = current_price_id
 
-            # Update currency if available
-            if isinstance(current_price, dict) and 'currency' in current_price:
-                subscription.currency = current_price['currency'].upper()
-                logger.info(f"[WEBHOOK] Updated currency to {subscription.currency}")
+                # Update amount from the new price
+                if isinstance(current_price, dict) and 'unit_amount' in current_price:
+                    subscription.amount_cents = current_price['unit_amount']
+                    logger.info(f"[WEBHOOK] Updated amount_cents to {subscription.amount_cents}")
 
-            # First, try to get tier_id from subscription metadata (set by execute-upgrade)
-            if stripe_sub.metadata and 'tier_id' in stripe_sub.metadata:
-                new_tier_id = int(stripe_sub.metadata['tier_id'])
+                # Update currency if available
+                if isinstance(current_price, dict) and 'currency' in current_price:
+                    subscription.currency = current_price['currency'].upper()
+                    logger.info(f"[WEBHOOK] Updated currency to {subscription.currency}")
+
+            # Check metadata for tier_id (set by execute-upgrade or create-checkout)
+            metadata = sub_data.get('metadata', {})
+            if metadata and 'tier_id' in metadata:
+                new_tier_id = int(metadata['tier_id'])
                 new_tier = session.query(TierPlan).filter(TierPlan.id == new_tier_id).first()
                 if new_tier:
-                    logger.info(f"[WEBHOOK] Found tier {new_tier.name} from subscription metadata")
-
-            # Fallback: search for tier by price ID in stripe_price_ids
-            if not new_tier:
-                all_tiers = session.query(TierPlan).all()
-                for tier in all_tiers:
-                    if tier.stripe_price_ids:
-                        for billing_cycle, currencies in tier.stripe_price_ids.items():
-                            if isinstance(currencies, dict):
-                                for currency, price_id in currencies.items():
-                                    if price_id == current_price_id:
-                                        new_tier = tier
-                                        logger.info(f"[WEBHOOK] Found tier {tier.name} from stripe_price_ids")
-                                        break
-                            if new_tier:
-                                break
-                    if new_tier:
-                        break
+                    logger.info(f"[WEBHOOK] Found tier {new_tier.name} (id={new_tier.id}) from subscription metadata")
 
             # Update tier if found and different
             if new_tier and subscription.tier_id != new_tier.id:
@@ -570,8 +561,12 @@ async def handle_subscription_updated(event, session: Session):
                 if user:
                     user.tier_id = new_tier.id
                 tier_changed = True
+            elif new_tier:
+                logger.info(f"[WEBHOOK] Tier already correct: {new_tier.id} ({new_tier.name})")
+        else:
+            logger.warning(f"[WEBHOOK] Could not extract price_id from subscription items")
     except Exception as e:
-        logger.error(f"[WEBHOOK] Error checking for tier change: {e}")
+        logger.error(f"[WEBHOOK] Error checking for tier change: {e}", exc_info=True)
 
     session.commit()
     logger.info(f"[WEBHOOK] Updated subscription {subscription.id} to status {stripe_sub.status}")
