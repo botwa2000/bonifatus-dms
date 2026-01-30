@@ -32,7 +32,43 @@ def get_active_subscription(session: Session, user_id) -> Subscription | None:
     """
     Get the user's current active subscription.
     Returns the most recent one if multiple exist (legacy data from old upgrade flow).
+    Verifies Stripe-managed subscriptions against Stripe to reconcile stale DB records
+    caused by webhook processing failures.
     """
+    import stripe
+
+    subs = session.execute(
+        select(Subscription)
+        .where(Subscription.user_id == user_id)
+        .where(Subscription.status.in_(ACTIVE_SUBSCRIPTION_STATUSES))
+        .order_by(Subscription.created_at.desc())
+    ).scalars().all()
+
+    if not subs:
+        return None
+
+    reconciled = False
+    for sub in subs:
+        # Only verify Stripe-managed subscriptions (skip admin-granted)
+        if not sub.stripe_subscription_id or sub.stripe_subscription_id.startswith('admin_granted'):
+            continue
+        try:
+            stripe_sub = stripe.Subscription.retrieve(sub.stripe_subscription_id)
+            stripe_status = stripe_sub['status'] if isinstance(stripe_sub, dict) else stripe_sub.status
+            if stripe_status not in ACTIVE_SUBSCRIPTION_STATUSES:
+                logger.info(f"Reconciling stale subscription {sub.stripe_subscription_id}: DB={sub.status}, Stripe={stripe_status}")
+                sub.status = stripe_status
+                if stripe_status in ('canceled', 'cancelled'):
+                    sub.canceled_at = sub.canceled_at or datetime.now(timezone.utc)
+                    sub.ended_at = sub.ended_at or datetime.now(timezone.utc)
+                reconciled = True
+        except Exception as e:
+            logger.warning(f"Could not verify subscription {sub.stripe_subscription_id} with Stripe: {e}")
+
+    if reconciled:
+        session.commit()
+
+    # Re-query after reconciliation to return only genuinely active subscriptions
     return session.execute(
         select(Subscription)
         .where(Subscription.user_id == user_id)
