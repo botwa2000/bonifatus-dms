@@ -201,20 +201,36 @@ async def cancel_subscription(
                 logger.info(f"  Payment intent ID from DB: {recent_payment.stripe_payment_intent_id}")
                 payment_intent_id = recent_payment.stripe_payment_intent_id
 
-            # If no Payment record, try to get payment_intent from Stripe invoice directly
-            if not payment_intent_id and subscription.stripe_subscription_id:
+            # If no Payment record, try to get the charge from Stripe directly
+            # Note: Stripe deprecated invoice.payment_intent (2025-03-31 API change)
+            # Instead, we find the latest charge for this customer
+            if not payment_intent_id and current_user.stripe_customer_id:
                 try:
-                    # Get the subscription's invoices from Stripe
-                    invoices = stripe.Invoice.list(
-                        subscription=subscription.stripe_subscription_id,
-                        status='paid',
+                    charges = stripe.Charge.list(
+                        customer=current_user.stripe_customer_id,
                         limit=1
                     )
-                    if invoices.data:
-                        payment_intent_id = invoices.data[0].payment_intent
-                        logger.info(f"  Payment intent ID from Stripe invoice: {payment_intent_id}")
+                    if charges.data and charges.data[0].payment_intent:
+                        payment_intent_id = charges.data[0].payment_intent
+                        logger.info(f"  Payment intent ID from Stripe charge: {payment_intent_id}")
+                    elif charges.data:
+                        # If no payment_intent on charge, we can refund the charge directly
+                        charge_id = charges.data[0].id
+                        logger.info(f"  Using charge ID directly for refund: {charge_id}")
+                        try:
+                            refund = stripe.Refund.create(
+                                charge=charge_id,
+                                reason='requested_by_customer'
+                            )
+                            refund_issued = True
+                            refund_amount_cents = refund.amount
+                            refund_currency = refund.currency.upper()
+                            stripe_refund_id = refund.id
+                            logger.info(f"Refund issued via charge for user {current_user.email}: {refund_amount_cents/100} {refund_currency}")
+                        except Exception as e:
+                            logger.error(f"Refund via charge failed for user {current_user.email}: {e}")
                 except Exception as e:
-                    logger.warning(f"Could not retrieve invoices from Stripe: {e}")
+                    logger.warning(f"Could not retrieve charges from Stripe: {e}")
 
             if payment_intent_id:
                 try:

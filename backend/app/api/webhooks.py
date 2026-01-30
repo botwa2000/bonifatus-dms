@@ -6,6 +6,7 @@ Handles asynchronous events from Stripe (payments, subscriptions, invoices)
 
 import logging
 import asyncio
+import stripe
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -728,25 +729,38 @@ async def handle_invoice_payment_succeeded(event, session: Session):
         session.add(invoice)
 
     # Also create a Payment record for refund tracking
-    # The payment_intent is needed for refunds during cancellation
-    if hasattr(stripe_invoice, 'payment_intent') and stripe_invoice.payment_intent:
-        existing_payment = session.query(Payment).filter(
-            Payment.stripe_payment_intent_id == stripe_invoice.payment_intent
-        ).first()
+    # Note: Stripe deprecated invoice.payment_intent (2025-03-31 API change)
+    # Use Charge.list to find the charge associated with this invoice
+    try:
+        charges = stripe.Charge.list(
+            customer=stripe_invoice.customer,
+            limit=5
+        )
+        for charge in charges.data:
+            if charge.invoice == stripe_invoice.id and charge.paid:
+                existing_payment = session.query(Payment).filter(
+                    Payment.stripe_payment_intent_id == charge.payment_intent
+                ).first() if charge.payment_intent else None
 
-        if not existing_payment:
-            payment = Payment(
-                user_id=user.id,
-                stripe_payment_intent_id=stripe_invoice.payment_intent,
-                stripe_invoice_id=stripe_invoice.id,
-                amount_cents=stripe_invoice.amount_paid,
-                amount_refunded_cents=0,
-                currency=stripe_invoice.currency.upper(),
-                status='succeeded',
-                payment_method='card'  # Subscriptions typically use card
-            )
-            session.add(payment)
-            logger.info(f"Created Payment record for invoice {stripe_invoice.id} with payment_intent {stripe_invoice.payment_intent}")
+                if not existing_payment:
+                    payment = Payment(
+                        user_id=user.id,
+                        stripe_payment_intent_id=charge.payment_intent,
+                        stripe_invoice_id=stripe_invoice.id,
+                        amount_cents=charge.amount,
+                        amount_refunded_cents=charge.amount_refunded or 0,
+                        currency=charge.currency.upper(),
+                        status='succeeded',
+                        payment_method='card',
+                        card_brand=charge.payment_method_details.card.brand if charge.payment_method_details and charge.payment_method_details.card else None,
+                        card_last4=charge.payment_method_details.card.last4 if charge.payment_method_details and charge.payment_method_details.card else None,
+                        receipt_url=charge.receipt_url
+                    )
+                    session.add(payment)
+                    logger.info(f"Created Payment record for invoice {stripe_invoice.id} with payment_intent {charge.payment_intent}")
+                break
+    except Exception as e:
+        logger.warning(f"Could not create Payment record from charge: {e}")
 
     session.commit()
     logger.info(f"Invoice {stripe_invoice.id} payment succeeded for user {user.email}")
