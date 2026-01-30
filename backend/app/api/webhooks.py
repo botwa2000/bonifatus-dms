@@ -360,6 +360,27 @@ async def handle_subscription_created(event, session: Session):
         amount_cents=amount_cents
     )
 
+    # Cancel any existing active subscriptions in Stripe before adding the new one
+    # This prevents duplicate subscriptions when user goes through Checkout while having an active sub
+    from app.api.billing_subscriptions import ACTIVE_SUBSCRIPTION_STATUSES
+    existing_active_subs = session.query(Subscription).filter(
+        Subscription.user_id == user.id,
+        Subscription.status.in_(ACTIVE_SUBSCRIPTION_STATUSES),
+        Subscription.stripe_subscription_id != stripe_sub.id  # Not the new one
+    ).all()
+
+    for old_sub in existing_active_subs:
+        logger.warning(f"[WEBHOOK] Found existing active subscription {old_sub.stripe_subscription_id} - cancelling to consolidate")
+        if old_sub.stripe_subscription_id:
+            try:
+                stripe.Subscription.cancel(old_sub.stripe_subscription_id)
+                logger.info(f"[WEBHOOK] Cancelled old subscription {old_sub.stripe_subscription_id} in Stripe")
+            except Exception as e:
+                logger.warning(f"[WEBHOOK] Could not cancel old subscription {old_sub.stripe_subscription_id}: {e}")
+        old_sub.status = 'canceled'
+        old_sub.canceled_at = datetime.now(timezone.utc)
+        old_sub.ended_at = datetime.now(timezone.utc)
+
     session.add(db_subscription)
 
     # Update user's tier

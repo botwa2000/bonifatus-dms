@@ -147,8 +147,7 @@ async def cancel_subscription(
     All configuration values loaded from system_settings table
     """
     try:
-        # Get active subscription using centralized helper
-        # This handles multiple subscription records from legacy upgrade flow
+        # Get the primary active subscription
         subscription = get_active_subscription(session, current_user.id)
 
         logger.info(f"Cancel subscription request from user {current_user.email}")
@@ -164,6 +163,14 @@ async def cancel_subscription(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No active subscription found"
             )
+
+        # Find ALL active subscriptions for this user (handles legacy duplicates)
+        all_active_subs = session.query(Subscription).filter(
+            Subscription.user_id == current_user.id,
+            Subscription.status.in_(ACTIVE_SUBSCRIPTION_STATUSES)
+        ).all()
+        if len(all_active_subs) > 1:
+            logger.warning(f"User {current_user.email} has {len(all_active_subs)} active subscriptions - will cancel all")
 
         # Get refund policy from database
         refund_policy_days = get_refund_policy_days(session)
@@ -345,6 +352,20 @@ async def cancel_subscription(
 
             access_end_date = subscription.current_period_end.strftime('%B %d, %Y')
             downgraded_to_free = False
+
+        # Cancel any OTHER active subscriptions in Stripe (handles legacy duplicates)
+        for other_sub in all_active_subs:
+            if other_sub.id == subscription.id:
+                continue  # Already handled above
+            if other_sub.stripe_subscription_id:
+                try:
+                    stripe.Subscription.cancel(other_sub.stripe_subscription_id)
+                    logger.info(f"Also cancelled duplicate subscription {other_sub.stripe_subscription_id}")
+                except Exception as e:
+                    logger.warning(f"Could not cancel duplicate subscription {other_sub.stripe_subscription_id}: {e}")
+            other_sub.status = 'canceled'
+            other_sub.canceled_at = datetime.now(timezone.utc)
+            other_sub.ended_at = datetime.now(timezone.utc)
 
         # Create cancellation record in database
         cancellation = SubscriptionCancellation(
