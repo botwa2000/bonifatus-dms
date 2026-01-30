@@ -491,18 +491,30 @@ async def handle_subscription_updated(event, session: Session):
     old_tier_id = subscription.tier_id
     old_price_id = subscription.stripe_price_id
 
-    subscription.status = stripe_sub.status
-    subscription.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
-    subscription.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
-    subscription.cancel_at_period_end = stripe_sub.cancel_at_period_end
+    # Use dict-style access for Stripe objects (safe across API versions)
+    sub_data = stripe_sub if isinstance(stripe_sub, dict) else stripe_sub.to_dict() if hasattr(stripe_sub, 'to_dict') else {}
 
-    if stripe_sub.canceled_at:
-        subscription.canceled_at = datetime.fromtimestamp(stripe_sub.canceled_at, tz=timezone.utc)
+    subscription.status = sub_data.get('status', stripe_sub.status if hasattr(stripe_sub, 'status') else subscription.status)
+
+    period_start = sub_data.get('current_period_start')
+    period_end = sub_data.get('current_period_end')
+
+    if period_start:
+        subscription.current_period_start = datetime.fromtimestamp(period_start, tz=timezone.utc)
+    if period_end:
+        subscription.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+
+    subscription.cancel_at_period_end = sub_data.get('cancel_at_period_end', False)
+
+    canceled_at = sub_data.get('canceled_at')
+    if canceled_at:
+        subscription.canceled_at = datetime.fromtimestamp(canceled_at, tz=timezone.utc)
 
     user = session.query(User).filter(User.id == subscription.user_id).first()
     if user:
-        user.subscription_status = stripe_sub.status
-        user.subscription_ends_at = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
+        user.subscription_status = sub_data.get('status', 'active')
+        if period_end:
+            user.subscription_ends_at = datetime.fromtimestamp(period_end, tz=timezone.utc)
 
     # Check if the price has changed (upgrade/downgrade)
     tier_changed = False
