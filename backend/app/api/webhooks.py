@@ -673,6 +673,29 @@ async def handle_invoice_payment_succeeded(event, session: Session):
     """Process invoice.payment_succeeded event"""
     stripe_invoice = event.data.object
 
+    # Extract subscription ID early (handle both string and object forms)
+    # Stripe API changes may return objects instead of string IDs
+    sub_id = None
+    try:
+        sub_val = getattr(stripe_invoice, 'subscription', None)
+        if isinstance(sub_val, str):
+            sub_id = sub_val
+        elif hasattr(sub_val, 'id'):
+            sub_id = sub_val.id
+    except Exception:
+        pass
+
+    # Fallback: get subscription ID from line items
+    if not sub_id:
+        try:
+            if stripe_invoice.lines and stripe_invoice.lines.data:
+                for line in stripe_invoice.lines.data:
+                    if hasattr(line, 'subscription') and line.subscription:
+                        sub_id = line.subscription if isinstance(line.subscription, str) else line.subscription.id
+                        break
+        except Exception:
+            pass
+
     user = session.query(User).filter(
         User.stripe_customer_id == stripe_invoice.customer
     ).first()
@@ -768,16 +791,17 @@ async def handle_invoice_payment_succeeded(event, session: Session):
     logger.info(f"Invoice {stripe_invoice.id} payment succeeded for user {user.email}")
 
     # Check if this is an upgrade invoice - if so, update the tier
-    if stripe_invoice.billing_reason in ('subscription_update', 'subscription_create'):
+    if stripe_invoice.billing_reason in ('subscription_update', 'subscription_create') and sub_id:
         try:
+            logger.info(f"Checking for upgrade on subscription {sub_id}")
+
             # Get the subscription from Stripe to check the current price
-            import stripe
-            stripe_sub = stripe.Subscription.retrieve(stripe_invoice.subscription)
+            stripe_sub = stripe.Subscription.retrieve(sub_id)
             current_price_id = stripe_sub['items']['data'][0]['price']['id']
 
             # Find the tier for this price by checking all tiers' stripe_price_ids
             subscription = session.query(Subscription).filter(
-                Subscription.stripe_subscription_id == stripe_invoice.subscription
+                Subscription.stripe_subscription_id == sub_id
             ).first()
 
             if subscription and subscription.stripe_price_id != current_price_id:
@@ -833,8 +857,8 @@ async def handle_invoice_payment_succeeded(event, session: Session):
     try:
         # Get subscription and tier information
         subscription = session.query(Subscription).filter(
-            Subscription.stripe_subscription_id == stripe_invoice.subscription
-        ).first() if hasattr(stripe_invoice, 'subscription') and stripe_invoice.subscription else None
+            Subscription.stripe_subscription_id == sub_id
+        ).first() if sub_id else None
 
         tier = None
         if subscription:
