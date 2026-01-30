@@ -1096,24 +1096,31 @@ async def execute_upgrade(
 
         # Use Stripe Subscription.modify() - the industry standard approach
         # This modifies the existing subscription instead of creating a new one
+        # Note: metadata cannot be passed with payment_behavior='pending_if_incomplete'
+        # so we update metadata in a separate call
         updated_subscription = stripe.Subscription.modify(
             subscription.stripe_subscription_id,
             items=[{
                 'id': subscription_item_id,
                 'price': new_price_id,
             }],
-            # Create prorations and invoice immediately
             proration_behavior='always_invoice',
-            # Require payment confirmation for the prorated amount
             payment_behavior='pending_if_incomplete',
-            # Store tier info in metadata for webhook processing
-            metadata={
-                'user_id': str(current_user.id),
-                'tier_id': str(tier_id),
-                'billing_cycle': billing_cycle,
-                'currency': currency,
-            }
         )
+
+        # Update metadata separately (not supported with pending_if_incomplete)
+        try:
+            stripe.Subscription.modify(
+                subscription.stripe_subscription_id,
+                metadata={
+                    'user_id': str(current_user.id),
+                    'tier_id': str(tier_id),
+                    'billing_cycle': billing_cycle,
+                    'currency': currency,
+                }
+            )
+        except Exception as meta_err:
+            logger.warning(f"Could not update subscription metadata: {meta_err}")
 
         logger.info(f"Subscription modified successfully: {updated_subscription.id}")
         logger.info(f"  New status: {updated_subscription.status}")
