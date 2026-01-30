@@ -628,35 +628,37 @@ async def handle_subscription_deleted(event, session: Session):
         logger.info(f"[WEBHOOK] Skipping cancellation email - this is an upgrade")
         return
 
-    # Send cancellation confirmation email
+    # Check if cancellation was initiated by our API (SubscriptionCancellation record exists)
+    # If so, the API endpoint already sent the email - skip to avoid duplicate
+    from app.database.models import SubscriptionCancellation
+    existing_cancellation = session.query(SubscriptionCancellation).filter(
+        SubscriptionCancellation.subscription_id == subscription.id
+    ).first()
+
+    if existing_cancellation:
+        logger.info(f"[WEBHOOK] Cancellation record already exists for subscription {subscription.id} - skipping email (already sent by API)")
+        return
+
+    # Send cancellation confirmation email only for Stripe-dashboard-initiated cancellations
+    logger.info(f"[WEBHOOK] No cancellation record found - sending email for Stripe-initiated cancellation")
     try:
-        # Access ends at current_period_end (user keeps access until then)
         access_end_date = subscription.current_period_end.strftime('%B %d, %Y') if subscription.current_period_end else 'today'
 
-        # Get frontend URL
         frontend_url = settings.app.app_frontend_url
-        reactivate_url = f"{frontend_url}/profile/subscription"
+        reactivate_url = f"{frontend_url}/profile"
         feedback_url = f"{frontend_url}/feedback?reason=cancellation"
         support_url = f"{frontend_url}/support"
 
-        # Free tier features (you can customize these)
-        free_tier_features = [
-            "Upload up to 50 documents per month",
-            "Basic document categorization",
-            "Access to your document history"
-        ]
-
-        # Send email
         asyncio.create_task(
             email_service.send_cancellation_email(
                 session=session,
                 user_email=user.email,
                 user_name=user.full_name or user.email,
-                plan_name=tier.name if tier else 'Premium',
+                plan_name=tier.display_name if tier else 'Premium',
                 access_end_date=access_end_date,
-                free_tier_feature_1=free_tier_features[0],
-                free_tier_feature_2=free_tier_features[1],
-                free_tier_feature_3=free_tier_features[2],
+                free_tier_feature_1='',
+                free_tier_feature_2='',
+                free_tier_feature_3='',
                 reactivate_url=reactivate_url,
                 feedback_url=feedback_url,
                 support_url=support_url
