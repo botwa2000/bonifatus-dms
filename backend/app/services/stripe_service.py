@@ -71,6 +71,27 @@ class StripeService:
                 **(metadata or {})
             }
 
+            # Search for existing customer by email to avoid orphaned duplicates
+            existing_customers = stripe.Customer.search(
+                query=f'email:"{email}"'
+            )
+            if existing_customers.data:
+                customer = existing_customers.data[0]
+                # Update metadata to link to new user_id
+                stripe.Customer.modify(customer.id, metadata=customer_metadata, name=name)
+                logger.info(f"Reused existing Stripe customer {customer.id} for user {user_id}")
+
+                # Cancel any orphaned active subscriptions
+                old_subs = stripe.Subscription.list(customer=customer.id, status='active')
+                for old_sub in old_subs.data:
+                    try:
+                        stripe.Subscription.cancel(old_sub.id)
+                        logger.info(f"Cancelled orphaned subscription {old_sub.id} for re-created user {email}")
+                    except Exception as e:
+                        logger.warning(f"Could not cancel orphaned subscription {old_sub.id}: {e}")
+
+                return customer
+
             customer = stripe.Customer.create(
                 email=email,
                 name=name,

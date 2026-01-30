@@ -182,13 +182,31 @@ async def create_checkout_session(
         # Get or create Stripe customer BEFORE checkout to prevent race conditions
         stripe_customer_id = getattr(current_user, 'stripe_customer_id', None)
         if not stripe_customer_id:
-            # Create customer now, not during checkout
-            customer = stripe.Customer.create(
-                email=current_user.email,
-                name=current_user.full_name,
-                metadata={'user_id': str(current_user.id)}
+            # Search for existing Stripe customer by email (handles re-created accounts)
+            existing_customers = stripe.Customer.search(
+                query=f'email:"{current_user.email}"'
             )
-            stripe_customer_id = customer.id
+            if existing_customers.data:
+                customer = existing_customers.data[0]
+                stripe_customer_id = customer.id
+                logger.info(f"Found existing Stripe customer {stripe_customer_id} for email {current_user.email}")
+
+                # Cancel any active subscriptions from previous account
+                old_subs = stripe.Subscription.list(customer=stripe_customer_id, status='active')
+                for old_sub in old_subs.data:
+                    try:
+                        stripe.Subscription.cancel(old_sub.id)
+                        logger.info(f"Cancelled orphaned subscription {old_sub.id} for re-created user {current_user.email}")
+                    except Exception as e:
+                        logger.warning(f"Could not cancel orphaned subscription {old_sub.id}: {e}")
+            else:
+                customer = stripe.Customer.create(
+                    email=current_user.email,
+                    name=current_user.full_name,
+                    metadata={'user_id': str(current_user.id)}
+                )
+                stripe_customer_id = customer.id
+                logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
             # Save to database immediately using direct UPDATE to avoid session state issues
             session.execute(
@@ -197,7 +215,6 @@ async def create_checkout_session(
                 .values(stripe_customer_id=stripe_customer_id)
             )
             session.commit()
-            logger.info(f"Created Stripe customer {stripe_customer_id} for user {current_user.email}")
 
         # Clear any pending invoice items that might cause currency conflicts
         try:
