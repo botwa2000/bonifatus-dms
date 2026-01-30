@@ -467,7 +467,8 @@ async def get_public_tier_plans():
     """
     session = db_manager.session_local()
     try:
-        from app.database.models import TierPlan, Currency
+        from app.database.models import TierPlan, Currency, TierProviderSettings
+        from app.core.provider_registry import ProviderRegistry
 
         result = session.execute(
             select(TierPlan).where(
@@ -483,6 +484,25 @@ async def get_public_tier_plans():
         )
         currencies = currencies_result.scalars().all()
         currency_map = {curr.code: curr.symbol for curr in currencies}
+
+        # Get provider settings for all tiers
+        provider_settings_result = session.execute(
+            select(TierProviderSettings)
+        )
+        all_provider_settings = provider_settings_result.scalars().all()
+
+        # Group provider settings by tier_id
+        tier_provider_map: Dict[int, Dict[str, bool]] = {}
+        for ps in all_provider_settings:
+            if ps.tier_id not in tier_provider_map:
+                tier_provider_map[ps.tier_id] = {}
+            tier_provider_map[ps.tier_id][ps.provider_key] = ps.is_enabled
+
+        # Build provider display names from registry
+        provider_display_names = {
+            p.provider_key: p.display_name
+            for p in ProviderRegistry.get_all()
+        }
 
         tier_list = []
         for tier in tiers:
@@ -513,7 +533,9 @@ async def get_public_tier_plans():
                 'multi_user_enabled': tier.multi_user_enabled,
                 'api_access_enabled': tier.api_access_enabled,
                 'priority_support': tier.priority_support,
-                'custom_categories_limit': tier.custom_categories_limit
+                'custom_categories_limit': tier.custom_categories_limit,
+                'provider_settings': tier_provider_map.get(tier.id, {}),
+                'provider_display_names': provider_display_names
             })
 
         return {'tiers': tier_list}

@@ -74,6 +74,8 @@ interface TierPlan {
   currency_symbol: string
   description: string
   email_to_process_enabled?: boolean
+  provider_settings?: Record<string, boolean>
+  provider_display_names?: Record<string, string>
 }
 
 export default function ProfilePage() {
@@ -1126,6 +1128,18 @@ export default function ProfilePage() {
                               <div>
                                 <h4 className="font-semibold text-neutral-900 dark:text-white">{tier.display_name}</h4>
                                 <p className="text-sm text-neutral-600 mt-1">{tier.description}</p>
+                                {tier.provider_settings && (() => {
+                                  const enabledProviders = Object.entries(tier.provider_settings)
+                                    .filter(([, enabled]) => enabled)
+                                    .map(([key]) => tier.provider_display_names?.[key] || key.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()))
+                                  if (enabledProviders.length === 0) return null
+                                  const label = enabledProviders.length >= 2 ? 'Multi-cloud' : 'Cloud'
+                                  return (
+                                    <p className="text-xs text-neutral-500 mt-1">
+                                      {label}: {enabledProviders.join(', ')}
+                                    </p>
+                                  )
+                                })()}
                               </div>
                               {isComingSoon && <Badge variant="warning">Coming Soon</Badge>}
                             </div>

@@ -34,6 +34,8 @@ interface TierPlan {
   api_access_enabled: boolean
   priority_support: boolean
   custom_categories_limit: number | null
+  provider_settings?: Record<string, boolean>
+  provider_display_names?: Record<string, string>
 }
 
 export default function HomePageClient() {
@@ -603,16 +605,24 @@ export default function HomePageClient() {
                         </span>
                       </li>
 
-                      {isPro && (
-                        <li className="flex items-start">
-                          <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-neutral-700 dark:text-neutral-300">
-                            <strong>✨ Multi-cloud:</strong> Google Drive, Dropbox, OneDrive, Box
-                          </span>
-                        </li>
-                      )}
+                      {tier.provider_settings && (() => {
+                        const enabledProviders = Object.entries(tier.provider_settings)
+                          .filter(([, enabled]) => enabled)
+                          .map(([key]) => tier.provider_display_names?.[key] || key.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()))
+                        const providerCount = enabledProviders.length
+                        if (providerCount === 0) return null
+                        const label = providerCount >= 2 ? 'Multi-cloud' : 'Single cloud'
+                        return (
+                          <li className="flex items-start">
+                            <svg className="h-5 w-5 text-admin-success mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-neutral-700 dark:text-neutral-300">
+                              {providerCount >= 2 ? <strong>✨ {label}:</strong> : <>{label}:</>} {enabledProviders.join(', ')}
+                            </span>
+                          </li>
+                        )
+                      })()}
                     </ul>
 
                     <Link href={`/signup?tier_id=${tier.id}&tier_name=${encodeURIComponent(tier.display_name)}&billing_cycle=${billingCycle}`}>
