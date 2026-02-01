@@ -192,12 +192,18 @@ export const trackSubscriptionStart = (tier: string, billingCycle: string) => {
   }
 }
 
-export const trackSubscriptionComplete = (tier: string, billingCycle: string, amount: number) => {
-  // GA4 Enhanced Ecommerce
+export const trackSubscriptionComplete = (tier: string, billingCycle: string, amount: number, currency: string, transactionId?: string) => {
+  if (!analyticsEnabled) return
+
+  if (!isProduction) {
+    logger.debug('[Analytics DEV] Subscription complete:', { tier, billingCycle, amount, currency, transactionId })
+  }
+
+  // GA4 Enhanced Ecommerce - 'purchase' event is importable as a Google Ads conversion
   window.gtag?.('event', 'purchase', {
-    transaction_id: `sub_${Date.now()}`,
+    transaction_id: transactionId || `sub_${Date.now()}`,
     value: amount,
-    currency: 'USD',
+    currency: currency,
     items: [{
       item_id: tier,
       item_name: `${tier} Plan`,
@@ -212,7 +218,7 @@ export const trackSubscriptionComplete = (tier: string, billingCycle: string, am
       tier,
       billing_cycle: billingCycle,
       amount,
-      currency: 'USD',
+      currency: currency,
     })
   }
 }

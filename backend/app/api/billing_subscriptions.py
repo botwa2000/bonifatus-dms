@@ -288,6 +288,64 @@ async def create_checkout_session(
         )
 
 
+@router.get(
+    "/subscriptions/checkout-session/{session_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Get Checkout Session Details"
+)
+async def get_checkout_session(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db)
+):
+    """
+    Retrieve details of a completed Stripe checkout session.
+    Used by the frontend to fire conversion tracking events after successful checkout.
+    """
+    import stripe
+
+    try:
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+    except stripe.error.InvalidRequestError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Checkout session not found"
+        )
+    except Exception as e:
+        logger.error(f"Failed to retrieve checkout session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve checkout session"
+        )
+
+    # Verify the checkout session belongs to this user's Stripe customer
+    if checkout_session.get('customer') != current_user.stripe_customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Checkout session does not belong to this user"
+        )
+
+    metadata = checkout_session.get('metadata', {})
+    amount_total = checkout_session.get('amount_total', 0)
+    currency = checkout_session.get('currency', 'usd').upper()
+
+    # Get tier name from metadata
+    tier_id = metadata.get('tier_id')
+    tier_name = None
+    if tier_id:
+        tier = session.query(TierPlan).filter(TierPlan.id == int(tier_id)).first()
+        if tier:
+            tier_name = tier.display_name
+
+    return {
+        "tier_name": tier_name or metadata.get('tier_id', 'unknown'),
+        "billing_cycle": metadata.get('billing_cycle', 'monthly'),
+        "amount_total": amount_total / 100,  # Convert from cents
+        "currency": currency,
+        "subscription_id": checkout_session.get('subscription', ''),
+    }
+
+
 @router.post(
     "/subscribe",
     response_model=SubscriptionResponse,

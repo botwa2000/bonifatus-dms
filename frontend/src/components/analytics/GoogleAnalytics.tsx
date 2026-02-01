@@ -63,8 +63,8 @@ export default function GoogleAnalytics() {
               page_path: window.location.pathname,
               cookie_flags: 'SameSite=None;Secure',
               anonymize_ip: true,
-              allow_google_signals: false,
-              allow_ad_personalization_signals: false,
+              allow_google_signals: true,
+              allow_ad_personalization_signals: true,
             });
           `,
         }}

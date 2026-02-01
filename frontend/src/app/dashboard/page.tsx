@@ -7,10 +7,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { delegateService } from '@/services/delegate.service'
+import { trackSubscriptionComplete } from '@/lib/analytics'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
 import { InfoBanner } from '@/components/ui'
@@ -29,6 +30,7 @@ interface Document {
 export default function DashboardPage() {
   const { user, isLoading, loadUser, logout } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // ALL HOOKS MUST BE AT THE TOP - BEFORE ANY CONDITIONAL LOGIC
   const [recentDocuments, setRecentDocuments] = useState<Document[]>([])
@@ -161,6 +163,47 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  // Fire Google Ads conversion event after successful Stripe checkout
+  useEffect(() => {
+    const checkout = searchParams.get('checkout')
+    const sessionId = searchParams.get('session_id')
+
+    if (checkout !== 'success' || !sessionId || !user) return
+
+    // Prevent duplicate firing on page refresh
+    const storageKey = `conversion_tracked_${sessionId}`
+    if (sessionStorage.getItem(storageKey)) return
+
+    const fireConversionEvent = async () => {
+      try {
+        const sessionDetails = await apiClient.get<{
+          tier_name: string
+          billing_cycle: string
+          amount_total: number
+          currency: string
+          subscription_id: string
+        }>(`/api/v1/billing/subscriptions/checkout-session/${sessionId}`, true)
+
+        trackSubscriptionComplete(
+          sessionDetails.tier_name,
+          sessionDetails.billing_cycle,
+          sessionDetails.amount_total,
+          sessionDetails.currency,
+          sessionDetails.subscription_id
+        )
+
+        sessionStorage.setItem(storageKey, 'true')
+        logger.debug('Conversion event fired for session:', sessionId)
+      } catch (error) {
+        logger.error('Failed to fire conversion event:', error)
+      }
+
+      // Clean up URL params
+      window.history.replaceState({}, '', '/dashboard')
+    }
+
+    fireConversionEvent()
+  }, [searchParams, user])
 
   // Show loading state while user data loads or processing tier selection
   if (isLoading || !user || isProcessingTier) {
