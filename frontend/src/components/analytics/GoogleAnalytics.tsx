@@ -3,7 +3,7 @@
 
 import Script from 'next/script'
 import { useEffect, useState } from 'react'
-import { GA_MEASUREMENT_ID } from '@/lib/analytics'
+import { GA_MEASUREMENT_ID, GOOGLE_ADS_ID } from '@/lib/analytics'
 import * as CookieConsent from 'vanilla-cookieconsent'
 
 export default function GoogleAnalytics() {
@@ -66,6 +66,7 @@ export default function GoogleAnalytics() {
               allow_google_signals: true,
               allow_ad_personalization_signals: true,
             });
+            ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ''}
           `,
         }}
       />

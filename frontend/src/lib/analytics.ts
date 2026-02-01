@@ -10,6 +10,8 @@ import { logger } from '@/lib/logger'
 
 // Google Analytics 4
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || ''
+export const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || ''
+export const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL || ''
 
 // PostHog (Product Analytics with session recordings)
 export const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY || ''
@@ -212,6 +214,16 @@ export const trackSubscriptionComplete = (tier: string, billingCycle: string, am
       quantity: 1,
     }],
   })
+
+  // Direct Google Ads conversion event
+  if (GOOGLE_ADS_ID && GOOGLE_ADS_CONVERSION_LABEL) {
+    window.gtag?.('event', 'conversion', {
+      send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}`,
+      value: amount,
+      currency: currency,
+      transaction_id: transactionId || `sub_${Date.now()}`,
+    })
+  }
 
   if (typeof window !== 'undefined' && window.posthog) {
     window.posthog.capture('subscription_complete', {
