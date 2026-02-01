@@ -22,7 +22,7 @@ export const faqs: FAQ[] = [
     id: 'getting-started-1',
     category: FAQCategory.GETTING_STARTED,
     question: 'How do I create an account?',
-    answer: 'Click "Sign In" in the top right corner, then select "Sign in with Google". You\'ll be redirected to Google\'s secure login page. Once authenticated, you\'ll be automatically signed up with the Free tier, which includes 50 pages per month.'
+    answer: 'Click "Sign In" in the top right corner, then select "Sign in with Google". You\'ll be redirected to Google\'s secure login page. Once authenticated, you\'ll be automatically signed up with the Free tier, which includes 20 pages per month.'
   },
   {
     id: 'getting-started-2',
@@ -76,7 +76,7 @@ export const faqs: FAQ[] = [
     id: 'getting-started-10',
     category: FAQCategory.GETTING_STARTED,
     question: 'What is the difference between the Free, Starter, and Pro tiers?',
-    answer: 'The <strong>Free tier</strong> includes 50 pages/month, perfect for trying out the service. The <strong>Starter tier</strong> offers 250 pages/month with bulk upload capabilities for light users. The <strong>Pro tier</strong> provides unlimited pages, unlimited users, bulk processing, email-to-process feature, and multi-cloud support (Google Drive, Dropbox, OneDrive, Box).'
+    answer: 'The <strong>Free tier</strong> includes 20 pages/month, perfect for trying out the service. The <strong>Starter tier</strong> offers 100 pages/month with bulk upload and email-to-process capabilities. The <strong>Pro tier</strong> provides unlimited pages, up to 10 team members, bulk processing, email-to-process feature, folder watching, and multi-cloud support (Google Drive, Dropbox, OneDrive, Box).'
   },
   {
     id: 'getting-started-11',
@@ -88,7 +88,7 @@ export const faqs: FAQ[] = [
     id: 'getting-started-12',
     category: FAQCategory.GETTING_STARTED,
     question: 'Can I bulk upload documents?',
-    answer: 'Yes! With the Starter or Pro tier, you can upload multiple documents at once (up to 100 files simultaneously on Pro). Simply drag and drop multiple PDFs, and the AI will process them all in the background. You\'ll receive a notification when processing is complete.'
+    answer: 'Yes! With the Starter or Pro tier, you can upload multiple documents at once (up to 50 files simultaneously on Pro). Simply drag and drop multiple PDFs, and the AI will process them all in the background. You\'ll receive a notification when processing is complete.'
   },
   {
     id: 'getting-started-13',
@@ -134,7 +134,7 @@ export const faqs: FAQ[] = [
     id: 'billing-1',
     category: FAQCategory.BILLING_SECURITY,
     question: 'How much does Bonifatus DMS cost?',
-    answer: 'We offer three tiers: <strong>Free</strong> (€0/month, 50 pages/month), <strong>Starter</strong> (€9.99/month or €99/year, 250 pages/month), and <strong>Pro</strong> (€29.99/month or €299/year, unlimited pages and users). Annual billing saves you approximately 17%.'
+    answer: 'We offer three tiers: <strong>Free</strong> (€0/month, 20 pages/month), <strong>Starter</strong> (from €2.99/month or €28.70/year, 100 pages/month), and <strong>Pro</strong> (from €7.99/month or €76.70/year, unlimited pages, up to 10 team members). Annual billing saves you approximately 20%. Prices shown in EUR — other currencies are available at checkout.'
   },
   {
     id: 'billing-2',
@@ -200,7 +200,7 @@ export const faqs: FAQ[] = [
     id: 'billing-12',
     category: FAQCategory.BILLING_SECURITY,
     question: 'Is there a free trial for paid tiers?',
-    answer: 'All new users start with the Free tier (50 pages/month), which serves as a trial. You can test all core features including AI categorization and smart search before upgrading. There\'s no credit card required for the Free tier.'
+    answer: 'All new users start with the Free tier (20 pages/month), which serves as a trial. You can test all core features including AI categorization and smart search before upgrading. There\'s no credit card required for the Free tier.'
   },
   {
     id: 'billing-13',
@@ -270,7 +270,7 @@ export const faqs: FAQ[] = [
     id: 'integrations-9',
     category: FAQCategory.INTEGRATIONS,
     question: 'What are the storage quotas for each tier?',
-    answer: '<strong>Free:</strong> 500 MB storage limit in your cloud. <strong>Starter:</strong> 5 GB storage limit. <strong>Pro:</strong> Unlimited storage (subject to your cloud provider\'s quota). Storage limits refer to the space used within the Bonifatus DMS folder in your cloud.'
+    answer: '<strong>Free:</strong> 50 MB upload limit per month. <strong>Starter:</strong> 100 MB upload limit per month. <strong>Pro:</strong> 10 GB upload limit per month. Storage limits refer to the monthly upload volume within Bonifatus DMS. Your cloud provider\'s own storage quota also applies.'
   },
   {
     id: 'integrations-10',
@@ -292,7 +292,7 @@ export const faqs: FAQ[] = [
     id: 'troubleshooting-1',
     category: FAQCategory.TROUBLESHOOTING,
     question: 'My document upload failed. What should I do?',
-    answer: 'Common causes: 1) File is not a PDF (convert it first), 2) File is corrupted or password-protected, 3) File exceeds size limit (Free: 10MB, Starter: 25MB, Pro: 100MB per file), or 4) Your cloud storage is full. Check the error message for specific details. If the issue persists, contact support with the document filename.'
+    answer: 'Common causes: 1) File is not a PDF (convert it first), 2) File is corrupted or password-protected, 3) File exceeds size limit (Free: 10MB, Starter: 50MB, Pro: 200MB per file), or 4) Your cloud storage is full. Check the error message for specific details. If the issue persists, contact support with the document filename.'
   },
   {
     id: 'troubleshooting-2',

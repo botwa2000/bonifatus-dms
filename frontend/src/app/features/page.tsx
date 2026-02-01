@@ -211,7 +211,7 @@ export default function FeaturesPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-xl text-white/90 mb-8">
-            Start with 50 pages free. No credit card required.
+            Start with 20 pages free. No credit card required.
           </p>
           <Link
             href="/login"

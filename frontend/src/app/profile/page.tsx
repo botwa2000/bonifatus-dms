@@ -401,7 +401,8 @@ export default function ProfilePage() {
           {
             tier_id: tierId,
             billing_cycle: billingCycle,
-            currency: selectedCurrency.code
+            currency: selectedCurrency.code,
+            locale: navigator.language
           },
           true
         )

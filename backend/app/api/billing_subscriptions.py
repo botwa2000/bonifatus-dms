@@ -101,6 +101,7 @@ async def create_checkout_session(
         billing_cycle = request.get('billing_cycle', 'monthly')
         currency_code = request.get('currency')
         referral_code = request.get('referral_code')
+        locale = request.get('locale')  # Browser locale for Stripe checkout UI
 
         if not tier_id:
             raise HTTPException(
@@ -256,9 +257,24 @@ async def create_checkout_session(
 
         # Create checkout session with existing customer
         # Note: payment_method_types omitted - Stripe automatically shows all methods enabled in dashboard
+        # Map browser locale to Stripe-supported locale
+        # Stripe supports: auto, bg, cs, da, de, el, en, es, et, fi, fil, fr, hr, hu, id, it, ja, ko, lt, lv, ms, mt, nb, nl, pl, pt, ro, ru, sk, sl, sv, th, tr, vi, zh
+        STRIPE_SUPPORTED_LOCALES = {
+            'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fil', 'fr',
+            'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'mt', 'nb',
+            'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'th', 'tr', 'vi', 'zh',
+        }
+        stripe_locale = 'auto'
+        if locale:
+            # Extract language code from locale (e.g., 'en-US' -> 'en')
+            lang = locale.split('-')[0].lower()
+            if lang in STRIPE_SUPPORTED_LOCALES:
+                stripe_locale = lang
+
         checkout_session = stripe.checkout.Session.create(
             customer=stripe_customer_id,
             mode='subscription',
+            locale=stripe_locale,
             line_items=[{
                 'price': price_id,
                 'quantity': 1,

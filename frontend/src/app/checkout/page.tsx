@@ -47,7 +47,8 @@ function CheckoutContent() {
         }>('/api/v1/billing/subscriptions/create-checkout', {
           tier_id: parseInt(tierId),
           billing_cycle: billingCycle as 'monthly' | 'yearly',
-          currency: selectedCurrency.code
+          currency: selectedCurrency.code,
+          locale: navigator.language
         })
 
         if (response.checkout_url) {

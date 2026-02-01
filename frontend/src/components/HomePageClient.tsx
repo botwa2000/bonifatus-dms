@@ -669,7 +669,7 @@ export default function HomePageClient() {
             Ready to Never Manually File Documents Again?
           </h2>
           <p className="text-xl text-blue-100 dark:text-blue-200 dark:text-blue-300 mb-8 max-w-2xl mx-auto">
-            Start free with 50 pages/month. No credit card required.
+            Start free with 20 pages/month. No credit card required.
           </p>
           <Link href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly">
             <Button size="lg" className="!bg-white !text-admin-primary hover:!bg-neutral-50">

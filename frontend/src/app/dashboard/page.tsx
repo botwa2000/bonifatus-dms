@@ -104,7 +104,8 @@ export default function DashboardPage() {
           {
             tier_id: tierId,
             billing_cycle: selectedBillingCycle || 'yearly',  // Default to yearly for better conversion
-            referral_code: referralCode || undefined
+            referral_code: referralCode || undefined,
+            locale: navigator.language
           },
           true
         )

@@ -61,8 +61,8 @@ export default function HomePage() {
             "offers": {
               "@type": "AggregateOffer",
               "lowPrice": "0",
-              "highPrice": "79.99",
-              "priceCurrency": "USD",
+              "highPrice": "7.99",
+              "priceCurrency": "EUR",
               "availability": "https://schema.org/InStock"
             },
             "aggregateRating": {
