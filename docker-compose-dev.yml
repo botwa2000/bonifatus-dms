@@ -98,6 +98,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: "https://api-dev.bonidoc.com"
         NEXT_PUBLIC_DEBUG_LOGS: "true"
+        NEXT_PUBLIC_GOOGLE_ADS_ID: ${NEXT_PUBLIC_GOOGLE_ADS_ID}
+        NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL: ${NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL}
     image: bonifatus-frontend-dev:latest
     container_name: bonifatus-frontend-dev
     ports:
