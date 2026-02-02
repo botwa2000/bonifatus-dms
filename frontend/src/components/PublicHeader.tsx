@@ -24,9 +24,9 @@ export default function PublicHeader() {
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
-            <a href="/#features" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Features</a>
-            <a href="/#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">How It Works</a>
-            <a href="/#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Pricing</a>
+            <Link href="/#features" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Features</Link>
+            <Link href="/#how-it-works" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">How It Works</Link>
+            <Link href="/#pricing" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Pricing</Link>
             <Link href="/faq" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">FAQ</Link>
             <Link href="/about" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">About</Link>
             <Link href="/contact" className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400">Contact</Link>
@@ -63,27 +63,27 @@ export default function PublicHeader() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-neutral-200 dark:border-neutral-800">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              <a
+              <Link
                 href="/#features"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
               >
                 Features
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/#how-it-works"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
               >
                 How It Works
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/#pricing"
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-3 py-2 rounded-md text-base font-medium text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
               >
                 Pricing
-              </a>
+              </Link>
               <Link
                 href="/faq"
                 onClick={() => setMobileMenuOpen(false)}

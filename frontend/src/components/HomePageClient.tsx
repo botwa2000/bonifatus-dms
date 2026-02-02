@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button, FeatureCard } from '@/components/ui'
 import { useAuth } from '@/contexts/auth-context'
 import { useCurrency } from '@/contexts/currency-context'
