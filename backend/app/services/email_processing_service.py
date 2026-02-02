@@ -907,6 +907,11 @@ class EmailProcessingService:
                     sender_email = self.extract_email_address(sender_raw)
                     subject = self.decode_email_header(subject_raw)
 
+                    # Skip system-generated emails (contact form notifications, etc.)
+                    if sender_email and sender_email.lower() == settings.email.email_from_noreply.lower():
+                        logger.info(f"[EMAIL] Skipping system email from {sender_email}: {subject}")
+                        continue
+
                     # Extract attachments to get count and size for validation
                     attachments = self.extract_attachments(email_message)
                     attachment_count = len(attachments)
