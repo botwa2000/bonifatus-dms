@@ -41,7 +41,7 @@ class ContactFormRequest(BaseModel):
     email: EmailStr
     subject: str = Field(..., min_length=1, max_length=200)
     message: str = Field(..., min_length=10, max_length=5000)
-    turnstile_token: str = Field(default="")
+    turnstile_token: str = Field(..., min_length=1)
     honeypot: Optional[str] = Field(default=None)
 
 
@@ -79,20 +79,19 @@ async def submit_contact_form(request: Request, data: ContactFormRequest):
             detail="Too many messages. Please try again later.",
         )
 
-    # Verify Turnstile token (skip if widget didn't provide one)
-    if data.turnstile_token:
-        captcha_result = await captcha_service.verify_token(
-            token=data.turnstile_token,
-            ip_address=ip_address,
+    # Verify Turnstile token
+    captcha_result = await captcha_service.verify_token(
+        token=data.turnstile_token,
+        ip_address=ip_address,
+    )
+    if not captcha_result.get("success"):
+        error_msg = captcha_service.format_error_message(
+            captcha_result.get("error_codes", [])
         )
-        if not captcha_result.get("success"):
-            error_msg = captcha_service.format_error_message(
-                captcha_result.get("error_codes", [])
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_msg,
-            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg,
+        )
 
     # Send notification email to info@bonidoc.com
     notification_html = f"""

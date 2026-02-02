@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
 import PublicHeader from '@/components/PublicHeader'
 
@@ -15,6 +15,7 @@ const SUBJECT_OPTIONS = [
 ]
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error'
+type TurnstileStatus = 'loading' | 'solved' | 'error' | 'expired'
 
 export default function ContactPage() {
   const [name, setName] = useState('')
@@ -22,20 +23,43 @@ export default function ContactPage() {
   const [subject, setSubject] = useState(SUBJECT_OPTIONS[0])
   const [message, setMessage] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileStatus, setTurnstileStatus] = useState<TurnstileStatus>('loading')
   const [status, setStatus] = useState<FormStatus>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const turnstileRef = useRef<TurnstileInstance>(null)
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 
+  const handleTurnstileSuccess = useCallback((token: string) => {
+    setTurnstileToken(token)
+    setTurnstileStatus('solved')
+  }, [])
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken(null)
+    setTurnstileStatus('error')
+  }, [])
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken(null)
+    setTurnstileStatus('expired')
+  }, [])
+
+  const canSubmit = status !== 'submitting' && turnstileStatus === 'solved'
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setStatus('submitting')
     setErrorMessage('')
 
-    // Read honeypot from form
     const formData = new FormData(e.currentTarget)
     const honeypot = formData.get('website') as string | null
+
+    if (!turnstileToken) {
+      setErrorMessage('Please complete the security verification.')
+      setStatus('error')
+      return
+    }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -47,7 +71,7 @@ export default function ContactPage() {
           email,
           subject,
           message,
-          turnstile_token: turnstileToken || '',
+          turnstile_token: turnstileToken,
           honeypot: honeypot || null,
         }),
       })
@@ -63,10 +87,50 @@ export default function ContactPage() {
       setSubject(SUBJECT_OPTIONS[0])
       setMessage('')
       setTurnstileToken(null)
+      setTurnstileStatus('loading')
       turnstileRef.current?.reset()
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong')
       setStatus('error')
+      // Reset Turnstile so user gets a fresh token for retry
+      setTurnstileToken(null)
+      setTurnstileStatus('loading')
+      turnstileRef.current?.reset()
+    }
+  }
+
+  const turnstileStatusMessage = () => {
+    switch (turnstileStatus) {
+      case 'loading':
+        return <p className="text-sm text-neutral-500 dark:text-neutral-400">Verifying you are human...</p>
+      case 'error':
+        return (
+          <div className="text-sm text-red-600 dark:text-red-400">
+            Security verification failed.{' '}
+            <button
+              type="button"
+              onClick={() => { setTurnstileStatus('loading'); turnstileRef.current?.reset() }}
+              className="underline hover:no-underline"
+            >
+              Try again
+            </button>
+          </div>
+        )
+      case 'expired':
+        return (
+          <div className="text-sm text-amber-600 dark:text-amber-400">
+            Verification expired.{' '}
+            <button
+              type="button"
+              onClick={() => { setTurnstileStatus('loading'); turnstileRef.current?.reset() }}
+              className="underline hover:no-underline"
+            >
+              Refresh
+            </button>
+          </div>
+        )
+      case 'solved':
+        return <p className="text-sm text-green-600 dark:text-green-400">Verification complete</p>
     }
   }
 
@@ -167,14 +231,24 @@ export default function ContactPage() {
               />
             </div>
 
-            {siteKey && (
-              <Turnstile
-                ref={turnstileRef}
-                siteKey={siteKey}
-                onSuccess={setTurnstileToken}
-                onError={() => setTurnstileToken(null)}
-                onExpire={() => setTurnstileToken(null)}
-              />
+            {siteKey ? (
+              <div>
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={siteKey}
+                  onSuccess={handleTurnstileSuccess}
+                  onError={handleTurnstileError}
+                  onExpire={handleTurnstileExpire}
+                  options={{
+                    theme: 'auto',
+                  }}
+                />
+                <div className="mt-2">{turnstileStatusMessage()}</div>
+              </div>
+            ) : (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                Security verification is not configured. Please contact us directly at info@bonidoc.com.
+              </p>
             )}
 
             {status === 'error' && errorMessage && (
@@ -183,7 +257,7 @@ export default function ContactPage() {
 
             <button
               type="submit"
-              disabled={status === 'submitting'}
+              disabled={!canSubmit || !siteKey}
               className="w-full bg-admin-primary hover:bg-admin-primary/90 text-white font-medium py-2.5 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === 'submitting' ? 'Sending...' : 'Send Message'}
