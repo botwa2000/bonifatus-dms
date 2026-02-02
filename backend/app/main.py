@@ -339,6 +339,7 @@ routers = [
     ("app.api.email_processing", "EmailProcessing"),
     ("app.api.delegates", "Delegates"),
     ("app.api.metrics", "Metrics"),
+    ("app.api.contact", "Contact"),
 ]
 
 for module_path, name in routers:
