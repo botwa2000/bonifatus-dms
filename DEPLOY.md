@@ -156,30 +156,32 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
   docker compose -f docker-compose-dev.yml build && \
   echo "=== [3/9] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
-  echo "=== [4/9] Forcing backend update ===" && \
+  echo "=== [4/10] Forcing backend update ===" && \
   docker service update --force bonifatus-dev_backend && \
-  echo "=== [5/9] Forcing celery-worker update ===" && \
+  echo "=== [5/10] Forcing frontend update ===" && \
+  docker service update --force bonifatus-dev_frontend && \
+  echo "=== [6/10] Forcing celery-worker update ===" && \
   docker service update --force bonifatus-dev_celery-worker && \
-  echo "=== [6/9] Waiting for services to start (30s) ===" && \
+  echo "=== [7/10] Waiting for services to start (30s) ===" && \
   sleep 30 && \
-  echo "=== [7/9] Running migrations ===" && \
+  echo "=== [8/10] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [8/9] Health check ===" && \
+  echo "=== [9/10] Health check ===" && \
   curl -s https://api-dev.bonidoc.com/health && echo "" && \
-  echo "=== [9/9] Service status ===" && \
+  echo "=== [10/10] Service status ===" && \
   docker stack ps bonifatus-dev --no-trunc | head -10'
 ```
 
 **Expected Output:**
-- All 9 steps complete without errors
+- All 10 steps complete without errors
 - Backend health returns: `{"status":"healthy","environment":"development"}`
 - Services show "Running" state
-- Backend and celery worker updated with latest code
+- Backend, frontend, and celery worker updated with latest code
 
 **Time:** ~3-5 minutes
 
-**CRITICAL:** Always force-update celery-worker service to ensure it has the latest code changes!
+**CRITICAL:** Always force-update frontend and celery-worker services to ensure they have the latest code changes!
 
 **Note:** If the new container hasn't started yet after 30 seconds, wait an additional 10-20 seconds before running migrations.
 
@@ -204,26 +206,28 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
   docker secret ls | grep -E "database_url_prod|security_secret_key_prod|encryption_key_prod" && \
   echo "=== [4/9] Deploying to Docker Swarm ===" && \
   docker stack deploy -c docker-compose.yml bonifatus && \
-  echo "=== [5/9] Forcing backend update ===" && \
+  echo "=== [5/10] Forcing backend update ===" && \
   docker service update --force bonifatus_backend && \
-  echo "=== [6/9] Forcing celery-worker update ===" && \
+  echo "=== [6/10] Forcing frontend update ===" && \
+  docker service update --force bonifatus_frontend && \
+  echo "=== [7/10] Forcing celery-worker update ===" && \
   docker service update --force bonifatus_celery-worker && \
-  echo "=== [7/9] Waiting for services to start (40s) ===" && \
+  echo "=== [8/10] Waiting for services to start (40s) ===" && \
   sleep 40 && \
-  echo "=== [8/9] Running migrations ===" && \
+  echo "=== [9/10] Running migrations ===" && \
   CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
   docker exec $CONTAINER alembic upgrade head && \
-  echo "=== [9/9] Health check ===" && \
+  echo "=== [10/10] Health check ===" && \
   curl -s https://api.bonidoc.com/health && echo "" && \
   docker stack ps bonifatus --no-trunc | head -10'
 ```
 
 **Expected Output:**
 ```
-✓ All 9 steps complete
+✓ All 10 steps complete
 ✓ Services show "Running" state in docker stack ps
 ✓ Backend health: {"status":"healthy","environment":"production"}
-✓ Backend and celery worker updated with latest code
+✓ Backend, frontend, and celery worker updated with latest code
 ✓ No migration errors
 ```
 
@@ -249,6 +253,8 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms-dev && \
   git pull origin main && \
   docker compose -f docker-compose-dev.yml build && \
   docker stack deploy -c docker-compose-dev.yml bonifatus-dev && \
+  docker service update --force bonifatus-dev_backend && \
+  docker service update --force bonifatus-dev_frontend && \
   docker service update --force bonifatus-dev_celery-worker && \
   sleep 30 && \
   CONTAINER=$(docker ps | grep bonifatus-dev_backend | head -1 | cut -d" " -f1) && \
@@ -267,6 +273,8 @@ ssh root@91.99.212.17 'cd /opt/bonifatus-dms && \
   git pull origin main && \
   docker compose build && \
   docker stack deploy -c docker-compose.yml bonifatus && \
+  docker service update --force bonifatus_backend && \
+  docker service update --force bonifatus_frontend && \
   docker service update --force bonifatus_celery-worker && \
   sleep 40 && \
   CONTAINER=$(docker ps | grep bonifatus_backend | head -1 | cut -d" " -f1) && \
