@@ -37,12 +37,6 @@ export default function ContactPage() {
     const formData = new FormData(e.currentTarget)
     const honeypot = formData.get('website') as string | null
 
-    if (!turnstileToken) {
-      setErrorMessage('Please complete the security check.')
-      setStatus('error')
-      return
-    }
-
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
       const res = await fetch(`${apiUrl}/api/v1/contact`, {
@@ -53,7 +47,7 @@ export default function ContactPage() {
           email,
           subject,
           message,
-          turnstile_token: turnstileToken,
+          turnstile_token: turnstileToken || '',
           honeypot: honeypot || null,
         }),
       })
