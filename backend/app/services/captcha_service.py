@@ -19,8 +19,9 @@ class CaptchaService:
     VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     
     def __init__(self):
-        self.secret_key = os.getenv('TURNSTILE_SECRET_KEY')
-        self.site_key = os.getenv('TURNSTILE_SITE_KEY')
+        from app.core.config import settings
+        self.secret_key = settings.security.turnstile_secret_key or os.getenv('TURNSTILE_SECRET_KEY')
+        self.site_key = settings.security.turnstile_site_key or os.getenv('TURNSTILE_SITE_KEY')
         self._verification_cache = {}
         self._cache_ttl = timedelta(minutes=5)
     
