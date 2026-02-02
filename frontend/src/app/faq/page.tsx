@@ -7,6 +7,7 @@ import { Accordion } from '@/components/ui/Accordion'
 import { FAQSearch } from '@/components/faq/FAQSearch'
 import { FAQCategoryFilter } from '@/components/faq/FAQCategoryFilter'
 import { faqs, getCategories } from '@/data/faq-data'
+import PublicHeader from '@/components/PublicHeader'
 
 export default function FAQPage() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -68,22 +69,7 @@ export default function FAQPage() {
         }}
       />
 
-      {/* Navigation Header */}
-      <header className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-2xl font-bold text-admin-primary">
-              Bonifatus DMS
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center font-medium rounded-md transition-colors px-3 py-1.5 text-sm bg-admin-primary text-white hover:bg-admin-primary/90"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-800 dark:to-neutral-900 py-12 border-b border-neutral-200 dark:border-neutral-800">
