@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.database.connection import get_db
 from app.database.models import User
 from app.middleware.auth_middleware import get_current_active_user, get_client_ip
@@ -137,8 +138,8 @@ async def get_captcha_site_key() -> dict:
     Get Cloudflare Turnstile site key for frontend integration
     Public endpoint - no authentication required
     """
-    site_key = captcha_service.get_site_key()
-    
+    site_key = settings.security.turnstile_site_key
+
     if not site_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
