@@ -208,6 +208,7 @@ class EmailSettings(BaseSettings):
         description="Brevo API key (loaded from Docker Swarm secret)"
     )
     email_from_info: str = Field(default="info@bonidoc.com", description="Info email address")
+    email_from_support: str = Field(default="support@bonidoc.com", description="Support email address")
     email_from_noreply: str = Field(default="no-reply@bonidoc.com", description="No-reply email address")
     email_from_name: str = Field(default="BoniDoc", description="Sender name for emails")
 

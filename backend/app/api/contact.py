@@ -93,7 +93,7 @@ async def submit_contact_form(request: Request, data: ContactFormRequest):
             detail=error_msg,
         )
 
-    # Send notification email to info@bonidoc.com
+    # Send notification email to support@bonidoc.com
     notification_html = f"""
     <h2>New Contact Form Submission</h2>
     <p><strong>Name:</strong> {data.name}</p>
@@ -107,7 +107,7 @@ async def submit_contact_form(request: Request, data: ContactFormRequest):
     """
 
     notification_sent = await email_service.send_email(
-        to_email=settings.email.email_from_info,
+        to_email=settings.email.email_from_support,
         to_name="Bonifatus DMS",
         subject=f"[Contact Form] {data.subject}",
         html_content=notification_html,

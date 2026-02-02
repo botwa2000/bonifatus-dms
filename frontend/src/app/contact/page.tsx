@@ -142,8 +142,8 @@ export default function ContactPage() {
         <h1 className="text-4xl font-bold text-neutral-900 dark:text-white mb-4">Contact Us</h1>
         <p className="text-neutral-600 dark:text-neutral-400 mb-8">
           Have a question or feedback? Reach out to us at{' '}
-          <a href="mailto:info@bonidoc.com" className="text-admin-primary hover:underline">
-            info@bonidoc.com
+          <a href="mailto:support@bonidoc.com" className="text-admin-primary hover:underline">
+            support@bonidoc.com
           </a>{' '}
           or use the form below.
         </p>
@@ -247,7 +247,7 @@ export default function ContactPage() {
               </div>
             ) : (
               <p className="text-sm text-red-600 dark:text-red-400">
-                Security verification is not configured. Please contact us directly at info@bonidoc.com.
+                Security verification is not configured. Please contact us directly at support@bonidoc.com.
               </p>
             )}
 
