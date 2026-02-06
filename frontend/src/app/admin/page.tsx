@@ -38,6 +38,7 @@ interface User {
   storage_used_bytes: number
   storage_quota_bytes: number
   document_count: number
+  cloud_provider: string | null
   created_at: string
   monthly_usage?: {
     month_period: string
@@ -777,9 +778,9 @@ export default function AdminDashboard() {
                       >
                         Tier {userSortField === 'tier_name' && (userSortDirection === 'asc' ? '↑' : '↓')}
                       </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Documents</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Storage</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Docs / Storage</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Monthly Usage</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Cloud</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Status</th>
                       <th
                         onClick={() => toggleSort('created_at')}
@@ -812,29 +813,48 @@ export default function AdminDashboard() {
                             <span className="ml-2 text-xs text-admin-primary dark:text-blue-400 dark:text-blue-400">Updating...</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">{user.document_count}</td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
-                          {formatBytes(user.storage_used_bytes)} / {formatBytes(user.storage_quota_bytes)}
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                          <div className="space-y-0.5">
+                            <div className="text-xs">
+                              Docs: {user.document_count}
+                            </div>
+                            <div className="text-xs">
+                              Used: {formatBytes(user.storage_used_bytes)}
+                            </div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                              Quota: {formatBytes(user.storage_quota_bytes)}
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
                           {user.monthly_usage ? (
                             user.monthly_usage.admin_unlimited ? (
                               <span className="text-neutral-500 dark:text-neutral-400">Unlimited</span>
                             ) : (
-                              <div className="space-y-1">
+                              <div className="space-y-0.5">
                                 <div className="text-xs">
                                   Pages: {user.monthly_usage.pages_processed} / {user.monthly_usage.pages_limit || '∞'}
                                   <span className="text-neutral-500 dark:text-neutral-400 ml-1">({user.monthly_usage.pages_percent}%)</span>
                                 </div>
                                 <div className="text-xs">
-                                  Volume: {formatBytes(user.monthly_usage.volume_uploaded_bytes)} / {user.monthly_usage.volume_limit_bytes ? formatBytes(user.monthly_usage.volume_limit_bytes) : '∞'}
+                                  Vol: {formatBytes(user.monthly_usage.volume_uploaded_bytes)} / {user.monthly_usage.volume_limit_bytes ? formatBytes(user.monthly_usage.volume_limit_bytes) : '∞'}
                                   <span className="text-neutral-500 dark:text-neutral-400 ml-1">({user.monthly_usage.volume_percent}%)</span>
+                                </div>
+                                <div className="text-xs">
+                                  Docs: {user.monthly_usage.documents_uploaded}
                                 </div>
                               </div>
                             )
                           ) : (
                             <span className="text-neutral-400">No data</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                          {user.cloud_provider === 'google_drive' ? 'GDrive' :
+                           user.cloud_provider === 'onedrive' ? 'OneDrive' :
+                           user.cloud_provider === 'dropbox' ? 'Dropbox' :
+                           user.cloud_provider === 'box' ? 'Box' :
+                           <span className="text-neutral-400">—</span>}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {user.is_active ? (

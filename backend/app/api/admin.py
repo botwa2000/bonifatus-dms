@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency
+from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency, ProviderConnection
 from app.database.connection import db_manager, get_db
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -125,7 +125,7 @@ async def list_users(
         from datetime import datetime
         current_month = datetime.utcnow().strftime("%Y-%m")
 
-        query = select(User, TierPlan, UserStorageQuota, UserMonthlyUsage).join(
+        query = select(User, TierPlan, UserStorageQuota, UserMonthlyUsage, ProviderConnection).join(
             TierPlan, User.tier_id == TierPlan.id
         ).outerjoin(
             UserStorageQuota, UserStorageQuota.user_id == User.id
@@ -134,6 +134,12 @@ async def list_users(
             and_(
                 UserMonthlyUsage.user_id == User.id,
                 UserMonthlyUsage.month_period == current_month
+            )
+        ).outerjoin(
+            ProviderConnection,
+            and_(
+                ProviderConnection.user_id == User.id,
+                ProviderConnection.is_active == True
             )
         )
 
@@ -164,7 +170,7 @@ async def list_users(
         results = session.execute(query).all()
 
         users = []
-        for user, tier, quota, monthly_usage in results:
+        for user, tier, quota, monthly_usage, provider_conn in results:
             # Calculate usage percentages
             pages_percent = 0
             volume_percent = 0
@@ -208,6 +214,8 @@ async def list_users(
                     "month_period": current_month,
                     "admin_unlimited": True
                 },
+
+                "cloud_provider": provider_conn.provider_key if provider_conn else None,
 
                 "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
                 "created_at": user.created_at.isoformat()
