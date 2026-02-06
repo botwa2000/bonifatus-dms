@@ -185,37 +185,44 @@ async def google_oauth_callback_redirect(
             error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
             return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
 
-        # Determine redirect URL based on tier selection and existing subscription
+        # Determine redirect URL based on tier selection, admin status, and existing subscription
         # If user selected a paid tier, check if they already have an active subscription
-        # If user selected free tier or no tier, redirect to dashboard
-        if tier_id and tier_id > 0:
-            # Paid tier selected - check if user already has active subscription
-            from app.database.models import Subscription
-            from app.database.connection import get_db
+        # If user selected free tier or no tier, redirect to dashboard (or /admin for admins)
+        from app.database.models import Subscription
+        from app.database.connection import get_db
 
-            db = next(get_db())
-            try:
+        db = next(get_db())
+        try:
+            # Check if user is admin
+            oauth_user = db.query(User).filter(User.id == auth_result['user_id']).first()
+            is_admin_user = oauth_user.is_admin if oauth_user else False
+
+            if tier_id and tier_id > 0:
+                # Paid tier selected - check if user already has active subscription
                 active_sub = db.query(Subscription).filter(
                     Subscription.user_id == auth_result['user_id'],
                     Subscription.status.in_(['active', 'trialing', 'past_due'])
                 ).first()
 
                 if active_sub:
-                    # User already has active subscription - redirect to dashboard
-                    # (Redirecting to /profile causes cookie timing issues)
-                    redirect_url = f"{settings.app.app_frontend_url}/dashboard"
-                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to dashboard")
+                    # User already has active subscription - redirect to dashboard (or admin)
+                    redirect_url = f"{settings.app.app_frontend_url}/{'admin' if is_admin_user else 'dashboard'}"
+                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to {'admin' if is_admin_user else 'dashboard'}")
                 else:
                     # No active subscription - proceed to checkout
                     billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
                     redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
                     logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
-            finally:
-                db.close()
-        else:
-            # Free tier or no tier selected - redirect to welcome dashboard
-            redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
-            logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+            else:
+                # Free tier or no tier selected - redirect to welcome dashboard (or /admin for admins)
+                if is_admin_user:
+                    redirect_url = f"{settings.app.app_frontend_url}/admin"
+                    logger.info(f"Admin user {auth_result['email']} using free tier, redirecting to admin")
+                else:
+                    redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
+                    logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+        finally:
+            db.close()
 
         redirect_response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
 

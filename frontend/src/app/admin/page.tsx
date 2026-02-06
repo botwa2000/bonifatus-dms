@@ -781,7 +781,12 @@ export default function AdminDashboard() {
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Storage</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Monthly Usage</th>
                       <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Status</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300">Actions</th>
+                      <th
+                        onClick={() => toggleSort('created_at')}
+                        className="px-4 py-2 text-left text-sm font-medium text-neutral-700 dark:text-neutral-300 dark:text-neutral-300 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                      >
+                        Registered {userSortField === 'created_at' && (userSortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -838,8 +843,8 @@ export default function AdminDashboard() {
                             <Badge variant="error">Inactive</Badge>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {user.is_admin && <Badge variant="warning">Admin</Badge>}
+                        <td className="px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300">
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                         </td>
                       </tr>
                     ))}

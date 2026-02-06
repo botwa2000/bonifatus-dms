@@ -59,8 +59,9 @@ export default function LoginPageContent() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        // Successful login - redirect to dashboard
-        router.push('/dashboard')
+        // Successful login - redirect admins to /admin, others to /dashboard
+        const redirectPath = data.user?.is_admin ? '/admin' : '/dashboard'
+        router.push(redirectPath)
       } else if (data.requires_verification) {
         // Email not verified - redirect to verification page
         // Store email securely in sessionStorage (not in URL)

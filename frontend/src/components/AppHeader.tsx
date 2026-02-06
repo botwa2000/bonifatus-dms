@@ -168,6 +168,20 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
                     </svg>
                     <span>Settings</span>
                   </button>
+                  {user.is_admin && (
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false)
+                        router.push('/admin')
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center space-x-2"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <span>Admin Dashboard</span>
+                    </button>
+                  )}
                   <hr className="my-1 border-neutral-200 dark:border-neutral-700" />
                   <button
                     onClick={() => {
@@ -286,6 +300,18 @@ export default function AppHeader({ title, subtitle, showNav = true, action }: A
                   </svg>
                   <span className="font-medium">Settings</span>
                 </Link>
+                {user.is_admin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center space-x-3 px-4 py-3 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span className="font-medium">Admin Dashboard</span>
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)

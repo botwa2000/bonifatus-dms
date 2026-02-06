@@ -12,6 +12,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { Button } from '@/components/ui/Button'
+import { trackSignup } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
 function SignupContent() {
@@ -99,6 +100,9 @@ function SignupContent() {
       const data = await response.json()
 
       if (response.ok && data.success) {
+        // Track signup event for Google Ads conversion
+        trackSignup('email')
+
         // Store tier selection for after email verification
         if (tierId) {
           sessionStorage.setItem('selected_tier_id', tierId)

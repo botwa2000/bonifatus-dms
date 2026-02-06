@@ -11,7 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { apiClient } from '@/services/api-client'
 import { delegateService } from '@/services/delegate.service'
-import { trackSubscriptionComplete } from '@/lib/analytics'
+import { trackSignup, trackSubscriptionComplete } from '@/lib/analytics'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
 import { InfoBanner } from '@/components/ui'
@@ -43,6 +43,17 @@ export default function DashboardPage() {
   useEffect(() => {
     loadUser()
   }, [loadUser])
+
+  // Track Google OAuth signup event when redirected with ?welcome=true
+  useEffect(() => {
+    if (searchParams.get('welcome') === 'true' && user) {
+      const storageKey = 'signup_tracked_google'
+      if (!sessionStorage.getItem(storageKey)) {
+        trackSignup('google')
+        sessionStorage.setItem(storageKey, 'true')
+      }
+    }
+  }, [searchParams, user])
 
   // Check if user selected a paid tier before login and redirect to checkout
   // ONLY if they don't already have an active subscription

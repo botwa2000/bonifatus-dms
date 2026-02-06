@@ -515,6 +515,37 @@ class AuthService:
                             # Don't fail user creation if email fails
                             logger.error(f"Failed to send welcome email to {user.email}: {email_error}")
 
+                        # Send admin notification emails (async, don't block response)
+                        try:
+                            from app.services.email_service import email_service
+                            from app.database.models import TierPlan
+                            from sqlalchemy import select as sql_select
+
+                            admin_users = db.execute(
+                                sql_select(User).where(User.is_admin == True)
+                            ).scalars().all()
+
+                            tier = db.execute(
+                                sql_select(TierPlan).where(TierPlan.id == user.tier_id)
+                            ).scalar_one_or_none()
+                            tier_name = tier.display_name if tier else "Free"
+
+                            registration_date = user.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+                            for admin in admin_users:
+                                await email_service.send_admin_new_user_notification(
+                                    session=db,
+                                    admin_email=admin.email,
+                                    admin_name=admin.full_name or admin.email,
+                                    new_user_name=user.full_name or user.email,
+                                    new_user_id=user.id,
+                                    new_user_email=user.email,
+                                    tier_name=tier_name,
+                                    registration_date=registration_date
+                                )
+                            logger.info(f"Admin notifications sent for new Google OAuth user: {user.email}")
+                        except Exception as admin_notif_error:
+                            logger.error(f"Failed to send admin notifications for {user.email}: {admin_notif_error}")
+
                     # Create session with refresh token
                     session_info = await session_service.create_session(
                         user_id=str(user.id),
