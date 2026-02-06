@@ -125,10 +125,23 @@ async def list_users(
         from datetime import datetime
         current_month = datetime.utcnow().strftime("%Y-%m")
 
-        query = select(User, TierPlan, UserStorageQuota, UserMonthlyUsage, ProviderConnection).join(
+        # Compute actual document count and storage from Document table
+        doc_stats = select(
+            Document.user_id,
+            func.count(Document.id).label('doc_count'),
+            func.coalesce(func.sum(Document.file_size), 0).label('total_size')
+        ).where(
+            Document.is_deleted == False
+        ).group_by(Document.user_id).subquery()
+
+        query = select(
+            User, TierPlan, UserMonthlyUsage, ProviderConnection,
+            func.coalesce(doc_stats.c.doc_count, 0).label('doc_count'),
+            func.coalesce(doc_stats.c.total_size, 0).label('total_size')
+        ).join(
             TierPlan, User.tier_id == TierPlan.id
         ).outerjoin(
-            UserStorageQuota, UserStorageQuota.user_id == User.id
+            doc_stats, doc_stats.c.user_id == User.id
         ).outerjoin(
             UserMonthlyUsage,
             and_(
@@ -170,7 +183,7 @@ async def list_users(
         results = session.execute(query).all()
 
         users = []
-        for user, tier, quota, monthly_usage, provider_conn in results:
+        for user, tier, monthly_usage, provider_conn, doc_count, total_size in results:
             # Calculate usage percentages
             pages_percent = 0
             volume_percent = 0
@@ -189,10 +202,10 @@ async def list_users(
                 "is_active": user.is_active,
                 "is_admin": user.is_admin,
 
-                # Legacy storage info (deprecated but kept for backward compatibility)
-                "storage_used_bytes": quota.used_bytes if quota else 0,
-                "storage_quota_bytes": quota.total_quota_bytes if quota else 0,
-                "document_count": quota.document_count if quota else 0,
+                # Storage info (computed from actual documents)
+                "storage_used_bytes": int(total_size),
+                "storage_quota_bytes": tier.max_monthly_upload_bytes or 0,
+                "document_count": int(doc_count),
 
                 # Monthly usage stats
                 "monthly_usage": {

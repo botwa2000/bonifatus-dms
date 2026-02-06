@@ -781,7 +781,19 @@ class DocumentService:
             # NOTE: Monthly usage is NOT decremented on deletion
             # Monthly usage tracks consumption for the month, not current storage
             # Deleting documents does not reduce monthly page/volume consumption
-            logger.info(f"[DELETE DEBUG] Document deleted (monthly usage not affected)")
+
+            # But storage quota IS decremented (tracks current storage, not monthly consumption)
+            try:
+                from app.services.tier_service import tier_service
+                await tier_service.update_storage_usage(
+                    user_id=user_id,
+                    file_size_bytes=file_size or 0,
+                    session=session,
+                    increment=False
+                )
+                logger.info(f"[DELETE DEBUG] Storage quota decremented by {file_size} bytes")
+            except Exception as quota_err:
+                logger.warning(f"[DELETE DEBUG] Failed to update storage quota: {quota_err}")
 
             await self._log_document_action(
                 user_id, "document_delete", "document", document_id,

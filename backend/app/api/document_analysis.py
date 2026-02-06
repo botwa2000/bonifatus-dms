@@ -354,6 +354,14 @@ async def confirm_upload(
             session=session
         )
 
+        # Update storage quota (document_count + used_bytes)
+        await tier_service.update_storage_usage(
+            user_id=str(current_user.id),
+            file_size_bytes=file_size,
+            session=session,
+            increment=True
+        )
+
         # Clean up temp storage immediately after successful confirmation
         if confirm_request.temp_id in temp_storage:
             # Single file upload - remove from memory
