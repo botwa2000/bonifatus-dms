@@ -121,7 +121,7 @@ class KeywordExtractionService:
         Returns:
             List of tokens
         """
-        tokens = re.findall(r'\b[a-zа-яäöüß]{3,}\b', text, re.IGNORECASE)
+        tokens = re.findall(r'\b[a-zа-яäöüßàáâãçéèêëíìîïñóòôõúùûüğışţ]{3,}\b', text, re.IGNORECASE)
         return tokens
 
     def filter_tokens(

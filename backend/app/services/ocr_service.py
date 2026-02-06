@@ -143,7 +143,11 @@ class OCRService:
             'en': 'en_US',
             'de': 'de_DE',
             'ru': 'ru_RU',
-            'fr': 'fr'
+            'fr': 'fr',
+            'tr': 'tr_TR',
+            'es': 'es_ES',
+            'pt': 'pt_BR',
+            'it': 'it_IT',
         }
 
         dict_code = dict_map.get(language, 'en_US')
@@ -217,7 +221,7 @@ class OCRService:
             return metrics['quality_score'], metrics
 
         # Extract words for spell checking (min 3 chars)
-        words = re.findall(r'\b[a-zA-ZäöüßÄÖÜа-яА-Я]{3,}\b', text.lower())
+        words = re.findall(r'\b[a-zA-ZäöüßÄÖÜà-яА-ЯáâãçéèêëíìîïñóòôõúùûüğışţÀÁÂÃÇÉÈÊËÍÌÎÏÑÓÒÔÕÚÙÛÜĞİŞŢ]{3,}\b', text.lower())
 
         if len(words) < 5:
             metrics['quality_score'] = 0.5
