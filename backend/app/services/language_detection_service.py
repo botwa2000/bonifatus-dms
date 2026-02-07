@@ -15,20 +15,16 @@ class LanguageDetectionService:
     """Hybrid language detection using FastText for speed and Lingua for accuracy"""
 
     def __init__(self):
-        # Lingua detector for short texts (75 languages)
+        # Lingua detector — must match the 8 supported document processing languages
         self.lingua = LanguageDetectorBuilder.from_languages(
             Language.ENGLISH,
             Language.GERMAN,
             Language.RUSSIAN,
             Language.FRENCH,
+            Language.TURKISH,
             Language.SPANISH,
-            Language.ITALIAN,
-            Language.DUTCH,
             Language.PORTUGUESE,
-            Language.POLISH,
-            Language.CZECH,
-            Language.UKRAINIAN,
-            Language.TURKISH
+            Language.ITALIAN
         ).build()
 
         # Thresholds
