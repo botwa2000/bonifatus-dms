@@ -27,7 +27,8 @@ class LanguageDetectionService:
             Language.PORTUGUESE,
             Language.POLISH,
             Language.CZECH,
-            Language.UKRAINIAN
+            Language.UKRAINIAN,
+            Language.TURKISH
         ).build()
 
         # Thresholds
