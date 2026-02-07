@@ -150,6 +150,26 @@ class DocumentUploadService:
             # Calculate file hash for storage (duplicate check happens earlier in /analyze endpoint)
             file_hash = hashlib.sha256(file_content).hexdigest()
 
+            # Safety net: Check for duplicate document (guards against double-submit)
+            existing = session.query(Document).filter(
+                and_(
+                    Document.file_hash == file_hash,
+                    Document.user_id == uuid_lib.UUID(user_id),
+                    Document.is_deleted == False
+                )
+            ).first()
+            if existing:
+                logger.warning(f"Duplicate upload detected for file_hash={file_hash}, returning existing document {existing.id}")
+                return {
+                    'success': True,
+                    'document_id': str(existing.id),
+                    'title': existing.title,
+                    'filename': existing.file_name,
+                    'original_filename': existing.original_filename,
+                    'file_size': existing.file_size,
+                    'duplicate': True
+                }
+
             # Validate category count
             max_categories = await config_service.get_setting('max_categories_per_document', 5, session)
             if len(category_ids) > max_categories:

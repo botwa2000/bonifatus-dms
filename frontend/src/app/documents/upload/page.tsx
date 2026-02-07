@@ -77,6 +77,7 @@ export default function BatchUploadPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string | React.ReactNode} | null>(null)
   const [maxFilenameLength, setMaxFilenameLength] = useState(200)
+  const [isConfirming, setIsConfirming] = useState(false)
 
   // Async batch processing state
   const [batchProgress, setBatchProgress] = useState<{
@@ -546,11 +547,13 @@ export default function BatchUploadPage() {
   }
 
   const handleConfirmAll = async () => {
+    if (isConfirming) return
+
     // Validate all files
-    const invalid = uploadStates.filter(s => 
+    const invalid = uploadStates.filter(s =>
       s.selected_categories.length === 0 || s.filename_error !== null
     )
-    
+
     if (invalid.length > 0) {
       setMessage({
         type: 'error',
@@ -559,9 +562,10 @@ export default function BatchUploadPage() {
       return
     }
 
+    setIsConfirming(true)
     try {
       setMessage(null)
-      
+
       // Upload all files
       const uploads = uploadStates.map(state =>
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/document-analysis/confirm-upload`, {
@@ -631,6 +635,8 @@ export default function BatchUploadPage() {
         type: 'error',
         text: 'Upload failed. Please try again.'
       })
+    } finally {
+      setIsConfirming(false)
     }
   }
 
@@ -1019,9 +1025,15 @@ export default function BatchUploadPage() {
                 <div className="flex space-x-4">
                   <Button
                     onClick={handleConfirmAll}
+                    disabled={isConfirming}
                     className="flex-1"
                   >
-                    Upload All {uploadStates.length} Documents
+                    {isConfirming ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Spinner size="sm" />
+                        Uploading...
+                      </span>
+                    ) : `Upload All ${uploadStates.length} Documents`}
                   </Button>
                   <Button
                     variant="secondary"
