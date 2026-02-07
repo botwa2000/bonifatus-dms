@@ -146,7 +146,7 @@ export default function FeaturesPage() {
               </div>
               <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-3">Multi-Language Support</h3>
               <p className="text-neutral-600 dark:text-neutral-400">
-                Support for English, German, Dutch, and more. Automatic language detection and categorization in multiple languages.
+                Support for English, German, Russian, French, Turkish, Spanish, Portuguese, and Italian with automatic language detection.
               </p>
             </div>
 

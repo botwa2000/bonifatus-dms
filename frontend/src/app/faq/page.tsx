@@ -29,7 +29,8 @@ export default function FAQPage() {
       filtered = filtered.filter(
         faq =>
           faq.question.toLowerCase().includes(lowerQuery) ||
-          faq.answer.toLowerCase().includes(lowerQuery)
+          faq.answer.toLowerCase().includes(lowerQuery) ||
+          (faq.searchTerms && faq.searchTerms.toLowerCase().includes(lowerQuery))
       )
     }
 

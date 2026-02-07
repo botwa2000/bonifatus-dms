@@ -12,6 +12,7 @@ export interface FAQ {
   category: FAQCategory
   question: string
   answer: string
+  searchTerms?: string
 }
 
 export const faqs: FAQ[] = [
@@ -22,7 +23,8 @@ export const faqs: FAQ[] = [
     id: 'getting-started-1',
     category: FAQCategory.GETTING_STARTED,
     question: 'How do I create an account?',
-    answer: 'Click "Sign In" in the top right corner, then select "Sign in with Google". You\'ll be redirected to Google\'s secure login page. Once authenticated, you\'ll be automatically signed up with the Free tier, which includes 20 pages per month.'
+    answer: 'Click "Sign In" in the top right corner, then select "Sign in with Google". You\'ll be redirected to Google\'s secure login page. Once authenticated, you\'ll be automatically signed up with the Free tier, which includes 20 pages per month.',
+    searchTerms: 'register signup sign up sign-up registration create account'
   },
   {
     id: 'getting-started-2',
@@ -52,7 +54,8 @@ export const faqs: FAQ[] = [
     id: 'getting-started-6',
     category: FAQCategory.GETTING_STARTED,
     question: 'What languages are supported?',
-    answer: 'Bonifatus DMS supports documents in <strong>English, German, Russian, French, Spanish, Italian, Portuguese, Dutch, Polish, Turkish, and many more languages</strong>. The AI automatically detects the document language and processes it accordingly. The user interface is currently available in English, German, and Russian, with more languages coming soon.'
+    answer: 'Bonifatus DMS supports document processing in <strong>English, German, Russian, French, Turkish, Spanish, Portuguese, and Italian</strong>. The AI automatically detects the document language and processes it accordingly. The user interface is currently available in English, German, and Russian, with more languages coming soon.',
+    searchTerms: 'multilingual multi-language multi language OCR translation'
   },
   {
     id: 'getting-started-7',
@@ -76,7 +79,8 @@ export const faqs: FAQ[] = [
     id: 'getting-started-10',
     category: FAQCategory.GETTING_STARTED,
     question: 'What is the difference between the Free, Starter, and Pro tiers?',
-    answer: 'The <strong>Free tier</strong> includes 20 pages/month, perfect for trying out the service. The <strong>Starter tier</strong> offers 100 pages/month with bulk upload and email-to-process capabilities. The <strong>Pro tier</strong> provides unlimited pages, up to 10 team members, bulk processing, email-to-process feature, folder watching, and multi-cloud support (Google Drive, Dropbox, OneDrive, Box).'
+    answer: 'The <strong>Free tier</strong> includes 20 pages/month, perfect for trying out the service. The <strong>Starter tier</strong> offers 100 pages/month with bulk upload and email-to-process capabilities. The <strong>Pro tier</strong> provides unlimited pages, up to 10 team members, bulk processing, email-to-process feature, folder watching, and multi-cloud support (Google Drive, Dropbox, OneDrive, Box).',
+    searchTerms: 'pricing price cost subscription plan tier'
   },
   {
     id: 'getting-started-11',
@@ -88,7 +92,8 @@ export const faqs: FAQ[] = [
     id: 'getting-started-12',
     category: FAQCategory.GETTING_STARTED,
     question: 'Can I bulk upload documents?',
-    answer: 'Yes! With the Starter or Pro tier, you can upload multiple documents at once (up to 50 files simultaneously on Pro). Simply drag and drop multiple PDFs, and the AI will process them all in the background. You\'ll receive a notification when processing is complete.'
+    answer: 'Yes! With the Starter or Pro tier, you can upload multiple documents at once (up to 50 files simultaneously on Pro). Simply drag and drop multiple PDFs, and the AI will process them all in the background. You\'ll receive a notification when processing is complete.',
+    searchTerms: 'batch upload multiple files mass import'
   },
   {
     id: 'getting-started-13',
@@ -126,6 +131,13 @@ export const faqs: FAQ[] = [
     question: 'What happens if I exceed my monthly page limit?',
     answer: 'If you approach your page limit, we\'ll send you a notification. Once you reach the limit, document processing will be paused until the next billing cycle or you can upgrade your tier immediately. Already processed documents remain accessible, and you can still download, search, and view them.'
   },
+  {
+    id: 'getting-started-19',
+    category: FAQCategory.GETTING_STARTED,
+    question: 'Can I share my documents with other users?',
+    answer: 'Yes! With the Delegate feature, you can invite trusted people to view your documents. Delegates can browse, search, and view your document library from their own account, making it easy to share access with family members, accountants, or colleagues. As the account owner, you retain full control and can revoke access at any time from Settings > Team Access.',
+    searchTerms: 'delegate delegates shared sharing multi-user multiuser multi user team member members collaboration collaborate joint account family'
+  },
 
   // ========================================
   // BILLING & SECURITY (14 questions)
@@ -158,13 +170,15 @@ export const faqs: FAQ[] = [
     id: 'billing-5',
     category: FAQCategory.BILLING_SECURITY,
     question: 'How do I cancel my subscription?',
-    answer: 'Go to Settings > Billing, and click "Cancel Subscription". Your subscription will remain active until the end of your current billing cycle. After cancellation, you\'ll be downgraded to the Free tier, and you can still access and download all your documents.'
+    answer: 'Go to Settings > Billing, and click "Cancel Subscription". Your subscription will remain active until the end of your current billing cycle. After cancellation, you\'ll be downgraded to the Free tier, and you can still access and download all your documents.',
+    searchTerms: 'cancel cancellation unsubscribe stop end terminate'
   },
   {
     id: 'billing-6',
     category: FAQCategory.BILLING_SECURITY,
     question: 'Is my data secure?',
-    answer: 'Absolutely! <strong>Your documents are stored securely in YOUR own cloud storage</strong> (Google Drive, Dropbox, etc.), not on our servers. We only process documents temporarily during AI analysis and never permanently store them. All data transmission is encrypted using industry-standard TLS/SSL. We are GDPR compliant.'
+    answer: 'Absolutely! <strong>Your documents are stored securely in YOUR own cloud storage</strong> (Google Drive, Dropbox, etc.), not on our servers. We only process documents temporarily during AI analysis and never permanently store them. All data transmission is encrypted using industry-standard TLS/SSL. We are GDPR compliant.',
+    searchTerms: 'secure safe privacy private encryption encrypted'
   },
   {
     id: 'billing-7',
@@ -328,13 +342,14 @@ export const faqs: FAQ[] = [
     id: 'troubleshooting-7',
     category: FAQCategory.TROUBLESHOOTING,
     question: 'How do I contact support?',
-    answer: 'Email us at <a href="mailto:support@bonidoc.com" class="text-admin-primary hover:underline">support@bonidoc.com</a> or use the "Contact Support" button in Settings. Free tier: response within 48 hours. Starter tier: response within 24 hours. Pro tier: priority support with response within 12 hours (business days). Include your account email and a detailed description of the issue.'
+    answer: 'Email us at <a href="mailto:support@bonidoc.com" class="text-admin-primary hover:underline">support@bonidoc.com</a> or visit our <a href="/contact" class="text-admin-primary hover:underline">Contact page</a>. Free tier: response within 48 hours. Starter tier: response within 24 hours. Pro tier: priority support with response within 12 hours (business days). Include your account email and a detailed description of the issue.',
+    searchTerms: 'help assistance customer service reach out email phone'
   },
   {
     id: 'troubleshooting-8',
     category: FAQCategory.TROUBLESHOOTING,
     question: 'Can I request new features?',
-    answer: 'Absolutely! We love hearing from our users. Submit feature requests via email to <a href="mailto:feedback@bonidoc.com" class="text-admin-primary hover:underline">feedback@bonidoc.com</a> or through the feedback form in Settings. Pro tier users have priority for feature requests, and we review all suggestions during our monthly product roadmap meetings.'
+    answer: 'Absolutely! We love hearing from our users. Submit feature requests via email to <a href="mailto:feedback@bonidoc.com" class="text-admin-primary hover:underline">feedback@bonidoc.com</a> or through our <a href="/contact" class="text-admin-primary hover:underline">Contact page</a> (select "Feature Request" as the subject). Pro tier users have priority for feature requests, and we review all suggestions during our monthly product roadmap meetings.'
   },
 ]
 
@@ -354,6 +369,7 @@ export function searchFAQs(query: string): FAQ[] {
   return faqs.filter(
     faq =>
       faq.question.toLowerCase().includes(lowerQuery) ||
-      faq.answer.toLowerCase().includes(lowerQuery)
+      faq.answer.toLowerCase().includes(lowerQuery) ||
+      (faq.searchTerms && faq.searchTerms.toLowerCase().includes(lowerQuery))
   )
 }
