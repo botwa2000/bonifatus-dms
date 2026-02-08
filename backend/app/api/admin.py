@@ -7,13 +7,13 @@ Administrative endpoints for user management, tier configuration, and system mon
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency, ProviderConnection
+from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency, ProviderConnection, MarketingCampaign
 from app.database.connection import db_manager, get_db
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -1513,5 +1513,337 @@ async def delete_currency(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete currency"
         )
+    finally:
+        session.close()
+
+
+# ============================================================
+# Marketing Campaign Management (Admin Only)
+# ============================================================
+
+class CampaignCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    subject: str = Field(..., min_length=1, max_length=500)
+    html_body: str = Field(..., min_length=1)
+    audience_filter: str = Field(default='all')
+
+
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    subject: Optional[str] = Field(None, max_length=500)
+    html_body: Optional[str] = None
+    audience_filter: Optional[str] = None
+
+
+@router.get("/campaigns", summary="List campaigns")
+async def list_campaigns(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """List all marketing campaigns, newest first."""
+    session = db_manager.get_session()
+    try:
+        campaigns = session.query(MarketingCampaign).order_by(
+            desc(MarketingCampaign.created_at)
+        ).all()
+
+        return {
+            "campaigns": [
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "subject": c.subject,
+                    "audience_filter": c.audience_filter,
+                    "status": c.status,
+                    "total_recipients": c.total_recipients,
+                    "sent_count": c.sent_count,
+                    "failed_count": c.failed_count,
+                    "sent_at": c.sent_at.isoformat() if c.sent_at else None,
+                    "completed_at": c.completed_at.isoformat() if c.completed_at else None,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "error_message": c.error_message,
+                }
+                for c in campaigns
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error listing campaigns: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list campaigns")
+    finally:
+        session.close()
+
+
+@router.post("/campaigns", summary="Create campaign")
+async def create_campaign(
+    data: CampaignCreate,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Create a new campaign draft."""
+    if data.audience_filter not in ('all', 'free', 'starter', 'pro'):
+        raise HTTPException(status_code=400, detail="Invalid audience_filter")
+
+    session = db_manager.get_session()
+    try:
+        campaign = MarketingCampaign(
+            name=data.name,
+            subject=data.subject,
+            html_body=data.html_body,
+            audience_filter=data.audience_filter,
+            status='draft',
+            created_by=current_admin.id,
+        )
+        session.add(campaign)
+        session.commit()
+        session.refresh(campaign)
+
+        logger.info(f"Admin {current_admin.email} created campaign: {campaign.name}")
+
+        return {
+            "message": "Campaign created",
+            "campaign": {
+                "id": str(campaign.id),
+                "name": campaign.name,
+                "status": campaign.status,
+            }
+        }
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error creating campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create campaign")
+    finally:
+        session.close()
+
+
+@router.get("/campaigns/{campaign_id}", summary="Get campaign details")
+async def get_campaign(
+    campaign_id: str,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get full campaign details including html_body."""
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        return {
+            "id": str(campaign.id),
+            "name": campaign.name,
+            "subject": campaign.subject,
+            "html_body": campaign.html_body,
+            "audience_filter": campaign.audience_filter,
+            "status": campaign.status,
+            "total_recipients": campaign.total_recipients,
+            "sent_count": campaign.sent_count,
+            "failed_count": campaign.failed_count,
+            "sent_at": campaign.sent_at.isoformat() if campaign.sent_at else None,
+            "completed_at": campaign.completed_at.isoformat() if campaign.completed_at else None,
+            "created_at": campaign.created_at.isoformat() if campaign.created_at else None,
+            "error_message": campaign.error_message,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get campaign")
+    finally:
+        session.close()
+
+
+@router.put("/campaigns/{campaign_id}", summary="Update campaign")
+async def update_campaign(
+    campaign_id: str,
+    data: CampaignUpdate,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Update a draft campaign."""
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.status != 'draft':
+            raise HTTPException(status_code=400, detail="Only draft campaigns can be edited")
+
+        if data.name is not None:
+            campaign.name = data.name
+        if data.subject is not None:
+            campaign.subject = data.subject
+        if data.html_body is not None:
+            campaign.html_body = data.html_body
+        if data.audience_filter is not None:
+            if data.audience_filter not in ('all', 'free', 'starter', 'pro'):
+                raise HTTPException(status_code=400, detail="Invalid audience_filter")
+            campaign.audience_filter = data.audience_filter
+
+        session.commit()
+        logger.info(f"Admin {current_admin.email} updated campaign: {campaign.name}")
+
+        return {"message": "Campaign updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update campaign")
+    finally:
+        session.close()
+
+
+@router.delete("/campaigns/{campaign_id}", summary="Delete campaign")
+async def delete_campaign(
+    campaign_id: str,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Delete a draft campaign."""
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.status != 'draft':
+            raise HTTPException(status_code=400, detail="Only draft campaigns can be deleted")
+
+        session.delete(campaign)
+        session.commit()
+        logger.info(f"Admin {current_admin.email} deleted campaign: {campaign.name}")
+
+        return {"message": "Campaign deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error deleting campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete campaign")
+    finally:
+        session.close()
+
+
+@router.get("/campaigns/{campaign_id}/preview", summary="Preview campaign")
+async def preview_campaign(
+    campaign_id: str,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Preview rendered campaign HTML with sample variables."""
+    from app.services.campaign_service import campaign_service
+
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        preview = campaign_service.preview_campaign(campaign.html_body, campaign.subject)
+        return preview
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to preview campaign")
+    finally:
+        session.close()
+
+
+@router.get("/campaigns/{campaign_id}/recipient-count", summary="Get recipient count")
+async def get_campaign_recipient_count(
+    campaign_id: str,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get count of eligible recipients for a campaign."""
+    from app.services.campaign_service import campaign_service
+
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        count = campaign_service.get_recipient_count(session, campaign.audience_filter)
+        return {"count": count, "audience_filter": campaign.audience_filter}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recipient count: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get recipient count")
+    finally:
+        session.close()
+
+
+async def _run_campaign_send(campaign_id: str, admin_user_id: str):
+    """Background task to send a campaign."""
+    from app.services.campaign_service import campaign_service
+
+    session = db_manager.get_session()
+    try:
+        await campaign_service.send_campaign(session, campaign_id, admin_user_id)
+    except Exception as e:
+        logger.error(f"Background campaign send failed: {e}")
+    finally:
+        session.close()
+
+
+@router.post("/campaigns/{campaign_id}/send", summary="Send campaign")
+async def send_campaign(
+    campaign_id: str,
+    background_tasks: BackgroundTasks,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Trigger sending a campaign. Runs in the background."""
+    from app.services.campaign_service import campaign_service
+
+    session = db_manager.get_session()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.status != 'draft':
+            raise HTTPException(
+                status_code=400,
+                detail=f'Campaign is in "{campaign.status}" status, must be "draft" to send'
+            )
+
+        # Verify there are recipients
+        count = campaign_service.get_recipient_count(session, campaign.audience_filter)
+        if count == 0:
+            raise HTTPException(status_code=400, detail="No eligible recipients found")
+
+        # Mark as sending
+        campaign.status = 'sending'
+        campaign.total_recipients = count
+        session.commit()
+
+        logger.info(f"Admin {current_admin.email} triggered campaign send: {campaign.name} to {count} recipients")
+
+        # Run in background
+        background_tasks.add_task(_run_campaign_send, str(campaign.id), str(current_admin.id))
+
+        return {
+            "message": "Campaign sending started",
+            "campaign_id": str(campaign.id),
+            "total_recipients": count,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error sending campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send campaign")
     finally:
         session.close()

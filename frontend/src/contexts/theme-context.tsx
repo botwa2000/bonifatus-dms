@@ -23,53 +23,43 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeTheme = async () => {
       logger.debug('[THEME DEBUG] === Initializing Theme ===')
-      setMounted(true)
 
-      // Load from localStorage first (instant, no API call)
+      // Load from localStorage first as immediate fallback
       const localTheme = localStorage.getItem('theme') as Theme
-      logger.debug('[THEME DEBUG] localStorage theme:', localTheme)
+      let resolvedTheme: Theme = 'light'
 
       if (localTheme && (localTheme === 'light' || localTheme === 'dark')) {
-        logger.debug('[THEME DEBUG] ✅ Using theme from localStorage:', localTheme)
-        setThemeState(localTheme)
-        applyTheme(localTheme)
-      } else {
-        // No valid theme in localStorage, use default
-        logger.debug('[THEME DEBUG] ℹ️  No theme in localStorage, using default: light')
-        setThemeState('light')
-        applyTheme('light')
+        resolvedTheme = localTheme
       }
 
-      // Then try to sync with backend (only for logged-in users)
-      // This will silently fail with 401 if user is not logged in - that's expected
+      // Apply localStorage theme to DOM immediately to prevent flash
+      applyTheme(resolvedTheme)
+
+      // Try to sync with backend (only succeeds for logged-in users)
+      // Backend is the source of truth for logged-in users
       try {
         const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
-        logger.debug('[THEME DEBUG] Syncing theme from backend:', url)
 
         const response = await fetch(url, {
           credentials: 'include'
         })
 
-        // Only update if we get a successful response (user is logged in)
         if (response.ok) {
           const data = await response.json()
-          logger.debug('[THEME DEBUG] Backend response:', data)
 
           if (data.value === 'light' || data.value === 'dark') {
-            // Update if backend theme is different from localStorage
-            if (data.value !== localTheme) {
-              logger.debug('[THEME DEBUG] ✅ Syncing theme from backend:', data.value)
-              setThemeState(data.value as Theme)
-              applyTheme(data.value as Theme)
-              localStorage.setItem('theme', data.value)
-            }
+            resolvedTheme = data.value as Theme
+            localStorage.setItem('theme', resolvedTheme)
+            applyTheme(resolvedTheme)
           }
         }
-        // Silently ignore 401/403 errors (user not logged in - expected)
-      } catch (error) {
-        // Silently ignore fetch errors - theme already loaded from localStorage
-        logger.debug('[THEME DEBUG] Could not sync with backend (user may not be logged in)')
+        // 401/403 = not logged in → keep light default
+      } catch {
+        // Fetch error → keep localStorage/default theme
       }
+
+      setThemeState(resolvedTheme)
+      setMounted(true)
     }
 
     initializeTheme()

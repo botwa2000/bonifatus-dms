@@ -1161,6 +1161,45 @@ class EmailTemplate(Base, TimestampMixin):
     )
 
 
+class MarketingCampaign(Base, TimestampMixin):
+    """Marketing email campaigns sent by admins"""
+    __tablename__ = "marketing_campaigns"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    subject = Column(String(500), nullable=False)
+    html_body = Column(Text, nullable=False)
+
+    # Audience targeting: 'all', 'free', 'starter', 'pro'
+    audience_filter = Column(String(50), nullable=False, server_default='all')
+
+    # Campaign status: 'draft', 'sending', 'sent', 'failed'
+    status = Column(String(20), nullable=False, server_default='draft')
+
+    # Delivery stats
+    total_recipients = Column(Integer, nullable=False, server_default='0')
+    sent_count = Column(Integer, nullable=False, server_default='0')
+    failed_count = Column(Integer, nullable=False, server_default='0')
+
+    # Timestamps
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Admin who created/sent the campaign
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by])
+
+    __table_args__ = (
+        Index('idx_campaign_status', 'status'),
+        Index('idx_campaign_created', 'created_at'),
+    )
+
+
 class CookieCategory(Base, TimestampMixin):
     """Cookie categories for GDPR consent management"""
     __tablename__ = "cookie_categories"

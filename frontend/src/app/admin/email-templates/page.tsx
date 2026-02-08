@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { apiClient } from '@/services/api-client'
 import { logger } from '@/lib/logger'
+import EmailHtmlEditor from '@/components/admin/EmailHtmlEditor'
 
 interface EmailTemplate {
   id: string
@@ -340,16 +341,11 @@ export default function EmailTemplatesAdmin() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
                       HTML Content *
                     </label>
-                    <textarea
+                    <EmailHtmlEditor
                       value={formData.html_content}
-                      onChange={(e) => setFormData({ ...formData, html_content: e.target.value })}
-                      rows={15}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-700 text-gray-900 dark:text-neutral-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      onChange={(v) => setFormData({ ...formData, html_content: v })}
                       placeholder="HTML email content with {{variable}} placeholders"
                     />
-                    <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-                      Use {`{{variable_name}}`} for dynamic content
-                    </p>
                   </div>
 
                   {/* Description */}

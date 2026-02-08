@@ -186,7 +186,7 @@ export default function AdminDashboard() {
   const [entityQualityConfigs, setEntityQualityConfigs] = useState<EntityQualityConfig[]>([])
   const [editingConfig, setEditingConfig] = useState<{key: string, value: string} | null>(null)
   const [storageProviders, setStorageProviders] = useState<StorageProvider[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates' | 'entity-quality'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tiers' | 'currencies' | 'health' | 'email-templates' | 'campaigns' | 'entity-quality'>('overview')
   const [loadingData, setLoadingData] = useState(true)
   const [editingTier, setEditingTier] = useState<TierPlan | null>(null)
   const [editingCurrency, setEditingCurrency] = useState<{code: string, rate: string} | null>(null)
@@ -659,6 +659,16 @@ export default function AdminDashboard() {
             }`}
           >
             Email Templates
+          </button>
+          <button
+            onClick={() => setActiveTab('campaigns')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'campaigns'
+                ? 'text-admin-primary border-b-2 border-admin-primary'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:text-white dark:hover:text-neutral-200'
+            }`}
+          >
+            Campaigns
           </button>
           <button
             onClick={() => setActiveTab('entity-quality')}
@@ -1934,6 +1944,21 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Campaigns Tab */}
+        {activeTab === 'campaigns' && (
+          <Card>
+            <CardHeader title="Marketing Campaigns" />
+            <CardContent>
+              <p className="text-gray-600 dark:text-neutral-400 mb-4">
+                Create and send promotional emails to your users. Campaigns respect the marketing email preference toggle in user settings.
+              </p>
+              <Button onClick={() => router.push('/admin/campaigns')} variant="primary">
+                Open Campaign Manager
+              </Button>
             </CardContent>
           </Card>
         )}
