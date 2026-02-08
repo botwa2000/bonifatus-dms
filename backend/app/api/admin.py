@@ -1787,11 +1787,13 @@ async def _run_campaign_send(campaign_id: str, admin_user_id: str):
     """Background task to send a campaign."""
     from app.services.campaign_service import campaign_service
 
+    logger.info(f"[CAMPAIGN BG] Starting background send for campaign {campaign_id}")
     session = db_manager.session_local()
     try:
-        await campaign_service.send_campaign(session, campaign_id, admin_user_id)
+        result = await campaign_service.send_campaign(session, campaign_id, admin_user_id)
+        logger.info(f"[CAMPAIGN BG] Send completed for campaign {campaign_id}: {result}")
     except Exception as e:
-        logger.error(f"Background campaign send failed: {e}")
+        logger.error(f"[CAMPAIGN BG] Background campaign send failed for {campaign_id}: {e}", exc_info=True)
     finally:
         session.close()
 
@@ -1823,11 +1825,6 @@ async def send_campaign(
         count = campaign_service.get_recipient_count(session, campaign.audience_filter)
         if count == 0:
             raise HTTPException(status_code=400, detail="No eligible recipients found")
-
-        # Mark as sending
-        campaign.status = 'sending'
-        campaign.total_recipients = count
-        session.commit()
 
         logger.info(f"Admin {current_admin.email} triggered campaign send: {campaign.name} to {count} recipients")
 

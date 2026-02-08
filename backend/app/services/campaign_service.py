@@ -135,18 +135,24 @@ class CampaignService:
         Updates campaign status throughout the process.
         Rate-limited to ~10 emails/second via asyncio.sleep.
         """
+        logger.info(f"[CAMPAIGN SEND] Looking up campaign {campaign_id}")
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
         ).first()
 
         if not campaign:
+            logger.error(f"[CAMPAIGN SEND] Campaign {campaign_id} not found")
             return {'error': 'Campaign not found'}
 
+        logger.info(f"[CAMPAIGN SEND] Campaign '{campaign.name}' status={campaign.status}")
+
         if campaign.status != 'draft':
+            logger.warning(f"[CAMPAIGN SEND] Campaign not in draft status: {campaign.status}")
             return {'error': f'Campaign is in "{campaign.status}" status, must be "draft" to send'}
 
         # Get recipients
         recipients = self.get_eligible_recipients(session, campaign.audience_filter)
+        logger.info(f"[CAMPAIGN SEND] Found {len(recipients)} eligible recipients")
 
         if not recipients:
             return {'error': 'No eligible recipients found'}
@@ -167,8 +173,9 @@ class CampaignService:
         failed = 0
 
         try:
-            for email, full_name, tier_name in recipients:
+            for idx, (email, full_name, tier_name) in enumerate(recipients, 1):
                 try:
+                    logger.info(f"[CAMPAIGN SEND] Sending {idx}/{len(recipients)} to {email}")
                     # Render template for this user
                     rendered_subject = self._render_template(
                         campaign.subject, full_name, email, tier_name
