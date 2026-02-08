@@ -1540,7 +1540,7 @@ async def list_campaigns(
     current_admin: User = Depends(get_current_admin_user)
 ):
     """List all marketing campaigns, newest first."""
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaigns = session.query(MarketingCampaign).order_by(
             desc(MarketingCampaign.created_at)
@@ -1581,7 +1581,7 @@ async def create_campaign(
     if data.audience_filter not in ('all', 'free', 'starter', 'pro'):
         raise HTTPException(status_code=400, detail="Invalid audience_filter")
 
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = MarketingCampaign(
             name=data.name,
@@ -1619,7 +1619,7 @@ async def get_campaign(
     current_admin: User = Depends(get_current_admin_user)
 ):
     """Get full campaign details including html_body."""
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
@@ -1659,7 +1659,7 @@ async def update_campaign(
     current_admin: User = Depends(get_current_admin_user)
 ):
     """Update a draft campaign."""
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
@@ -1701,7 +1701,7 @@ async def delete_campaign(
     current_admin: User = Depends(get_current_admin_user)
 ):
     """Delete a draft campaign."""
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
@@ -1735,7 +1735,7 @@ async def preview_campaign(
     """Preview rendered campaign HTML with sample variables."""
     from app.services.campaign_service import campaign_service
 
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
@@ -1763,7 +1763,7 @@ async def get_campaign_recipient_count(
     """Get count of eligible recipients for a campaign."""
     from app.services.campaign_service import campaign_service
 
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
@@ -1787,7 +1787,7 @@ async def _run_campaign_send(campaign_id: str, admin_user_id: str):
     """Background task to send a campaign."""
     from app.services.campaign_service import campaign_service
 
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         await campaign_service.send_campaign(session, campaign_id, admin_user_id)
     except Exception as e:
@@ -1805,7 +1805,7 @@ async def send_campaign(
     """Trigger sending a campaign. Runs in the background."""
     from app.services.campaign_service import campaign_service
 
-    session = db_manager.get_session()
+    session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
             MarketingCampaign.id == campaign_id
