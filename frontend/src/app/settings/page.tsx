@@ -414,15 +414,11 @@ export default function SettingsPage() {
 
   const handleTogglePreference = async (key: keyof UserPreferences) => {
     if (!preferences) return
-    const updatedPreferences = { ...preferences, [key]: !preferences[key] }
-    setPreferences(updatedPreferences)
+    const newValue = !preferences[key]
+    setPreferences({ ...preferences, [key]: newValue })
 
     try {
-      const preferencesWithAllLanguages = {
-        ...updatedPreferences,
-        preferred_doc_languages: systemSettings?.available_languages || []
-      }
-      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      await apiClient.put('/api/v1/users/preferences', { [key]: newValue }, true)
       setMessage({ type: 'success', text: 'Preference updated' })
       setTimeout(() => setMessage(null), 2000)
     } catch (error) {
