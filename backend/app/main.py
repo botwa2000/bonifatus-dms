@@ -137,6 +137,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Email polling initialization failed: {e}")
 
+    # Start campaign scheduler task
+    try:
+        from app.tasks import start_campaign_scheduler
+        start_campaign_scheduler()
+        logger.info("Campaign scheduler task initialized")
+    except Exception as e:
+        logger.warning(f"Campaign scheduler initialization failed: {e}")
+
     logger.info("Application startup completed successfully")
 
     yield
@@ -151,6 +159,14 @@ async def lifespan(app: FastAPI):
         logger.info("Email polling task stopped")
     except Exception as e:
         logger.warning(f"Email polling shutdown error: {e}")
+
+    # Stop campaign scheduler task
+    try:
+        from app.tasks import stop_campaign_scheduler
+        stop_campaign_scheduler()
+        logger.info("Campaign scheduler task stopped")
+    except Exception as e:
+        logger.warning(f"Campaign scheduler shutdown error: {e}")
     
     try:
         from app.database.connection import close_database

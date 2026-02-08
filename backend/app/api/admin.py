@@ -13,7 +13,7 @@ from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency, ProviderConnection, MarketingCampaign
+from app.database.models import User, TierPlan, TierProviderSettings, UserStorageQuota, UserMonthlyUsage, Document, AuditLog, EmailTemplate, Currency, ProviderConnection, MarketingCampaign, CampaignSend
 from app.database.connection import db_manager, get_db
 from app.middleware.auth_middleware import get_current_admin_user
 from app.services.clamav_health_service import clamav_health_service
@@ -1535,6 +1535,12 @@ class CampaignUpdate(BaseModel):
     audience_filter: Optional[str] = None
 
 
+class CampaignScheduleUpdate(BaseModel):
+    schedule_enabled: bool = Field(..., description="Enable or disable scheduling")
+    schedule_type: Optional[str] = Field(None, description="Schedule type: interval_days, weekday, monthly_day")
+    schedule_value: Optional[Any] = Field(None, description="Schedule value (number of days, weekday name, or day of month)")
+
+
 @router.get("/campaigns", summary="List campaigns")
 async def list_campaigns(
     current_admin: User = Depends(get_current_admin_user)
@@ -1561,6 +1567,9 @@ async def list_campaigns(
                     "completed_at": c.completed_at.isoformat() if c.completed_at else None,
                     "created_at": c.created_at.isoformat() if c.created_at else None,
                     "error_message": c.error_message,
+                    "schedule_enabled": c.schedule_enabled,
+                    "schedule_cron": c.schedule_cron,
+                    "last_scheduled_run": c.last_scheduled_run.isoformat() if c.last_scheduled_run else None,
                 }
                 for c in campaigns
             ]
@@ -1642,6 +1651,9 @@ async def get_campaign(
             "completed_at": campaign.completed_at.isoformat() if campaign.completed_at else None,
             "created_at": campaign.created_at.isoformat() if campaign.created_at else None,
             "error_message": campaign.error_message,
+            "schedule_enabled": campaign.schedule_enabled,
+            "schedule_cron": campaign.schedule_cron,
+            "last_scheduled_run": campaign.last_scheduled_run.isoformat() if campaign.last_scheduled_run else None,
         }
     except HTTPException:
         raise
@@ -1658,7 +1670,7 @@ async def update_campaign(
     data: CampaignUpdate,
     current_admin: User = Depends(get_current_admin_user)
 ):
-    """Update a draft campaign."""
+    """Update a draft or active campaign."""
     session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
@@ -1667,8 +1679,8 @@ async def update_campaign(
 
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
-        if campaign.status != 'draft':
-            raise HTTPException(status_code=400, detail="Only draft campaigns can be edited")
+        if campaign.status not in ('draft', 'active'):
+            raise HTTPException(status_code=400, detail="Only draft or active campaigns can be edited")
 
         if data.name is not None:
             campaign.name = data.name
@@ -1760,7 +1772,7 @@ async def get_campaign_recipient_count(
     campaign_id: str,
     current_admin: User = Depends(get_current_admin_user)
 ):
-    """Get count of eligible recipients for a campaign."""
+    """Get count of eligible recipients for a campaign, including already-sent breakdown."""
     from app.services.campaign_service import campaign_service
 
     session = db_manager.session_local()
@@ -1772,8 +1784,14 @@ async def get_campaign_recipient_count(
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
 
-        count = campaign_service.get_recipient_count(session, campaign.audience_filter)
-        return {"count": count, "audience_filter": campaign.audience_filter}
+        counts = campaign_service.get_recipient_counts_detailed(session, campaign.id, campaign.audience_filter)
+        return {
+            "count": counts['new_recipients'],
+            "total_eligible": counts['total_eligible'],
+            "already_sent": counts['already_sent'],
+            "new_recipients": counts['new_recipients'],
+            "audience_filter": campaign.audience_filter,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -1804,7 +1822,7 @@ async def send_campaign(
     background_tasks: BackgroundTasks,
     current_admin: User = Depends(get_current_admin_user)
 ):
-    """Trigger sending a campaign. Runs in the background."""
+    """Trigger sending a campaign to new recipients. Runs in the background."""
     from app.services.campaign_service import campaign_service
 
     session = db_manager.session_local()
@@ -1815,18 +1833,21 @@ async def send_campaign(
 
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
-        if campaign.status != 'draft':
+        if campaign.status not in ('draft', 'active'):
             raise HTTPException(
                 status_code=400,
-                detail=f'Campaign is in "{campaign.status}" status, must be "draft" to send'
+                detail=f'Campaign is in "{campaign.status}" status, must be "draft" or "active" to send'
             )
 
-        # Verify there are recipients
-        count = campaign_service.get_recipient_count(session, campaign.audience_filter)
-        if count == 0:
-            raise HTTPException(status_code=400, detail="No eligible recipients found")
+        # Get detailed counts (total eligible, already sent, new)
+        counts = campaign_service.get_recipient_counts_detailed(session, campaign.id, campaign.audience_filter)
+        if counts['new_recipients'] == 0:
+            raise HTTPException(status_code=400, detail="No new recipients to send to")
 
-        logger.info(f"Admin {current_admin.email} triggered campaign send: {campaign.name} to {count} recipients")
+        logger.info(
+            f"Admin {current_admin.email} triggered campaign send: {campaign.name} "
+            f"to {counts['new_recipients']} new recipients ({counts['already_sent']} already sent)"
+        )
 
         # Run in background
         background_tasks.add_task(_run_campaign_send, str(campaign.id), str(current_admin.id))
@@ -1834,7 +1855,9 @@ async def send_campaign(
         return {
             "message": "Campaign sending started",
             "campaign_id": str(campaign.id),
-            "total_recipients": count,
+            "new_recipients": counts['new_recipients'],
+            "already_sent": counts['already_sent'],
+            "total_eligible": counts['total_eligible'],
         }
     except HTTPException:
         raise
@@ -1842,5 +1865,87 @@ async def send_campaign(
         session.rollback()
         logger.error(f"Error sending campaign: {e}")
         raise HTTPException(status_code=500, detail="Failed to send campaign")
+    finally:
+        session.close()
+
+
+@router.get("/campaigns/{campaign_id}/sends", summary="Get campaign send history")
+async def get_campaign_sends(
+    campaign_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get individual send records for a campaign."""
+    from app.services.campaign_service import campaign_service
+
+    session = db_manager.session_local()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        result = campaign_service.get_campaign_send_history(session, campaign.id, page, page_size)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting campaign sends: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get campaign send history")
+    finally:
+        session.close()
+
+
+@router.put("/campaigns/{campaign_id}/schedule", summary="Update campaign schedule")
+async def update_campaign_schedule(
+    campaign_id: str,
+    data: CampaignScheduleUpdate,
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Enable or disable scheduling for a campaign with frequency configuration."""
+    import json
+
+    session = db_manager.session_local()
+    try:
+        campaign = session.query(MarketingCampaign).filter(
+            MarketingCampaign.id == campaign_id
+        ).first()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if campaign.status not in ('draft', 'active'):
+            raise HTTPException(status_code=400, detail="Only draft or active campaigns can be scheduled")
+
+        campaign.schedule_enabled = data.schedule_enabled
+
+        if data.schedule_enabled:
+            if not data.schedule_type or data.schedule_value is None:
+                raise HTTPException(status_code=400, detail="schedule_type and schedule_value required when enabling")
+            if data.schedule_type not in ('interval_days', 'weekday', 'monthly_day'):
+                raise HTTPException(status_code=400, detail="Invalid schedule_type")
+            campaign.schedule_cron = json.dumps({
+                'type': data.schedule_type,
+                'value': data.schedule_value,
+            })
+        else:
+            campaign.schedule_cron = None
+
+        session.commit()
+        logger.info(f"Admin {current_admin.email} updated schedule for campaign: {campaign.name}")
+
+        return {
+            "message": "Campaign schedule updated",
+            "schedule_enabled": campaign.schedule_enabled,
+            "schedule_cron": campaign.schedule_cron,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error updating campaign schedule: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update campaign schedule")
     finally:
         session.close()

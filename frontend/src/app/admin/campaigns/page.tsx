@@ -25,6 +25,26 @@ interface Campaign {
   completed_at: string | null
   created_at: string | null
   error_message: string | null
+  schedule_enabled: boolean
+  schedule_cron: string | null
+  last_scheduled_run: string | null
+}
+
+interface CampaignSendRecord {
+  id: string
+  user_id: string
+  user_email: string
+  sent_at: string
+  status: string
+  error_message: string | null
+}
+
+interface RecipientCounts {
+  count: number
+  total_eligible: number
+  already_sent: number
+  new_recipients: number
+  audience_filter: string
 }
 
 const AUDIENCE_OPTIONS = [
@@ -34,11 +54,22 @@ const AUDIENCE_OPTIONS = [
   { value: 'pro', label: 'Pro Tier' },
 ]
 
+const SCHEDULE_OPTIONS = [
+  { value: '', label: 'No Schedule' },
+  { value: 'interval_days:1', label: 'Every day' },
+  { value: 'interval_days:3', label: 'Every 3 days' },
+  { value: 'interval_days:7', label: 'Every 7 days' },
+  { value: 'weekday:monday', label: 'Every Monday' },
+  { value: 'monthly_day:1', label: 'Every 1st of month' },
+]
+
 const STATUS_BADGE: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   draft: 'default',
   sending: 'warning',
+  active: 'success',
   sent: 'success',
   failed: 'error',
+  paused: 'info',
 }
 
 export default function CampaignsAdmin() {
@@ -64,8 +95,21 @@ export default function CampaignsAdmin() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
   const [showSendConfirm, setShowSendConfirm] = useState(false)
-  const [recipientCount, setRecipientCount] = useState(0)
+  const [recipientCounts, setRecipientCounts] = useState<RecipientCounts | null>(null)
   const [isSending, setIsSending] = useState(false)
+
+  // Send history
+  const [showSendHistory, setShowSendHistory] = useState(false)
+  const [sendHistory, setSendHistory] = useState<CampaignSendRecord[]>([])
+  const [sendHistoryTotal, setSendHistoryTotal] = useState(0)
+  const [sendHistoryLoading, setSendHistoryLoading] = useState(false)
+  const [sendHistoryCampaign, setSendHistoryCampaign] = useState<Campaign | null>(null)
+
+  // Schedule
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleCampaign, setScheduleCampaign] = useState<Campaign | null>(null)
+  const [scheduleValue, setScheduleValue] = useState('')
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
 
   useEffect(() => {
     loadUser()
@@ -172,10 +216,10 @@ export default function CampaignsAdmin() {
 
   const handleSendClick = async (campaign: Campaign) => {
     try {
-      const data = await apiClient.get<{ count: number }>(
+      const data = await apiClient.get<RecipientCounts>(
         `/api/v1/admin/campaigns/${campaign.id}/recipient-count`
       )
-      setRecipientCount(data.count)
+      setRecipientCounts(data)
       setSelectedCampaign(campaign)
       setShowSendConfirm(true)
     } catch (error) {
@@ -189,9 +233,10 @@ export default function CampaignsAdmin() {
     setIsSending(true)
     try {
       await apiClient.post(`/api/v1/admin/campaigns/${selectedCampaign.id}/send`, {})
-      setMessage({ type: 'success', text: `Campaign sending started to ${recipientCount} recipients` })
+      setMessage({ type: 'success', text: `Campaign sending started to ${recipientCounts?.new_recipients || 0} new recipients` })
       setShowSendConfirm(false)
       setSelectedCampaign(null)
+      setRecipientCounts(null)
       await loadCampaigns()
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Error sending campaign'
@@ -201,9 +246,84 @@ export default function CampaignsAdmin() {
     }
   }
 
+  const handleViewSendHistory = async (campaign: Campaign) => {
+    setSendHistoryCampaign(campaign)
+    setSendHistoryLoading(true)
+    setShowSendHistory(true)
+    try {
+      const data = await apiClient.get<{ sends: CampaignSendRecord[]; total: number }>(
+        `/api/v1/admin/campaigns/${campaign.id}/sends`
+      )
+      setSendHistory(data.sends || [])
+      setSendHistoryTotal(data.total)
+    } catch (error) {
+      logger.error('Error loading send history:', error)
+      setMessage({ type: 'error', text: 'Error loading send history' })
+    } finally {
+      setSendHistoryLoading(false)
+    }
+  }
+
+  const handleScheduleClick = (campaign: Campaign) => {
+    setScheduleCampaign(campaign)
+    // Parse existing schedule
+    if (campaign.schedule_enabled && campaign.schedule_cron) {
+      try {
+        const config = JSON.parse(campaign.schedule_cron)
+        setScheduleValue(`${config.type}:${config.value}`)
+      } catch {
+        setScheduleValue('')
+      }
+    } else {
+      setScheduleValue('')
+    }
+    setShowSchedule(true)
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!scheduleCampaign) return
+    setIsSavingSchedule(true)
+    try {
+      if (!scheduleValue) {
+        await apiClient.put(`/api/v1/admin/campaigns/${scheduleCampaign.id}/schedule`, {
+          schedule_enabled: false,
+        })
+      } else {
+        const [type, value] = scheduleValue.split(':')
+        const parsedValue = type === 'weekday' ? value : parseInt(value, 10)
+        await apiClient.put(`/api/v1/admin/campaigns/${scheduleCampaign.id}/schedule`, {
+          schedule_enabled: true,
+          schedule_type: type,
+          schedule_value: parsedValue,
+        })
+      }
+      setMessage({ type: 'success', text: 'Schedule updated' })
+      setShowSchedule(false)
+      setScheduleCampaign(null)
+      await loadCampaigns()
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error updating schedule'
+      setMessage({ type: 'error', text: errorMessage })
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }
+
   const handleCancel = () => {
     setIsEditing(false)
     setSelectedCampaign(null)
+  }
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      draft: 'Draft',
+      sending: 'Sending',
+      active: 'Active',
+      sent: 'Sent',
+      failed: 'Failed',
+      paused: 'Paused',
+    }
+    return labels[status] || status.charAt(0).toUpperCase() + status.slice(1)
   }
 
   if (isLoading || !user) {
@@ -261,16 +381,19 @@ export default function CampaignsAdmin() {
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-neutral-100">{c.name}</h3>
                           <Badge variant={STATUS_BADGE[c.status] || 'default'}>
-                            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                            {getStatusLabel(c.status)}
                           </Badge>
                           <Badge variant="info">
                             {AUDIENCE_OPTIONS.find((a) => a.value === c.audience_filter)?.label || c.audience_filter}
                           </Badge>
+                          {c.schedule_enabled && (
+                            <Badge variant="info">Scheduled</Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-600 dark:text-neutral-300 mb-1">
                           <strong>Subject:</strong> {c.subject}
                         </p>
-                        {(c.status === 'sent' || c.status === 'sending') && (
+                        {(c.status === 'active' || c.status === 'sent' || c.status === 'sending') && (
                           <p className="text-sm text-gray-500 dark:text-neutral-400">
                             Sent: {c.sent_count} / {c.total_recipients}
                             {c.failed_count > 0 && <span className="text-red-500"> ({c.failed_count} failed)</span>}
@@ -281,18 +404,29 @@ export default function CampaignsAdmin() {
                         )}
                         <p className="text-xs text-gray-400 dark:text-neutral-500 mt-2">
                           {c.sent_at
-                            ? `Sent: ${new Date(c.sent_at).toLocaleString()}`
+                            ? `Last sent: ${new Date(c.sent_at).toLocaleString()}`
                             : `Created: ${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}`}
+                          {c.last_scheduled_run && (
+                            <span> | Last scheduled run: {new Date(c.last_scheduled_run).toLocaleString()}</span>
+                          )}
                         </p>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex gap-2 ml-4 flex-wrap justify-end">
                         <Button onClick={() => handlePreview(c)} variant="secondary" size="sm">Preview</Button>
-                        {c.status === 'draft' && (
+                        {(c.status === 'active' || c.sent_count > 0) && (
+                          <Button onClick={() => handleViewSendHistory(c)} variant="secondary" size="sm">History</Button>
+                        )}
+                        {(c.status === 'draft' || c.status === 'active') && (
                           <>
                             <Button onClick={() => handleEdit(c)} variant="primary" size="sm">Edit</Button>
-                            <Button onClick={() => handleSendClick(c)} variant="primary" size="sm">Send</Button>
-                            <Button onClick={() => handleDelete(c)} variant="secondary" size="sm">Delete</Button>
+                            <Button onClick={() => handleSendClick(c)} variant="primary" size="sm">
+                              {c.status === 'active' ? 'Re-send' : 'Send'}
+                            </Button>
+                            <Button onClick={() => handleScheduleClick(c)} variant="secondary" size="sm">Schedule</Button>
                           </>
+                        )}
+                        {c.status === 'draft' && (
+                          <Button onClick={() => handleDelete(c)} variant="secondary" size="sm">Delete</Button>
                         )}
                       </div>
                     </div>
@@ -405,28 +539,137 @@ export default function CampaignsAdmin() {
         )}
 
         {/* Send Confirmation Modal */}
-        {showSendConfirm && (
+        {showSendConfirm && recipientCounts && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-md w-full">
               <div className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-neutral-100 mb-4">Confirm Send</h2>
                 <p className="text-gray-700 dark:text-neutral-300 mb-2">
-                  This will send the campaign <strong>&quot;{selectedCampaign?.name}&quot;</strong> to{' '}
-                  <strong>{recipientCount}</strong> recipients.
+                  Campaign: <strong>&quot;{selectedCampaign?.name}&quot;</strong>
                 </p>
+                <div className="bg-gray-50 dark:bg-neutral-700/50 rounded-lg p-3 mb-4 space-y-1">
+                  <p className="text-sm text-gray-600 dark:text-neutral-300">
+                    Total eligible: <strong>{recipientCounts.total_eligible}</strong>
+                  </p>
+                  {recipientCounts.already_sent > 0 && (
+                    <p className="text-sm text-gray-500 dark:text-neutral-400">
+                      Already sent: {recipientCounts.already_sent}
+                    </p>
+                  )}
+                  <p className="text-sm font-medium text-gray-900 dark:text-neutral-100">
+                    New recipients: <strong>{recipientCounts.new_recipients}</strong>
+                  </p>
+                </div>
                 <p className="text-sm text-gray-500 dark:text-neutral-400 mb-6">
-                  Only users with marketing emails enabled will receive this. This action cannot be undone.
+                  Only users with marketing emails enabled will receive this.
+                  {recipientCounts.already_sent > 0 && ' Users who already received this campaign will be skipped.'}
                 </p>
                 <div className="flex justify-end gap-3">
                   <Button
-                    onClick={() => { setShowSendConfirm(false); setSelectedCampaign(null) }}
+                    onClick={() => { setShowSendConfirm(false); setSelectedCampaign(null); setRecipientCounts(null) }}
                     variant="secondary"
                     disabled={isSending}
                   >
                     Cancel
                   </Button>
                   <Button onClick={handleConfirmSend} variant="primary" disabled={isSending}>
-                    {isSending ? 'Sending...' : `Send to ${recipientCount} Users`}
+                    {isSending ? 'Sending...' : `Send to ${recipientCounts.new_recipients} New Users`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Send History Modal */}
+        {showSendHistory && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-neutral-100">
+                    Send History: {sendHistoryCampaign?.name}
+                  </h2>
+                  <Button onClick={() => { setShowSendHistory(false); setSendHistoryCampaign(null) }} variant="secondary" size="sm">Close</Button>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-neutral-400 mb-4">
+                  Total sends: {sendHistoryTotal}
+                </p>
+                {sendHistoryLoading ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-neutral-400">Loading...</div>
+                ) : sendHistory.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-neutral-400">No sends yet.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b dark:border-neutral-700">
+                          <th className="text-left py-2 px-3 text-gray-600 dark:text-neutral-400">Email</th>
+                          <th className="text-left py-2 px-3 text-gray-600 dark:text-neutral-400">Status</th>
+                          <th className="text-left py-2 px-3 text-gray-600 dark:text-neutral-400">Sent At</th>
+                          <th className="text-left py-2 px-3 text-gray-600 dark:text-neutral-400">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sendHistory.map((s) => (
+                          <tr key={s.id} className="border-b dark:border-neutral-700/50">
+                            <td className="py-2 px-3 text-gray-900 dark:text-neutral-100">{s.user_email}</td>
+                            <td className="py-2 px-3">
+                              <Badge variant={s.status === 'sent' ? 'success' : 'error'}>
+                                {s.status}
+                              </Badge>
+                            </td>
+                            <td className="py-2 px-3 text-gray-600 dark:text-neutral-300">
+                              {new Date(s.sent_at).toLocaleString()}
+                            </td>
+                            <td className="py-2 px-3 text-red-500 text-xs">{s.error_message || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule Modal */}
+        {showSchedule && scheduleCampaign && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-neutral-100 mb-4">
+                  Schedule: {scheduleCampaign.name}
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-neutral-300 mb-4">
+                  Scheduled campaigns automatically send to new eligible users on the configured frequency.
+                  Users who already received this campaign will be skipped.
+                </p>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+                    Send Frequency
+                  </label>
+                  <select
+                    value={scheduleValue}
+                    onChange={(e) => setScheduleValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-700 text-gray-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {SCHEDULE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button
+                    onClick={() => { setShowSchedule(false); setScheduleCampaign(null) }}
+                    variant="secondary"
+                    disabled={isSavingSchedule}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveSchedule} variant="primary" disabled={isSavingSchedule}>
+                    {isSavingSchedule ? 'Saving...' : 'Save Schedule'}
                   </Button>
                 </div>
               </div>

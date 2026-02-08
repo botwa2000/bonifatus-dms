@@ -9,11 +9,13 @@ type Theme = 'light' | 'dark'
 interface ThemeContextType {
   theme: Theme
   setTheme: (theme: Theme) => void
+  refreshTheme: () => Promise<void>
 }
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: 'light',
   setTheme: () => {},
+  refreshTheme: async () => {},
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -72,6 +74,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.add(newTheme)
   }
 
+  const refreshTheme = async () => {
+    logger.debug('[THEME DEBUG] === Refreshing Theme from Backend ===')
+    try {
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
+      const response = await fetch(url, { credentials: 'include' })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.value === 'light' || data.value === 'dark') {
+          logger.debug('[THEME DEBUG] Backend theme:', data.value)
+          setThemeState(data.value as Theme)
+          localStorage.setItem('theme', data.value)
+          applyTheme(data.value as Theme)
+        }
+      }
+    } catch {
+      logger.debug('[THEME DEBUG] refreshTheme fetch failed, keeping current theme')
+    }
+  }
+
   const setTheme = async (newTheme: Theme) => {
     logger.debug('[THEME DEBUG] === Setting Theme ===')
     logger.debug('[THEME DEBUG] New theme:', newTheme)
@@ -125,7 +146,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, refreshTheme }}>
       {children}
     </ThemeContext.Provider>
   )

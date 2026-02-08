@@ -1191,12 +1191,43 @@ class MarketingCampaign(Base, TimestampMixin):
     # Error tracking
     error_message = Column(Text, nullable=True)
 
+    # Scheduling
+    schedule_enabled = Column(Boolean, nullable=False, server_default='false')
+    schedule_cron = Column(Text, nullable=True)  # JSON: {"type": "interval_days", "value": 7}
+    last_scheduled_run = Column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     creator = relationship("User", foreign_keys=[created_by])
+    sends = relationship("CampaignSend", back_populates="campaign", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_campaign_status', 'status'),
         Index('idx_campaign_created', 'created_at'),
+        Index('idx_campaign_schedule', 'schedule_enabled', 'status'),
+    )
+
+
+class CampaignSend(Base):
+    """Individual send records for campaign recipients"""
+    __tablename__ = "campaign_sends"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID(as_uuid=True), ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_email = Column(String(320), nullable=False)
+    sent_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    status = Column(String(20), nullable=False, server_default='sent')  # 'sent', 'failed'
+    error_message = Column(Text, nullable=True)
+
+    # Relationships
+    campaign = relationship("MarketingCampaign", back_populates="sends")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint('campaign_id', 'user_id', name='uq_campaign_send_user'),
+        Index('idx_campaign_send_campaign', 'campaign_id'),
+        Index('idx_campaign_send_user', 'user_id'),
+        Index('idx_campaign_send_status', 'status'),
     )
 
 

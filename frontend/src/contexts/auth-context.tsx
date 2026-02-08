@@ -6,6 +6,7 @@ import { authService } from '@/services/auth.service'
 import { User } from '@/types/auth.types'
 import { identifyUser, trackLogout, resetUser } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
+import { useTheme } from '@/contexts/theme-context'
 
 interface AuthContextType {
   user: User | null
@@ -23,6 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { refreshTheme } = useTheme()
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)  // Start false for public pages
@@ -46,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(!!currentUser)
       logger.debug('[AUTH DEBUG] Auth state updated - isAuthenticated:', !!currentUser)
 
-      // Identify user for analytics
+      // Identify user for analytics and refresh theme from backend
       if (currentUser) {
         identifyUser(currentUser.id, {
           email: currentUser.email,
@@ -54,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           tier: currentUser.tier,
           created_at: currentUser.created_at,
         })
+        // Fetch user's saved theme preference from backend
+        refreshTheme()
       }
     } catch (err) {
       logger.error('[AUTH DEBUG] Error in loadUser:', err)
