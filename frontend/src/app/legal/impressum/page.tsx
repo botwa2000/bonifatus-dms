@@ -27,31 +27,10 @@ export default function ImpressumPage() {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Company Information</h2>
             <div className="text-neutral-700 dark:text-neutral-300 space-y-2">
-              <p><strong>Company Name:</strong> Bonifatus DMS GmbH</p>
-              <p><strong>Address:</strong> Business District<br />12345 Berlin, Germany</p>
-              <p><strong>Email:</strong> info@bonifatus-dms.com</p>
-              <p><strong>Phone:</strong> +49 (0)30 12345678</p>
-            </div>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Legal Information</h2>
-            <div className="text-neutral-700 dark:text-neutral-300 space-y-2">
-              <p><strong>Managing Director:</strong> [Director Name]</p>
-              <p><strong>Commercial Register:</strong> HRB [Number] Berlin</p>
-              <p><strong>VAT ID:</strong> DE[Number]</p>
-              <p><strong>Tax Number:</strong> [Tax Number]</p>
-            </div>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Responsible for Content</h2>
-            <div className="text-neutral-700 dark:text-neutral-300">
-              <p>According to § 55 Abs. 2 RStV:</p>
-              <p>
-                [Director Name]<br />
-                Business District<br />
-                12345 Berlin, Germany
+              <p><strong>Company Name:</strong> Bonifatus</p>
+              <p><strong>Address:</strong> Bad Homburg, Germany</p>
+              <p><strong>Email:</strong>{' '}
+                <a href="mailto:info@bonifatus.com" className="text-admin-primary hover:underline">info@bonifatus.com</a>
               </p>
             </div>
           </section>
@@ -69,9 +48,9 @@ export default function ImpressumPage() {
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Contact</h2>
             <p className="text-neutral-700 dark:text-neutral-300">
               For questions regarding this legal notice, please contact us at{' '}
-              <Link href="/contact" className="text-admin-primary hover:underline">
-                legal@bonifatus-dms.com
-              </Link>
+              <a href="mailto:info@bonifatus.com" className="text-admin-primary hover:underline">
+                info@bonifatus.com
+              </a>
             </p>
           </section>
         </div>

@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
         <div className="prose prose-lg max-w-none">
           <p className="text-neutral-600 mb-6">
-            <strong>Last updated:</strong> November 20, 2025
+            <strong>Last updated:</strong> February 8, 2026
           </p>
 
           <p className="text-neutral-700 dark:text-neutral-300 mb-6">
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
 
             <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">1.1 Information You Provide</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
-              <li><strong>Account Information:</strong> When you create an account using Google OAuth, we collect your name, email address, and profile picture from your Google account.</li>
+              <li><strong>Account Information:</strong> When you create an account using Google OAuth or Facebook Login, we collect your name, email address, and profile picture from your Google or Facebook account.</li>
               <li><strong>Document Content:</strong> Documents you upload, including metadata, file names, and document text extracted through OCR (Optical Character Recognition).</li>
               <li><strong>Payment Information:</strong> When you subscribe to paid tiers, billing information is processed by Stripe. We do not store your complete credit card numbers.</li>
               <li><strong>Communication Data:</strong> Messages you send through our contact forms or support channels.</li>
@@ -59,9 +59,9 @@ export default function PrivacyPage() {
             <p className="text-neutral-700 dark:text-neutral-300 mb-4">We process your personal data for the following purposes:</p>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2">
               <li><strong>Service Provision:</strong> To operate, maintain, and provide the features of our Service.</li>
-              <li><strong>Authentication:</strong> To verify your identity using Google OAuth.</li>
+              <li><strong>Authentication:</strong> To verify your identity using Google OAuth or Facebook Login.</li>
               <li><strong>Document Processing:</strong> To perform OCR, translation, categorization, and other document analysis features.</li>
-              <li><strong>Storage Integration:</strong> To sync your documents with Google Drive when you enable this feature.</li>
+              <li><strong>Storage Integration:</strong> To sync your documents with Google Drive or Microsoft OneDrive when you enable this feature.</li>
               <li><strong>Payment Processing:</strong> To process subscriptions and handle billing through Stripe.</li>
               <li><strong>Communication:</strong> To send transactional emails (account notifications, password resets, payment confirmations) via Brevo.</li>
               <li><strong>Service Improvement:</strong> To analyze usage patterns and improve our Service.</li>
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
             <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3 mt-6">Legal Bases for Processing (GDPR)</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2">
               <li><strong>Contract Performance:</strong> Processing necessary to provide the Service you requested.</li>
-              <li><strong>Consent:</strong> Where you have given explicit consent (e.g., cookie preferences, Google Drive sync).</li>
+              <li><strong>Consent:</strong> Where you have given explicit consent (e.g., cookie preferences, cloud storage sync).</li>
               <li><strong>Legitimate Interests:</strong> For service improvement, security, and fraud prevention.</li>
               <li><strong>Legal Obligation:</strong> To comply with applicable laws and regulations.</li>
             </ul>
@@ -91,14 +91,28 @@ export default function PrivacyPage() {
               <li>We only request the minimum necessary permissions (email, profile, and Drive access if enabled)</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.2 Cloudflare</h3>
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.2 Facebook</h3>
+            <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
+              <li><strong>Facebook Login:</strong> For secure authentication (<Link href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Facebook Privacy Policy</Link>)</li>
+              <li>We only request your email address and public profile information</li>
+              <li>You can revoke access at any time through your Facebook account settings</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.3 Microsoft OneDrive</h3>
+            <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
+              <li><strong>OneDrive API:</strong> For optional document synchronization (only when you explicitly enable this feature)</li>
+              <li>We only request the minimum necessary permissions to manage your documents folder</li>
+              <li><Link href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Microsoft Privacy Statement</Link></li>
+            </ul>
+
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.4 Cloudflare</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
               <li>We use Cloudflare for CDN services, DDoS protection, and web application firewall</li>
               <li>Cloudflare may process IP addresses and HTTP headers for security purposes</li>
               <li><Link href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Cloudflare Privacy Policy</Link></li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.3 Stripe</h3>
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.5 Stripe</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
               <li>Payment processing for subscriptions</li>
               <li>Stripe processes payment information according to PCI DSS standards</li>
@@ -106,19 +120,19 @@ export default function PrivacyPage() {
               <li><Link href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Stripe Privacy Policy</Link></li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.4 Brevo (formerly Sendinblue)</h3>
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.6 Brevo (formerly Sendinblue)</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
               <li>Transactional email delivery (account notifications, password resets, receipts)</li>
               <li><Link href="https://www.brevo.com/legal/privacypolicy/" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Brevo Privacy Policy</Link></li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.5 LibreTranslate</h3>
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.7 LibreTranslate</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
               <li>Self-hosted translation service for document text translation</li>
               <li>No data is sent to external translation services</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.6 Hetzner</h3>
+            <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">3.8 Hetzner</h3>
             <ul className="list-disc pl-6 text-neutral-700 dark:text-neutral-300 space-y-2 mb-4">
               <li>Infrastructure hosting (servers located in Germany and Finland)</li>
               <li><Link href="https://www.hetzner.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-admin-primary hover:underline">Hetzner Privacy Policy</Link></li>
@@ -177,7 +191,7 @@ export default function PrivacyPage() {
             <h3 className="text-xl font-semibold text-neutral-900 dark:text-white mb-3">6.3 How to Exercise Your Rights</h3>
             <p className="text-neutral-700 dark:text-neutral-300 mb-2">
               To exercise any of these rights, contact us at:{' '}
-              <Link href="/contact" className="text-admin-primary hover:underline">privacy@bonidoc.com</Link>
+              <a href="mailto:info@bonifatus.com" className="text-admin-primary hover:underline">info@bonifatus.com</a>
             </p>
             <p className="text-neutral-700 dark:text-neutral-300">
               We will respond to your request within 30 days (or as required by applicable law).
@@ -253,9 +267,9 @@ export default function PrivacyPage() {
             <p className="text-neutral-700 dark:text-neutral-300 mb-4">
               For questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact:
             </p>
-            <div className="bg-neutral-50 p-4 rounded">
+            <div className="bg-neutral-50 dark:bg-neutral-800 p-4 rounded">
               <p className="text-neutral-700 dark:text-neutral-300 mb-2"><strong>Email:</strong>{' '}
-                <Link href="/contact" className="text-admin-primary hover:underline">privacy@bonidoc.com</Link>
+                <a href="mailto:info@bonifatus.com" className="text-admin-primary hover:underline">info@bonifatus.com</a>
               </p>
               <p className="text-neutral-700 dark:text-neutral-300 mb-2"><strong>Data Protection Officer:</strong> Available upon request</p>
               <p className="text-neutral-700 dark:text-neutral-300"><strong>Response Time:</strong> Within 30 days</p>

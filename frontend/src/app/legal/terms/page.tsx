@@ -25,7 +25,7 @@ export default function TermsPage() {
         
         <div className="prose prose-lg max-w-none">
           <p className="text-neutral-600 mb-6">
-            <strong>Last updated:</strong> December 2024
+            <strong>Last updated:</strong> February 2026
           </p>
 
           <section className="mb-8">
@@ -73,9 +73,9 @@ export default function TermsPage() {
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">6. Contact Information</h2>
             <p className="text-neutral-700 dark:text-neutral-300">
               If you have any questions about these Terms of Service, please contact us at{' '}
-              <Link href="/contact" className="text-admin-primary hover:underline">
-                legal@bonifatus-dms.com
-              </Link>
+              <a href="mailto:info@bonifatus.com" className="text-admin-primary hover:underline">
+                info@bonifatus.com
+              </a>
             </p>
           </section>
         </div>
