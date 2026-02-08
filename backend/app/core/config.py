@@ -105,6 +105,27 @@ class GoogleSettings(BaseSettings):
         extra = "ignore"
 
 
+class FacebookSettings(BaseSettings):
+    """Facebook OAuth configuration"""
+
+    facebook_client_id: str = Field(
+        default_factory=lambda: read_secret("facebook_client_id"),
+        description="Facebook App ID (loaded from Docker Swarm secret)"
+    )
+    facebook_client_secret: str = Field(
+        default_factory=lambda: read_secret("facebook_client_secret"),
+        description="Facebook App Secret (loaded from Docker Swarm secret)"
+    )
+    facebook_redirect_uri: str = Field(
+        default="", env="FACEBOOK_REDIRECT_URI",
+        description="Facebook OAuth redirect URI"
+    )
+
+    class Config:
+        case_sensitive = False
+        extra = "ignore"
+
+
 class OneDriveSettings(BaseSettings):
     """Microsoft OneDrive configuration"""
 
@@ -314,6 +335,7 @@ class Settings(BaseSettings):
     app: AppSettings = Field(default_factory=AppSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     google: GoogleSettings = Field(default_factory=GoogleSettings)
+    facebook: FacebookSettings = Field(default_factory=FacebookSettings)
     onedrive: OneDriveSettings = Field(default_factory=OneDriveSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     translation: TranslationSettings = Field(default_factory=TranslationSettings)

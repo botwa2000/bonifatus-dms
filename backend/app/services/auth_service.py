@@ -585,4 +585,194 @@ class AuthService:
                 return None
 
 
+    async def authenticate_with_facebook(
+            self,
+            access_token: str,
+            ip_address: str,
+            user_agent: str,
+            tier_id: Optional[int] = None
+        ) -> Optional[Dict[str, Any]]:
+            """
+            Authenticate user with Facebook access token.
+            Fetches user profile from Graph API, creates/updates user, returns JWT tokens.
+            """
+            try:
+                import httpx
+
+                # Fetch user profile from Facebook Graph API
+                graph_url = "https://graph.facebook.com/v21.0/me"
+                graph_params = {
+                    "fields": "id,name,email,picture.type(large)",
+                    "access_token": access_token
+                }
+
+                async with httpx.AsyncClient() as client:
+                    profile_response = await client.get(graph_url, params=graph_params)
+
+                    if profile_response.status_code != 200:
+                        logger.error(f"Facebook Graph API failed: {profile_response.text}")
+                        return None
+
+                    profile = profile_response.json()
+
+                facebook_id = profile.get("id")
+                email = profile.get("email")
+                full_name = profile.get("name", "")
+                picture_data = profile.get("picture", {}).get("data", {})
+                profile_picture = picture_data.get("url") if not picture_data.get("is_silhouette") else None
+
+                if not facebook_id:
+                    logger.error("Missing Facebook user ID")
+                    return None
+
+                if not email:
+                    logger.error(f"Facebook user {facebook_id} did not grant email permission")
+                    return None
+
+                # Get or create user
+                db = next(get_db())
+                try:
+                    # First try to find by facebook_id
+                    user = db.query(User).filter(User.facebook_id == facebook_id).first()
+
+                    is_new_user = False
+                    if not user:
+                        # Try to find by email (handles linking FB to existing account)
+                        user = db.query(User).filter(User.email == email).first()
+
+                        if user:
+                            # Existing user (e.g., from Google OAuth or email) - link Facebook ID
+                            user.facebook_id = facebook_id
+                            if profile_picture and not user.profile_picture:
+                                user.profile_picture = profile_picture
+                            logger.info(f"Linked Facebook ID to existing user: {email}")
+                        else:
+                            # New user
+                            is_admin = email in settings.security.admin_emails
+
+                            if is_admin:
+                                final_tier_id = 100
+                                logger.info(f"Creating admin user via Facebook: {email} with tier_id=100")
+                            elif tier_id is not None:
+                                final_tier_id = tier_id
+                                logger.info(f"Creating new user via Facebook: {email} with selected tier_id={tier_id}")
+                            else:
+                                final_tier_id = 0
+                                logger.info(f"Creating new user via Facebook: {email} with default tier_id=0 (Free)")
+
+                            user = User(
+                                email=email,
+                                full_name=full_name,
+                                facebook_id=facebook_id,
+                                profile_picture=profile_picture,
+                                is_active=True,
+                                is_admin=is_admin,
+                                auth_provider='facebook',
+                                tier_id=final_tier_id,
+                                preferred_doc_languages=["en"]
+                            )
+                            db.add(user)
+                            is_new_user = True
+                    else:
+                        # Returning Facebook user - update profile
+                        if profile_picture:
+                            user.profile_picture = profile_picture
+                        user.full_name = full_name
+
+                        if not user.is_active:
+                            user.is_active = True
+                            logger.info(f"Reactivating previously deactivated user: {email}")
+                        else:
+                            logger.info(f"Updating existing Facebook user: {email}")
+
+                    user.last_login_at = datetime.now(timezone.utc)
+                    user.last_login_ip = ip_address
+
+                    db.commit()
+                    db.refresh(user)
+
+                    # Copy template categories to new user's workspace
+                    if is_new_user:
+                        self._copy_template_categories_to_user(user.id, db)
+
+                        # Send welcome email to new user
+                        try:
+                            from app.services.email_service import email_service
+                            dashboard_url = settings.app.app_frontend_url
+                            await email_service.send_user_created_notification(
+                                session=db,
+                                to_email=user.email,
+                                user_name=user.full_name,
+                                dashboard_url=dashboard_url,
+                                user_can_receive_marketing=user.email_marketing_enabled
+                            )
+                            logger.info(f"Welcome email sent to new Facebook user: {user.email}")
+                        except Exception as email_error:
+                            logger.error(f"Failed to send welcome email to {user.email}: {email_error}")
+
+                        # Send admin notification emails
+                        try:
+                            from app.services.email_service import email_service
+                            from app.database.models import TierPlan
+                            from sqlalchemy import select as sql_select
+
+                            admin_users = db.execute(
+                                sql_select(User).where(User.is_admin == True)
+                            ).scalars().all()
+
+                            tier = db.execute(
+                                sql_select(TierPlan).where(TierPlan.id == user.tier_id)
+                            ).scalar_one_or_none()
+                            tier_name = tier.display_name if tier else "Free"
+
+                            registration_date = user.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+                            for admin in admin_users:
+                                await email_service.send_admin_new_user_notification(
+                                    session=db,
+                                    admin_email=admin.email,
+                                    admin_name=admin.full_name or admin.email,
+                                    new_user_name=user.full_name or user.email,
+                                    new_user_id=user.id,
+                                    new_user_email=user.email,
+                                    tier_name=tier_name,
+                                    registration_date=registration_date
+                                )
+                            logger.info(f"Admin notifications sent for new Facebook user: {user.email}")
+                        except Exception as admin_notif_error:
+                            logger.error(f"Failed to send admin notifications for {user.email}: {admin_notif_error}")
+
+                    # Create session with refresh token
+                    session_info = await session_service.create_session(
+                        user_id=str(user.id),
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        session=db
+                    )
+
+                    # Generate JWT tokens
+                    jwt_access_token = self.create_access_token(data={"sub": str(user.id)})
+
+                    return {
+                        "access_token": jwt_access_token,
+                        "refresh_token": session_info['refresh_token'],
+                        "token_type": "bearer",
+                        "user_id": str(user.id),
+                        "email": user.email,
+                        "full_name": user.full_name,
+                        "profile_picture": user.profile_picture,
+                        "tier": user.tier.name if user.tier else "free",
+                        "tier_id": user.tier_id,
+                        "is_active": user.is_active,
+                        "session_id": session_info['session_id'],
+                        "expires_in": self.access_token_expire_minutes * 60
+                    }
+
+                finally:
+                    db.close()
+
+            except Exception as e:
+                logger.error(f"Facebook authentication error: {e}")
+                return None
+
+
 auth_service = AuthService()

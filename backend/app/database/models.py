@@ -128,6 +128,7 @@ class User(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     google_id = Column(String(50), unique=True, nullable=True, index=True)  # Nullable for email/password users
+    facebook_id = Column(String(50), unique=True, nullable=True, index=True)  # Nullable for non-Facebook users
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
     profile_picture = Column(Text, nullable=True)
@@ -197,6 +198,7 @@ class User(Base, TimestampMixin):
 
     __table_args__ = (
         Index('idx_user_google_id', 'google_id'),
+        Index('idx_user_facebook_id', 'facebook_id'),
         Index('idx_user_email', 'email'),
         Index('idx_user_tier_id', 'tier_id'),
     )

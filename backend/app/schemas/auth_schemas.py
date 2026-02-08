@@ -147,6 +147,20 @@ class GoogleOAuthConfigResponse(BaseModel):
             }
         }
 
+class FacebookOAuthConfigResponse(BaseModel):
+    """Response model for Facebook OAuth configuration"""
+    facebook_client_id: str = Field(..., description="Facebook App ID")
+    redirect_uri: str = Field(..., description="Facebook OAuth redirect URI")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "facebook_client_id": "1234567890123456",
+                "redirect_uri": "https://api.bonidoc.com/api/v1/auth/facebook/callback"
+            }
+        }
+
+
 class TokenData(BaseModel):
     """Data extracted from JWT token payload"""
     user_id: str = Field(..., description="User ID from token")

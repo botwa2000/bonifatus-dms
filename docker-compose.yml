@@ -16,6 +16,8 @@ services:
       - google_client_secret_prod
       - onedrive_client_id_prod
       - onedrive_client_secret_prod
+      - facebook_client_id_prod
+      - facebook_client_secret_prod
       - gcp_project_prod
       - brevo_api_key_prod
       - imap_password_prod
@@ -35,6 +37,7 @@ services:
       - APP_VERSION=1.0.0
       - NEXTAUTH_URL=https://bonidoc.com
       - GOOGLE_REDIRECT_URI=https://api.bonidoc.com/api/v1/auth/google/callback
+      - FACEBOOK_REDIRECT_URI=https://api.bonidoc.com/api/v1/auth/facebook/callback
       - GOOGLE_DRIVE_FOLDER_NAME=Bonifatus_DMS
       - ONEDRIVE_REDIRECT_URI=https://api.bonidoc.com/api/v1/storage/providers/onedrive/callback
       - ONEDRIVE_FOLDER_NAME=Bonifatus_DMS
@@ -204,6 +207,8 @@ services:
       - google_client_secret_prod
       - onedrive_client_id_prod
       - onedrive_client_secret_prod
+      - facebook_client_id_prod
+      - facebook_client_secret_prod
       - gcp_project_prod
       - brevo_api_key_prod
       - imap_password_prod
@@ -292,6 +297,10 @@ secrets:
   onedrive_client_id_prod:
     external: true
   onedrive_client_secret_prod:
+    external: true
+  facebook_client_id_prod:
+    external: true
+  facebook_client_secret_prod:
     external: true
   gcp_project_prod:
     external: true

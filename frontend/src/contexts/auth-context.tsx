@@ -15,6 +15,7 @@ interface AuthContextType {
   error: string | null
   loadUser: () => Promise<void>
   initializeGoogleAuth: (tierId?: number, billingCycle?: 'monthly' | 'yearly') => Promise<void>
+  initializeFacebookAuth: (tierId?: number, billingCycle?: 'monthly' | 'yearly') => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
 }
@@ -79,6 +80,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const initializeFacebookAuth = useCallback(async (tierId?: number, billingCycle?: 'monthly' | 'yearly') => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      await authService.initializeFacebookOAuth(tierId, billingCycle)
+    } catch (err) {
+      logger.error('[AuthProvider] Facebook auth failed:', err)
+      setError(err instanceof Error ? err.message : 'Authentication failed')
+      setIsLoading(false)
+    }
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       // Track logout event
@@ -126,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       error,
       loadUser,
       initializeGoogleAuth,
+      initializeFacebookAuth,
       logout,
       clearError
     }}>

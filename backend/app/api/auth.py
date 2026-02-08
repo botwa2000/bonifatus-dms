@@ -14,13 +14,14 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.schemas.auth_schemas import (
-    GoogleTokenRequest, 
-    TokenResponse, 
-    RefreshTokenRequest, 
+    GoogleTokenRequest,
+    TokenResponse,
+    RefreshTokenRequest,
     RefreshTokenResponse,
     UserResponse,
     ErrorResponse,
-    GoogleOAuthConfigResponse
+    GoogleOAuthConfigResponse,
+    FacebookOAuthConfigResponse
 )
 from app.services.auth_service import auth_service
 from app.services.email_auth_service import EmailAuthService
@@ -343,6 +344,212 @@ async def google_oauth_callback_ajax(
         )
 
 
+@router.get(
+    "/facebook/config",
+    response_model=FacebookOAuthConfigResponse,
+    responses={
+        200: {"model": FacebookOAuthConfigResponse, "description": "Facebook OAuth configuration"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Get Facebook OAuth Configuration",
+    description="Retrieve Facebook App ID and redirect URI for frontend authentication flow"
+)
+async def get_facebook_oauth_config() -> FacebookOAuthConfigResponse:
+    try:
+        return FacebookOAuthConfigResponse(
+            facebook_client_id=settings.facebook.facebook_client_id,
+            redirect_uri=settings.facebook.facebook_redirect_uri
+        )
+    except Exception as e:
+        logger.error(f"Failed to get Facebook OAuth config: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Facebook OAuth configuration unavailable"
+        )
+
+
+@router.get(
+    "/facebook/callback",
+    responses={
+        302: {"description": "Redirect to dashboard on success"},
+        401: {"description": "OAuth authentication failed"},
+        500: {"description": "Internal server error"}
+    },
+    summary="Complete Facebook OAuth Flow",
+    description="Server-side callback - exchanges code for token, authenticates user, redirects"
+)
+async def facebook_oauth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None
+):
+    try:
+        if error or not code:
+            logger.info(f"Facebook OAuth flow cancelled or failed: error={error}, code_present={bool(code)}")
+            redirect_url = f"{settings.app.app_frontend_url}/"
+            return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("User-Agent", "unknown")
+
+        # Extract tier selection from OAuth state parameter
+        tier_id = None
+        billing_cycle = None
+        if state:
+            try:
+                import json
+                import base64
+                state_data = json.loads(base64.b64decode(state).decode('utf-8'))
+                tier_id = state_data.get('tier_id')
+                billing_cycle = state_data.get('billing_cycle')
+                logger.info(f"Facebook OAuth state decoded - tier_id: {tier_id}, billing_cycle: {billing_cycle}")
+            except Exception as e:
+                logger.warning(f"Failed to decode Facebook OAuth state: {e}")
+
+        # Exchange authorization code for access token
+        import httpx
+
+        token_url = "https://graph.facebook.com/v21.0/oauth/access_token"
+        token_data = {
+            "client_id": settings.facebook.facebook_client_id,
+            "client_secret": settings.facebook.facebook_client_secret,
+            "redirect_uri": settings.facebook.facebook_redirect_uri,
+            "code": code
+        }
+
+        async with httpx.AsyncClient() as client:
+            token_response = await client.get(token_url, params=token_data)
+
+            if token_response.status_code != 200:
+                logger.error(f"Facebook token exchange failed: {token_response.text}")
+                error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
+                return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+            tokens = token_response.json()
+            fb_access_token = tokens.get("access_token")
+
+            if not fb_access_token:
+                logger.error("No access token in Facebook response")
+                error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
+                return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+        # Authenticate with Facebook access token
+        auth_result = await auth_service.authenticate_with_facebook(
+            fb_access_token,
+            ip_address,
+            user_agent,
+            tier_id=tier_id
+        )
+
+        if not auth_result:
+            logger.warning(f"Facebook authentication failed from IP: {ip_address}")
+            error_url = f"{settings.app.app_frontend_url}/login?error=auth_failed"
+            return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+        # Determine redirect URL (same logic as Google callback)
+        from app.database.models import Subscription
+        from app.database.connection import get_db
+
+        db = next(get_db())
+        try:
+            oauth_user = db.query(User).filter(User.id == auth_result['user_id']).first()
+            is_admin_user = oauth_user.is_admin if oauth_user else False
+
+            if tier_id and tier_id > 0:
+                active_sub = db.query(Subscription).filter(
+                    Subscription.user_id == auth_result['user_id'],
+                    Subscription.status.in_(['active', 'trialing', 'past_due'])
+                ).first()
+
+                if active_sub:
+                    redirect_url = f"{settings.app.app_frontend_url}/{'admin' if is_admin_user else 'dashboard'}"
+                    logger.info(f"User {auth_result['email']} has active subscription, redirecting to {'admin' if is_admin_user else 'dashboard'}")
+                else:
+                    billing_cycle_param = f"&billing_cycle={billing_cycle}" if billing_cycle else "&billing_cycle=monthly"
+                    redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
+                    logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
+            else:
+                if is_admin_user:
+                    redirect_url = f"{settings.app.app_frontend_url}/admin"
+                    logger.info(f"Admin user {auth_result['email']} using free tier, redirecting to admin")
+                else:
+                    redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
+                    logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+        finally:
+            db.close()
+
+        redirect_response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+        redirect_response.set_cookie(
+            key="access_token",
+            value=auth_result["access_token"],
+            httponly=True,
+            secure=settings.security.cookie_secure,
+            samesite="lax",
+            domain=settings.security.cookie_domain,
+            max_age=settings.security.access_token_expire_minutes * 60,
+            path="/"
+        )
+
+        redirect_response.set_cookie(
+            key="refresh_token",
+            value=auth_result["refresh_token"],
+            httponly=True,
+            secure=settings.security.cookie_secure,
+            samesite="strict",
+            domain=settings.security.cookie_domain,
+            max_age=604800,  # 7 days
+            path="/"
+        )
+
+        logger.info(f"[Facebook OAuth] User {auth_result['email']} authenticated successfully")
+        logger.info(f"[Facebook OAuth] Setting cookies: domain={settings.security.cookie_domain}, secure={settings.security.cookie_secure}")
+        logger.info(f"[Facebook OAuth] Redirecting to: {redirect_url}")
+
+        return redirect_response
+
+    except Exception as e:
+        logger.error(f"Facebook OAuth callback error: {e}")
+        error_url = f"{settings.app.app_frontend_url}/login?error=server_error"
+        return RedirectResponse(url=error_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.post(
+    "/facebook/data-deletion",
+    responses={
+        200: {"description": "Data deletion request acknowledged"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    },
+    summary="Facebook Data Deletion Callback",
+    description="Handles Facebook data deletion requests (required by Facebook Platform Policy)"
+)
+async def facebook_data_deletion(request: Request):
+    try:
+        body = await request.json()
+        signed_request = body.get("signed_request", "")
+        logger.info(f"Facebook data deletion request received: {signed_request[:20]}...")
+
+        # Generate a confirmation code for tracking
+        import hashlib
+        confirmation_code = hashlib.sha256(signed_request.encode()).hexdigest()[:12]
+        status_url = f"{settings.app.app_frontend_url}/legal/privacy"
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "url": status_url,
+                "confirmation_code": confirmation_code
+            }
+        )
+    except Exception as e:
+        logger.error(f"Facebook data deletion callback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Data deletion request processing failed"
+        )
+
+
 @router.post(
     "/refresh",
     response_model=RefreshTokenResponse,
@@ -620,6 +827,7 @@ async def auth_service_health():
             "service": "authentication",
             "components": {
                 "google_oauth": "configured" if settings.google.google_client_id else "not_configured",
+                "facebook_oauth": "configured" if settings.facebook.facebook_client_id else "not_configured",
                 "jwt_service": "available",
                 "database": "available"
             },

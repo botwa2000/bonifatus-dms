@@ -45,6 +45,11 @@ export interface GoogleOAuthConfig {
   scope: string
 }
 
+export interface FacebookOAuthConfig {
+  facebook_client_id: string
+  redirect_uri: string
+}
+
 export interface AuthState {
   user: User | null
   isAuthenticated: boolean

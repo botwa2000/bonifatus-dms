@@ -1,7 +1,7 @@
 // frontend/src/services/auth.service.ts
 
 import { apiClient } from './api-client'
-import { User, GoogleOAuthConfig, AuthError } from '@/types/auth.types'
+import { User, GoogleOAuthConfig, FacebookOAuthConfig, AuthError } from '@/types/auth.types'
 import { logger } from '@/lib/logger'
 interface AuthServiceConfig {
   apiUrl: string
@@ -22,6 +22,7 @@ export class AuthService {
   private tokenRefreshPromise: Promise<boolean> | null = null
   private refreshTimeoutId: NodeJS.Timeout | null = null
   private oauthConfigCache: GoogleOAuthConfig | null = null
+  private facebookOAuthConfigCache: FacebookOAuthConfig | null = null
 
   constructor() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -178,6 +179,51 @@ export class AuthService {
     } catch (error) {
       logger.error('OAuth initialization failed:', error)
       throw new Error('Authentication service unavailable: ' + (error as Error).message)
+    }
+  }
+
+  async getFacebookOAuthConfig(): Promise<FacebookOAuthConfig> {
+    if (this.facebookOAuthConfigCache) {
+      return this.facebookOAuthConfigCache
+    }
+
+    try {
+      const response = await apiClient.get<{ facebook_client_id: string; redirect_uri: string }>('/api/v1/auth/facebook/config')
+
+      this.facebookOAuthConfigCache = {
+        facebook_client_id: response.facebook_client_id,
+        redirect_uri: response.redirect_uri
+      }
+
+      return this.facebookOAuthConfigCache
+    } catch (error) {
+      logger.error('Failed to fetch Facebook OAuth config:', error)
+      throw new Error('Unable to initialize Facebook authentication')
+    }
+  }
+
+  async initializeFacebookOAuth(tierId?: number, billingCycle?: 'monthly' | 'yearly'): Promise<void> {
+    try {
+      this.clearOAuthProcessingFlags()
+
+      const config = await this.getFacebookOAuthConfig()
+      const state = this.generateSecureState(tierId, billingCycle)
+
+      const params = new URLSearchParams({
+        client_id: config.facebook_client_id,
+        redirect_uri: config.redirect_uri,
+        state,
+        scope: 'email,public_profile',
+        response_type: 'code'
+      })
+
+      const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`
+      this.storeOAuthState(state, tierId, billingCycle)
+      window.location.href = authUrl
+
+    } catch (error) {
+      logger.error('Facebook OAuth initialization failed:', error)
+      throw new Error('Facebook authentication service unavailable: ' + (error as Error).message)
     }
   }
 
