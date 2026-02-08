@@ -412,6 +412,27 @@ export default function SettingsPage() {
     }
   }
 
+  const handleTogglePreference = async (key: keyof UserPreferences) => {
+    if (!preferences) return
+    const updatedPreferences = { ...preferences, [key]: !preferences[key] }
+    setPreferences(updatedPreferences)
+
+    try {
+      const preferencesWithAllLanguages = {
+        ...updatedPreferences,
+        preferred_doc_languages: systemSettings?.available_languages || []
+      }
+      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      setMessage({ type: 'success', text: 'Preference updated' })
+      setTimeout(() => setMessage(null), 2000)
+    } catch (error) {
+      logger.error(`Failed to save ${key}:`, error)
+      setMessage({ type: 'error', text: 'Failed to save preference' })
+      // Revert on failure
+      setPreferences(preferences)
+    }
+  }
+
   const handleConnectDrive = async () => {
     setDriveLoading(true)
     setMessage(null)
@@ -857,7 +878,7 @@ export default function SettingsPage() {
                 <div className="pt-4 border-t border-neutral-200">
                   <ToggleSwitch
                     enabled={preferences.email_marketing_enabled}
-                    onChange={() => setPreferences({ ...preferences, email_marketing_enabled: !preferences.email_marketing_enabled })}
+                    onChange={() => handleTogglePreference('email_marketing_enabled')}
                     label="Product Updates & Tips"
                     description="Welcome emails, feature announcements, and helpful tips (optional)"
                   />
@@ -871,7 +892,7 @@ export default function SettingsPage() {
             <CardContent>
               <ToggleSwitch
                 enabled={preferences.auto_categorization}
-                onChange={() => setPreferences({ ...preferences, auto_categorization: !preferences.auto_categorization })}
+                onChange={() => handleTogglePreference('auto_categorization')}
                 label="AI Auto-Categorization"
                 description="Automatically suggest categories for uploaded documents"
               />
