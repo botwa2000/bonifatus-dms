@@ -335,12 +335,18 @@ export default function CampaignsAdmin() {
       const config = JSON.parse(campaign.schedule_cron)
       const { type, value } = config
       const now = new Date()
+      const fmt = (d: Date) => d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
       if (type === 'interval_days') {
-        if (!campaign.last_scheduled_run) return 'Pending first run'
+        if (!campaign.last_scheduled_run) {
+          // Scheduler checks hourly; first run fires on next check
+          const created = campaign.created_at ? new Date(campaign.created_at) : now
+          const next = new Date(Math.max(created.getTime(), now.getTime()) + 60 * 60 * 1000)
+          return `Next send: ~${fmt(next)} (first run)`
+        }
         const lastRun = new Date(campaign.last_scheduled_run)
         const next = new Date(lastRun.getTime() + value * 24 * 60 * 60 * 1000)
-        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+        return `Next send: ${fmt(next)}`
       }
 
       if (type === 'weekday') {
@@ -350,8 +356,8 @@ export default function CampaignsAdmin() {
         const currentDay = now.getDay()
         let daysUntil = targetDay - currentDay
         if (daysUntil <= 0) daysUntil += 7
-        const next = new Date(now.getTime() + daysUntil * 24 * 60 * 60 * 1000)
-        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntil)
+        return `Next send: ${fmt(next)}`
       }
 
       if (type === 'monthly_day') {
@@ -360,7 +366,7 @@ export default function CampaignsAdmin() {
         if (next <= now) {
           next = new Date(now.getFullYear(), now.getMonth() + 1, targetDayOfMonth)
         }
-        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+        return `Next send: ${fmt(next)}`
       }
 
       return null

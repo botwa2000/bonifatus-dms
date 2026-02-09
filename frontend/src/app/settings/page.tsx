@@ -372,13 +372,9 @@ export default function SettingsPage() {
       logger.debug('[SETTINGS DEBUG] Applied theme to DOM immediately')
     }
 
-    // Auto-save to backend
+    // Auto-save to backend (send only the changed field)
     try {
-      const preferencesWithAllLanguages = {
-        ...updatedPreferences,
-        preferred_doc_languages: systemSettings?.available_languages || []
-      }
-      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      await apiClient.put('/api/v1/users/preferences', { theme: newTheme }, true)
       logger.debug('[SETTINGS DEBUG] ✅ Theme saved to backend')
       setMessage({ type: 'success', text: 'Theme updated' })
       setTimeout(() => setMessage(null), 2000)
@@ -396,13 +392,9 @@ export default function SettingsPage() {
     const updatedPreferences = { ...preferences!, timezone: newTimezone }
     setPreferences(updatedPreferences)
 
-    // Auto-save to backend
+    // Auto-save to backend (send only the changed field)
     try {
-      const preferencesWithAllLanguages = {
-        ...updatedPreferences,
-        preferred_doc_languages: systemSettings?.available_languages || []
-      }
-      await apiClient.put('/api/v1/users/preferences', preferencesWithAllLanguages, true)
+      await apiClient.put('/api/v1/users/preferences', { timezone: newTimezone }, true)
       logger.debug('[SETTINGS DEBUG] ✅ Timezone saved to backend')
       setMessage({ type: 'success', text: 'Timezone updated' })
       setTimeout(() => setMessage(null), 2000)
