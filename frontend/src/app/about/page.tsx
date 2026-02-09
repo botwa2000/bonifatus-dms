@@ -4,7 +4,7 @@
  */
 
 import type { Metadata } from 'next'
-import { GoogleLoginButton } from '@/components/GoogleLoginButton'
+import Link from 'next/link'
 import PublicHeader from '@/components/PublicHeader'
 
 export const metadata: Metadata = {
@@ -90,12 +90,15 @@ export default function AboutPage() {
           <section className="mb-12 bg-neutral-50 dark:bg-neutral-800 p-8 rounded-lg">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">Ready to Get Started?</h2>
             <p className="text-neutral-700 dark:text-neutral-300 mb-6">
-              Experience the future of document management with our 30-day premium trial.
+              Create your free account and let AI organize your documents.
               No credit card required.
             </p>
-            <GoogleLoginButton size="lg">
-              Start Your Free Trial
-            </GoogleLoginButton>
+            <Link
+              href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly"
+              className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md bg-admin-primary text-white hover:bg-admin-primary/90 transition-colors"
+            >
+              Start Free
+            </Link>
           </section>
         </div>
       </div>

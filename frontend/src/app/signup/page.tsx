@@ -135,7 +135,7 @@ function SignupContent() {
             <Link href="/" className="flex items-center">
               <div className="relative h-10 w-40">
                 <Image
-                  src="/logo_text.png"
+                  src="/logo-header.png"
                   alt="Bonifatus DMS"
                   fill
                   className="object-contain object-left"
