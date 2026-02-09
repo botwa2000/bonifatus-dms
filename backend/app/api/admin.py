@@ -1712,7 +1712,7 @@ async def delete_campaign(
     campaign_id: str,
     current_admin: User = Depends(get_current_admin_user)
 ):
-    """Delete a draft campaign."""
+    """Delete a campaign."""
     session = db_manager.session_local()
     try:
         campaign = session.query(MarketingCampaign).filter(
@@ -1721,8 +1721,8 @@ async def delete_campaign(
 
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
-        if campaign.status != 'draft':
-            raise HTTPException(status_code=400, detail="Only draft campaigns can be deleted")
+        if campaign.status == 'sending':
+            raise HTTPException(status_code=400, detail="Cannot delete a campaign while it is sending")
 
         session.delete(campaign)
         session.commit()

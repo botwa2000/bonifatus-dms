@@ -190,7 +190,10 @@ export default function CampaignsAdmin() {
   }
 
   const handleDelete = async (campaign: Campaign) => {
-    if (!confirm(`Delete campaign "${campaign.name}"?`)) return
+    const msg = campaign.sent_count > 0
+      ? `Delete campaign "${campaign.name}"? This will also permanently delete all ${campaign.sent_count} send records. This cannot be undone.`
+      : `Delete campaign "${campaign.name}"? This cannot be undone.`
+    if (!confirm(msg)) return
     try {
       await apiClient.delete(`/api/v1/admin/campaigns/${campaign.id}`)
       setMessage({ type: 'success', text: 'Campaign deleted' })
@@ -326,6 +329,46 @@ export default function CampaignsAdmin() {
     return labels[status] || status.charAt(0).toUpperCase() + status.slice(1)
   }
 
+  const getNextSendInfo = (campaign: Campaign): string | null => {
+    if (!campaign.schedule_enabled || !campaign.schedule_cron) return null
+    try {
+      const config = JSON.parse(campaign.schedule_cron)
+      const { type, value } = config
+      const now = new Date()
+
+      if (type === 'interval_days') {
+        if (!campaign.last_scheduled_run) return 'Pending first run'
+        const lastRun = new Date(campaign.last_scheduled_run)
+        const next = new Date(lastRun.getTime() + value * 24 * 60 * 60 * 1000)
+        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+      }
+
+      if (type === 'weekday') {
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+        const targetDay = dayNames.indexOf(value.toLowerCase())
+        if (targetDay === -1) return null
+        const currentDay = now.getDay()
+        let daysUntil = targetDay - currentDay
+        if (daysUntil <= 0) daysUntil += 7
+        const next = new Date(now.getTime() + daysUntil * 24 * 60 * 60 * 1000)
+        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+      }
+
+      if (type === 'monthly_day') {
+        const targetDayOfMonth = typeof value === 'number' ? value : parseInt(value, 10)
+        let next = new Date(now.getFullYear(), now.getMonth(), targetDayOfMonth)
+        if (next <= now) {
+          next = new Date(now.getFullYear(), now.getMonth() + 1, targetDayOfMonth)
+        }
+        return `Next send: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}`
+      }
+
+      return null
+    } catch {
+      return null
+    }
+  }
+
   if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -386,9 +429,15 @@ export default function CampaignsAdmin() {
                           <Badge variant="info">
                             {AUDIENCE_OPTIONS.find((a) => a.value === c.audience_filter)?.label || c.audience_filter}
                           </Badge>
-                          {c.schedule_enabled && (
-                            <Badge variant="info">Scheduled</Badge>
-                          )}
+                          {c.schedule_enabled && c.schedule_cron && (() => {
+                            try {
+                              const config = JSON.parse(c.schedule_cron)
+                              const option = SCHEDULE_OPTIONS.find(o => o.value === `${config.type}:${config.value}`)
+                              return <Badge variant="info">{option?.label || 'Scheduled'}</Badge>
+                            } catch {
+                              return <Badge variant="info">Scheduled</Badge>
+                            }
+                          })()}
                         </div>
                         <p className="text-sm text-gray-600 dark:text-neutral-300 mb-1">
                           <strong>Subject:</strong> {c.subject}
@@ -406,9 +455,10 @@ export default function CampaignsAdmin() {
                           {c.sent_at
                             ? `Last sent: ${new Date(c.sent_at).toLocaleString()}`
                             : `Created: ${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}`}
-                          {c.last_scheduled_run && (
-                            <span> | Last scheduled run: {new Date(c.last_scheduled_run).toLocaleString()}</span>
-                          )}
+                          {(() => {
+                            const nextSend = getNextSendInfo(c)
+                            return nextSend ? <span> | {nextSend}</span> : null
+                          })()}
                         </p>
                       </div>
                       <div className="flex gap-2 ml-4 flex-wrap justify-end">
@@ -425,8 +475,8 @@ export default function CampaignsAdmin() {
                             <Button onClick={() => handleScheduleClick(c)} variant="secondary" size="sm">Schedule</Button>
                           </>
                         )}
-                        {c.status === 'draft' && (
-                          <Button onClick={() => handleDelete(c)} variant="secondary" size="sm">Delete</Button>
+                        {c.status !== 'sending' && (
+                          <Button onClick={() => handleDelete(c)} variant="danger" size="sm">Delete</Button>
                         )}
                       </div>
                     </div>

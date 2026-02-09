@@ -254,7 +254,7 @@ class CampaignService:
 
         # Update campaign to sending
         campaign.status = 'sending'
-        campaign.sent_at = campaign.sent_at or datetime.now(timezone.utc)
+        campaign.sent_at = datetime.now(timezone.utc)
         campaign.error_message = None
         session.commit()
 
