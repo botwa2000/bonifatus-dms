@@ -134,6 +134,7 @@ def start_campaign_scheduler():
             name='Check and send scheduled campaigns',
             replace_existing=True,
             max_instances=1,
+            misfire_grace_time=300,
         )
 
         logger.info("Campaign scheduler job registered on shared scheduler")
