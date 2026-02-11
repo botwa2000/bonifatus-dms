@@ -1,12 +1,12 @@
 """
 Campaign Scheduler Background Task
-Periodically checks for scheduled campaigns and sends to new recipients
+Periodically checks for scheduled campaigns and sends to new recipients.
+Uses the shared scheduler from email_poller to avoid multiple AsyncIOScheduler conflicts.
 """
 
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.database.connection import db_manager
@@ -14,11 +14,11 @@ from app.database.models import MarketingCampaign
 
 logger = logging.getLogger(__name__)
 
-# Global scheduler instance
-campaign_scheduler = AsyncIOScheduler()
+# Check interval in seconds (every 15 minutes)
+SCHEDULER_CHECK_INTERVAL_SECONDS = 900
 
-# Check interval in seconds (every hour)
-SCHEDULER_CHECK_INTERVAL_SECONDS = 3600
+# Job ID for the campaign scheduler
+CAMPAIGN_JOB_ID = 'campaign_scheduler'
 
 
 def _is_campaign_due(schedule_cron: str, last_run: datetime | None) -> bool:
@@ -29,6 +29,7 @@ def _is_campaign_due(schedule_cron: str, last_run: datetime | None) -> bool:
     Supported types:
       - interval_days: send every N days
       - weekday: send on specific day ("monday", "tuesday", etc.)
+      - monthly_day: send on specific day of month
     """
     try:
         config = json.loads(schedule_cron)
@@ -78,7 +79,7 @@ async def check_scheduled_campaigns():
     Finds campaigns with schedule_enabled=True in draft/active status,
     checks if they're due, and sends to new recipients only.
     """
-    logger.debug("[CAMPAIGN SCHEDULER] Checking for scheduled campaigns...")
+    logger.info("[CAMPAIGN SCHEDULER] Checking for scheduled campaigns...")
 
     try:
         db = next(db_manager.get_db_session())
@@ -91,8 +92,10 @@ async def check_scheduled_campaigns():
             ).all()
 
             if not campaigns:
-                logger.debug("[CAMPAIGN SCHEDULER] No scheduled campaigns found")
+                logger.info("[CAMPAIGN SCHEDULER] No scheduled campaigns found")
                 return
+
+            logger.info(f"[CAMPAIGN SCHEDULER] Found {len(campaigns)} scheduled campaign(s)")
 
             for campaign in campaigns:
                 if _is_campaign_due(campaign.schedule_cron, campaign.last_scheduled_run):
@@ -108,7 +111,7 @@ async def check_scheduled_campaigns():
                     except Exception as e:
                         logger.error(f"[CAMPAIGN SCHEDULER] Error sending campaign '{campaign.name}': {e}")
                 else:
-                    logger.debug(f"[CAMPAIGN SCHEDULER] Campaign '{campaign.name}' not yet due")
+                    logger.info(f"[CAMPAIGN SCHEDULER] Campaign '{campaign.name}' not yet due")
 
         finally:
             db.close()
@@ -118,34 +121,34 @@ async def check_scheduled_campaigns():
 
 
 def start_campaign_scheduler():
-    """Start the campaign scheduler. Called during application startup."""
+    """Start the campaign scheduler by adding job to the shared scheduler."""
     try:
+        from app.tasks.email_poller import scheduler as shared_scheduler
+
         logger.info(f"Starting campaign scheduler with {SCHEDULER_CHECK_INTERVAL_SECONDS}s interval")
 
-        campaign_scheduler.add_job(
+        shared_scheduler.add_job(
             check_scheduled_campaigns,
             trigger=IntervalTrigger(seconds=SCHEDULER_CHECK_INTERVAL_SECONDS),
-            id='campaign_scheduler',
+            id=CAMPAIGN_JOB_ID,
             name='Check and send scheduled campaigns',
             replace_existing=True,
             max_instances=1,
         )
 
-        if not campaign_scheduler.running:
-            campaign_scheduler.start()
-            logger.info("Campaign scheduler started successfully")
-        else:
-            logger.warning("Campaign scheduler already running")
+        logger.info("Campaign scheduler job registered on shared scheduler")
 
     except Exception as e:
         logger.error(f"Failed to start campaign scheduler: {e}", exc_info=True)
 
 
 def stop_campaign_scheduler():
-    """Stop the campaign scheduler. Called during application shutdown."""
+    """Remove campaign scheduler job from shared scheduler."""
     try:
-        if campaign_scheduler.running:
-            campaign_scheduler.shutdown()
-            logger.info("Campaign scheduler stopped")
+        from app.tasks.email_poller import scheduler as shared_scheduler
+
+        if shared_scheduler.running:
+            shared_scheduler.remove_job(CAMPAIGN_JOB_ID)
+            logger.info("Campaign scheduler job removed")
     except Exception as e:
         logger.error(f"Error stopping campaign scheduler: {e}")

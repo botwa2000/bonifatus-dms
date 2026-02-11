@@ -339,9 +339,9 @@ export default function CampaignsAdmin() {
 
       if (type === 'interval_days') {
         if (!campaign.last_scheduled_run) {
-          // Scheduler checks hourly; first run fires on next check
+          // Scheduler checks every 15 min; first run fires on next check
           const created = campaign.created_at ? new Date(campaign.created_at) : now
-          const next = new Date(Math.max(created.getTime(), now.getTime()) + 60 * 60 * 1000)
+          const next = new Date(Math.max(created.getTime(), now.getTime()) + 15 * 60 * 1000)
           return `Next send: ~${fmt(next)} (first run)`
         }
         const lastRun = new Date(campaign.last_scheduled_run)
