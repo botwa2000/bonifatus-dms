@@ -135,24 +135,32 @@ export default function FAQPage() {
         </div>
       </section>
 
-      {/* Contact CTA Section */}
-      <section className="bg-neutral-50 dark:bg-neutral-800 py-12 border-t border-neutral-200 dark:border-neutral-700">
+      {/* CTA Section */}
+      <section className="py-16 bg-admin-primary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">
-            Can&apos;t find what you&apos;re looking for?
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Ready to get started?
           </h2>
-          <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-6">
-            Our support team is here to help. Get in touch and we&apos;ll answer your questions.
+          <p className="text-xl text-blue-100 mb-8">
+            Start free with 20 pages/month. No credit card required.
           </p>
-          <Link
-            href="/contact"
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-admin-primary hover:bg-admin-primary/90 transition-colors"
-          >
-            Contact Support
-            <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link
+              href="/signup?tier_id=0&tier_name=Free&billing_cycle=monthly"
+              className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md text-admin-primary bg-white hover:bg-neutral-50 transition-colors min-w-[200px]"
+            >
+              Start free
+            </Link>
+            <Link
+              href="/contact"
+              className="inline-flex items-center justify-center px-6 py-3 border-2 border-white text-base font-medium rounded-md text-white hover:bg-white/10 transition-colors min-w-[200px]"
+            >
+              Contact Support
+              <svg className="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </section>
 
