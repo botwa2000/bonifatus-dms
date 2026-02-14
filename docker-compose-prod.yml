@@ -46,7 +46,7 @@ services:
         NEXT_PUBLIC_API_URL: https://api.bonidoc.com
         NEXT_PUBLIC_GA_MEASUREMENT_ID: G-4ZJWP2FWRZ
         NEXT_PUBLIC_POSTHOG_KEY: phc_h3K1bLEqWza5EYj1qs3WO1QWpcTyCownrVXjGAipWnA
-        NEXT_PUBLIC_POSTHOG_HOST: https://app.posthog.com
+        NEXT_PUBLIC_POSTHOG_HOST: https://eu.i.posthog.com
     container_name: bonifatus-frontend
     ports:
       - "3000:3000"

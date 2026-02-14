@@ -15,7 +15,7 @@ export const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CO
 
 // PostHog (Product Analytics with session recordings)
 export const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY || ''
-export const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com'
+export const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com'
 
 // Plausible (Privacy-friendly analytics)
 export const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || 'bonidoc.com'

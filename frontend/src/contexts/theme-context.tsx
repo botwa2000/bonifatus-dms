@@ -37,27 +37,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       // Apply localStorage theme to DOM immediately to prevent flash
       applyTheme(resolvedTheme)
 
-      // Try to sync with backend (only succeeds for logged-in users)
-      // Backend is the source of truth for logged-in users
-      try {
-        const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
-
-        const response = await fetch(url, {
-          credentials: 'include'
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-
-          if (data.value === 'light' || data.value === 'dark') {
-            resolvedTheme = data.value as Theme
-            localStorage.setItem('theme', resolvedTheme)
-            applyTheme(resolvedTheme)
+      // Try to sync with backend (only for logged-in users)
+      // Skip the request entirely if no auth cookie to avoid 401 console noise
+      const hasAuthCookie = document.cookie.split(';').some(c => c.trim().startsWith('access_token='))
+      if (hasAuthCookie) {
+        try {
+          const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
+          const response = await fetch(url, { credentials: 'include' })
+          if (response.ok) {
+            const data = await response.json()
+            if (data.value === 'light' || data.value === 'dark') {
+              resolvedTheme = data.value as Theme
+              localStorage.setItem('theme', resolvedTheme)
+              applyTheme(resolvedTheme)
+            }
           }
+        } catch {
+          // Fetch error → keep localStorage/default theme
         }
-        // 401/403 = not logged in → keep light default
-      } catch {
-        // Fetch error → keep localStorage/default theme
       }
 
       setThemeState(resolvedTheme)
@@ -76,6 +73,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const refreshTheme = async () => {
     logger.debug('[THEME DEBUG] === Refreshing Theme from Backend ===')
+    const hasAuthCookie = typeof document !== 'undefined' && document.cookie.split(';').some(c => c.trim().startsWith('access_token='))
+    if (!hasAuthCookie) return
     try {
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settings/theme`
       const response = await fetch(url, { credentials: 'include' })
