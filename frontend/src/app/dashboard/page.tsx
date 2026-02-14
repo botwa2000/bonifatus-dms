@@ -44,13 +44,14 @@ export default function DashboardPage() {
     loadUser()
   }, [loadUser])
 
-  // Track Google OAuth signup event when redirected with ?welcome=true
+  // Track OAuth signup event when redirected with ?welcome=true (new users only)
   useEffect(() => {
     if (searchParams.get('welcome') === 'true' && user) {
-      const storageKey = 'signup_tracked_google'
-      if (!sessionStorage.getItem(storageKey)) {
+      // Only track if not already tracked (email signup tracks on the signup page)
+      const alreadyTracked = sessionStorage.getItem('signup_tracked_google') || sessionStorage.getItem('signup_tracked_email')
+      if (!alreadyTracked) {
         trackSignup('google')
-        sessionStorage.setItem(storageKey, 'true')
+        sessionStorage.setItem('signup_tracked_google', 'true')
       }
     }
   }, [searchParams, user])

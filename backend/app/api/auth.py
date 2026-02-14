@@ -215,13 +215,15 @@ async def google_oauth_callback_redirect(
                     redirect_url = f"{settings.app.app_frontend_url}/checkout?tier_id={tier_id}{billing_cycle_param}&new_user=true"
                     logger.info(f"User {auth_result['email']} selected paid tier {tier_id}, redirecting to checkout")
             else:
-                # Free tier or no tier selected - redirect to welcome dashboard (or /admin for admins)
+                # Free tier or no tier selected - redirect to dashboard (or /admin for admins)
                 if is_admin_user:
                     redirect_url = f"{settings.app.app_frontend_url}/admin"
                     logger.info(f"Admin user {auth_result['email']} using free tier, redirecting to admin")
                 else:
-                    redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
-                    logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+                    # Only add ?welcome=true for genuinely new users to avoid false conversion tracking
+                    welcome_param = "?welcome=true" if auth_result.get('is_new_user') else ""
+                    redirect_url = f"{settings.app.app_frontend_url}/dashboard{welcome_param}"
+                    logger.info(f"User {auth_result['email']} ({'new' if auth_result.get('is_new_user') else 'returning'}) using free tier, redirecting to dashboard")
         finally:
             db.close()
 
@@ -474,8 +476,10 @@ async def facebook_oauth_callback(
                     redirect_url = f"{settings.app.app_frontend_url}/admin"
                     logger.info(f"Admin user {auth_result['email']} using free tier, redirecting to admin")
                 else:
-                    redirect_url = f"{settings.app.app_frontend_url}/dashboard?welcome=true"
-                    logger.info(f"User {auth_result['email']} using free tier, redirecting to dashboard")
+                    # Only add ?welcome=true for genuinely new users to avoid false conversion tracking
+                    welcome_param = "?welcome=true" if auth_result.get('is_new_user') else ""
+                    redirect_url = f"{settings.app.app_frontend_url}/dashboard{welcome_param}"
+                    logger.info(f"User {auth_result['email']} ({'new' if auth_result.get('is_new_user') else 'returning'}) using free tier, redirecting to dashboard")
         finally:
             db.close()
 

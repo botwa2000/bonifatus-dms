@@ -103,6 +103,8 @@ function SignupContent() {
       if (response.ok && data.success) {
         // Track signup event for Google Ads conversion
         trackSignup('email')
+        // Mark that signup was already tracked (prevents duplicate tracking on dashboard)
+        sessionStorage.setItem('signup_tracked_email', 'true')
 
         // Store tier selection for after email verification
         if (tierId) {

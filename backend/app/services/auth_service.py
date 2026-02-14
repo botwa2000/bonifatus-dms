@@ -573,10 +573,11 @@ class AuthService:
                         "tier": user.tier.name if user.tier else "free",
                         "tier_id": user.tier_id,
                         "is_active": user.is_active,
+                        "is_new_user": is_new_user,
                         "session_id": session_info['session_id'],
                         "expires_in": self.access_token_expire_minutes * 60
                     }
-                    
+
                 finally:
                     db.close()
                     
@@ -763,6 +764,7 @@ class AuthService:
                         "tier": user.tier.name if user.tier else "free",
                         "tier_id": user.tier_id,
                         "is_active": user.is_active,
+                        "is_new_user": is_new_user,
                         "session_id": session_info['session_id'],
                         "expires_in": self.access_token_expire_minutes * 60
                     }
