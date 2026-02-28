@@ -82,12 +82,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Download spaCy NER models for organization/person/location extraction
-# These models enable entity extraction in multiple languages
+# Download ALL spaCy NER models at build time to avoid runtime downloads
+# Must match the spacy_model_mapping in the database (see migration 053)
+# Languages: de, en, fr, ru (original) + es, pt, it, tr/xx (migration 053)
 RUN python -m spacy download de_core_news_md \
     && python -m spacy download en_core_web_md \
     && python -m spacy download fr_core_news_md \
-    && python -m spacy download ru_core_news_md
+    && python -m spacy download ru_core_news_md \
+    && python -m spacy download es_core_news_md \
+    && python -m spacy download pt_core_news_md \
+    && python -m spacy download it_core_news_md \
+    && python -m spacy download xx_ent_wiki_sm
 
 # Copy application code
 COPY app/ ./app/
